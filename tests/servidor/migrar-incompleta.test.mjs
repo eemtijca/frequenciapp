@@ -111,6 +111,21 @@ function semAplicacao(resultado) {
   );
 }
 
+// Toda mensagem de bloqueio precisa apontar o roteiro e não sugerir remoção
+// de dados, volume, schema ou histórico de migrações.
+function mensagemSegura(resultado) {
+  assert.match(
+    resultado.stderr,
+    /docs\/auto-hospedagem\.md#migração-incompleta-ou-checksum-divergente/,
+    "a mensagem precisa apontar o roteiro de recuperação",
+  );
+  assert.doesNotMatch(
+    resultado.stderr,
+    /migrate reset|down -v|recrie o banco|drop database|rm -rf|apague|delete|destrua/i,
+    "a mensagem não pode recomendar destruição",
+  );
+}
+
 test("registro concluído existente e checksum correto são aceitos sem reaplicar", async () => {
   const resultado = await executar([registro()]);
   assert.equal(resultado.status, 0, resultado.stderr);
@@ -123,7 +138,7 @@ test("registro sem conclusão nem rollback bloqueia a migração sem alteração
   assert.notEqual(resultado.status, 0, `registro incompleto foi aceito: ${resultado.stdout}`);
   assert.match(resultado.stderr, /incompleta|não concluída/i);
   assert.match(resultado.stderr, new RegExp(nome));
-  assert.doesNotMatch(resultado.stderr, /migrate reset|down -v|recrie o banco/i);
+  mensagemSegura(resultado);
   semAplicacao(resultado);
 });
 
@@ -132,6 +147,7 @@ test("registro incompleto desconhecido também bloqueia antes de novas migraçõ
   const resultado = await executar([registro({ migration_name: desconhecida, finished_at: null })]);
   assert.notEqual(resultado.status, 0, `registro incompleto foi aceito: ${resultado.stdout}`);
   assert.match(resultado.stderr, new RegExp(desconhecida));
+  mensagemSegura(resultado);
   semAplicacao(resultado);
 });
 
@@ -139,6 +155,7 @@ test("registro incompleto não é ocultado por outro concluído com mesmo nome",
   const resultado = await executar([registro({ finished_at: null }), registro()]);
   assert.notEqual(resultado.status, 0, `registro incompleto foi aceito: ${resultado.stdout}`);
   assert.match(resultado.stderr, new RegExp(nome));
+  mensagemSegura(resultado);
   semAplicacao(resultado);
 });
 
@@ -147,6 +164,7 @@ test("checksum divergente de registro concluído continua bloqueando", async () 
   assert.equal(resultado.status, 4, resultado.stderr);
   assert.match(resultado.stderr, /conteúdo alterado/);
   assert.match(resultado.stderr, new RegExp(nome));
+  mensagemSegura(resultado);
   semAplicacao(resultado);
 });
 
