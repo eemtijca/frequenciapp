@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A inicialização auto-hospedada valida `app.env` e `ops.env` antes de qualquer `source`, recusando substituição de comando, crase, ponto e vírgula, CR, NUL, continuação de linha e valor sem aspas com espaços. A mensagem aponta arquivo e linha sem repetir o valor. A inicialização recusa registros de migração não revertidos com `finished_at` nulo e tem roteiro para migração incompleta e checksum divergente, sem apagar dados. Os horários do exemplo são normalizados em LF e passam a ser valores válidos em um arquivo carregado pelo shell. Os contextos de build excluem certificados, chaves SSH, keystores e arquivos sensíveis comuns. O migrador é exercitado contra PostgreSQL 17 real, inclusive nos bloqueios de migração incompleta e checksum divergente.
+
 - A simulação da atualização deixa de buscar referências e não altera refs ou tags; usa as refs locais e orienta a buscar manualmente para considerar o remoto.
 
 - As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.

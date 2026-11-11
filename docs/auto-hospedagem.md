@@ -216,7 +216,7 @@ Para TLS interno, não usar Certbot. Colocar `fullchain.pem` e `privkey.pem` em:
 infra/servidor/nginx/certificados/live/frequenciapp/
 ```
 
-O diretório é ignorado pelo Git. O Nginx escolhe HTTPS quando os dois arquivos existem. A renovação do certificado interno é responsabilidade da CA da escola.
+O diretório padrão é ignorado pelo Git e pelos contextos de build. Para outro `CERTBOT_CERTS_DIR`, prefira um diretório absoluto fora do checkout e dos contextos de build; as regras de exclusão cobrem nomes e extensões comuns, não todos os possíveis segredos. O Nginx escolhe HTTPS quando os dois arquivos existem. A renovação do certificado interno é responsabilidade da CA da escola.
 
 ## Escolher entre Caddy e Nginx
 
@@ -359,12 +359,14 @@ O instalador grava:
 Horários configuráveis:
 
 ```text
-AGENDA_HORARIO=*/5 * * * *
-BACKUP_HORARIO=30 2 * * *
-BACKUP_PLANILHAS_HORARIO=0 3 * * *
-ATUALIZAR_HORARIO=30 4 * * *
-CERTBOT_RENOVAR_HORARIO=15 2 * * *
+AGENDA_HORARIO='*/5 * * * *'
+BACKUP_HORARIO='30 2 * * *'
+BACKUP_PLANILHAS_HORARIO='0 3 * * *'
+ATUALIZAR_HORARIO='30 4 * * *'
+CERTBOT_RENOVAR_HORARIO='15 2 * * *'
 ```
+
+No arquivo `ops.env`, mantenha as aspas nos valores com espaços. Corrija os horários sem aspas em instalações existentes antes de carregar as rotinas.
 
 O cron agenda no fuso do daemon. O fuso da aplicação continua em `TZ_APP`.
 
@@ -425,6 +427,92 @@ O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database
 - Confirmar que o volume `pgdata` existe.
 - Confirmar que a aplicação está na rede `interna`.
 - Conferir `scripts/servidor/compose.sh logs db`.
+
+### Migração incompleta ou checksum divergente
+
+O migrador encerra com código 4 e não aplica migrações novas quando encontra um registro sem `finished_at` e sem `rolled_back_at` em `_prisma_migrations` ou quando o checksum de uma migração já aplicada difere do arquivo em `prisma/migrations`. A aplicação não inicia. O banco e os dados devem ser preservados; a recuperação começa pela leitura do histórico, não pela remoção de tabelas, do schema ou do volume.
+
+1. Ler os logs do contêiner da aplicação e localizar a mensagem `[migrar]`:
+
+   ```bash
+   scripts/servidor/compose.sh logs --tail 200 app
+   ```
+
+2. Conferir o estado das migrações com `prisma migrate status`. A partir do checkout, em uma estação com Node e pnpm instalados e `DIRECT_URL` apontando para a conexão de sessão:
+
+   ```bash
+   DIRECT_URL='postgresql://usuario:senha@host:5432/frequencia' pnpm exec prisma migrate status
+   ```
+
+   No servidor, o mesmo comando roda em um contêiner descartável da imagem da aplicação, com o `prisma.config.ts` do checkout montado:
+
+   ```bash
+   scripts/servidor/compose.sh run --rm --no-deps \
+     -v "${APP_DIR:-/opt/frequenciapp}/prisma.config.ts:/app/prisma.config.ts:ro" \
+     --entrypoint ./node_modules/.bin/prisma app migrate status
+   ```
+
+3. Inspecionar `_prisma_migrations` no schema configurado. A consulta é somente leitura:
+
+   ```bash
+   scripts/servidor/compose.sh exec db psql \
+     -U "${POSTGRES_USER:-frequencia}" -d "${POSTGRES_DB:-frequencia}" \
+     -c "select migration_name, started_at, finished_at, rolled_back_at, applied_steps_count, logs from \"${DATABASE_SCHEMA:-public}\"._prisma_migrations order by started_at;"
+   ```
+
+Um registro com `finished_at` nulo e `rolled_back_at` nulo é o caso de migração incompleta. A coluna `logs` traz o erro registrado pelo Prisma CLI, quando existir. A mensagem `[migrar]` também informa o nome da migração bloqueada.
+
+#### Recuperar uma migração incompleta
+
+A decisão depende do que a migração já alterou no banco. `prisma migrate resolve --rolled-back` apenas registra que a migração deve ser reaplicada; ele não desfaz SQL executado. Antes de usá-lo, conferir cada objeto criado ou alterado pela migração e confirmar que não restou efeito parcial. Se houver efeito parcial que não possa ser desfeito com segurança, restaurar o backup anterior.
+
+Para marcar a migração como revertida depois da revisão:
+
+```bash
+scripts/servidor/compose.sh run --rm --no-deps \
+  -v "${APP_DIR:-/opt/frequenciapp}/prisma.config.ts:/app/prisma.config.ts:ro" \
+  --entrypoint ./node_modules/.bin/prisma app migrate resolve --rolled-back 20260101000000_exemplo
+```
+
+Depois, subir a aplicação para o migrador reaplicar a migração:
+
+```bash
+scripts/servidor/compose.sh up -d app
+scripts/servidor/compose.sh logs --tail 100 app
+```
+
+Baixar a cópia remota com rclone antes de restaurar, quando o arquivo não estiver no servidor:
+
+```bash
+scripts/servidor/restaurar.sh --arquivo /caminho/backup.dump.age --confirmar
+```
+
+A restauração segue o roteiro de [backup-servidor.md](backup-servidor.md):
+
+- valida o checksum, quando o arquivo `.sha256` existe;
+- confere o histórico de migrações;
+- para a aplicação;
+- troca o banco mantendo uma cópia do anterior.
+
+Um dump anterior ao checkout pode receber as migrações pendentes na subida. Se a restauração recusar o histórico por divergência, a decisão precisa ser administrativa e registrada; `RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES=true` não substitui a conferência.
+
+#### Corrigir checksum divergente
+
+O checksum divergente indica que o arquivo `prisma/migrations/<nome>/migration.sql` não é o mesmo que foi aplicado. A migração já está registrada no banco e não deve ser reaplicada nem apagada. As opções, em ordem de preferência:
+
+1. Restaurar o arquivo original a partir do commit ou da tag implantada:
+
+   ```bash
+   git show <commit>:prisma/migrations/<nome>/migration.sql > prisma/migrations/<nome>/migration.sql
+   ```
+
+   Conferir `git diff` e subir a aplicação. O checksum volta a coincidir sem alterar dados. A alteração local resolve a subida imediata, mas deixa a árvore Git suja, o que bloqueia a próxima atualização; a correção definitiva precisa entrar em um commit ou release.
+
+2. Se a alteração do arquivo for intencional, criar uma migração nova com a diferença e manter o arquivo já aplicado intacto. Migração aplicada nunca é editada.
+
+3. Se o banco recebeu um dump de outra origem ou o histórico não corresponde ao checkout, restaurar um backup compatível com o código implantado.
+
+Não editar o checksum em `_prisma_migrations`, não remover linhas do histórico e não apagar tabelas, o schema ou o volume para contornar a divergência. O comando `prisma migrate reset` nunca deve ser executado em produção: ele apaga o schema e os dados. Quando a recuperação não puder ser feita sem perda, abrir uma decisão administrativa com a coordenação, registrar o backup usado e seguir o roteiro de restauração.
 
 ### Back-up falhou
 

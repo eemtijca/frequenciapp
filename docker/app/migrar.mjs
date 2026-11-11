@@ -8,6 +8,8 @@ import pg from "pg";
 import { resolverSchema, selecionarSchema } from "../../src/infra/schema-postgres.mjs";
 
 const TIMEOUT_CONEXAO_MS = 5000;
+// Roteiro de recuperação citado nas mensagens de bloqueio.
+const RECUPERACAO = "docs/auto-hospedagem.md#migração-incompleta-ou-checksum-divergente";
 
 // Trava própria do migrador: dois contêineres subindo ao mesmo tempo
 // serializam as migrações em vez de tentar aplicar a mesma em paralelo.
@@ -116,13 +118,21 @@ async function main() {
      )`,
   );
 
-  const aplicadas = new Map(
-    (
-      await cliente.query(
-        "select migration_name, checksum from _prisma_migrations where rolled_back_at is null",
-      )
-    ).rows.map((linha) => [linha.migration_name, linha.checksum]),
-  );
+  const registros = (
+    await cliente.query(
+      "select migration_name, checksum, finished_at from _prisma_migrations where rolled_back_at is null",
+    )
+  ).rows;
+  const incompleta = registros.find((linha) => linha.finished_at == null);
+  if (incompleta) {
+    console.error(
+      `[migrar] A migração ${incompleta.migration_name} está incompleta e não foi revertida. ` +
+        "A aplicação de migrações foi interrompida antes de aplicar novas migrações. " +
+        `Preserve o banco e consulte o roteiro de recuperação em ${RECUPERACAO}.`,
+    );
+    process.exit(4);
+  }
+  const aplicadas = new Map(registros.map((linha) => [linha.migration_name, linha.checksum]));
 
   const pastas = await listar();
   if (pastas.length === 0) {
@@ -131,7 +141,7 @@ async function main() {
   }
 
   // Migração já aplicada não pode mudar de conteúdo: o banco e o repositório
-  // precisam contar a mesma história. Recrie o ambiente para seguir.
+  // precisam contar a mesma história. A recuperação segue o roteiro da documentação.
   for (const nome of pastas) {
     if (!aplicadas.has(nome)) continue;
     const sql = await readFile(path.join(pasta, nome, "migration.sql"), "utf8");
@@ -139,7 +149,8 @@ async function main() {
     if (aplicadas.get(nome) !== checksum) {
       console.error(
         `[migrar] A migração ${nome} já aplicada teve o conteúdo alterado. ` +
-          "Recrie o banco (migrate reset ou docker compose down -v) antes de continuar.",
+          "A aplicação de migrações foi interrompida antes de aplicar novas migrações. " +
+          `Preserve o banco e consulte o roteiro de recuperação em ${RECUPERACAO}.`,
       );
       process.exit(4);
     }
