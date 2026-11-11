@@ -82,6 +82,14 @@ jobs:
           docker compose -f compose.yml -f compose.ci.yml logs app
           exit 1
 
+      - name: Testar o migrador real em banco descartável
+        # Cria e derruba bancos migracao_qa_* no PostgreSQL do Compose, sem
+        # tocar no banco da aplicação.
+        env:
+          MIGRADOR_BANCO_DESCARTAVEL: "true"
+          DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+        run: node --test tests/servidor/migrar-real.test.mjs
+
       - name: Validar scripts administrativos no contêiner
         run: |
           # Exercita o dotenv e o driver pg dentro da imagem, além do

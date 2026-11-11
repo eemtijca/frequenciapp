@@ -95,6 +95,18 @@ A suíte usa os dias 2026-06-15 a 2026-06-19 como dias isolados de teste, cria e
 
 Os testes de planilha criam um servidor HTTP local que responde nos formatos OAuth e Sheets API, com dados sintéticos. O módulo de transporte acima aceita apenas tokens de teste e endereço HTTP em `127.0.0.1`. Não carregar esse módulo em produção. O Compose de CI monta o módulo somente no serviço de testes. O `AUTH_SECRET` usado para cifrar a conexão sintética precisa ser o mesmo do aplicativo; o script do Playwright repassa esse segredo ao contêiner.
 
+## Migrador com PostgreSQL 17 real
+
+`tests/servidor/migrar-real.test.mjs` cria bancos `migracao_qa_<aleatorio>` no PostgreSQL do job Testes, monta `_prisma_migrations` com registros sintéticos e executa `docker/app/migrar.mjs` com `DIRECT_URL` apontando para o banco descartável. O ensaio cobre registro incompleto, checksum divergente e registro revertido, e derruba cada banco no `finally`. A role da conexão precisa poder criar bancos.
+
+```bash
+MIGRADOR_BANCO_DESCARTAVEL=true \
+DIRECT_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
+node --test tests/servidor/migrar-real.test.mjs
+```
+
+A guarda exige `MIGRADOR_BANCO_DESCARTAVEL=true` e host `localhost`, `127.0.0.1`, `::1` ou `db`. O ensaio não toca no banco do aplicativo.
+
 ## Ponta a ponta com Playwright
 
 Rode a suíte na imagem oficial da Microsoft, sem instalar navegadores no host. O aplicativo precisa estar no ar antes (`docker compose up -d` ou `pnpm run dev`):
