@@ -121,13 +121,15 @@ O `aplicar` executa o plano com trava exclusiva e estado durável. A ordem das e
 
 O `aplicar` interrompe na etapa exata da falha, preserva estado e recursos e não faz limpeza destrutiva. Depois de uma migração aplicada, ele não inicia automaticamente a imagem anterior. A recuperação usa o backup e `restaurar.sh`.
 
+No perfil `simples`, as etapas de Dropbox, controlador e agendador não são executadas; elas pertencem aos perfis opt-in e às tarefas seguintes do instalador. O primeiro backup usa a cifra configurada e exige a chave pública em `BACKUP_GPG_CHAVE_PUBLICA` ou o arquivo de destinatários age. O fingerprint de `--destinatario-gpg` também é usado como pin; quando a chave de cifra for uma subchave, definir `BACKUP_GPG_FINGERPRINT` com o fingerprint da chave primária. Nesta versão, o `aplicar` do perfil simples aceita apenas `--modo-backup compose`; o modo URL fica para a evolução do instalador.
+
 Ações destrutivas exigem `--sim`. Com `--nao-interativo` e sem `--sim`, a execução falha com `E_USO` antes de qualquer alteração. O `--forcar` repete a etapa selecionada, mas não ignora estado incerto, política de canal, downgrade nem hash do controlador.
 
 As flags de teste têm efeito restrito:
 
 - `--nao-iniciar` instala e valida a configuração sem subir a pilha;
 - `--pular-saude` não espera o health check e registra aviso;
-- `--modo-teste` usa caminhos e nomes de projeto de teste, e é recusado em instalação real;
+- `--modo-teste` usa caminhos e nomes de projeto de teste, exige `INSTALADOR_RAIZ` apontando para um diretório sintético e é recusado em instalação real;
 - `--autoteste` valida CLI, detecção, schema e estado sem alterar o host.
 
 ### situacao
@@ -665,9 +667,11 @@ sudo ./instalar.sh planejar \
   --tag v1.0.0 \
   --dominio frequencia.exemplo.br \
   --email-acme administracao@escola.exemplo.br \
+  --email-admin direcao@escola.exemplo.br \
   --proxy caddy \
   --tls acme \
   --arquivo-senha-admin /root/senha-admin \
+  --destinatario-gpg 0123456789ABCDEF0123456789ABCDEF01234567 \
   --salvar-config /root/instalador.json \
   --json
 ```
@@ -713,11 +717,13 @@ sudo ./instalar.sh planejar \
   --tag v1.0.0 \
   --dominio frequencia.exemplo.br \
   --email-acme administracao@escola.exemplo.br \
+  --email-admin direcao@escola.exemplo.br \
   --proxy caddy \
   --tls acme \
   --agendador systemd \
   --firewall sim \
   --arquivo-senha-admin /root/senha-admin \
+  --destinatario-gpg 0123456789ABCDEF0123456789ABCDEF01234567 \
   --salvar-config /root/instalador.json \
   --json
 sudo ./instalar.sh aplicar \

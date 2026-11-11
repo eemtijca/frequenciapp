@@ -15,12 +15,20 @@ import {
   erroUso,
   erroValidacao,
 } from "./json.mjs";
-import { caminhoTrava, gravarArquivoComTrava, lerEstado } from "./estado.mjs";
+import {
+  caminhoTrava,
+  gravarArquivoAtomico,
+  gravarArquivoComTrava,
+  gravarEstado,
+  lerEstado,
+} from "./estado.mjs";
+import { executarAplicacao, ORDEM_ETAPAS } from "./executor.mjs";
 import {
   DOCUMENTACAO,
   VERSAO_INSTALADOR,
   agoraPadrao,
   deduplicarAvisos,
+  lerDisco,
   montarDiagnostico,
   montarDocumento,
   montarPlano,
@@ -176,6 +184,7 @@ const VALORES_ACEITOS = new Map([
   ["--criptografia", ["gpg", "age"]],
   ["--firewall", ["auto", "sim", "nao"]],
   ["--canal-atualizacao", ["release", "main"]],
+  ["--desde-etapa", ORDEM_ETAPAS],
 ]);
 
 const PADROES = {
@@ -277,10 +286,16 @@ const COMANDOS_CONHECIDOS = new Set([
   "esquema",
 ]);
 
-const COMANDOS_DISPONIVEIS = new Set(["planejar", "versao", "esquema", "situacao", "diagnosticar"]);
+const COMANDOS_DISPONIVEIS = new Set([
+  "planejar",
+  "aplicar",
+  "versao",
+  "esquema",
+  "situacao",
+  "diagnosticar",
+]);
 
 const COMANDOS_RECUSADOS = new Set([
-  "aplicar",
   "atualizar",
   "backup",
   "restaurar",
@@ -720,6 +735,38 @@ function processarPlanejar(opcoes, io, deps) {
   return emitir(documento, opcoes, io);
 }
 
+function processarAplicar(opcoes, io, deps) {
+  if (opcoes.operandos.length > 1) {
+    throw erroUso("O comando aplicar não aceita argumentos posicionais.", {
+      dica: "Use apenas as opções documentadas.",
+      documentacao: `${DOCUMENTACAO}#aplicar`,
+    });
+  }
+  recusarSalvarConfig(opcoes);
+  const avisosConfig = carregarConfig(opcoes);
+  const raiz =
+    deps.raiz && deps.raiz !== "/"
+      ? deps.raiz
+      : opcoes.booleanas.has("--modo-teste") && process.env.INSTALADOR_RAIZ
+        ? path.resolve(process.env.INSTALADOR_RAIZ)
+        : (deps.raiz ?? "/");
+  const deteccao = deps.detectar({
+    raiz,
+    executar: deps.executar,
+    comandoExiste: deps.comandoExiste,
+  });
+  const estadoResultado = lerEstadoSeguro({ ...deps, raiz });
+  const { valores } = resolverConfiguracao(opcoes, estadoResultado);
+  const { auditoria } = auditarSeguro(deps, deteccao);
+  const documento = executarAplicacao(
+    opcoes,
+    { ...deps, raiz },
+    { raiz, configuracao: valores, deteccao, auditoria, estadoResultado },
+  );
+  documento.avisos = deduplicarAvisos([...avisosConfig, ...documento.avisos]);
+  return emitir(documento, opcoes, io);
+}
+
 function recusarSalvarConfig(opcoes) {
   if (opcoes.valores.has("--salvar-config")) {
     throw erroUso("A opção --salvar-config só se aplica ao comando planejar.", {
@@ -1008,12 +1055,62 @@ function formatarLeituraHumana(documentoFinal, titulo) {
   return `${linhas.join("\n")}\n`;
 }
 
+function formatarAplicacaoHumana(documentoFinal) {
+  const linhas = [];
+  linhas.push("FrequenciApp - aplicação");
+  linhas.push("");
+  linhas.push(`Comando: ${documentoFinal.comando}`);
+  linhas.push(`Perfil: ${documentoFinal.perfil}  Canal: ${documentoFinal.canal}`);
+  linhas.push(`Distribuição: ${documentoFinal.distro}  Tier: ${documentoFinal.tier}`);
+  if (documentoFinal.tag) linhas.push(`Tag: ${documentoFinal.tag}`);
+  if (documentoFinal.commit) linhas.push(`Commit: ${documentoFinal.commit}`);
+  linhas.push("");
+  linhas.push("Etapas:");
+  for (const etapa of documentoFinal.etapas) {
+    const rotulo = etapa.estado;
+    linhas.push(`- ${etapa.id}: ${rotulo}${etapa.codigo ? ` (${etapa.codigo})` : ""}`);
+    for (const item of etapa.acoes) {
+      linhas.push(`  ${item.altera ? "altera" : "confere"}: ${item.descricao}`);
+    }
+    for (const aviso of etapa.avisos) {
+      linhas.push(`  aviso: ${aviso.mensagem}`);
+    }
+  }
+  if (documentoFinal.avisos.length) {
+    linhas.push("");
+    linhas.push("Avisos:");
+    for (const item of documentoFinal.avisos) {
+      linhas.push(`- ${item.codigo ? `${item.codigo}: ` : ""}${item.mensagem}`);
+    }
+  }
+  if (documentoFinal.erros.length) {
+    linhas.push("");
+    linhas.push("Erros:");
+    for (const item of documentoFinal.erros) {
+      linhas.push(`- ${item.codigo}: ${item.mensagem}`);
+      if (item.dica) linhas.push(`  Dica: ${item.dica}`);
+      if (item.comando) linhas.push(`  Comando: ${item.comando}`);
+    }
+  }
+  if (documentoFinal.proximos.length) {
+    linhas.push("");
+    linhas.push("Próximos passos:");
+    for (const item of documentoFinal.proximos) linhas.push(`- ${item}`);
+  }
+  linhas.push("");
+  linhas.push(`Resultado: ${documentoFinal.ok ? "ok" : documentoFinal.codigo}`);
+  return `${linhas.join("\n")}\n`;
+}
+
 function formatarHumano(documentoFinal) {
   if (documentoFinal.comando === "situacao") {
     return formatarLeituraHumana(documentoFinal, "situação");
   }
   if (documentoFinal.comando === "diagnosticar") {
     return formatarLeituraHumana(documentoFinal, "diagnóstico");
+  }
+  if (documentoFinal.comando === "aplicar") {
+    return formatarAplicacaoHumana(documentoFinal);
   }
   return formatarPlanoHumano(documentoFinal);
 }
@@ -1118,8 +1215,11 @@ function determinarComando(opcoes) {
   if (opcoes.booleanas.has("--aplicar")) return "aplicar";
   const primeiro = opcoes.operandos[0];
   if (!primeiro) {
+    if (opcoes.booleanas.has("--autoteste")) return "aplicar";
     if (opcoes.booleanas.has("--simular")) return "planejar";
-    throw erroUso("Comando ausente. Use planejar, situacao, diagnosticar, versao ou esquema.");
+    throw erroUso(
+      "Comando ausente. Use planejar, aplicar, situacao, diagnosticar, versao ou esquema.",
+    );
   }
   if (primeiro === "canal") {
     const subcomando = opcoes.operandos[1];
@@ -1160,7 +1260,6 @@ function comandoParaErro(argv) {
 
 function processarRecusa(comando) {
   const mensagens = {
-    aplicar: "O comando aplicar ainda não está disponível nesta versão.",
     atualizar: "O comando atualizar ainda não está disponível nesta versão.",
     backup: "O comando backup ainda não está disponível nesta versão.",
     restaurar: "O comando restaurar ainda não está disponível nesta versão.",
@@ -1183,6 +1282,7 @@ function textoAjuda() {
     "",
     "Comandos:",
     "  planejar      Lê o host e mostra o plano, sem alterar o sistema",
+    "  aplicar       Executa o plano com trava, estado e retomada",
     "  situacao      Mostra containers, saúde, versão, backup, timers e disco",
     "  diagnosticar  Verifica dependências, portas, DNS, TLS, banco e backup",
     "  versao        Mostra a versão do instalador, do projeto e a detecção básica",
@@ -1193,11 +1293,19 @@ function textoAjuda() {
     "  --versao, --version                 Mostra a versão",
     "  --json                              Emite um único documento JSON no stdout",
     "  --nao-interativo, --non-interactive Não faz perguntas",
+    "  --sim, --yes                        Confirma ações destrutivas",
+    "  --retomar                           Continua da primeira etapa não concluída",
+    "  --desde-etapa <etapa>               Recomeça na etapa indicada",
+    "  --forcar                            Repete a etapa selecionada",
+    "  --forcar-pacotes                    Reinstala pacotes explicitamente",
+    "  --nao-iniciar                       Valida a configuração sem subir a pilha",
+    "  --pular-saude                       Não espera o health check",
+    "  --modo-teste                        Usa caminhos sintéticos de teste",
+    "  --autoteste                         Valida CLI, schema, detecção e estado",
     "  --config <arquivo>                  Lê a configuração JSON",
     "  --salvar-config [arquivo]           Grava a configuração efetiva com modo 600",
     "  --relatorio, --report <arquivo>     Grava o relatório com modo 600",
     "  --arquivo-log <arquivo>             Grava o log com modo 600",
-    "  --forcar                            Confirma a sobrescrita da configuração",
     "  --permitir-instavel                 Confirma o uso do canal main",
     "  --simular, --dry-run                Não altera o host",
     "  --perfil, --profile <nome>          Perfil de instalação (padrão: simples)",
@@ -1205,6 +1313,8 @@ function textoAjuda() {
     "",
     "Exemplos:",
     "  ./instalar.sh planejar --json --nao-interativo",
+    "  sudo ./instalar.sh aplicar --sim --json",
+    "  sudo ./instalar.sh aplicar --retomar --sim",
     "  ./instalar.sh situacao --json",
     "  ./instalar.sh diagnosticar --json",
     "  ./instalar.sh versao --json",
@@ -1276,12 +1386,21 @@ export function principal(
     detectarBasico,
     auditarPacotes,
     lerEstado,
+    gravarEstado,
+    gravarArquivoAtomico,
     gravarConfig: gravarArquivoComTrava,
     caminhoTrava: () => caminhoTrava(),
     agora: agoraPadrao,
     executar: executarPadrao,
     comandoExiste: null,
-    raiz: "/",
+    raiz: process.env.INSTALADOR_RAIZ || "/",
+    uid: () => (typeof process.getuid === "function" ? process.getuid() : 0),
+    usuarioServico: process.env.SERVIDOR_USUARIO || undefined,
+    raizRepositorio: undefined,
+    esperar: undefined,
+    lerDisco,
+    memoriaTotal: undefined,
+    adquirirTrava: undefined,
     ...dependencias,
   };
   deps.executar = deps.executar ?? executarPadrao;
@@ -1302,6 +1421,7 @@ export function principal(
     const comando = determinarComando(opcoes);
     if (COMANDOS_RECUSADOS.has(comando)) processarRecusa(comando);
     if (comando === "planejar") return processarPlanejar(opcoes, io, deps);
+    if (comando === "aplicar") return processarAplicar(opcoes, io, deps);
     if (comando === "versao") return processarVersao(opcoes, io, deps);
     if (comando === "esquema") return processarEsquema(opcoes, io);
     if (comando === "situacao") return processarSituacao(opcoes, io, deps);

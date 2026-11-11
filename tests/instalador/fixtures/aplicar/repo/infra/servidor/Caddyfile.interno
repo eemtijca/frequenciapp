@@ -1,0 +1,5 @@
+# Fixture do Caddyfile interno.
+{$DOMINIO} {
+	tls internal
+	reverse_proxy app:3000
+}
