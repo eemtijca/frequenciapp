@@ -17,6 +17,7 @@ A auto-hospedagem já tem portão próprio: `scripts/servidor/atualizar.sh` exec
 - O `implantacao.yml` é o único caminho de produção da Vercel e roda em cada push na `main`, além de tags estáveis.
 - A Vercel não usa `IMPLANTACAO_ATESTADO` nem exige backup e recuperação manuais. A sequência valida, constrói, migra, publica sem domínio, promove e confere a saúde por SHA.
 - O auto-deploy nativo da `main` fica desligado em `vercel.json` com `git.deploymentEnabled.main=false` e também no painel da Vercel. Previews de outros branches continuam.
+- O build da Vercel recebe valores descartáveis para as variáveis de runtime, porque o `vercel pull` não devolve os segredos do projeto. A Vercel injeta os valores reais na execução e nenhum segredo é copiado para o runner.
 - A auto-hospedagem mantém o backup obrigatório, a confirmação de migração e o rollback verificado em `scripts/servidor/atualizar.sh`. O Kubernetes mantém o hook `backup-gate`.
 - O atestado de backup e recuperação não é transferido para a Vercel. A recuperação da Vercel depende do backup e da restauração da plataforma.
 - O `migracoes.yml` continua como entrada manual que delega a sequência inteira, sem um segundo caminho de migração.

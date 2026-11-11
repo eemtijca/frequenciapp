@@ -1,8 +1,24 @@
 // Um proprietário por destino: validar e construir antes de migrar, publicar e promover.
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { validarPublicacao } from "./validar-publicacao.mjs";
+
+// O build da Vercel não recebe os segredos do projeto; valores descartáveis
+// permitem validar o ambiente sem gravar credenciais reais no runner.
+const AMBIENTE_DE_BUILD = [
+  "DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia",
+  "DIRECT_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia",
+  "AUTH_SECRET=segredo-dummy-de-32-bytes-para-build-0000",
+  "TZ_APP=America/Fortaleza",
+  "",
+].join("\n");
+
+export function prepararAmbienteDeBuild(diretorio = ".vercel") {
+  mkdirSync(diretorio, { recursive: true });
+  writeFileSync(path.join(diretorio, ".env.production.local"), AMBIENTE_DE_BUILD, "utf8");
+}
 
 const filas = new Map();
 export function selecionarEvento({ evento, ref }) {
@@ -77,6 +93,7 @@ export function executorVercel(ambiente, { comando = execFileSync, buscar = fetc
       }
       case "build":
         vercel(["pull", "--yes", "--environment=production"]);
+        prepararAmbienteDeBuild();
         vercel(["build", "--prod"]);
         break;
       case "migrar":
