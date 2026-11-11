@@ -839,7 +839,7 @@ O instalador não configura a Vercel nem o GitHub sozinho. Ele pode mostrar os c
 
 ## Testes em Docker
 
-Nenhum teste do instalador roda no Windows, no WSL ou diretamente no host. A matriz usa Docker, worktree em LF e imagens oficiais. As evidências registram imagem, comando, código de saída e caminho do log.
+Nenhum teste do instalador roda no Windows, no WSL ou diretamente no host. A matriz usa Docker, worktree em LF e imagens oficiais. As evidências registram imagem, comando, código de saída e caminho do log. O executor `scripts/dev/executar-container.sh` concentra as chamadas: `instalador-plano` percorre a matriz de `planejar` e `instalador-aplicar` usa o contêiner systemd descartável.
 
 ### Matriz de plano
 

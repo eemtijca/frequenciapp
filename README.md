@@ -7,7 +7,7 @@
 
 Aplicativo da coordenação escolar: chamada única diária, saídas antecipadas e indicadores da escola. Mobile-first, sem ruído e com o menor número de toques possível entre abrir o app e ter a chamada salva.
 
-Aplicação publicada em https://frequenciappjca.vercel.app.
+Demonstração pública em https://frequenciappjca.vercel.app.
 
 O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começam presentes, toque apenas nos alunos que faltaram, escolha a justificativa quando houver e salve. O Painel mostra a infrequência do dia por série e por turma, a área Saídas e entradas registra quem saiu ou chegou mais tarde com justificativa e quem liberou, e os Relatórios reúnem histórico, grade por período e o resumo por aluno.
 
@@ -23,7 +23,9 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 - [Configuração](#configuração)
 - [Arquitetura](#arquitetura)
 - [Testes e qualidade](#testes-e-qualidade)
-- [Deploy](#deploy)
+- [Formas de implantação](#formas-de-implantação)
+- [Para agentes de IA](#para-agentes-de-ia)
+- [Segurança da implantação](#segurança-da-implantação)
 - [Privacidade](#privacidade)
 - [Segurança](#segurança)
 - [Roadmap](#roadmap)
@@ -39,7 +41,7 @@ O fluxo segue a prática da coordenação: escolha a turma e o dia, todos começ
 
 ## Demonstração
 
-A aplicação publicada fica em https://frequenciappjca.vercel.app. Para experimentar localmente com dados sintéticos, siga a seção [Começando](#começando): o Compose cria o administrador e a semente gera séries, turmas, alunos e alguns dias de chamadas e saídas.
+A demonstração pública fica em https://frequenciappjca.vercel.app. Para experimentar localmente com dados sintéticos, siga a seção [Começando](#começando): o Compose cria o administrador e a semente gera séries, turmas, alunos e alguns dias de chamadas e saídas.
 
 <p align="center">
   <a href="docs/imagens/painel-desktop-claro.png">
@@ -177,13 +179,191 @@ As camadas, o fluxo de requisição e as decisões registradas estão em [docs/a
 
 A convenção das suítes está em [docs/testes.md](docs/testes.md) e [tests/README.md](tests/README.md).
 
-## Deploy
+## Formas de implantação
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Feemtijca%2Ffrequenciapp&project-name=frequenciapp&repository-name=frequenciapp&env=DATABASE_URL,DIRECT_URL,AUTH_SECRET,TZ_APP,ADMIN_EMAIL,ADMIN_SENHA,ADMIN_NOME&envDescription=Vari%C3%A1veis%20do%20FrequenciApp%3A%20banco%2C%20segredo%20de%20sess%C3%A3o%2C%20fuso%20e%20administrador%20inicial&envLink=https%3A%2F%2Fgithub.com%2Feemtijca%2Ffrequenciapp%2Fblob%2Fmain%2Fdocs%2Fambiente.md)
+O VPS Linux é o destino de produção do FrequenciApp. A Vercel fica como ambiente de preview ou desligada, sem deploy automático da `main`. A escolha evita dois bancos, duas agendas e duas origens de dados para o mesmo domínio.
+
+O instalador `instalar.sh` é o caminho recomendado em VPS. Ele segue o contrato de [docs/instalador.md](docs/instalador.md), com comandos, flags, JSON e códigos de erro estáveis, e orquestra os scripts de servidor já existentes. O [roteiro do ensaio em VPS](docs/ensaio-implantacao-vps.md) descreve a validação em Ubuntu 26.04 descartável; o roteiro foi escrito e ainda não foi executado.
 
 O build da Vercel apenas gera o cliente Prisma; as migrações são aplicadas pelo workflow de implantação em cada push na `main` ou manualmente com `pnpm run db:deploy`. A agenda de notificações usa o `CRON_SECRET`. As demais formas de publicação estão em [docs/deploy.md](docs/deploy.md) e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
 
-Para VPS, servidor dedicado ou máquina on-premises, o guia de [auto-hospedagem](docs/auto-hospedagem.md) cobre Caddy ou Nginx, TLS público ou interno, backup do banco e atualização com rollback. O backup e a restauração estão em [docs/backup-servidor.md](docs/backup-servidor.md).
+### Instalação rápida em VPS Ubuntu 26.04
+
+Pré-requisitos: VPS com Ubuntu 26.04 LTS, DNS do domínio apontando para o servidor, portas 80 e 443 liberadas no provedor e uma conta com `sudo`.
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git
+sudo git clone https://github.com/eemtijca/frequenciapp.git /opt/frequenciapp
+cd /opt/frequenciapp
+```
+
+Gravar a senha inicial da administração em um arquivo com modo 600, como `/root/senha-admin`, sem digitar o valor na linha de comando. A tag `vX.Y.Z` é ilustrativa e deve ser substituída pela tag estável publicada no momento da instalação.
+
+```bash
+sudo ./instalar.sh planejar \
+  --perfil simples \
+  --canal release \
+  --tag vX.Y.Z \
+  --dominio frequencia.exemplo.br \
+  --email-acme administracao@escola.exemplo.br \
+  --proxy caddy \
+  --tls acme \
+  --arquivo-senha-admin /root/senha-admin \
+  --salvar-config /root/instalador.json \
+  --json
+
+sudo ./instalar.sh aplicar \
+  --config /root/instalador.json \
+  --sim
+```
+
+Conferir o plano, os avisos e os códigos antes do `aplicar`. O `aplicar` grava a configuração efetiva em `/etc/frequenciapp/instalador.json`, sem segredos. Depois da subida:
+
+```bash
+sudo ./instalar.sh situacao --json
+sudo ./instalar.sh diagnosticar --json
+curl -fsS https://frequencia.exemplo.br/api/saude
+```
+
+O domínio e o e-mail acima são fictícios. O `--seed` não entra no caminho de produção, porque cria massa sintética. As demais flags, como backup e agendador, estão no [contrato do instalador](docs/instalador.md) e no [guia de auto-hospedagem](docs/auto-hospedagem.md).
+
+### Perfis
+
+| Perfil        | Controlador | Dropbox | Uso                                               |
+| ------------- | ----------- | ------- | ------------------------------------------------- |
+| `simples`     | não         | não     | Escola com VPS e Docker. É o perfil padrão.       |
+| `controlador` | sim         | não     | Escola que adota journal, pins e entrada estável. |
+| `dropbox`     | não         | sim     | Escola que usa Dropbox para o backup do banco.    |
+| `completo`    | sim         | sim     | Escola que adota controlador e Dropbox.           |
+
+Os perfis `controlador`, `dropbox` e `completo` são opt-in e exigem configuração explícita. O perfil `simples` não pode ser bloqueado por artefato do controlador nem depender do Dropbox.
+
+Neste PR, apenas o perfil `simples` está implementado. Os perfis `controlador`, `dropbox` e `completo` entram no PR dos perfis opt-in e não devem ser usados antes disso.
+
+### Distribuições suportadas
+
+| Tier | Distribuições                                                                                                          | Tratamento                                                 |
+| ---- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| 1    | Ubuntu 22.04, 24.04 e 26.04; Debian 12 e 13; RHEL, Rocky e Alma 9 e 10; Fedora atual; Arch; openSUSE Leap e Tumbleweed | Plano testado em Docker; aplicação validada em subconjunto |
+| 2    | Amazon Linux 2023, Oracle Linux 9 e 10, CentOS Stream, Alpine 3.20 ou superior, Raspberry Pi OS 64 bits                | Melhor esforço, com aviso e fallback                       |
+| 3    | 32 bits, sem Bash, WSL, macOS, Windows, sem Docker                                                                     | Recusa com `E_DISTRO`                                      |
+
+### Métodos
+
+| Método                | Quando usar                                            | Comando                                                                                                                                                       | Guia                                       |
+| --------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| VPS simples           | Escola com VPS e Docker, sem os perfis opt-in          | `sudo ./instalar.sh planejar --perfil simples ...` e `sudo ./instalar.sh aplicar --config /root/instalador.json --sim`                                        | [instalador](docs/instalador.md)           |
+| Compose manual        | Operador que quer controle manual da pilha             | `cp .env.example .env && docker compose up -d --build`                                                                                                        | [auto-hospedagem](docs/auto-hospedagem.md) |
+| Imagem publicada      | Outro orquestrador, como ECS, Cloud Run ou App Service | `docker pull ghcr.io/eemtijca/frequenciapp:<tag>`                                                                                                             | [deploy](docs/deploy.md)                   |
+| Kubernetes            | Cluster Kubernetes com Helm                            | `helm upgrade --install frequenciapp infra/kubernetes/frequenciapp --namespace frequenciapp --set existingSecret=frequenciapp-segredos --set image.tag=<tag>` | [Kubernetes](docs/kubernetes.md)           |
+| Vercel ou nuvem       | Preview ou demonstração; a produção fica no VPS        | workflow `implantacao.yml` com `DEPLOY_TARGET` vazio ou `vercel`                                                                                              | [deploy](docs/deploy.md)                   |
+| Desenvolvimento local | Desenvolvimento e testes da aplicação                  | `pnpm install --frozen-lockfile` e `pnpm run dev`                                                                                                             | [ambiente](docs/ambiente.md)               |
+| Atualização           | VPS existente, com backup confirmado                   | `sudo ./instalar.sh atualizar --canal release --tag vX.Y.Z --sim`                                                                                             | [instalador](docs/instalador.md)           |
+| Backup                | Rotina manual ou antes de atualização                  | `sudo ./instalar.sh backup`                                                                                                                                   | [backup](docs/backup-servidor.md)          |
+| Restauração           | Recuperação de desastre ou retorno ao banco anterior   | `sudo ./instalar.sh restaurar --do-remoto --sim`                                                                                                              | [backup](docs/backup-servidor.md)          |
+| Desinstalação         | Remoção dos serviços, preservando dados                | `sudo ./instalar.sh desinstalar`                                                                                                                              | [instalador](docs/instalador.md)           |
+| Canal                 | Troca de `main` para `release` ou fixação de tag       | `sudo ./instalar.sh canal definir release --tag vX.Y.Z --planejar`                                                                                            | [instalador](docs/instalador.md)           |
+| Diagnóstico           | Suporte, auditoria e uso por agentes                   | `sudo ./instalar.sh diagnosticar --json`                                                                                                                      | [instalador](docs/instalador.md)           |
+
+As linhas de perfil usam `...` para as flags de domínio, TLS, contas, backup e agendador, que são as mesmas da instalação rápida e estão detalhadas no guia. Os métodos com controlador, Dropbox e perfil completo entram no PR dos perfis opt-in.
+
+### VPS único de produção
+
+O VPS Ubuntu 26.04 LTS é o único destino de produção. A Vercel fica como preview ou desligada, sem deploy automático da `main`. O corte no repositório começa pelas variáveis de operação:
+
+```bash
+gh variable set DEPLOY_TARGET --body servidor
+gh variable set AGENDA_EXTERNA --body servidor
+gh variable set BACKUP_EXTERNO --body servidor
+```
+
+Com esses valores, os workflows de implantação, migração, agenda e backup da nuvem são pulados. O instalador não configura o GitHub nem a Vercel. O passo a passo, o checklist e a reversão estão no [roteiro do ensaio em VPS](docs/ensaio-implantacao-vps.md) e no guia de [auto-hospedagem](docs/auto-hospedagem.md).
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Feemtijca%2Ffrequenciapp&project-name=frequenciapp&repository-name=frequenciapp&env=DATABASE_URL,DIRECT_URL,AUTH_SECRET,TZ_APP,ADMIN_EMAIL,ADMIN_SENHA,ADMIN_NOME&envDescription=Vari%C3%A1veis%20do%20FrequenciApp%3A%20banco%2C%20segredo%20de%20sess%C3%A3o%2C%20fuso%20e%20administrador%20inicial&envLink=https%3A%2F%2Fgithub.com%2Feemtijca%2Ffrequenciapp%2Fblob%2Fmain%2Fdocs%2Fambiente.md)
+
+O botão acima cria uma demonstração ou uma instalação de outra escola na Vercel. A produção desta escola fica no VPS. O caminho de nuvem está em [docs/deploy.md](docs/deploy.md), e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
+
+### Segurança da implantação
+
+- O `aplicar`, o `atualizar` e o `desinstalar` exigem root ou uma conta com `sudo`. O `planejar` e o `diagnosticar` podem rodar sem root, com avisos sobre as verificações que exigem privilégio.
+- O grupo `docker` equivale a root. O controlador é proteção cooperativa e não impede root, DBA ou acesso direto ao daemon do Docker.
+- O firewall só é alterado com `--sim`, e apenas as portas 22, 80 e 443 ficam públicas. A aplicação e o banco continuam internos.
+- `app.env`, `ops.env`, `rclone.conf`, o token do Dropbox, o estado do instalador e os logs ficam com modo 600. Nenhum segredo entra em JSON, relatório, estado ou commit.
+- A chave pública GPG ou age pode ficar no servidor. A chave privada fica fora, em cofre ou gerenciador de senhas, porque a perda dela torna as cópias irrecuperáveis.
+- Segredos entram apenas por arquivo 600 ou entrada padrão. O instalador recusa segredo em `argv` e redige o valor em log, JSON, relatório e mensagem. A linha de comando, o histórico do shell e a saída do processo não são canais confiáveis para segredo.
+
+### Testes do instalador em Docker
+
+Os testes do instalador rodam em contêineres Docker, com worktree em LF e imagens oficiais. Nenhum teste roda no Windows, no WSL ou diretamente no host. O executor `scripts/dev/executar-container.sh` concentra as chamadas: `instalador-plano` percorre a matriz de `planejar` e `instalador-aplicar` usa um contêiner systemd descartável.
+
+A matriz de `planejar` cobre:
+
+```text
+ubuntu:22.04
+ubuntu:24.04
+ubuntu:26.04
+debian:12
+debian:13
+rockylinux:9
+almalinux:9
+fedora:latest
+archlinux:latest
+opensuse/leap:15.6
+amazonlinux:2023
+alpine:3.22
+```
+
+No Alpine, o próprio teste instala `bash` e `curl` antes de chamar o instalador. A montagem do worktree é somente leitura e comprova que o `planejar` não altera o sistema. O subconjunto de `aplicar` valida units, timers, saúde e a segunda execução sem mudanças com `--modo-teste`, `--agendador systemd` e `--firewall nao`. O systemd em contêiner valida a configuração, mas não substitui o ensaio em VPS. O contrato completo dos testes está em [docs/instalador.md](docs/instalador.md).
+
+## Para agentes de IA
+
+O instalador foi desenhado para uso não interativo e leitura por máquina. A saída `--json` é a fonte de verdade; texto humano, cor e barra de progresso não entram na decisão. A versão do contrato é conferida por `versao` e `esquema`.
+
+Em uma instalação já preparada, com a configuração efetiva em `/etc/frequenciapp/instalador.json`, a sequência de leitura é:
+
+```bash
+sudo ./instalar.sh versao --json
+sudo ./instalar.sh esquema
+sudo ./instalar.sh planejar --config /etc/frequenciapp/instalador.json --json --nao-interativo
+sudo ./instalar.sh situacao --json --nao-interativo
+sudo ./instalar.sh diagnosticar --config /etc/frequenciapp/instalador.json --json --nao-interativo
+```
+
+O `aplicar` só pode ser executado depois de aprovação humana explícita:
+
+```bash
+sudo ./instalar.sh aplicar --config /etc/frequenciapp/instalador.json --json --nao-interativo --sim
+```
+
+O `--json` não confirma nada e não substitui o `--sim`. O `--nao-interativo` sem `--sim` falha com `E_USO` antes de qualquer ação destrutiva. A mesma aprovação vale para `atualizar`, `restaurar`, `desinstalar` e `canal definir --aplicar`.
+
+Regras para a execução:
+
+- Conferir `ok`, `codigo`, `erros`, `avisos` e `etapas`. Considerar a operação concluída apenas com saída 0 e `ok: true`.
+- Usar `--simular` para pré-visualizar uma ação mutável sem executá-la.
+- Preparar arquivos de segredo com modo 600 fora do agente e passar apenas o caminho. Nunca inserir senha, token, chave ou URL com credencial em prompt, argumento, log ou mensagem.
+- Não usar `--forcar` para contornar bloqueio de política, estado incerto, downgrade ou readoção do controlador.
+- Depois de uma falha, executar `diagnosticar --json` e seguir `proximos` e a dica do erro. Não repetir a mesma ação sem mudar a causa.
+- Não editar o estado, o journal ou os pins à mão para destravar uma operação.
+
+| Código          | Uso                                                    | Ação do agente                                                        |
+| --------------- | ------------------------------------------------------ | --------------------------------------------------------------------- |
+| `E_USO`         | Flag ausente, conflito ou valor inválido               | Corrigir flags ou configuração e repetir o plano.                     |
+| `E_DISTRO`      | Distro ou arquitetura não suportada                    | Parar e relatar a distro ou a arquitetura.                            |
+| `E_PACOTE`      | Falha de pacote ou gerenciador                         | Ler o pacote e o repositório no plano; não forçar upgrade geral.      |
+| `E_DOCKER`      | Docker ausente, parado ou sem permissão                | Conferir serviço, grupo e permissão.                                  |
+| `E_COMPOSE`     | Compose ausente ou abaixo da versão mínima             | Atualizar o Compose para 2.24 ou superior.                            |
+| `E_REDE`        | DNS, download, proxy ou porta                          | Conferir DNS, porta, proxy e conectividade.                           |
+| `E_VALIDACAO`   | Pré-requisito, disco, memória, relógio ou configuração | Corrigir a causa; não usar `--forcar`.                                |
+| `E_SAUDE`       | Aplicação, migração ou health check                    | Executar `diagnosticar` e preservar estado e logs.                    |
+| `E_BACKUP`      | Backup, recibo ou retenção                             | Corrigir cifra, chave, espaço ou destino; não atualizar sem recibo.   |
+| `E_RESTAURACAO` | Restauração, checksum ou banco anterior                | Não repetir sobre o banco em uso; conferir checksum e banco anterior. |
+| `E_CONTROLADOR` | Perfil, journal, pin ou hash do migrador               | Parar o controlador e pedir readoção revisada.                        |
+| `E_DROPBOX`     | Token, pasta, autoridade ou retenção                   | Conferir token, pasta, remote e retenção.                             |
+| `E_CANAL`       | Canal, tag, downgrade ou migração incompatível         | Não forçar downgrade; revisar tag, commit e migrações.                |
+
+As saídas seguem o contrato: 0 para sucesso, 1 para falha interna, 2 a 10 para erros classificados, 78 para bloqueio de política e 130 ou 143 para sinais. Um sinal 130 ou 143 preserva a etapa em andamento, e a retomada usa `--retomar`. O contrato completo, com as chaves JSON e as etapas, está em [docs/instalador.md](docs/instalador.md).
 
 ## Privacidade
 
@@ -230,7 +410,11 @@ Em uma issue no GitHub. Vulnerabilidades seguem o [SECURITY.md](SECURITY.md).
 | [docs/planilha.md](docs/planilha.md)                                                       | Integração opcional com Google Planilhas.           |
 | [docs/testes.md](docs/testes.md)                                                           | Suítes, convenções e cobertura.                     |
 | [docs/deploy.md](docs/deploy.md)                                                           | Docker Compose, Vercel e outras formas.             |
+| [docs/instalador.md](docs/instalador.md)                                                   | Contrato do instalador, flags, JSON e erros.        |
 | [docs/auto-hospedagem.md](docs/auto-hospedagem.md)                                         | Servidor próprio, proxy TLS, agenda e atualização.  |
+| [docs/controlador-manutencao.md](docs/controlador-manutencao.md)                           | Adoção do controlador, journal, pins e reversão.    |
+| [docs/dropbox-retencao.md](docs/dropbox-retencao.md)                                       | Token, pasta, retenção e restauração no Dropbox.    |
+| [docs/ensaio-implantacao-vps.md](docs/ensaio-implantacao-vps.md)                           | Roteiro do ensaio em VPS, sem execução.             |
 | [docs/kubernetes.md](docs/kubernetes.md)                                                   | Chart Helm, Ingress, migração, agenda e backup.     |
 | [docs/backup-servidor.md](docs/backup-servidor.md)                                         | Dump, cifra, rclone, retenção e restauração.        |
 | [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md)                                     | AWS, Azure e GCP com Terraform.                     |
