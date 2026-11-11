@@ -1,16 +1,7 @@
 // Verifica o exemplo de ambiente e o recorte de regras do contexto Docker.
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import {
-  closeSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  openSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -19,8 +10,33 @@ import { fileURLToPath } from "node:url";
 const raiz = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const ler = (caminho) => readFileSync(join(raiz, caminho), "utf8");
 
-// Subconjunto usado pelo arquivo atual: padrões relativos sem classes ou **.
+// Subconjunto usado pelo arquivo atual: padrões relativos, * e ? sem classes.
 // Não substitui a implementação Docker e falha fechado em sintaxe não suportada.
+function casaSegmento(texto, padrao) {
+  let i = 0;
+  let j = 0;
+  let estrela = -1;
+  let marca = 0;
+  while (i < texto.length) {
+    if (j < padrao.length && (padrao[j] === "?" || padrao[j] === texto[i])) {
+      i += 1;
+      j += 1;
+    } else if (j < padrao.length && padrao[j] === "*") {
+      estrela = j;
+      j += 1;
+      marca = i;
+    } else if (estrela !== -1) {
+      j = estrela + 1;
+      marca += 1;
+      i = marca;
+    } else {
+      return false;
+    }
+  }
+  while (j < padrao.length && padrao[j] === "*") j += 1;
+  return j === padrao.length;
+}
+
 function incluído(caminho, regras) {
   let incluido = true;
   const partes = caminho.split("/");
@@ -34,19 +50,21 @@ function incluído(caminho, regras) {
     const emQualquerDiretorio = regra.startsWith("**/");
     if (emQualquerDiretorio) regra = regra.slice(3);
     assert.ok(!regra.includes("**") && !/[\[\]\\]/.test(regra), `Regra não suportada: ${linha}`);
-    const regex = new RegExp(
-      `^${regra
-        .replace(/[\\.+^${}()|]/g, "\\$&")
-        .replace(/\*/g, "[^/]*")
-        .replace(/\?/g, "[^/]")}$`,
-    );
-    if (
-      candidatos.some(
-        (candidato) =>
-          regex.test(candidato) || (emQualquerDiretorio && regex.test(candidato.split("/").at(-1))),
-      )
-    )
-      incluido = excecao;
+    const segmentosRegra = regra.split("/");
+    const combina = (candidato) => {
+      const segmentos = candidato.split("/");
+      if (emQualquerDiretorio) {
+        return (
+          segmentosRegra.length === 1 &&
+          casaSegmento(segmentos[segmentos.length - 1], segmentosRegra[0])
+        );
+      }
+      return (
+        segmentos.length === segmentosRegra.length &&
+        segmentosRegra.every((segmento, indice) => casaSegmento(segmentos[indice], segmento))
+      );
+    };
+    if (candidatos.some(combina)) incluido = excecao;
   }
   return incluido;
 }
@@ -86,25 +104,21 @@ function carregarEnv(conteudo) {
   try {
     const arquivo = join(diretorio, "ambiente");
     writeFileSync(arquivo, entrada, { mode: 0o600, flag: "wx" });
-    const fd = openSync(arquivo, "r");
-    try {
-      return spawnSync(
-        "/bin/sh",
-        [
-          "-eu",
-          "-c",
-          '. /dev/fd/3; printf "%s\\n" "$AGENDA_HORARIO" "$BACKUP_HORARIO" "$BACKUP_PLANILHAS_HORARIO" "$ATUALIZAR_HORARIO" "$CERTBOT_RENOVAR_HORARIO"',
-        ],
-        {
-          stdio: ["ignore", "pipe", "pipe", fd],
-          cwd: tmpdir(),
-          env: { PATH: "/usr/bin:/bin", HOME: tmpdir() },
-          encoding: "utf8",
-        },
-      );
-    } finally {
-      closeSync(fd);
-    }
+    return spawnSync(
+      "/bin/sh",
+      [
+        "-eu",
+        "-c",
+        '. "$1"; printf "%s\\n" "$AGENDA_HORARIO" "$BACKUP_HORARIO" "$BACKUP_PLANILHAS_HORARIO" "$ATUALIZAR_HORARIO" "$CERTBOT_RENOVAR_HORARIO"',
+        "sh",
+        arquivo,
+      ],
+      {
+        cwd: tmpdir(),
+        env: { PATH: "/usr/bin:/bin", HOME: tmpdir() },
+        encoding: "utf8",
+      },
+    );
   } finally {
     rmSync(diretorio, { recursive: true, force: true });
   }
