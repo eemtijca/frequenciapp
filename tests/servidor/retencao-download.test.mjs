@@ -159,6 +159,23 @@ test("checksum remoto divergente interrompe sem devolver caminho confiável", ()
   }
 });
 
+test("recibo remoto com destino divergente interrompe antes dos artefatos", () => {
+  const f = fixture();
+  try {
+    const r = JSON.parse(fs.readFileSync(path.join(f.remoto, f.recibo), "utf8"));
+    r.remoto = "falso:outro";
+    fs.writeFileSync(path.join(f.remoto, f.recibo), JSON.stringify(r) + "\n", { mode: 0o600 });
+    const resultado = f.executar(["--destino", f.destino]);
+    assert.equal(resultado.status, 1);
+    assert.equal(resultado.signal, null);
+    assert.ok(!resultado.stdout.includes(path.join(f.destino, f.dump)));
+    assert.ok(!fs.existsSync(path.join(f.destino, f.dump)));
+    assert.ok(!fs.existsSync(path.join(f.destino, `${f.dump}.sha256`)));
+  } finally {
+    fs.rmSync(f.tmp, { recursive: true, force: true });
+  }
+});
+
 test("destino remoto ausente ou divergente do estado bloqueia antes do download", () => {
   for (const caso of ["ausente", "divergente"]) {
     const f = fixture();

@@ -223,6 +223,7 @@ https.request = function(options, callback) {
   assert.equal(options.rejectUnauthorized, true);
   assert.equal(options.minVersion, 'TLSv1.2');
   assert.equal(options.port, 443);
+  assert.ok(!String(options.path).startsWith('/2/files/upload'));
   return original.call(this, {...options, hostname:'127.0.0.1', port:${server.address().port}, servername:options.hostname, ca:fs.readFileSync(${JSON.stringify(certPath)})}, callback);
 };
 `,
@@ -400,6 +401,28 @@ test("timeout absoluto encerra resposta JSON pendente sem apagar", async () => {
     assert.ok(fechou);
     assert.ok(Date.now() - inicio < 15000);
     assert.equal(deletes(f).length, 0);
+  } finally {
+    await f.fechar();
+  }
+});
+
+test("resposta JSON acima do limite declarado é recusada antes de qualquer exclusão", async () => {
+  const f = await fixture();
+  try {
+    f.state.hook = ({ req, res }) => {
+      if (req.url !== "/2/users/get_current_account") return false;
+      res.writeHead(200, {
+        "content-type": "application/json",
+        "content-length": String(5 * 1024 * 1024),
+      });
+      res.end("{}");
+      return true;
+    };
+    const r = await f.executar();
+    assert.equal(r.status, 1);
+    assert.equal(r.signal, null);
+    assert.equal(deletes(f).length, 0);
+    assert.equal(f.objects.size, 18);
   } finally {
     await f.fechar();
   }
