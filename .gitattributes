@@ -1,6 +1,7 @@
 # Normaliza os arquivos executados dentro de contêineres Linux.
 *.sh text eol=lf
 *.mjs text eol=lf
+*.env.example text eol=lf
 *.yml text eol=lf
 *.yaml text eol=lf
 Caddyfile text eol=lf
