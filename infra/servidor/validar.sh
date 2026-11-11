@@ -35,7 +35,7 @@ docker run --rm \
   -v "$REPO:/mnt" \
   -w /mnt \
   koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d \
-  -x -P scripts/servidor scripts/servidor/*.sh
+  -x -P scripts/servidor -P scripts/servidor/controlador scripts/servidor/*.sh scripts/servidor/controlador/*.sh
 
 docker compose \
   -f "$REPO/compose.yml" \
