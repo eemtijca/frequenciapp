@@ -4,7 +4,13 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 node --input-type=module <<'JS'
 import assert from 'node:assert/strict';
+import {copyFileSync, mkdtempSync, readFileSync, rmSync} from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import {orquestrar, executorVercel} from './scripts/github/orquestrar-implantacao.mjs';
+const pasta=mkdtempSync(path.join(os.tmpdir(),'qa-implantacao-'));
+copyFileSync('vercel.json', path.join(pasta,'vercel.json'));
+process.chdir(pasta);
 const sha='b'.repeat(40), chamadas=[];
 const ambiente={PATH:process.env.PATH,GITHUB_SHA:sha,DIRECT_URL_PROD:'CONEXAO_MIGRADOR_FICTICIA',VERCEL_TOKEN:'TOKEN_FICTICIO',APP_URL:'https://app.exemplo',GOOGLE_SECRET:'NAO_PROPAGAR'};
 const comando=(cmd,args,opts)=>{
@@ -24,5 +30,7 @@ assert(chamadas.findIndex(c=>c.args.includes('build')) < chamadas.findIndex(c=>c
 assert(chamadas.find(c=>c.args.includes('deploy')).args.includes('--skip-domain'));
 assert(chamadas.at(-1).args.includes('promote'));
 await assert.rejects(executorVercel(ambiente,{comando,buscar:async()=>new Response(JSON.stringify({ok:true,commit:'outro'}))})('saude'));
+assert(!readFileSync('.vercel/.env.production.local','utf8').includes('[SENSITIVE]'));
+rmSync(pasta,{recursive:true,force:true});
 console.log('Adaptador Vercel sintético: revisão, ambiente, ordem e saúde conferidos; nenhum deploy real.');
 JS

@@ -1,7 +1,13 @@
 // Ordem, exclusão por destino e falhas da implantação com executores sintéticos.
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { orquestrar, selecionarEvento } from "../../../scripts/github/orquestrar-implantacao.mjs";
+import {
+  orquestrar,
+  prepararAmbienteDeBuild,
+  selecionarEvento,
+} from "../../../scripts/github/orquestrar-implantacao.mjs";
 const sha = "a".repeat(40);
 const nomes = ["validar", "build", "migrar", "publicar", "promover", "saude"];
 
@@ -75,5 +81,18 @@ describe("proprietário único de implantação", () => {
   it("mantém o auto-deploy da main desligado no vercel.json", () => {
     const configuracao = JSON.parse(readFileSync("vercel.json", "utf8"));
     expect(configuracao.git?.deploymentEnabled?.main).toBe(false);
+  });
+  it("prepara variáveis descartáveis para o build da Vercel", () => {
+    const pasta = mkdtempSync(path.join(os.tmpdir(), "qa-build-vercel-"));
+    try {
+      prepararAmbienteDeBuild(pasta);
+      const conteudo = readFileSync(path.join(pasta, ".env.production.local"), "utf8");
+      expect(conteudo).toContain("DATABASE_URL=postgresql://");
+      expect(conteudo).toContain("DIRECT_URL=postgresql://");
+      expect(conteudo).toMatch(/AUTH_SECRET=.{32,}/);
+      expect(conteudo).not.toContain("[SENSITIVE]");
+    } finally {
+      rmSync(pasta, { recursive: true, force: true });
+    }
   });
 });
