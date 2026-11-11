@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       versao:
-        description: Versão da tag estável; vazio somente antes da primeira release na main
+        description: Versão da tag estável; vazio para publicar a main
         type: string
         required: false
 permissions:

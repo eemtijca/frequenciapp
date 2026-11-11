@@ -1,21 +1,8 @@
 // Contratos dos estágios e da identidade da implantação.
-export type AtestadoImplantacao = {
-  sha: string;
-  destino: string;
-  backupVerificado: boolean;
-  recuperacaoVerificada: boolean;
-  migracoesExpansivas: boolean;
-  autoDeployCoordenado: boolean;
-};
-export function selecionarEvento(opcoes: {
-  evento: string;
-  ref: string;
-  haRelease: boolean;
-}): "main" | "tag";
+export function selecionarEvento(opcoes: { evento: string; ref: string }): "main" | "tag";
 export function orquestrar(opcoes: {
   sha: string;
   destino: string;
-  atestado: unknown;
   executar: (etapa: string, sha: string) => Promise<unknown>;
 }): Promise<void>;
 export function executorVercel(

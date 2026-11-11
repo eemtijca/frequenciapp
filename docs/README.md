@@ -86,3 +86,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-072](adr/072-publicacao-e-implantacao-coordenadas.md): um único proprietário da migração e da implantação, identidade de publicação por tag, SHA e pacote, e `latest` monotônico.
 - [ADR-073](adr/073-papeis-de-runtime-separados.md): conexões distintas para runtime e migração, jobs de migração por nuvem e SQL de grants sem privilégios administrativos.
 - [ADR-074](adr/074-outbox-escolar-e-conferencia-da-fila.md): intenção escolar na mesma transação, despacho recuperável, conferência de escrita incerta e fencing da reserva.
+- [ADR-075](adr/075-vercel-continuo-e-auto-hospedagem-com-backup.md): Vercel contínua na `main`, sem atestado de backup, e auto-hospedagem com backup obrigatório antes da migração.

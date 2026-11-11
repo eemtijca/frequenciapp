@@ -30,10 +30,8 @@ type Opcoes = {
   ref?: string;
   sha?: string;
   versaoDelegada?: string;
-  primeiraRelease?: boolean;
   versaoPacote?: string;
   sujo?: boolean;
-  atestado?: boolean;
   falha?: string;
 };
 function executarEntrada(opcoes: Opcoes = {}) {
@@ -49,6 +47,7 @@ function executarEntrada(opcoes: Opcoes = {}) {
         readFileSync(`scripts/github/${nome}`),
       );
     }
+    writeFileSync(path.join(pasta, "vercel.json"), readFileSync("vercel.json"));
     const registrar = `import {appendFileSync} from 'node:fs';
 const registrar=(etapa,args=[])=>appendFileSync(${JSON.stringify(log)},JSON.stringify({etapa,args,commit:process.env.COMMIT_SHA,direct:process.env.DIRECT_URL})+'\\n');`;
     const config = JSON.stringify({
@@ -95,10 +94,6 @@ globalThis.fetch=async(url,opcoes)=>{registrar('saude',[String(url),opcoes.redir
 `,
     );
     writeFileSync(path.join(pasta, "evento.json"), JSON.stringify(opcoes.evento ?? { inputs: {} }));
-    writeFileSync(
-      path.join(pasta, "releases.json"),
-      JSON.stringify(opcoes.primeiraRelease ? [[]] : [[{ draft: false, prerelease: false }]]),
-    );
     const resultado = spawnSync(
       process.execPath,
       ["--import", path.join(pasta, "saude.mjs"), "scripts/github/orquestrar-implantacao.mjs"],
@@ -112,25 +107,12 @@ globalThis.fetch=async(url,opcoes)=>{registrar('saude',[String(url),opcoes.redir
           HOME: pasta,
           TMPDIR: pasta,
           GITHUB_EVENT_PATH: path.join(pasta, "evento.json"),
-          IMPLANTACAO_RELEASES: path.join(pasta, "releases.json"),
           GITHUB_EVENT_NAME: "release" in (opcoes.evento ?? {}) ? "release" : "workflow_dispatch",
           GITHUB_REF: opcoes.ref ?? "refs/tags/v1.2.3",
           GITHUB_SHA: opcoes.sha ?? shaTag,
           ...(opcoes.versaoDelegada !== undefined
             ? { IMPLANTACAO_VERSAO: opcoes.versaoDelegada }
             : {}),
-          IMPLANTACAO_ATESTADO: JSON.stringify(
-            opcoes.atestado === false
-              ? null
-              : {
-                  sha: shaTag,
-                  destino: "producao",
-                  backupVerificado: true,
-                  recuperacaoVerificada: true,
-                  migracoesExpansivas: true,
-                  autoDeployCoordenado: true,
-                },
-          ),
           DEPLOY_TARGET: "vercel",
           VERCEL_TOKEN: "TOKEN_FICTICIO",
           DIRECT_URL_PROD: "CONEXAO_FICTICIA_NAO_UTILIZADA",
@@ -200,10 +182,9 @@ describe("entrada completa da implantação", () => {
       }),
     );
   });
-  it("preserva main sem versão somente antes da primeira release", () => {
+  it("publica a main sem versão em qualquer momento", () => {
     const resultado = executarEntrada({
       ref: "refs/heads/main",
-      primeiraRelease: true,
       versaoDelegada: "",
     });
     expect(resultado.status).toBe(0);
@@ -217,11 +198,9 @@ describe("entrada completa da implantação", () => {
       { versaoDelegada: "1.2.3", ref: "refs/heads/v1.2.3" },
       "Evento fora do regime",
     ],
-    ["main depois de release", { ref: "refs/heads/main" }, "Evento fora do regime"],
     ["SHA divergente", { versaoDelegada: "1.2.3", sha: "c".repeat(40) }, "SHA esperado"],
     ["pacote divergente", { versaoDelegada: "1.2.3", versaoPacote: "0.1.0" }, "package.json"],
     ["checkout sujo", { versaoDelegada: "1.2.3", sujo: true }, "Command failed"],
-    ["atestado ausente", { versaoDelegada: "1.2.3", atestado: false }, "Atestado"],
     [
       "release preliminar",
       { evento: { release: { tag_name: "v1.2.3", prerelease: true } } },
