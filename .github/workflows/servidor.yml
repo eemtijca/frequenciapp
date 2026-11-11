@@ -44,7 +44,7 @@ jobs:
           node-version: 24.22.2
 
       - name: Verificar configuração e migrações sintéticas
-        run: node --test tests/servidor/configuracao-segura.test.mjs tests/servidor/contexto-docker.test.mjs tests/servidor/migrar-incompleta.test.mjs
+        run: node --test tests/servidor/ambiente-seguro.test.mjs tests/servidor/configuracao-segura.test.mjs tests/servidor/contexto-docker.test.mjs tests/servidor/migrar-incompleta.test.mjs
 
       - name: Validar servidor
         run: bash infra/servidor/validar.sh

@@ -65,6 +65,14 @@ verificar_permissao_arquivo() {
   fi
 }
 
+validar_ambiente() {
+  local validador="$APP_DIR/scripts/servidor/ambiente-seguro.mjs"
+  [ -f "$validador" ] || erro "Validador de ambiente não encontrado: $validador"
+  command -v node >/dev/null || erro "Instale Node.js para validar os arquivos de ambiente."
+  node "$validador" "$APP_ENV_FILE" "$OPS_ENV_FILE" ||
+    erro "Arquivo de ambiente recusado; corrija as linhas apontadas."
+}
+
 carregar_ambiente() {
   if [ "${SERVIDOR_AMBIENTE_INJETADO:-false}" = "true" ]; then
     log "Ambiente injetado pelo processo."
@@ -72,6 +80,7 @@ carregar_ambiente() {
   fi
   verificar_permissao_arquivo "$APP_ENV_FILE"
   verificar_permissao_arquivo "$OPS_ENV_FILE"
+  validar_ambiente
   set -a
   # shellcheck source=/dev/null
   . "$APP_ENV_FILE"
