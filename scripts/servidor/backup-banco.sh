@@ -48,6 +48,7 @@ if [ "$BACKUP_EXIGIR_REMOTO" = true ]; then
   [ "${BACKUP_VERIFICAR_REMOTO:-true}" = true ] || erro "O remoto obrigatório exige verificação."
 fi
 export BACKUP_MODO BACKUP_CRIPTOGRAFIA BACKUP_RETER_DIAS BACKUP_RETER_MINIMO BACKUP_CATALOGO_PERSISTENTE BACKUP_EXIGIR_REMOTO
+export ESTADO_DIR BACKUP_BANCO_DIR BACKUP_REMOTO BACKUP_RCLONE_CONFIG
 DATABASE_SCHEMA="${DATABASE_SCHEMA:-public}"
 export DATABASE_SCHEMA
 
@@ -224,6 +225,17 @@ fi
 
 if [ "$BACKUP_MODO" = "compose" ]; then
   conferir_banco_compose
+fi
+
+if [ "$verificar_somente" = false ] && [ -n "${BACKUP_DROPBOX_CONFIG:-}" ]; then
+  [ "$BACKUP_MODO" = compose ] || erro "A escrita Dropbox adotada exige o modo compose."
+  if [ -n "${BACKUP_DROPBOX_SESSAO:-}" ]; then
+    node "$DIR/dropbox-autoridade.mjs" conferir || erro "Handoff Dropbox inválido."
+  else
+    # O pai mantém a autoridade durante o upload rclone inteiro.
+    node "$DIR/dropbox-autoridade.mjs" executar
+    exit "$?"
+  fi
 fi
 
 preparar_criptografia
@@ -404,6 +416,11 @@ process.stdout.write(JSON.stringify({em:r.em,modo:process.argv[3],criptografia:r
 NODE
 chmod 600 "$estado.tmp"
 mv "$estado.tmp" "$estado"
+
+if [ -n "${BACKUP_DROPBOX_CONFIG:-}" ]; then
+  node "$DIR/dropbox-autoridade.mjs" publicar "$recibo" ||
+    erro "Publicação Dropbox não durável; expurgo suspenso."
+fi
 
 aplicar_retencao_remota
 aplicar_retencao_local
