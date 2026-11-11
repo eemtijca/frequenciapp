@@ -185,7 +185,7 @@ O VPS Linux é o destino de produção do FrequenciApp. A Vercel fica como ambie
 
 O instalador `instalar.sh` é o caminho recomendado em VPS. Ele segue o contrato de [docs/instalador.md](docs/instalador.md), com comandos, flags, JSON e códigos de erro estáveis, e orquestra os scripts de servidor já existentes. O [roteiro do ensaio em VPS](docs/ensaio-implantacao-vps.md) descreve a validação em Ubuntu 26.04 descartável; o roteiro foi escrito e ainda não foi executado.
 
-O build da Vercel apenas gera o cliente Prisma; as migrações são aplicadas pelo workflow de implantação em cada push na `main` ou manualmente com `pnpm run db:deploy`. A agenda de notificações usa o `CRON_SECRET`. As demais formas de publicação estão em [docs/deploy.md](docs/deploy.md) e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
+No caminho de nuvem, o build da Vercel apenas gera o cliente Prisma; as migrações são aplicadas pelo workflow de implantação em cada push na `main` ou manualmente com `pnpm run db:deploy`. A agenda de notificações usa o `CRON_SECRET`. As demais formas de publicação estão em [docs/deploy.md](docs/deploy.md) e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
 
 ### Instalação rápida em VPS Ubuntu 26.04
 
@@ -367,6 +367,18 @@ Regras para a execução:
 | `E_CANAL`       | Canal, tag, downgrade ou migração incompatível         | Não forçar downgrade; revisar tag, commit e migrações.                |
 
 As saídas seguem o contrato: 0 para sucesso, 1 para falha interna, 2 a 10 para erros classificados, 78 para bloqueio de política e 130 ou 143 para sinais. Um sinal 130 ou 143 preserva a etapa em andamento, e a retomada usa `--retomar`. O contrato completo, com as chaves JSON e as etapas, está em [docs/instalador.md](docs/instalador.md).
+
+### VPS único de produção
+
+O VPS Ubuntu 26.04 LTS é o único destino de produção. A Vercel fica como ambiente de preview ou desligada, sem deploy automático da `main`. O corte no repositório começa pelas variáveis de operação:
+
+```bash
+gh variable set DEPLOY_TARGET --body servidor
+gh variable set AGENDA_EXTERNA --body servidor
+gh variable set BACKUP_EXTERNO --body servidor
+```
+
+Com esses valores, os workflows de implantação, migração, agenda e backup da nuvem são pulados. O instalador não configura o GitHub nem a Vercel. O passo a passo, o checklist e a reversão estão no [roteiro do ensaio em VPS](docs/ensaio-implantacao-vps.md) e no guia de [auto-hospedagem](docs/auto-hospedagem.md).
 
 ## Privacidade
 

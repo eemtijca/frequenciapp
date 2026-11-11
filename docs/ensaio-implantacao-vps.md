@@ -9,7 +9,7 @@ Roteiro para validar o instalador auto-hospedado em uma VPS Ubuntu 26.04 LTS des
 
 - Validar `planejar`, `aplicar`, `situacao`, `diagnosticar`, `atualizar`, `backup`, `restaurar`, `desinstalar`, `canal`, `versao` e `esquema` nos perfis `simples`, `controlador`, `dropbox` e `completo`.
 - Usar somente dados sintéticos e insumos descartáveis. Nenhum dado de aluno, domínio, IP, senha, token, chave ou e-mail pessoal real entra no ensaio, no repositório ou nas evidências.
-- Não alterar GitHub, Vercel, workflows ou produção. O VPS único e as variáveis de nuvem pertencem ao roteiro de corte.
+- Não alterar GitHub, Vercel, workflows ou produção durante o ensaio. O VPS único e as variáveis de nuvem pertencem ao corte da seção 13, executado depois do ensaio aprovado.
 - O ensaio complementa os testes de systemd em contêiner: a VPS valida boot, DNS, TLS, firewall, disco e rede reais.
 - Parar na primeira falha inesperada e registrar o estado. Não continuar sobre instalação, backup ou journal incerto.
 - Guias de detalhe: [instalador.md](instalador.md), [auto-hospedagem.md](auto-hospedagem.md), [backup-servidor.md](backup-servidor.md), [controlador-manutencao.md](controlador-manutencao.md) e [dropbox-retencao.md](dropbox-retencao.md).
@@ -296,6 +296,56 @@ Comando, código, resultado, evidência e hash:
 - `[DESTRUTIVO]` A destruição da VPS, do snapshot e da pasta remota é irreversível. Confirmar o identificador, o domínio e o caminho duas vezes.
 - `desinstalar` preserva dados por padrão. Não usar `docker system prune` nem `docker volume prune`; remover apenas recursos do projeto do ensaio. A revogação do token e a exclusão do arquivo são ações distintas: apagar o arquivo não invalida o token.
 
-## 13. Declaração de não execução
+## 13. Corte para VPS único
+
+Bloco executado depois do ensaio aprovado e antes de desligar a produção na nuvem. Nenhum comando desta seção foi executado neste ciclo; as linhas ficam como instrução do operador.
+
+Pré-requisitos: critérios A1 a A12 atendidos, VPS de produção com DNS e TLS do domínio definitivo, backup remoto verificado e janela de manutenção aprovada. O domínio do ensaio não pode ser reaproveitado sem remover o registro anterior.
+
+### 13.1 Congelar a nuvem
+
+1. Confirmar que a `main` está verde e que não há implantação em andamento no GitHub Actions.
+2. Executar um backup do banco de produção da nuvem e conferir o recibo antes de qualquer alteração.
+3. Exportar as contas e os dados que precisam existir no VPS, sem gravar segredo em arquivo versionado.
+4. Definir as variáveis do repositório:
+
+```bash
+gh variable set DEPLOY_TARGET --body servidor
+gh variable set AGENDA_EXTERNA --body servidor
+gh variable set BACKUP_EXTERNO --body servidor
+gh variable list
+```
+
+- Com `DEPLOY_TARGET=servidor`, `implantacao.yml` e `migracoes.yml` são pulados; a produção de nuvem deixa de migrar e publicar na `main` e em release.
+- Com `AGENDA_EXTERNA=servidor`, os jobs de `notificacoes.yml` e `fila-planilha.yml` são pulados e a agenda do servidor assume notificações, fila de planilhas e indicadores.
+- Com `BACKUP_EXTERNO=servidor`, o job de `backup-externo.yml` é pulado e o backup das planilhas passa para a rotina do servidor.
+- A definição vale para o repositório inteiro. Conferir que nenhum outro ambiente depende desses workflows.
+
+### 13.2 Desligar a Vercel
+
+- Conferir no `vercel.json` que `git.deploymentEnabled.main` é `false`.
+- No painel do projeto, desativar a publicação automática da `main` e manter ou desativar o preview conforme a decisão da escola. A variável `DEPLOY_TARGET` não controla o preview.
+- Se o preview continuar, apontar os previews para banco descartável e remover o domínio de produção da Vercel.
+- O instalador não altera a Vercel nem o GitHub; essas ações são manuais e ficam registradas no histórico operacional.
+
+### 13.3 Conferir o VPS
+
+- `curl -fsS "https://$DOMINIO/api/saude"` responde `200` com o commit esperado.
+- O DNS do domínio de produção aponta para o VPS, sem CNAME para a Vercel.
+- O certificado está válido e a renovação está agendada.
+- O agendador do servidor executa a cada cinco minutos, com `systemctl list-timers` no perfil systemd; `notificacoes.yml` e `fila-planilha.yml` estão pulados.
+- `ultimo-backup.json` tem `verificadoRemoto` igual a `true` e a cópia mais recente está no destino externo.
+- O backup das planilhas executou no servidor e `backup-externo.yml` está pulado.
+- Um único banco de produção atende o domínio; previews e nuvem não usam esse banco.
+- Nenhum dispositivo recebe aviso duplicado.
+
+### 13.4 Reversão
+
+- Remover as três variáveis com `gh variable delete` e reativar o deploy Git da `main` na Vercel.
+- Manter um único banco de produção e um único ponto de agenda durante a troca.
+- Não manter os dois caminhos ativos por tempo indeterminado, porque a divergência de schema e de dados cresce a cada dia.
+- Registrar a decisão, a data e o efeito no histórico operacional, sem dados de aluno.
+
+## 14. Declaração de não execução
 
 Este roteiro foi escrito e revisado contra o contrato do instalador, mas não foi executado neste ciclo. Nenhuma VPS, registro DNS, certificado, conta, token, chave ou backup foi criado, alterado ou removido. A execução depende de aprovação, janela de manutenção e insumos descartáveis, e o resultado deve ser anexado ao registro de evidências e ao plano mestre.

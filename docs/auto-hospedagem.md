@@ -273,21 +273,84 @@ AGENDA_INDICADORES=true
 
 Os seletores aceitam apenas `true` ou `false`; ausência conserva `true` e qualquer outro valor encerra antes das chamadas. `AGENDA_TIMEOUT` é um inteiro positivo de até 2147483 segundos, aplicado a cada requisição. Uma falha ou timeout em uma rotina não impede as seguintes, e todas desligadas encerram sem exigir `CRON_SECRET`. O wrapper passa URL, timeout e seletores por `compose exec -e` ao serviço de aplicação configurado. Desligar uma função não remove dados nem itens de fila, e o backup de planilhas tem controle separado.
 
-## Desativar a automação do GitHub
+## VPS único como destino de produção
 
-A instalação auto-hospedada pode desativar os workflows de operação sem removê-los:
+O VPS Ubuntu 26.04 LTS é o único destino de produção. A Vercel fica como ambiente de preview ou desligada, sem deploy automático da `main`. Manter os dois caminhos ativos cria dois bancos, duas agendas e duas origens de dados para o mesmo domínio, com divergência crescente de schema e de dados.
 
-```text
-DEPLOY_TARGET=servidor
-AGENDA_EXTERNA=servidor
-BACKUP_EXTERNO=servidor
+O instalador não autentica no GitHub nem na Vercel, não define variáveis de repositório e não altera o projeto da Vercel. O corte é executado pelo operador, conferido item a item e registrado no [roteiro do ensaio em VPS](ensaio-implantacao-vps.md).
+
+### Variáveis do repositório
+
+Com o GitHub CLI autenticado e permissão de administração no repositório, executar:
+
+```bash
+gh variable set DEPLOY_TARGET --body servidor
+gh variable set AGENDA_EXTERNA --body servidor
+gh variable set BACKUP_EXTERNO --body servidor
+gh variable list
 ```
 
-- `DEPLOY_TARGET=servidor` ignora deploy, migração de produção e preview de Vercel.
-- `AGENDA_EXTERNA=servidor` ignora notificações e fila no GitHub.
-- `BACKUP_EXTERNO=servidor` ignora o backup externo de planilhas no GitHub.
+As variáveis ficam no nível do repositório e valem para todos os workflows. Elas são texto comum, não segredo, e não substituem `CRON_SECRET` nem as credenciais da Vercel.
 
-Sem as variáveis, o comportamento anterior é preservado para Vercel, AWS, Azure e GCP. Os valores podem ser definidos com `gh variable set`.
+| Variável                  | Efeito esperado                                                                                                                             |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEPLOY_TARGET=servidor`  | `implantacao.yml` e `migracoes.yml` são pulados; a produção de nuvem deixa de migrar e publicar na `main` e em release.                     |
+| `AGENDA_EXTERNA=servidor` | Os jobs de `notificacoes.yml` e `fila-planilha.yml` são pulados; a agenda do servidor assume notificações, fila de planilhas e indicadores. |
+| `BACKUP_EXTERNO=servidor` | O job de `backup-externo.yml` é pulado; o backup das planilhas passa a ser responsabilidade da rotina do servidor.                          |
+
+`implantacao.yml` e `migracoes.yml` aceitam apenas vazio ou `vercel` para publicar; qualquer outro valor, incluindo `servidor`, impede o job de executar. Em `notificacoes.yml`, `fila-planilha.yml` e `backup-externo.yml`, a condição é a ausência de `servidor`; remover a variável reativa o job.
+
+Com as três variáveis, a nuvem deixa de migrar, publicar, agendar e copiar arquivos. O VPS precisa estar com DNS, TLS, backup verificado, agenda ativa e notificações funcionando antes do corte.
+
+### Desligar a Vercel
+
+O `vercel.json` do repositório já define `git.deploymentEnabled` com a `main` desligada. A variável `DEPLOY_TARGET` desliga apenas a sequência de produção do GitHub Actions; o preview depende da integração de Git do projeto e não é alterado pelos comandos `gh variable set`. A configuração do projeto na Vercel também precisa ser conferida no painel:
+
+1. Abrir as configurações de Git do projeto.
+2. Desativar a publicação automática da branch `main`.
+3. Manter as demais branches como preview, quando o preview for desejado.
+4. Conferir que os previews usam banco descartável, nunca o banco de produção do VPS.
+
+Sem preview, desativar a integração de Git do projeto ou remover o domínio de produção da Vercel. O botão de deploy da Vercel do README atende a outra escola ou a uma demonstração, não a instalação de produção desta escola.
+
+### Checklist de conferência
+
+| Item                  | Conferência                                                                                                           |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Variáveis             | `gh variable list` mostra as três variáveis com `servidor`.                                                           |
+| Workflows de produção | `implantacao.yml` e `migracoes.yml` aparecem como pulados no próximo push ou disparo manual.                          |
+| Agendas do GitHub     | `notificacoes.yml` e `fila-planilha.yml` aparecem como pulados; o agendador do servidor executa a cada cinco minutos. |
+| Backup externo        | `backup-externo.yml` aparece como pulado; `ultimo-backup.json` tem `verificadoRemoto` igual a `true`.                 |
+| Vercel                | O deploy Git da `main` está desligado no repositório e no painel; o preview segue a decisão da escola.                |
+| DNS                   | O domínio de produção aponta para o VPS, sem CNAME para a Vercel.                                                     |
+| TLS                   | O certificado cobre o domínio de produção e a renovação está agendada.                                                |
+| Agenda                | As rotas de notificações, fila de planilhas e indicadores respondem `200` a partir do VPS.                            |
+| Notificações          | Os dispositivos recebem um único aviso, sem duplicidade entre VPS e nuvem.                                            |
+| Banco único           | Só o VPS usa a `DATABASE_URL` de produção; previews e nuvem usam banco descartável ou nenhum banco.                   |
+| Saúde                 | `https://frequencia.exemplo.br/api/saude` responde com o commit esperado.                                             |
+
+### Riscos dos dois caminhos ativos
+
+- Dois bancos de produção recebem escritas e divergem; a restauração de um não recupera o outro.
+- Duas agendas consultam as mesmas rotas e duplicam notificações, fila de planilhas e indicadores.
+- Uma migração aplicada pela nuvem deixa o schema do VPS atrás ou à frente do código em execução.
+- Dois backups externos gravam conjuntos diferentes e dão falsa cobertura sobre o mesmo banco.
+- O operador perde a referência de qual endereço é produção, o que atrasa o diagnóstico e a restauração.
+
+### Reversão
+
+Para voltar ao caminho anterior, remover as variáveis e reativar a publicação da `main` na Vercel, nesta ordem:
+
+```bash
+gh variable delete DEPLOY_TARGET
+gh variable delete AGENDA_EXTERNA
+gh variable delete BACKUP_EXTERNO
+```
+
+- Conferir no painel da Vercel que o deploy Git da `main` voltou a ser permitido.
+- Manter um único banco de produção: migrar os dados com backup verificado antes de trocar o endereço.
+- Desligar o agendador da agenda do servidor e as rotinas de backup quando a nuvem reassumir, para não duplicar chamadas.
+- Registrar a decisão, a data e o efeito no histórico operacional da escola, sem dados de aluno.
 
 ## Atualização
 
