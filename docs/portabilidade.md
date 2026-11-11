@@ -10,9 +10,9 @@ As duas imagens usam a versão canônica, `sha-<SHA completo>` e `latest` estáv
 
 ## Proprietário de implantação
 
-`implantacao.yml` concentra a seção serializada `implantacao-producao`, sem cancelamento da operação em curso. `migracoes.yml` delega a sequência inteira. A seleção aceita `main` antes da primeira release estável e somente tags estáveis depois, com inventário completo de releases. Primeiro valida e constrói, depois migra, publica sem domínio, promove e confere a saúde com o SHA esperado. A trava do migrador no banco permanece intacta.
+`implantacao.yml` concentra a seção serializada `implantacao-producao`, sem cancelamento da operação em curso. `migracoes.yml` delega a sequência inteira. A seleção aceita `main` em cada commit e tags estáveis. Primeiro valida e constrói, depois migra, publica sem domínio, promove e confere a saúde com o SHA esperado. A trava do migrador no banco permanece intacta.
 
-O atestado `IMPLANTACAO_ATESTADO` precisa corresponder ao SHA e destino e confirmar backup, recuperação, compatibilidade expansiva e coordenação do auto-deploy nativo. Este repositório não preenche um atestado real nem modifica plataformas. Sem essa confirmação, não há migração. Falha após iniciá-la pode deixar schema aplicado: rollback de imagem não desfaz banco, e não existe repetição mutante automática.
+O fluxo da Vercel não usa `IMPLANTACAO_ATESTADO`. A migração roda antes da publicação e a recuperação depende do backup da plataforma. A auto-hospedagem mantém o backup obrigatório em `scripts/servidor/atualizar.sh` e o hook `backup-gate` do Kubernetes. Falha após iniciar a migração pode deixar schema aplicado: rollback de imagem não desfaz banco, e não existe repetição mutante automática.
 
 O adaptador executável é Vercel. Outros valores de `DEPLOY_TARGET` recusam migração isolada, em vez de manter um segundo dono oculto. A AWS usa um container migrador lateral antes da tarefa principal; Azure e GCP têm jobs próprios e recibo de conclusão por revisão. A ativação desses contratos e sua integração operacional exigem os gates em [implantacao-nuvem.md](implantacao-nuvem.md).
 

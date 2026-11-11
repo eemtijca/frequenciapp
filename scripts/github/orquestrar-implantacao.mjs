@@ -5,34 +5,19 @@ import { pathToFileURL } from "node:url";
 import { validarPublicacao } from "./validar-publicacao.mjs";
 
 const filas = new Map();
-export function selecionarEvento({ evento, ref, haRelease }) {
-  if (!haRelease && ["push", "workflow_dispatch"].includes(evento) && ref === "refs/heads/main")
-    return "main";
+export function selecionarEvento({ evento, ref }) {
+  if (["push", "workflow_dispatch"].includes(evento) && ref === "refs/heads/main") return "main";
   if (
     ["release", "workflow_dispatch"].includes(evento) &&
     /^refs\/tags\/v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(ref)
   )
     return "tag";
-  throw new Error("Evento fora do regime: main antes da primeira release, tags estáveis depois.");
+  throw new Error("Evento fora do regime: main ou tag estável vX.Y.Z.");
 }
 
-export async function orquestrar({ sha, destino, atestado, executar }) {
-  if (
-    !/^[0-9a-f]{40}$/.test(sha) ||
-    !destino ||
-    atestado?.sha !== sha ||
-    atestado.destino !== destino ||
-    ![
-      "backupVerificado",
-      "recuperacaoVerificada",
-      "migracoesExpansivas",
-      "autoDeployCoordenado",
-    ].every((c) => atestado[c] === true)
-  ) {
-    throw new Error(
-      "Atestado de revisão, backup, recuperação, compatibilidade e coordenação ausente.",
-    );
-  }
+export async function orquestrar({ sha, destino, executar }) {
+  if (!/^[0-9a-f]{40}$/.test(sha) || !destino)
+    throw new Error("Revisão ou destino de implantação inválido.");
   const anterior = filas.get(destino) ?? Promise.resolve();
   const rodada = anterior
     .catch(() => {})
@@ -85,6 +70,9 @@ export function executorVercel(ambiente, { comando = execFileSync, buscar = fetc
         const url = new URL(ambiente.APP_URL);
         if (url.protocol !== "https:" || url.username || url.password)
           throw new Error("APP_URL exige HTTPS sem credenciais.");
+        const configuracao = JSON.parse(readFileSync("vercel.json", "utf8"));
+        if (configuracao.git?.deploymentEnabled?.main !== false)
+          throw new Error("O auto-deploy da main precisa estar desligado no vercel.json.");
         break;
       }
       case "build":
@@ -149,14 +137,9 @@ async function principal() {
   if (![undefined, "", "vercel"].includes(ambiente.DEPLOY_TARGET))
     throw new Error("Destino sem adaptador aprovado; não migrar isoladamente.");
   const evento = JSON.parse(readFileSync(ambiente.GITHUB_EVENT_PATH, "utf8"));
-  const releases = JSON.parse(readFileSync(ambiente.IMPLANTACAO_RELEASES, "utf8"));
-  if (!Array.isArray(releases) || !releases.every(Array.isArray))
-    throw new Error("Inventário de releases incompleto.");
-  const haRelease = releases.flat().some((r) => !r.draft && !r.prerelease);
   const modo = selecionarEvento({
     evento: ambiente.GITHUB_EVENT_NAME,
     ref: ambiente.GITHUB_REF,
-    haRelease,
   });
   if (modo === "tag") {
     if (evento.release?.draft || evento.release?.prerelease)
@@ -171,7 +154,6 @@ async function principal() {
   await orquestrar({
     sha: ambiente.GITHUB_SHA,
     destino: "producao",
-    atestado: JSON.parse(ambiente.IMPLANTACAO_ATESTADO ?? "null"),
     executar: executorVercel(ambiente),
   });
 }

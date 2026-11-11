@@ -123,11 +123,11 @@ A integração opcional com o Google Planilhas exige que o servidor alcance `scr
 
 ### Ordem de publicação
 
-`implantacao.yml` é o proprietário único de validar/buildar, migrar, publicar sem domínio, promover e verificar saúde por SHA. `migracoes.yml` delega essa sequência. A `main` é aceita antes da primeira release estável; tags estáveis são obrigatórias depois. `DIRECT_URL_PROD` é entregue somente ao processo migrador pelo adaptador. A CLI Vercel vem do lock, sem `dlx` ou `latest`. Com `DEPLOY_TARGET` diferente de vazio ou `vercel`, a sequência de produção é ignorada e o servidor próprio segue o guia de auto-hospedagem.
+`implantacao.yml` é o proprietário único de validar/buildar, migrar, publicar sem domínio, promover e verificar saúde por SHA. `migracoes.yml` delega essa sequência. A `main` é aceita em cada commit; tags estáveis também são aceitas. O auto-deploy nativo da `main` fica desligado no `vercel.json` e no painel da Vercel, para o workflow ser o único caminho de produção. `DIRECT_URL_PROD` é entregue somente ao processo migrador pelo adaptador. A CLI Vercel vem do lock, sem `dlx` ou `latest`. Com `DEPLOY_TARGET` diferente de vazio ou `vercel`, a sequência de produção é ignorada e o servidor próprio segue o guia de auto-hospedagem.
 
 `publicacao.yml` valida versão, tag e commit antes do login no GHCR, lê o inventário de releases e mantém `latest` monotônico. Uma imagem antiga republicada mantém a própria versão e `sha-<SHA>`, sem mover o canal estável para trás. O comando manual precisa ser executado na tag `vX.Y.Z`; a branch de mesmo nome é recusada.
 
-O gate `IMPLANTACAO_ATESTADO` vincula a revisão ao backup, recuperação, migrações expansivas e coordenação do auto-deploy nativo. Não preencher por conveniência. As proteções reais do GitHub e da Vercel precisam de confirmação do mantenedor. Falha posterior à entrada em migração pode deixar schema aplicado; não é rollback de banco. Detalhes em [releases.md](releases.md).
+O fluxo da Vercel não usa `IMPLANTACAO_ATESTADO`. A sequência aplica a migração antes de publicar e a recuperação depende do backup da plataforma. A auto-hospedagem mantém o backup obrigatório em `scripts/servidor/atualizar.sh` e o hook `backup-gate` do Kubernetes. Falha posterior à entrada em migração pode deixar schema aplicado; não é rollback de banco. Detalhes em [releases.md](releases.md).
 
 ### Preview e manutenção
 

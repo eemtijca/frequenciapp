@@ -8,13 +8,13 @@ on:
   workflow_dispatch:
     inputs:
       versao:
-        description: Versão da tag estável; vazio somente antes da primeira release na main
+        description: Versão da tag estável; vazio para publicar a main
         type: string
         required: false
   workflow_call:
     inputs:
       versao:
-        description: Versão da tag estável; vazio somente antes da primeira release na main
+        description: Versão da tag estável; vazio para publicar a main
         type: string
         required: false
 permissions:
@@ -41,15 +41,9 @@ jobs:
         with:
           node-version: 24.22.2
       - run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Inventariar releases antes de selecionar regime
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
       - name: Orquestrar a mesma revisão
         env:
           IMPLANTACAO_VERSAO: ${{ inputs.versao }}
-          IMPLANTACAO_RELEASES: ${{ runner.temp }}/releases.json
-          IMPLANTACAO_ATESTADO: ${{ vars.IMPLANTACAO_ATESTADO }}
           DEPLOY_TARGET: ${{ vars.DEPLOY_TARGET }}
           DIRECT_URL_PROD: ${{ secrets.DIRECT_URL_PROD }}
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}

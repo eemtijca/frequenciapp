@@ -10,16 +10,16 @@ O projeto segue o [Versionamento Semântico](https://semver.org/lang/pt-BR/) e m
 - Versão menor: funcionalidade nova compatível com as versões anteriores.
 - Versão de correção: correção de comportamento, segurança e dependências.
 
-Enquanto a primeira versão pública não é lançada, a versão permanece fixada em `0.1.0` e as mudanças acumulam na seção Não publicado do changelog. O deploy continua acompanhando a `main`.
+Enquanto a primeira versão pública não é lançada, a versão permanece fixada em `0.1.0` e as mudanças acumulam na seção Não publicado do changelog. O deploy da aplicação acompanha a `main` em cada commit.
 
-## Fluxo a partir da v1.0.0
+## Fluxo de release
 
 A primeira release será a `v1.0.0`. A partir dela:
 
 1. o [release-please](https://github.com/googleapis/release-please) mantém um pull request de release com a versão e o changelog;
 2. o merge do pull request de release cria a tag `vX.Y.Z` e a release imutável no GitHub;
-3. `publicacao.yml` valida identidade e publica as imagens no GHCR; `implantacao.yml` é o proprietário da sequência de implantação no environment `release`, com build anterior à migração;
-4. o deploy de produção acontece somente por tag; os previews continuam por pull request.
+3. `publicacao.yml` valida identidade e publica as imagens no GHCR; `implantacao.yml` continua sendo o proprietário da sequência de produção e roda em cada push na `main`, além de aceitar a tag estável;
+4. a produção acompanha a `main`; a tag também pode publicar o commit marcado. Os previews continuam por pull request.
 
 As entradas do changelog vêm dos títulos dos pull requests, escritos no presente do indicativo e lidos como afirmações sobre a mudança; o merge por squash usa o título como commit na `main`.
 
@@ -36,9 +36,9 @@ As entradas do changelog vêm dos títulos dos pull requests, escritos no presen
 
 ## Backup, compatibilidade e recuperação
 
-A seção mutante usa `cancel-in-progress:false` e uma chave comum por destino. `migracoes.yml` não migra mais por um caminho paralelo. O inventário de releases escolhe `main` apenas antes da primeira release estável e tags depois. O migrador mantém as duas travas consultivas e a conferência de checksums.
+A seção mutante usa `cancel-in-progress:false` e uma chave comum por destino. `migracoes.yml` não mantém um caminho paralelo. A `main` e as tags estáveis são aceitas. O migrador mantém as duas travas consultivas e a conferência de checksums.
 
-Antes da primeira mutação, o mantenedor registra `IMPLANTACAO_ATESTADO` com `sha`, `destino: "producao"`, `backupVerificado`, `recuperacaoVerificada`, `migracoesExpansivas` e `autoDeployCoordenado`. Todos os booleanos precisam ser verdadeiros para a revisão em questão. Atestar não executa backup nem ensaio de recuperação; o recibo depende dessas verificações reais previamente autorizadas. Configuração nativa de auto-deploy e proteções dos environments permanecem externas e não verificadas por unidade.
+O fluxo da Vercel não usa `IMPLANTACAO_ATESTADO`. A migração roda antes da publicação e a recuperação depende do backup da plataforma. A auto-hospedagem mantém o backup obrigatório em `scripts/servidor/atualizar.sh` e o hook `backup-gate` do Kubernetes; esses portões não valem para a Vercel. O auto-deploy nativo da `main` fica desligado em `vercel.json` e no painel da Vercel, para o workflow ser o único caminho de produção.
 
 O código valida e constrói a revisão antes de migrar, publica sem apontar o domínio, promove e exige `commit` igual ao SHA em `/api/saude`. Falha desde a entrada no estágio de migração informa que o schema pode já estar aplicado, inclusive em aplicação parcial. Não reexecutar automaticamente procedimento destrutivo. Recuperar a imagem anterior não reverte o banco; dados exigem decisão e procedimento de recuperação próprios, preferencialmente migração corretiva compatível.
 

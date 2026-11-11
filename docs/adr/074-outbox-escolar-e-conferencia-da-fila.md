@@ -26,7 +26,7 @@ Manter o enfileiramento depois do commit deixa a janela de perda. Gravar a inten
 - A resolução de escrita incerta depende de um sucesso posterior no mesmo escopo. Enquanto isso não acontece, o item permanece visível e fora do expurgo.
 - Recortes antigos, incompletos ou sem destino usam confirmação explícita. A confirmação não substitui a evidência de um destino conhecido.
 - A reserva impede que o consumidor vencido finalize o item do novo dono, mas não cancela uma escrita já iniciada no Google. A garantia continua sendo de recuperação e de conferência, não de exatamente uma vez.
-- A migração `20261109112215_l07_outbox_escolar_e_conferencia` precisa ser aplicada antes da nova versão.
+- A migração `20261109140000_l07_outbox_escolar_e_conferencia` precisa ser aplicada antes da nova versão.
 
 ## Referências
 

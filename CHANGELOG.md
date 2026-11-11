@@ -94,6 +94,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A Chamada mostra somente o nome da justificativa, sem sigla ou repetição. Após salvar, a linha exibe o nome; ao desbloquear, o seletor e a observação voltam a ficar disponíveis.
 
+### Corrigido
+
+- O fluxo da Vercel volta a publicar a `main` em cada commit e aplica a migração antes da publicação, sem o atestado de backup e recuperação da auto-hospedagem. O auto-deploy nativo da `main` fica desligado no `vercel.json`, para o workflow ser o único caminho de produção. A decisão está na [ADR-075](docs/adr/075-vercel-continuo-e-auto-hospedagem-com-backup.md).
+
 ### Adicionado
 
 - A chamada retroativa passa a ser permitida com confirmação explícita e auditoria quando a composição da turma não pode ser comprovada. A ordem das listas históricas fica estável, o retrato de aulas é usado na classificação e a exclusão de aula com histórico é recusada. A decisão está na [ADR-066](docs/adr/066-politica-retroativa.md).

@@ -13,8 +13,7 @@ const comando=(cmd,args,opts)=>{
   if(args.includes('deploy')) return 'https://ensaio.vercel.app\n';
   return '';
 };
-const atestado={sha,destino:'sintetico',backupVerificado:true,recuperacaoVerificada:true,migracoesExpansivas:true,autoDeployCoordenado:true};
-await orquestrar({sha,destino:'sintetico',atestado,executar:executorVercel(ambiente,{comando,buscar:async()=>new Response(JSON.stringify({ok:true,commit:sha}))})});
+await orquestrar({sha,destino:'sintetico',executar:executorVercel(ambiente,{comando,buscar:async()=>new Response(JSON.stringify({ok:true,commit:sha}))})});
 assert.equal(chamadas.filter(c=>c.args.includes('docker/app/migrar.mjs')).length,1);
 for(const chamada of chamadas){
   assert(!('GOOGLE_SECRET' in chamada.env));
