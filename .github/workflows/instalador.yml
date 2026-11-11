@@ -1,0 +1,98 @@
+# Valida o instalador cross-distro: qualidade, unidade e matriz Docker de plano.
+name: Instalador
+
+on:
+  pull_request:
+    paths:
+      - "instalar.sh"
+      - "scripts/instalador/**"
+      - "tests/instalador/**"
+      - "package.json"
+      - "docs/instalador.md"
+      - ".github/workflows/instalador.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: instalador-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualidade:
+    name: Qualidade do instalador
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.2
+
+      - name: Instalar ferramentas de análise
+        run: >
+          npm install --no-save --no-package-lock --ignore-scripts
+          prettier@3.9.10 prettier-plugin-tailwindcss@0.8.1
+          eslint@9.39.2 eslint-config-next@16.4.5 typescript@5.9.3
+
+      - name: Prettier
+        run: >
+          ./node_modules/.bin/prettier --check
+          scripts/instalador tests/instalador
+          .github/workflows/instalador.yml docs/instalador.md package.json
+
+      - name: ESLint
+        run: ./node_modules/.bin/eslint scripts/instalador tests/instalador
+
+      - name: Sintaxe do Bash
+        run: bash -n instalar.sh
+
+      - name: ShellCheck
+        run: >
+          docker run --rm -v "$PWD:/mnt:ro" -w /mnt
+          koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d
+          instalar.sh
+
+      - name: Actionlint
+        run: >
+          docker run --rm -v "$PWD:/repo" -w /repo
+          rhysd/actionlint:latest@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667
+          -color
+
+  unidade:
+    name: Unidade do instalador
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.2
+
+      - name: Testes unitários
+        env:
+          INSTALADOR_MATRIZ: "0"
+        run: npm run test:instalador:unit
+
+  matriz:
+    name: Matriz Docker de plano
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 24.22.2
+
+      - name: Matriz de planejar
+        run: npm run test:instalador:matriz

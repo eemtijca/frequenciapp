@@ -23,6 +23,8 @@
     "test:api": "vitest run --config vitest.api.config.ts",
     "test:servidor": "bash tests/servidor/executar.sh",
     "test:servidor:rapido": "bash tests/servidor/atualizacao.sh",
+    "test:instalador:unit": "node --test tests/instalador/*.test.mjs",
+    "test:instalador:matriz": "node --test tests/instalador/matriz.test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",

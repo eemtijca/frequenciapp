@@ -832,7 +832,7 @@ docker run --rm \
   bash -lc 'PATH=/node/bin:$PATH bash instalar.sh planejar --json --nao-interativo'
 ```
 
-O `planejar` exige Node.js 24 no PATH. A suíte prepara o runtime oficial fora do worktree e monta o diretório somente para leitura; o worktree também fica somente para leitura, o que comprova que o plano não escreve nele. Sem Node.js 24, o bootstrap encerra com `E_VALIDACAO` e saída 4, sem instalar pacote. A preparação automática de Node e utilitários ocorre apenas em comando que altera o host e com `INSTALADOR_PERMITIR_BOOTSTRAP=1`. Imagens mínimas sem `tar` ou `gzip` recebem esses utilitários antes da chamada, sem alterar o worktree.
+O `planejar` exige Node.js 24 no PATH. A suíte prepara o runtime oficial fora do worktree e monta o diretório somente para leitura; o worktree também fica somente para leitura, o que comprova que o plano não escreve nele. O runtime é apontado por `INSTALADOR_NODE` e fica em volume próprio, fora do worktree. Sem Node.js 24, o bootstrap encerra com `E_VALIDACAO` e saída 4, sem instalar pacote. A preparação automática de Node e utilitários ocorre apenas em comando que altera o host e com `INSTALADOR_PERMITIR_BOOTSTRAP=1`. Imagens mínimas sem `tar` ou `gzip` recebem esses utilitários antes da chamada, sem alterar o worktree.
 
 Imagens Tier 1:
 
@@ -856,7 +856,13 @@ amazonlinux:2023
 alpine:3.22
 ```
 
-No Alpine, o próprio teste instala `bash` e `libstdc++` e prepara o runtime Node antes de chamar o instalador. O `planejar` não altera o sistema do contêiner; a montagem read-only comprova a ausência de escrita no worktree.
+As imagens ficam fixadas por digest no teste; a tag serve apenas para leitura. As tags móveis `fedora:latest` e `archlinux:latest` têm o conteúdo congelado pelo digest. O comando da matriz é:
+
+```bash
+pnpm run test:instalador:matriz
+```
+
+No Alpine, o próprio teste instala `bash` e `libstdc++` e prepara o runtime Node antes de chamar o instalador. O `planejar` não altera o sistema do contêiner; a montagem read-only comprova a ausência de escrita no worktree. Quando o Docker não está disponível, o teste é pulado com mensagem explícita, sem transformar a ausência do daemon em falha da matriz.
 
 ### Aplicação e systemd
 
@@ -875,6 +881,10 @@ O systemd em contêiner valida units e timers, mas não substitui o ensaio em VP
 
 ### Testes unitários
 
+```bash
+pnpm run test:instalador:unit
+```
+
 Os testes ficam em `tests/instalador/` e cobrem:
 
 - detecção de distro, arquitetura, gerenciador, iniciador, firewall, SELinux e AppArmor;
@@ -888,9 +898,9 @@ Os testes ficam em `tests/instalador/` e cobrem:
 - porta ocupada, DNS inválido, disco insuficiente, backup falhando e saúde falhando;
 - troca de `main` para `release`, downgrade recusado e hash do migrador divergente;
 - perfis `simples`, `controlador`, `dropbox` e `completo`;
-- matriz de plano em todas as distros Tier 1 e subconjunto de aplicação com systemd.
+- matriz de plano em todas as distros Tier 1; o subconjunto de aplicação entra com a implementação do `aplicar`.
 
-O workflow `instalador.yml` separa detecção e plano, aplicação simples, canal, systemd e matriz. A suíte de qualidade do repositório continua rodando formatação, lint, tipos e unidade. O instalador não depende de `pnpm` no host de produção.
+O workflow `instalador.yml` separa qualidade, unidade e matriz de plano. A matriz de aplicação entra com a implementação do `aplicar`. A suíte de qualidade do repositório continua rodando formatação, lint, tipos e unidade. O instalador não depende de `pnpm` no host de produção; a matriz usa Docker e Node 24 preparado fora do worktree.
 
 ## Referências
 
