@@ -1,0 +1,21 @@
+{
+  "schema": "frequenciapp.instalacao/1",
+  "instaladoEm": "2026-11-11T12:00:00Z",
+  "atualizadoEm": "2026-11-11T12:10:00Z",
+  "perfil": "simples",
+  "canal": "release",
+  "tag": "v1.0.0",
+  "commit": "0000000000000000000000000000000000000000",
+  "imagem": "ghcr.io/eemtijca/frequenciapp",
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "etapas": [],
+  "controlador": {
+    "adotado": false,
+    "migradorSha256": null,
+    "readocaoPendente": false
+  },
+  "backup": {
+    "ultimoRecibo": null,
+    "verificadoEm": null
+  }
+}

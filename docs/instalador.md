@@ -10,6 +10,8 @@ As decisões estão na [ADR-076](adr/076-instalador-cross-distro.md) e na [ADR-0
 
 O entry point é `instalar.sh`, um bootstrap Bash pequeno. Ele confere o host, instala apenas o mínimo para executar a CLI Node interna e delega o trabalho a `scripts/instalador/`. A CLI não usa dependências externas de npm, para que a instalação não dependa de rede de pacotes JavaScript.
 
+O bootstrap não instala nada durante `planejar`, `versao` ou `esquema`. Quando falta Node.js 24 no PATH, ele encerra com `E_VALIDACAO` e saída 4, sem preparar o host. A instalação automática de utilitários e do runtime Node só ocorre em comando que altera o host e com `INSTALADOR_PERMITIR_BOOTSTRAP=1`; o runtime vem do tarball oficial com SHA-256. A variável `INSTALADOR_NODE` aponta um runtime já presente. Uma falha anterior à CLI, como Node ausente, usa o stderr e o código de saída do contrato, sem produzir JSON.
+
 ```text
 instalar.sh
 scripts/instalador/
@@ -324,6 +326,8 @@ Cada item de `etapas` tem as chaves abaixo. A ordem reflete a execução e os id
 | `detalhes` | objeto         | Dados estruturados da etapa, sempre redigidos                            |
 
 Cada ação tem `descricao`, `comando` e `altera`. `descricao` é uma frase curta em português. `comando` é uma string ou null com o comando equivalente, já redigido. `altera` é booleano e indica se a ação modifica o host.
+
+O schema fixa `additionalProperties: false` nos objetos do contrato. A exceção é `detalhes`, o único objeto aberto, reservado a dados estruturados da etapa.
 
 ### Erros e avisos
 
@@ -822,10 +826,13 @@ Nenhum teste do instalador roda no Windows, no WSL ou diretamente no host. A mat
 ```bash
 docker run --rm \
   -v "$PWD:/work:ro" \
+  -v "$NODE_DIR:/node:ro" \
   -w /work \
   ubuntu:26.04 \
-  bash -lc 'bash instalar.sh planejar --json --nao-interativo'
+  bash -lc 'PATH=/node/bin:$PATH bash instalar.sh planejar --json --nao-interativo'
 ```
+
+O `planejar` exige Node.js 24 no PATH. A suíte prepara o runtime oficial fora do worktree e monta o diretório somente para leitura; o worktree também fica somente para leitura, o que comprova que o plano não escreve nele. Sem Node.js 24, o bootstrap encerra com `E_VALIDACAO` e saída 4, sem instalar pacote. A preparação automática de Node e utilitários ocorre apenas em comando que altera o host e com `INSTALADOR_PERMITIR_BOOTSTRAP=1`. Imagens mínimas sem `tar` ou `gzip` recebem esses utilitários antes da chamada, sem alterar o worktree.
 
 Imagens Tier 1:
 
@@ -849,7 +856,7 @@ amazonlinux:2023
 alpine:3.22
 ```
 
-No Alpine, o próprio teste instala `bash` e `curl` antes de chamar o instalador. O `planejar` não altera o sistema do contêiner; a montagem read-only comprova a ausência de escrita no worktree.
+No Alpine, o próprio teste instala `bash` e `libstdc++` e prepara o runtime Node antes de chamar o instalador. O `planejar` não altera o sistema do contêiner; a montagem read-only comprova a ausência de escrita no worktree.
 
 ### Aplicação e systemd
 
