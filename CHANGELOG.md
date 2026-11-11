@@ -8,11 +8,16 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ## [Não publicado]
 
+As alterações de manutenção protegida, Dropbox, origem autenticada e restauração descritas neste recorte estão em desenvolvimento, sem aceite integrado nem liberação operacional. O estado e os bloqueios estão em [pendências de auto-hospedagem](docs/auto-hospedagem-pendencias.md).
+
+### Corrigido
+
+- A verificação de backups em Compose confere a identidade do banco antes de validar o recibo, mantendo a recusa de arquivos adulterados e de destinos divergentes.
+
 ### Alterado
 
-- A inicialização auto-hospedada recusa registros de migração não revertidos com `finished_at` nulo, orienta a revisão do histórico sem apagar dados, corrige os horários do exemplo e exclui certificados no caminho padrão e arquivos sensíveis comuns dos contextos de build.
-
 - A simulação da atualização deixa de buscar referências e não altera refs ou tags; usa as refs locais e orienta a buscar manualmente para considerar o remoto.
+- A inicialização auto-hospedada recusa registros de migração não revertidos com `finished_at` nulo, orienta a revisão do histórico sem apagar dados, corrige os horários do exemplo e exclui certificados no caminho padrão e arquivos sensíveis comuns dos contextos de build.
 
 - As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.
 
@@ -22,15 +27,19 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A atualização da auto-hospedagem passa a montar e validar o Compose antes do uso, exige backup em toda execução, constrói a imagem em uma worktree do commit alvo e confere o rótulo OCI da imagem. A imagem opcional de backup de planilhas deixa de ser exigida quando a rotina está desabilitada. O rollback deixa explícito que não desfaz migrações aplicadas. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
 
-- A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O modo URL exige uma URL de validação ou uma decisão explícita para dispensar o ensaio.
+- A restauração da auto-hospedagem valida o dump em banco descartável, corrige o conflito do schema `public`, troca o banco em uso por um banco validado e preserva o banco anterior. O perfil URL direto PostgreSQL 17 cria o próprio banco de ensaio; a dispensa continua sendo uma decisão explícita de risco.
 
-- O modo URL da restauração confere a identidade do servidor e do banco de validação e do destino, recusando a mesma base mesmo quando as URLs usam grafias diferentes.
+- O modo URL da restauração recusa URLs externas de validação e verifica nome, OID, dono e marcador do banco de ensaio próprio antes da restauração e do descarte. Falhas incertas preservam o recurso e exigem inspeção manual.
 
 - A troca de banco da restauração passa a ser transacional e a recuperação reconhece troca parcial, preservando o banco anterior e religando a aplicação.
 
 - A restauração em Compose recusa um banco com schemas fora de `DATABASE_SCHEMA`, porque o dump cobre apenas esse schema e a troca do banco inteiro perderia os demais.
 
-- O backup do banco cifra o dump em fluxo, compara a cópia remota com o hash local original e preserva um mínimo configurável de cinco cópias confirmadas. A limpeza remota passa a ser opcional.
+- O backup do banco cifra o dump em fluxo, compara a cópia remota com o hash local original e preserva um mínimo configurável de 30 cópias confirmadas por padrão. A retenção remota passa a exigir perfil Dropbox adotado, autoridade cooperativa, catálogo independente, journal durável e exclusão condicional da revisão verificada; os demais transportes continuam recusados.
+
+- A manutenção Compose ganha controlador instalado fora do checkout, snapshot protegido, intenção e conclusão duráveis e cópias físicas do conjunto de recuperação fora da retenção. O cron adotado chama a entrada estável e falhas com possível migração não iniciam automaticamente a imagem anterior.
+
+- O backup URL e o hook Kubernetes ganham perfil de origem autenticada com endpoint TLS fixado, snapshot PostgreSQL e HMAC em Secret separado. Legados sem prova de origem continuam recusados; o diagnóstico de integridade não autoriza rollout.
 
 - O instalador das rotinas valida o fuso do daemon do cron e só grava `CRON_TZ` quando a implementação comprova suporte. Os CronJobs do Helm aceitam `timeZone`.
 

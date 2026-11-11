@@ -86,3 +86,12 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-072](adr/072-publicacao-e-implantacao-coordenadas.md): um único proprietário da migração e da implantação, identidade de publicação por tag, SHA e pacote, e `latest` monotônico.
 - [ADR-073](adr/073-papeis-de-runtime-separados.md): conexões distintas para runtime e migração, jobs de migração por nuvem e SQL de grants sem privilégios administrativos.
 - [ADR-074](adr/074-outbox-escolar-e-conferencia-da-fila.md): intenção escolar na mesma transação, despacho recuperável, conferência de escrita incerta e fencing da reserva.
+
+## Perfis de manutenção adotados
+
+O recorte em desenvolvimento tem [estado, limites das provas e pendências de integração](auto-hospedagem-pendencias.md). Os contratos abaixo não constituem liberação operacional.
+
+- [Controlador de manutenção](controlador-manutencao.md): snapshot estável, autoridade, journal, pins e limites do operador.
+- [Retenção Dropbox](dropbox-retencao.md): pasta exclusiva, transporte nativo, configuração privada e exclusão condicional.
+- [Origem autenticada URL](origem-backup.md): endpoint direto TLS, snapshot, policy independente, HMAC e gate Kubernetes.
+- [Restauração URL](restauracao-url.md): banco de ensaio próprio, journal e recuperação manual diante de incerteza.

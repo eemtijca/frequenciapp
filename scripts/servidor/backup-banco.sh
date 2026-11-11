@@ -7,10 +7,15 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/comum.sh"
 
 verificar_somente=false
+diagnosticar_integridade=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --verificar)
       verificar_somente=true
+      shift
+      ;;
+    --diagnosticar-integridade)
+      diagnosticar_integridade=true
       shift
       ;;
     --ajuda | -h)
@@ -28,13 +33,17 @@ TEXTO
   esac
 done
 
+if [ "$verificar_somente" = true ] && [ "$diagnosticar_integridade" = true ]; then
+  erro "Use apenas uma das opções: --verificar ou --diagnosticar-integridade."
+fi
+
 carregar_ambiente
 
 BACKUP_MODO="${BACKUP_MODO:-compose}"
 BACKUP_CRIPTOGRAFIA="${BACKUP_CRIPTOGRAFIA:-gpg}"
 BACKUP_BANCO_DIR="${BACKUP_BANCO_DIR:-$BACKUP_DIR/banco}"
 BACKUP_RETER_DIAS="${BACKUP_RETER_DIAS:-30}"
-BACKUP_RETER_MINIMO="${BACKUP_RETER_MINIMO:-5}"
+BACKUP_RETER_MINIMO="${BACKUP_RETER_MINIMO:-30}"
 BACKUP_ESPACO_MINIMO_MB="${BACKUP_ESPACO_MINIMO_MB:-512}"
 BACKUP_INCLUIR_AMBIENTE="${BACKUP_INCLUIR_AMBIENTE:-true}"
 BACKUP_AMBIENTE_ARQUIVO="${BACKUP_AMBIENTE_ARQUIVO:-$APP_ENV_FILE}"
@@ -48,11 +57,12 @@ if [ "$BACKUP_EXIGIR_REMOTO" = true ]; then
   [ "${BACKUP_VERIFICAR_REMOTO:-true}" = true ] || erro "O remoto obrigatório exige verificação."
 fi
 export BACKUP_MODO BACKUP_CRIPTOGRAFIA BACKUP_RETER_DIAS BACKUP_RETER_MINIMO BACKUP_CATALOGO_PERSISTENTE BACKUP_EXIGIR_REMOTO
+export ESTADO_DIR BACKUP_BANCO_DIR BACKUP_REMOTO BACKUP_RCLONE_CONFIG
 DATABASE_SCHEMA="${DATABASE_SCHEMA:-public}"
 export DATABASE_SCHEMA
 
 if [ -n "${DATABASE_URL:-}${DIRECT_URL:-}${BACKUP_DATABASE_URL:-}" ]; then
-  node "$APP_DIR/scripts/servidor/validar-banco.mjs" || erro "A identidade do banco não confere."
+  node "$DIR/validar-banco.mjs" || erro "A identidade do banco não confere."
 fi
 
 case "$BACKUP_MODO" in
@@ -91,6 +101,14 @@ mkdir -p "$BACKUP_BANCO_DIR"
 chmod 700 "$BACKUP_BANCO_DIR" 2>/dev/null || true
 mkdir -p "$ESTADO_DIR"
 chmod 700 "$ESTADO_DIR" 2>/dev/null || true
+
+origem_adotada=false
+if [ "$BACKUP_MODO" = url ] && [ -n "${BACKUP_ORIGEM_POLICY:-}" ]; then
+  origem_config=$(node "$DIR/origem-backup.mjs" validar-config) || erro "Configuração independente de origem inválida."
+  IFS=$'\t' read -r SERVIDOR_ALVO_CHAVE BACKUP_BANCO_VERIFICADO <<<"$origem_config"
+  export SERVIDOR_ALVO_CHAVE BACKUP_BANCO_VERIFICADO
+  origem_adotada=true
+fi
 
 tmp=$(mktemp -d "$BACKUP_BANCO_DIR/.tmp.XXXXXX")
 trap 'status=$?; limpar_home_gpg; if [ "$status" -ne 0 ]; then notificar falha "Backup do banco falhou."; fi; rm -rf "$tmp"' EXIT
@@ -176,7 +194,7 @@ verificar_item_remoto() {
   local destino="$tmp/verificacao/$nome"
   mkdir -p "$(dirname "$destino")"
   rclone_limpo copyto "${BACKUP_REMOTO%/}/$nome" "$destino" ||
-    erro "NÃ£o foi possÃ­vel baixar $nome do destino remoto."
+    erro "Não foi possível baixar $nome do destino remoto."
   local calculado
   calculado=$(sha256sum "$destino" | cut -d' ' -f1)
   [ "$calculado" = "$esperado" ] ||
@@ -184,46 +202,94 @@ verificar_item_remoto() {
 }
 
 verificar_ultimo_backup() {
-  [ -f "$estado" ] || erro "NÃ£o hÃ¡ estado de backup em $estado."
-  local recibo
-  recibo=$(ler_campo_json "$estado" recibo)
-  [[ "$recibo" =~ ^frequenciapp-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}\.confirmado\.json$ ]] || erro "Backup legado exige adoÃ§Ã£o/verificaÃ§Ã£o explÃ­cita."
-  node "$DIR/recibos.mjs" conferir-estado "$BACKUP_BANCO_DIR" "$estado" || erro "Recibo, escopo ou artefatos invÃ¡lidos."
-  local arquivo
-  local sha
-  local ambiente
-  local ambiente_sha
-  arquivo=$(ler_campo_json "$estado" "arquivo")
-  sha=$(ler_campo_json "$estado" "sha256")
-  ambiente=$(ler_campo_json "$estado" "ambiente")
-  ambiente_sha=$(ler_campo_json "$estado" "ambienteSha256")
-  [ -n "$arquivo" ] || erro "O estado do backup nÃ£o informa o arquivo."
-  [ -n "$sha" ] || erro "O estado do backup nÃ£o informa o checksum."
-
-  verificar_arquivo_local "$BACKUP_BANCO_DIR/$arquivo" "$sha"
-  if [ -n "$ambiente" ]; then
-    [ -n "$ambiente_sha" ] || erro "O estado do backup nÃ£o informa o checksum do ambiente."
-    verificar_arquivo_local "$BACKUP_BANCO_DIR/$ambiente" "$ambiente_sha"
+  # Captura metadados uma única vez e preserva os inodes dos artefatos na
+  # pasta privada. A trava é cooperativa: isto não impede escrita no mesmo
+  # inode por outro processo com acesso, nem protege diretórios ancestrais.
+  local captura="$tmp/captura-verificacao"
+  mkdir -m 700 "$captura"
+  if ! node --input-type=module - "$DIR/recibos.mjs" "$estado" "$BACKUP_BANCO_DIR" "$captura" <<'NODE'
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { pathToFileURL } from 'node:url';
+const [modulo, ponteiro, origem, captura] = process.argv.slice(2);
+const { validarRecibo } = await import(pathToFileURL(modulo).href);
+function lerJsonLimitado(nome) {
+  const fd = fs.openSync(nome, fs.constants.O_RDONLY | fs.constants.O_NONBLOCK | fs.constants.O_NOFOLLOW);
+  try {
+    const limite = 1024 * 1024;
+    if (!fs.fstatSync(fd).isFile() || fs.fstatSync(fd).size > limite) throw new Error('Metadado inválido.');
+    const buffer = Buffer.alloc(limite + 1);
+    let total = 0;
+    while (total < buffer.length) {
+      const n = fs.readSync(fd, buffer, total, buffer.length - total, null);
+      if (!n) break;
+      total += n;
+    }
+    if (total > limite) throw new Error('Metadado excede limite.');
+    return buffer.subarray(0, total);
+  } finally { fs.closeSync(fd); }
+}
+const estadoBytes = lerJsonLimitado(ponteiro);
+const estado = JSON.parse(estadoBytes.toString('utf8'));
+if (typeof estado?.recibo !== 'string' || !/^frequenciapp-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}\.confirmado\.json$/.test(estado.recibo)) throw new Error('Ponteiro inválido.');
+const reciboBytes = lerJsonLimitado(path.join(origem, estado.recibo));
+const recibo = validarRecibo(JSON.parse(reciboBytes.toString('utf8')));
+if (estado.recibo !== `${recibo.base}.confirmado.json`) throw new Error('Recibo divergente.');
+fs.writeFileSync(path.join(captura, 'estado.json'), estadoBytes, { mode: 0o600, flag: 'wx' });
+fs.writeFileSync(path.join(captura, estado.recibo), reciboBytes, { mode: 0o600, flag: 'wx' });
+for (const item of recibo.artefatos) fs.linkSync(path.join(origem, item.nome), path.join(captura, item.nome));
+const reciboHash = createHash('sha256').update(reciboBytes).digest('hex');
+fs.writeFileSync(path.join(captura, 'remotos'), recibo.artefatos.map(a => `${a.nome}\t${a.sha256}\n`).join('') + `${estado.recibo}\t${reciboHash}\n`, { mode: 0o600, flag: 'wx' });
+fs.writeFileSync(path.join(captura, 'nome'), `${recibo.base}.dump.${recibo.criptografia}\n`, { mode: 0o600, flag: 'wx' });
+NODE
+  then
+    erro "Não foi possível capturar o ponteiro e o recibo com segurança."
   fi
-
+  node "$DIR/recibos.mjs" conferir-estado "$captura" "$captura/estado.json" || erro "Recibo, escopo ou artefatos inválidos."
   if [ -n "${BACKUP_REMOTO:-}" ]; then
     preparar_rclone
-    verificar_item_remoto "$arquivo" "$sha"
-    if [ -n "$ambiente" ]; then
-      verificar_item_remoto "$ambiente" "$ambiente_sha"
-    fi
-    log "A cÃ³pia remota confere com o hash local original."
+    local item item_sha
+    while IFS=$'\t' read -r item item_sha; do
+      verificar_item_remoto "$item" "$item_sha"
+    done <"$captura/remotos"
+    log "Todos os artefatos e o recibo remoto conferem com os hashes locais."
   fi
+  local arquivo
+  IFS= read -r arquivo <"$captura/nome"
   log "Backup confirmado: $arquivo."
 }
 
-if [ "$verificar_somente" = true ]; then
-  verificar_ultimo_backup
+if [ "$diagnosticar_integridade" = true ]; then
+  [ -f "$estado" ] || erro "Não há estado de backup em $estado."
+  node "$DIR/recibos.mjs" diagnosticar-integridade "$BACKUP_BANCO_DIR" "$estado" ||
+    erro "Recibo ou artefatos locais inválidos."
+  log "Integridade local conferida; origem do backup não comprovada. Não autoriza atualização ou retenção."
   exit 0
 fi
 
 if [ "$BACKUP_MODO" = "compose" ]; then
   conferir_banco_compose
+fi
+
+if [ "$verificar_somente" = false ] && [ -n "${BACKUP_DROPBOX_CONFIG:-}" ]; then
+  [ "$BACKUP_MODO" = compose ] || erro "Escrita Dropbox adotada suspensa no perfil URL."
+  if [ -n "${BACKUP_DROPBOX_SESSAO:-}" ]; then
+    node "$DIR/dropbox-autoridade.mjs" conferir || erro "Handoff Dropbox inválido."
+  else
+    # O pai mantém o FD 9; o wrapper mantém a autoridade até terminar o filho.
+    node "$DIR/dropbox-autoridade.mjs" executar
+    exit "$?"
+  fi
+fi
+
+if [ "$verificar_somente" = true ]; then
+  if [ "$BACKUP_MODO" = url ]; then
+    [ "$origem_adotada" = true ] || erro "Origem URL legada não adotada; use diagnóstico separado."
+    node "$DIR/origem-backup.mjs" verificar || erro "Origem autenticada ou artefatos divergentes."
+  fi
+  verificar_ultimo_backup
+  exit 0
 fi
 
 preparar_criptografia
@@ -280,7 +346,13 @@ gerar_dump_cifrado() {
     url_dump="${BACKUP_DATABASE_URL:-${DIRECT_URL:-}}"
     [ -n "$url_dump" ] || erro "Defina BACKUP_DATABASE_URL ou DIRECT_URL."
     log "Destino do dump: $(mascarar_url "$url_dump")"
-    if pg_dump "$url_dump" "${argumentos_dump[@]}" | tee "$fifo" | cifrar_fluxo "$destino"; then
+    if [ "$origem_adotada" = true ]; then
+      if node "$DIR/origem-backup.mjs" dump "$tmp/origem.json" | tee "$fifo" | cifrar_fluxo "$destino"; then
+        status_pipeline=0
+      else
+        status_pipeline=$?
+      fi
+    elif pg_dump "$url_dump" "${argumentos_dump[@]}" | tee "$fifo" | cifrar_fluxo "$destino"; then
       status_pipeline=0
     else
       status_pipeline=$?
@@ -383,6 +455,10 @@ aplicar_retencao_remota() {
 recibo="${base}.confirmado.json"
 RECIBO_REMOTO_VERIFICADO="$verificado_remoto" node "$DIR/recibos.mjs" criar "$BACKUP_BANCO_DIR" "$base" >"$tmp/$recibo" ||
   erro "NÃ£o foi possÃ­vel confirmar o conjunto."
+if [ "$origem_adotada" = true ]; then
+  node "$DIR/origem-backup.mjs" assinar "$tmp/$recibo" "$tmp/origem.json" >"$tmp/$recibo.assinado" || erro "Atestação de origem falhou."
+  mv "$tmp/$recibo.assinado" "$tmp/$recibo"
+fi
 if [ -n "${BACKUP_REMOTO:-}" ]; then
   rclone_limpo copyto "$tmp/$recibo" "${BACKUP_REMOTO%/}/$recibo" || erro "PublicaÃ§Ã£o remota do recibo falhou."
   verificar_item_remoto "$recibo" "$(sha256sum "$tmp/$recibo" | cut -d' ' -f1)"
@@ -404,6 +480,10 @@ process.stdout.write(JSON.stringify({em:r.em,modo:process.argv[3],criptografia:r
 NODE
 chmod 600 "$estado.tmp"
 mv "$estado.tmp" "$estado"
+
+if [ -n "${BACKUP_DROPBOX_CONFIG:-}" ]; then
+  node "$DIR/dropbox-autoridade.mjs" publicar "$recibo" || erro "Publicação Dropbox não durável; expurgo suspenso."
+fi
 
 aplicar_retencao_remota
 aplicar_retencao_local

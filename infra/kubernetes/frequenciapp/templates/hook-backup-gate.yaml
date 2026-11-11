@@ -1,3 +1,4 @@
+{{- include "frequenciapp.origem.validar" . }}
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -10,12 +11,13 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
 spec:
   backoffLimit: 0
-  activeDeadlineSeconds: 120
+  activeDeadlineSeconds: {{ .Values.backupGate.activeDeadlineSeconds }}
   template:
     metadata:
       labels:
         {{- include "frequenciapp.selectorLabels" . | nindent 8 }}
     spec:
+      automountServiceAccountToken: false
       restartPolicy: Never
       serviceAccountName: {{ include "frequenciapp.serviceAccountName" . }}
       {{- with .Values.image.pullSecrets }}
@@ -28,8 +30,15 @@ spec:
         - name: backup-gate
           image: {{ include "frequenciapp.backupImage" . | quote }}
           imagePullPolicy: {{ .Values.backupImage.pullPolicy }}
+          workingDir: /app
           command: ["bash", "/scripts/verificar-backup.sh"]
           env:
+            {{- if .Values.backupOrigin.adopted }}
+            - name: BACKUP_ORIGEM_POLICY
+              value: /etc/frequenciapp-origem/policy.json
+            - name: BACKUP_ORIGEM_CHAVE
+              value: /etc/frequenciapp-hmac/key
+            {{- end }}
             - name: ESTADO_DIR
               value: /backups/estado
             - name: BACKUP_BANCO_DIR
@@ -38,8 +47,6 @@ spec:
               value: {{ .Values.backupGate.maxAgeHours | quote }}
             - name: BACKUP_GATE_EXIGIR_REMOTO
               value: {{ .Values.backupGate.requireRemoteVerification | quote }}
-            - name: ENSAIO_SEM_PROTECAO
-              value: {{ .Values.backupGate.ensaioSemProtecao | quote }}
             - name: HOME
               value: /tmp
           resources:
@@ -47,6 +54,10 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           volumeMounts:
+            {{- if .Values.backupOrigin.adopted }}
+            {{- include "frequenciapp.origem.mount" . | nindent 12 }}
+            {{- include "frequenciapp.origem.chaveMount" . | nindent 12 }}
+            {{- end }}
             - name: script
               mountPath: /scripts
               readOnly: true
@@ -56,6 +67,10 @@ spec:
             - name: tmp
               mountPath: /tmp
       volumes:
+        {{- if .Values.backupOrigin.adopted }}
+        {{- include "frequenciapp.origem.volume" . | nindent 8 }}
+        {{- include "frequenciapp.origem.chaveVolume" . | nindent 8 }}
+        {{- end }}
         - name: script
           configMap:
             name: {{ include "frequenciapp.fullname" . }}-backup-gate-script

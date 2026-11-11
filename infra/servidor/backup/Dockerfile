@@ -12,6 +12,7 @@ RUN apt-get update \
     jq \
     rclone \
     age \
+    util-linux \
   && install -d /usr/share/postgresql-common/pgdg \
   && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
     -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \

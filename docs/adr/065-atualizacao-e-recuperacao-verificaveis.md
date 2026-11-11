@@ -4,6 +4,8 @@
 
 Implementada para revisão.
 
+**Nota sobre o estado atual:** as decisões abaixo registram o desenho original. A revisão acrescenta perfis explicitamente adotados para [controlador estável](../controlador-manutencao.md), [retenção Dropbox](../dropbox-retencao.md), [restauração URL](../restauracao-url.md) e [origem autenticada](../origem-backup.md). Configuração ausente ou incompatível continua recusada. O padrão preserva 30 conjuntos confirmados, sem impor esse valor a overrides explícitos. A implementação não autoriza ativação operacional nem substitui os gates de aceite.
+
 ## Contexto
 
 A referência de auto-hospedagem da ADR-064 entregou atualização, backup e restauração em scripts. Um ensaio em instalação descartável mostrou que o atualizador não montava o Compose antes do uso, construía a imagem antes do checkout do commit alvo, aceitava o primeiro uso sem backup e exigia a imagem opcional de backup de planilhas. A restauração recriava o banco e falhava no schema `public`, deixando a aplicação parada. O backup gravava um dump temporário em texto claro, confiava no checksum remoto e aplicava retenção apenas por idade. O cron escrevia `CRON_TZ` sem confirmar o suporte da implementação.
@@ -25,7 +27,7 @@ A correção precisa continuar portátil entre instalações Linux suportadas, s
 - A imagem recebe o rótulo OCI `org.opencontainers.image.revision` e o valor é conferido antes da aplicação.
 - A imagem de backup de planilhas só é baixada ou construída quando a rotina está habilitada.
 - Migrações novas continuam bloqueadas por padrão.
-- O rollback volta a imagem e o commit, mas não desfaz migrações aplicadas. A falha registra essa possibilidade e a recuperação do banco é feita pelo script de restauração.
+- O controlador não inicia automaticamente a imagem anterior após migração possível ou resultado incerto. Preserva journal e pins; recuperação exige inspeção e decisão administrativa sobre compatibilidade.
 - A atualização preserva o mesmo projeto e os mesmos volumes do Compose.
 
 ### Backup
@@ -33,7 +35,7 @@ A correção precisa continuar portátil entre instalações Linux suportadas, s
 - O dump é cifrado em fluxo, sem arquivo temporário em texto claro.
 - A validação usa `pg_restore -l` sobre o fluxo, antes de o arquivo ser confirmado.
 - O hash local é guardado antes do envio. A verificação remota compara o arquivo baixado com esse hash, sem confiar no checksum remoto.
-- A retenção local preserva um mínimo configurável de cópias confirmadas, com padrão de cinco, além do limite por idade.
+- A retenção local preserva um mínimo configurável de cópias confirmadas, com padrão de 30, além do limite por idade.
 - A limpeza remota é opcional, usa o mesmo mínimo e só ocorre depois de upload e verificação bem-sucedidos.
 - O checksum remoto é um manifesto não assinado. A comparação com o hash local cobre a adulteração do provedor, mas não substitui assinatura de manifesto em modelos de ameaça mais fortes.
 
@@ -44,7 +46,7 @@ A correção precisa continuar portátil entre instalações Linux suportadas, s
 - Só depois da validação a aplicação é parada. O banco em uso é renomeado para um nome de recuperação e o banco validado assume o nome de produção.
 - Em falha antes da troca, a aplicação continua no ar. Em falha depois da troca, o script tenta voltar ao banco anterior e religar a aplicação.
 - O banco anterior é preservado por padrão e pode ser descartado por configuração depois da conferência.
-- No modo URL, o destino exige uma URL de validação descartável. A opção `--sem-validacao` é explícita e documentada como risco.
+- No modo URL, o perfil direto cria o próprio banco de ensaio e recusa URLs externas de validação. A opção `--sem-validacao` é explícita e documentada como risco.
 - O dump cobre apenas o schema configurado. Roles, ACLs, publicações, assinaturas e dependências externas não fazem parte do arquivo.
 
 ### Agendamento
@@ -86,7 +88,7 @@ Pode apagar todas as cópias antigas quando o intervalo entre backups é maior q
 
 - A worktree e a validação em banco descartável exigem espaço em disco adicional.
 - O modo Compose mantém o banco anterior até a conferência, consumindo espaço.
-- O modo URL exige uma URL de validação ou a decisão explícita de dispensar o ensaio.
+- O modo URL exige o perfil direto suportado, permissão para criar o próprio banco de ensaio ou a decisão explícita de dispensá-lo.
 - A troca de banco exige permissão para renomear bancos e encerrar conexões.
 - A atualização continua dependendo de cron, Git, Docker Compose, GPG ou age e rclone conforme a configuração.
 - O rollback da imagem não reverte migrações.

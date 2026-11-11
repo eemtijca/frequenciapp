@@ -1,97 +1,66 @@
-# ADR-068: backup confirmado, rollout por checksum e volumes separados no Kubernetes
+# ADR-068: origem autenticada, backup e rollout no Kubernetes
 
 ## Estado
 
-Implementada para revisão.
+Implementado no perfil URL explicitamente adotado, com testes locais de Helm e fluxo CLI sintético. Não validado em cluster real. O contrato de adoção e a policy completa estão em [origem-backup.md](../origem-backup.md).
 
 ## Contexto
 
-O chart Helm da ADR-064 aplicava a migração no initContainer antes de qualquer confirmação de backup. As issues #433, #441 e #444 registraram três riscos independentes:
-
-- um `helm upgrade` podia migrar e trocar os Pods sem um backup do banco confirmado;
-- alterações no ConfigMap ou no Secret não alteravam o template do Pod, então o rollout dependia de reinício manual;
-- os CronJobs de backup do banco e das planilhas compartilhavam um PVC `ReadWriteOnce`, o estado do último backup ficava em `emptyDir` e o fuso dos CronJobs era opcional.
-
-O cenário é estático e foi reproduzido com `helm template`, `helm lint` e `kubeconform`, sem cluster real, sem dados de alunos e sem credenciais.
+O chart migrava no initContainer antes de conferir backup, não provocava rollout por mudanças de configuração e compartilhava volume entre rotinas. Recibos coerentes e hashes sem autenticação não provavam origem: um autor do PVC podia declarar banco, schema e destino arbitrários. Um bloqueio incondicional posterior preservava segurança, mas tornava upgrades indisponíveis mesmo sob uma adoção operacional válida.
 
 ## Decisão
 
-### Backup antes de migração e rollout
+### Autoridade de origem explicitamente adotada
 
-- O chart cria um Job de hook `pre-upgrade` e `pre-rollback` chamado `backup-gate`.
-- O hook usa a imagem de backup já publicada, não monta Secret e não depende de credencial real.
-- O Job lê o recibo `ultimo-backup.json` gravado pela rotina `backup-banco` no PVC do banco. O recibo contém data, arquivo, SHA-256 e o resultado da verificação remota.
-- O gate recusa o upgrade quando o recibo não existe, está fora de `backupGate.maxAgeHours`, aponta para arquivo ausente ou tem checksum divergente.
-- `backupGate.requireRemoteVerification=true` exige que o recibo confirme a cópia remota.
-- O gate é sempre renderizado e o padrão é bloquear. O único modo de prosseguir sem confirmação é `backupGate.ensaioSemProtecao=true`, um nome explícito que declara a ausência de proteção e de promessa de recuperação. O valor padrão é `false`.
-- A primeira instalação não executa o hook, porque não há dados anteriores a proteger.
-- O hook roda antes da criação dos recursos do upgrade, então a falha impede a migração e a troca de Pods.
+O perfil `postgres-direto-tls-snapshot-v1` parte de operador e produtor protegidos. A policy `operador-confiavel-v1`, fora do PVC, fixa IPv4 literal de endpoint PostgreSQL direto, porta, banco, usuário, CA TLS por SHA-256, identidade do cluster, OIDs do banco e schema, produtor, chave ID, destino, criptografia, destinatário e limites temporais. Não aprende esses valores do recibo. DNS, poolers, proxies e failover transparente ficam fora do perfil suportado.
+
+São usados três Secrets externos imutáveis: policy/CA, conexão e HMAC separado. O chart confere imutabilidade quando o lookup retorna o objeto; uma renderização offline não comprova existência, RBAC ou ownership. Runtime e migrador recebem apenas policy/CA e conexão, nunca HMAC. Somente produtor e hook montam a chave de autenticação. Root, DBA, administrador do cluster ou produtor comprometido estão fora da garantia: HMAC não substitui a autoridade inicial nem distingue sozinho clones físicos do banco.
+
+### Vínculo entre identidade e bytes
+
+O produtor abre transação somente leitura com snapshot repetível, confere TLS e identidade operacional e exporta snapshot. `pg_dump --snapshot` conecta ao mesmo endpoint direto e a sessão exportadora permanece aberta até a conclusão. Assim, a consulta e o dump não usam endereços independentes nem dependem de compatibilidade presumida com poolers.
+
+O fluxo bruto recebe SHA-256 e contagem de bytes, passa por `pg_restore -l` e cifra em fluxo. O recibo básico permanece versão 1 e recebe extensão `origem`, com HMAC-SHA-256 do JSON canônico completo, exceto a própria assinatura. A assinatura cobre hashes exatos do dump bruto, artefatos cifrados e sidecars, identidade, snapshot, timestamps, escopo, produtor e hash da policy. A chave nunca é gravada no recibo, estado ou PVC.
+
+### Gate operacional e configuração efetiva
+
+O Job `backup-gate` executa em `pre-upgrade,pre-rollback`. O ConfigMap do script também é hook, com peso `-10`, anterior ao Job de peso `0`. O hook monta o PVC somente para leitura, policy/CA e HMAC separados; não recebe credenciais de banco ou transporte.
+
+O gate aceita o conjunto autenticado compatível com a policy independente e confere assinatura, identidade, escopo, produtor, timestamps, ponteiro e hashes streaming de todos os artefatos. A leitura usa descritores regulares e blocos limitados. Recibos legados, `url-conservador`, policy/chave divergentes e conjuntos adulterados são recusados. Ausência de adoção ou perfil incompatível continua fail-closed; o perfil válido não é bloqueado incondicionalmente.
+
+Runtime, migrador e produtor recebem explicitamente as três URLs da mesma chave `url` do Secret de conexão. O wrapper confere igualdade efetiva e identidade operacional antes de executar migrador ou entrada original do aplicativo. O chart recusa `extraEnvFrom` opaco, `extraEnv` reservado e conflitos de conexão/TLS/schema na configuração gerenciada. O parâmetro Prisma `schema` é removido somente da URL passada a libpq; runtime e migrador mantêm sua URL compatível com `pg`.
+
+`--diagnosticar-integridade` continua separado e não autoriza rollout. A opção antiga `backupGate.ensaioSemProtecao=true` agora falha no template; a variável antiga também não contorna o hook. Confirmação remota é a observação registrada no instante da produção, não disponibilidade atual. Origem autenticada não prova recuperação ou compatibilidade de rollback.
+
+### Volumes, retenção, contexto de segurança e fuso
+
+- Banco e planilhas usam PVCs distintos, `-backup-banco` e `-backup-planilhas`, com `helm.sh/resource-policy: keep`.
+- O estado do banco e os dumps ficam no PVC do banco; a trava privada fica em `/backups/.locks`.
+- O perfil adotado exige produtor habilitado e PVC persistente. Fora do perfil, backup somente remoto exige destino e verificação efetivos, mas não fornece catálogo persistente ao hook.
+- A referência usa UID/GID/fsGroup 1000, usuário não root, rootfs somente leitura, capabilities removidas, sem escalada ou token automático e `/tmp` gravável.
+- Retenção padrão de 30 dias e mínimo de 30 conjuntos permite overrides positivos explícitos. Autenticar origem não libera expurgo: o produtor URL, inclusive adotado, continua sem exclusão local/remota neste recorte e exige monitoramento de capacidade.
+- Os três CronJobs têm `timeZone` explícito, `America/Fortaleza` por padrão. Banco às 02:30 e planilhas às 03:00 por padrão.
 
 ### Rollout por checksum
 
-- O template do Deployment recebe `checksum/config`, calculado a partir do ConfigMap renderizado.
-- Com `secrets.create=true`, `checksum/secret` usa o Secret renderizado pelo chart.
-- Com `existingSecret`, `checksum/secret` usa `lookup` do Secret no cluster. Quando o lookup não existe, como em `helm template` offline, o checksum usa `existingSecretRevision`, um valor explícito nos values.
-- A revisão explícita não descobre sozinha uma alteração feita fora do Helm. O operador precisa incrementá-la, ou usar um gerenciador que atualize o valor no arquivo de values.
+O Deployment recebe `checksum/config`. Com Secret gerenciado, `checksum/secret` usa o conteúdo renderizado. Com `existingSecret`, usa lookup no cluster ou `existingSecretRevision` offline. Trocar o Secret geral fora do Helm exige atualizar essa revisão. Secrets de origem usam nomes versionados; alterar seus nomes altera o Pod e exige backup compatível com a policy nova.
 
-### PVCs, estado e fuso
+## Verificação
 
-- O backup do banco usa o PVC `-backup-banco`; o backup das planilhas usa o PVC `-backup-planilhas`. Cada CronJob monta apenas o próprio volume.
-- O estado do banco fica em `/backups/estado/ultimo-backup.json`, no PVC do banco. O backup das planilhas mantém o arquivo confirmado e o `.confirmado.json` em `/backups/planilhas`, no PVC das planilhas.
-- Os dois PVCs usam `helm.sh/resource-policy: keep` para sobreviver ao `helm uninstall`.
-- `backup.database.persistence.enabled` e `backup.spreadsheets.persistence.enabled` são `true` por padrão. Sem o PVC do banco, o gate falha; sem o PVC das planilhas, a cópia local não é feita e o destino remoto precisa estar configurado.
-- O backup do banco habilitado exige PVC ou `backup.database.remote.enabled=true`. `backup.database.local=true` exige PVC, porque `emptyDir` não representa durabilidade. No modo somente remoto, o chart injeta `BACKUP_EXIGIR_REMOTO=true` e a rotina recusa destino vazio ou verificação desligada.
-- O gate continua lendo o recibo no PVC do banco. Uma instalação somente remota não grava esse recibo e falha no gate por padrão; a operação deve manter o PVC ou declarar `backupGate.ensaioSemProtecao=true`.
-- `agenda.timeZone`, `backup.database.timeZone` e `backup.spreadsheets.timeZone` são sempre renderizados e usam `America/Fortaleza` como padrão. Os três valores continuam sobrescrevíveis.
+- RED causal do hook antigo: recusou recibo autenticado válido por bloqueio incondicional; o hook novo aceitou o mesmo contrato e recusou adulteração, chave/escopo/policy/endpoint divergentes e legado.
+- RED causal do produtor de HEAD: a URL com `schema` falhou no `pg_dump` real. O candidato remove apenas esse parâmetro da conexão libpq e produz assinatura compatível com o hook.
+- Fluxo real em PostgreSQL 17 descartável: TLS com SAN IP, snapshot exportado, dump Bash, cifra age, `--verificar`, hook, descriptografia, hash bruto exato e recuperação de uma linha sintética em outro banco. Divergência de identidade impediu produzir evidência.
+- Helm lint/template locais do perfil adotado e testes de conflitos de env, Secret HMAC separado, PVC obrigatório e override positivo da retenção.
+- O driver Docker verifica imagem, labels próprias, rede `none`, ausência de portas e mounts do host e término real antes de remover somente seu contêiner. Não monta socket Docker dentro do contêiner.
 
-### Testes
+Essas evidências são focalizadas, não uma execução do agregador global. Não foram exercitados cluster, kubeconform, publicação, Dropbox real ou transições reais de Helm. O guia de origem descreve as ferramentas extras de CI: Helm, OpenSSL, PostgreSQL servidor/clientes, age e util-linux, além de Node.
 
-- `tests/kubernetes/validar.sh` roda em contêiner e não usa cluster.
-- O ensaio cobre `helm lint`, `helm template`, `kubeconform -strict`, a presença do hook e a recusa sem recibo, o modo de ensaio, a mudança dos checksums, os dois PVCs, o estado persistente e o `timeZone`.
-- O mesmo ensaio recusa backup sem PVC e sem remoto, aceita o modo somente remoto com `BACKUP_EXIGIR_REMOTO=true` e percorre as oito combinações da agenda e o timeout.
-- O workflow `Servidor` executa o ensaio em passo próprio.
+## Consequências e limites
 
-## Alternativas consideradas
+O gate torna upgrades operacionais sob autoridade explícita e preserva a recusa de metadados autodeclarados. Isso exige manutenção de Secrets/RBAC, CA, IP fixo e identidade. Mudanças nesses valores exigem nova adoção e novo backup, não edição do recibo antigo.
 
-### Apenas recusar no template sem hook
+A primeira instalação não executa `pre-upgrade`. Upgrades legados precisam preparar produtor novo, Secrets e backup no PVC antes do hook; não se deve depender da criação de recursos depois do próprio gate. A troca do PVC único antigo não migra seu conteúdo.
 
-Uma condição de template bloqueia o upgrade quando o backup está desabilitado, mas não confirma que o backup mais recente existe, está íntegro e está dentro da idade máxima. O hook verifica o estado real no PVC.
+Um rollback pode selecionar hook e imagem antigos, ou nenhum hook. `--no-hooks`, manifests diretos e administradores podem evitar o gate. O chart não é admission controller, não protege retroativamente revisões antigas e não desfaz migrações. Compatibilidade da imagem antiga com banco migrado e recuperação precisam de validação própria antes de ação autorizada.
 
-### Compartilhar um PVC entre os dois CronJobs
-
-Um PVC `ReadWriteOnce` não pode ser montado por dois Pods em nós diferentes ao mesmo tempo. Separar os volumes elimina a disputa e permite evoluir a retenção de cada rotina sem afetar a outra.
-
-### Manter o estado em emptyDir
-
-O recibo do último backup desaparece quando o Pod termina. Sem ele, o gate não consegue provar que existe um ponto de recuperação. O estado passa a viver no PVC da rotina.
-
-### Usar lookup como única fonte do checksum
-
-`helm template` offline não tem cluster e o lookup retorna vazio. A revisão explícita mantém o template reproduzível e dá ao operador um sinal determinístico para provocar o rollout.
-
-### Padrão permissivo para o ensaio
-
-Um valor padrão que permite upgrade sem backup transformaria a exceção em regra. O ensaio tem nome próprio, padrão `false` e aviso no `helm install` e no `helm upgrade`.
-
-## Consequências
-
-### Positivas
-
-- Nenhum upgrade e nenhum rollback de revisão com o hook aplica migração sem um recibo de backup íntegro e recente, fora do modo de ensaio explícito.
-- O gate roda com a imagem de backup publicada e sem Secret, então pode ser testado sem credencial.
-- ConfigMap e Secret alterados provocam rollout sem reinício manual.
-- Os CronJobs deixam de disputar um PVC `ReadWriteOnce`.
-- O estado do último backup do banco e as cópias das planilhas sobrevivem ao Job e ao `helm uninstall`.
-- O fuso dos três CronJobs deixa de depender do fuso do cluster.
-
-### Negativas e riscos
-
-- O primeiro upgrade depois de habilitar o backup exige que o PVC e o CronJob de backup já tenham produzido um recibo. Uma instalação antiga pode precisar de um backup manual antes do primeiro upgrade com o gate.
-- O gate não reconhece snapshots externos do PostgreSQL nem backups feitos fora do chart.
-- O `pre-rollback` só existe em revisões que já declaram o hook. Um rollback para uma revisão anterior à ADR-068 não executa o gate.
-- A troca do PVC único `-backup` por `-backup-banco` e `-backup-planilhas` não move o conteúdo antigo. A instalação existente precisa de um backup novo depois do upgrade.
-- O PVC `ReadWriteOnce` continua limitando cada rotina a um nó por vez; o CronJob usa `concurrencyPolicy: Forbid` e não escala em paralelo. O gate também lê o PVC do banco e pode aguardar se o Job de backup estiver montando o volume.
-- `existingSecretRevision` é manual. Sem cluster e sem incremento, uma alteração externa no Secret não dispara o rollout.
-- O `lookup` do `existingSecret` exige permissão de leitura de Secrets para quem executa o Helm.
-- O `helm.sh/resource-policy: keep` preserva os PVCs no `helm uninstall`, mas uma reinstalação que precise recriar os volumes exige remoção manual.
-- O modo `ensaioSemProtecao` permite upgrade sem proteção por decisão explícita do operador.
+PVC local não é recuperação de desastre. ReadWriteOnce ainda pode atrasar o hook se o volume estiver em outro nó. Travas e leitura de inodes são cooperativas, não proteção contra root ou escrita hostil no mesmo inode. A verificação de origem deve ser chamada explicitamente por common, controlador ou retenção remota antes de usar recibos URL para decisões protegidas; transportar a extensão HMAC não autoriza essas ações por si só.

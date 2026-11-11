@@ -141,28 +141,38 @@ agenda:
   resources: {}
   extraEnv: []
 
-# Bloqueio de migração e rollout sem backup confirmado. O gate é sempre
-# renderizado; o modo de ensaio é a única exceção explícita.
+# Perfil adotado pelo operador com Secrets imutáveis fora do PVC.
+backupOrigin:
+  adopted: false
+  policySecret: ""
+  hmacSecret: ""
+  connectionSecret: ""
+  schema: public
+
+# Sem adoção o hook recusa operações protegidas; diagnóstico é separado.
 backupGate:
   # Idade máxima do recibo do último backup do banco.
   maxAgeHours: 36
+  # Inclui tempo para leitura streaming de todos os artefatos do PVC.
+  activeDeadlineSeconds: 1800
   # Exige que o recibo confirme a verificação da cópia remota.
   requireRemoteVerification: false
-  # Ensaio explícito sem backup confirmado. Não há proteção nem promessa de
-  # recuperação enquanto este valor for true.
+  # Compatibilidade de values: true agora é recusado; não há bypass do gate.
   ensaioSemProtecao: false
   resources: {}
 
 backup:
   enabled: false
   retentionDays: 30
-  retentionMinimum: 5
+  retentionMinimum: 30
   remoteRetention: false
   minimumSpaceMB: 128
   # Secret com os arquivos rclone.conf, backup-publica.asc e age-recipients.txt.
   filesSecret: ""
   # Secret com BACKUP_DATABASE_URL, BACKUP_CRIPTOGRAFIA, BACKUP_GPG_DESTINATARIO,
-  # BACKUP_AGE_DESTINATARIOS, BACKUP_REMOTO e RCLONE_CONFIG_PASS.
+  # BACKUP_AGE_DESTINATARIOS_SHA256, BACKUP_REMOTO e RCLONE_CONFIG_PASS.
+  # O perfil adotado substitui URLs por connectionSecret; o restante continua
+  # neste Secret. Expurgos URL seguem separados da autenticação do hook.
   database:
     enabled: true
     schedule: "30 2 * * *"

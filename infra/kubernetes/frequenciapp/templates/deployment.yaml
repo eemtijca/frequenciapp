@@ -1,3 +1,4 @@
+{{- include "frequenciapp.origem.validar" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,13 +36,20 @@ spec:
       {{- end }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      automountServiceAccountToken: false
       terminationGracePeriodSeconds: 30
       {{- if .Values.migrations.enabled }}
       initContainers:
         - name: migrar
           image: {{ include "frequenciapp.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.backupOrigin.adopted }}
+          command: ["node", "scripts/servidor/origem-backup.mjs", "executar", "node", "./docker/app/migrar.mjs"]
+          env:
+            {{- include "frequenciapp.origem.env" . | nindent 12 }}
+          {{- else }}
           command: ["node", "./docker/app/migrar.mjs"]
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "frequenciapp.fullname" . }}
@@ -52,11 +60,17 @@ spec:
           resources:
             {{- toYaml .Values.migrations.resources | nindent 12 }}
           volumeMounts:
+            {{- if .Values.backupOrigin.adopted }}
+            {{- include "frequenciapp.origem.mount" . | nindent 12 }}
+            {{- end }}
             - name: tmp
               mountPath: /tmp
       {{- end }}
       containers:
         - name: app
+          {{- if .Values.backupOrigin.adopted }}
+          command: ["node", "scripts/servidor/origem-backup.mjs", "executar", "/bin/sh", "./docker/app/entrypoint.sh"]
+          {{- end }}
           image: {{ include "frequenciapp.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
@@ -72,6 +86,11 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
           env:
+            {{- if .Values.backupOrigin.adopted }}
+            {{- include "frequenciapp.origem.env" . | nindent 12 }}
+            - name: MIGRAR_NA_PARTIDA
+              value: "false"
+            {{- end }}
             - name: COMMIT_SHA
               value: {{ default (default .Chart.AppVersion .Values.image.tag) .Values.config.COMMIT_SHA | quote }}
             {{- with .Values.extraEnv }}
@@ -86,6 +105,9 @@ spec:
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           volumeMounts:
+            {{- if .Values.backupOrigin.adopted }}
+            {{- include "frequenciapp.origem.mount" . | nindent 12 }}
+            {{- end }}
             {{- if .Values.persistence.nextCache.enabled }}
             - name: next-cache
               mountPath: /app/.next/cache
@@ -95,6 +117,9 @@ spec:
               mountPath: /tmp
             {{- end }}
       volumes:
+        {{- if .Values.backupOrigin.adopted }}
+        {{- include "frequenciapp.origem.volume" . | nindent 8 }}
+        {{- end }}
         {{- if .Values.persistence.nextCache.enabled }}
         - name: next-cache
           emptyDir:

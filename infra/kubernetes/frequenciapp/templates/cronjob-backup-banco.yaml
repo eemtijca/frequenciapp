@@ -36,6 +36,7 @@ spec:
           labels:
             {{- include "frequenciapp.selectorLabels" . | nindent 12 }}
         spec:
+          automountServiceAccountToken: false
           restartPolicy: OnFailure
           serviceAccountName: {{ include "frequenciapp.serviceAccountName" . }}
           {{- with .Values.image.pullSecrets }}
@@ -53,6 +54,11 @@ spec:
                 - secretRef:
                     name: {{ $segredoBanco }}
               env:
+                {{- if .Values.backupOrigin.adopted }}
+                {{- include "frequenciapp.origem.env" . | nindent 16 }}
+                - name: BACKUP_ORIGEM_CHAVE
+                  value: /etc/frequenciapp-hmac/key
+                {{- end }}
                 - name: BACKUP_MODO
                   value: url
                 - name: BACKUP_EXIGIR_REMOTO
@@ -69,6 +75,8 @@ spec:
                   value: /backups/banco
                 - name: ESTADO_DIR
                   value: /backups/estado
+                - name: SERVIDOR_LOCK_DIR
+                  value: /backups/.locks
                 - name: BACKUP_RCLONE_CONFIG
                   value: /etc/frequenciapp/rclone.conf
                 - name: BACKUP_GPG_CHAVE_PUBLICA
@@ -90,6 +98,10 @@ spec:
               securityContext:
                 {{- toYaml .Values.securityContext | nindent 16 }}
               volumeMounts:
+                {{- if .Values.backupOrigin.adopted }}
+                {{- include "frequenciapp.origem.mount" . | nindent 16 }}
+                {{- include "frequenciapp.origem.chaveMount" . | nindent 16 }}
+                {{- end }}
                 - name: arquivos-backup
                   mountPath: /etc/frequenciapp
                   readOnly: true
@@ -98,6 +110,10 @@ spec:
                 - name: tmp
                   mountPath: /tmp
           volumes:
+            {{- if .Values.backupOrigin.adopted }}
+            {{- include "frequenciapp.origem.volume" . | nindent 12 }}
+            {{- include "frequenciapp.origem.chaveVolume" . | nindent 12 }}
+            {{- end }}
             - name: arquivos-backup
               secret:
                 secretName: {{ include "frequenciapp.backupFilesSecret" . }}

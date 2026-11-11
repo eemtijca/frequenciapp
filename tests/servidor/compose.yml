@@ -1,46 +1,95 @@
-# Compose descartável dos ensaios de servidor. Não publica portas e usa
-# somente imagens públicas, sem dados reais.
-name: ${COMPOSE_PROJECT_NAME:-frequenciapp-testes}
+# Receita fechada do ensaio, sem portas publicadas ou redes externas.
+name: ${COMPOSE_PROJECT_NAME:?projeto obrigatório}
+
+x-confinamento: &confinamento
+  network_mode: none
+  read_only: true
+  cap_drop: [ALL]
+  security_opt:
+    - no-new-privileges:true
+  cpus: 1
+  mem_limit: 512m
+  pids_limit: 128
+  restart: "no"
+  logging:
+    driver: json-file
+    options:
+      max-size: 1m
+      max-file: "1"
+  labels:
+    frequenciapp.backup.rodada: ${BACKUP_ENSAIO_RODADA:?rodada obrigatória}
 
 services:
   db:
-    image: postgres:17-alpine
+    <<: *confinamento
+    image: postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994
+    pull_policy: never
+    user: "999:999"
+    entrypoint: [bash, -euc]
+    command:
+      - |
+        test "$$(stat -c '%u:%g' /var/lib/postgresql/data)" = 999:999
+        test -r /var/lib/postgresql/data -a -w /var/lib/postgresql/data -a -x /var/lib/postgresql/data
+        test -z "$$(find /var/lib/postgresql/data -mindepth 1 -maxdepth 1 -print -quit)"
+        printf 'STORAGE_PROPRIO_VAZIO_UID999\n'
+        exec docker-entrypoint.sh postgres -c listen_addresses=127.0.0.1
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-frequencia}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-frequencia}
-      POSTGRES_DB: ${POSTGRES_DB:-frequencia}
+      POSTGRES_USER: frequencia
+      POSTGRES_PASSWORD: ${BACKUP_ENSAIO_SENHA:?senha sintética obrigatória}
+      POSTGRES_DB: frequencia
+      POSTGRES_INITDB_ARGS: --auth-local=scram-sha-256 --auth-host=scram-sha-256
+      PGHOST: 127.0.0.1
+      PGPASSWORD: ${BACKUP_ENSAIO_SENHA:?senha sintética obrigatória}
+      PGCONNECT_TIMEOUT: "3"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+      - /var/run/postgresql:rw,nosuid,nodev,noexec,size=16m,uid=999,gid=999,mode=0700
     healthcheck:
-      test:
-        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-frequencia} -d ${POSTGRES_DB:-frequencia}"]
-      interval: 2s
-      timeout: 3s
+      test: [CMD, psql, -X, -U, frequencia, -d, frequencia, -tAc, "select 1"]
+      interval: 1s
+      timeout: 5s
       retries: 30
 
   app:
-    image: alpine:3.20
-    command: ["sh", "-c", "while true; do sleep 3600; done"]
-    depends_on:
-      db:
-        condition: service_healthy
+    <<: *confinamento
+    image: ${BACKUP_ENSAIO_FERRAMENTAS:?imagem conferida obrigatória}
+    pull_policy: never
+    user: "1000:1000"
+    entrypoint: [node]
+    command:
+      [
+        "-e",
+        "require('http').createServer((q,s)=>{s.writeHead(q.url==='/api/saude'?200:404);s.end('saude-sintetica')}).listen(3000,'127.0.0.1')",
+      ]
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
     healthcheck:
-      test: ["CMD", "sh", "-c", "exit 0"]
-      interval: 2s
-      timeout: 2s
-      retries: 10
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/api/saude').then(r=>process.exit(r.status===200?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 1s
+      timeout: 5s
+      retries: 30
 
+  # Configuração exigida pelo produto; não constitui prova de proxy.
   caddy:
-    image: alpine:3.20
-    command: ["sh", "-c", "while true; do sleep 3600; done"]
-    depends_on:
-      app:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "sh", "-c", "exit 0"]
-      interval: 2s
-      timeout: 2s
-      retries: 10
+    <<: *confinamento
+    image: ${BACKUP_ENSAIO_FERRAMENTAS:?imagem conferida obrigatória}
+    pull_policy: never
+    user: "1000:1000"
+    entrypoint: [node]
+    command: ["-e", "process.exit(0)"]
+    profiles: [backup]
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=16m,mode=1777
 
 volumes:
   pgdata:
+    external: true
+    name: ${BACKUP_ENSAIO_VOLUME:?volume próprio obrigatório}

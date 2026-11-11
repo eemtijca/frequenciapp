@@ -4,5 +4,10 @@
   "buildCommand": "pnpm run vercel-build",
   "installCommand": "NODE_ENV=development pnpm install --frozen-lockfile",
   "outputDirectory": ".next",
-  "cleanUrls": true
+  "cleanUrls": true,
+  "git": {
+    "deploymentEnabled": {
+      "fix/autohospedagem-pendente": false
+    }
+  }
 }

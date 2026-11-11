@@ -4,7 +4,8 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
+import { fixtureDropbox } from "./dropbox-api-falso.mjs";
 import { test } from "node:test";
 import { criarRecibo } from "../../scripts/servidor/recibos.mjs";
 import { identidadeCompose } from "../../scripts/servidor/identidade.mjs";
@@ -72,53 +73,30 @@ function nomes(r) {
 function copiar(r, origem, destino) {
   for (const nome of nomes(r)) fs.copyFileSync(path.join(origem, nome), path.join(destino, nome));
 }
-function executarBackup(env) {
-  const inicio = performance.now();
-  const resultado = spawnSync("bash", ["scripts/servidor/backup-banco.sh"], {
+async function executarBackup(env) {
+  const p = spawn("bash", ["scripts/servidor/backup-banco.sh"], {
     cwd: raiz,
     env,
-    encoding: "utf8",
-    timeout: 25000,
+    stdio: ["ignore", "pipe", "pipe"],
   });
-  const duracaoMs = performance.now() - inicio;
-  const config = ler(env.BACKUP_RCLONE_CONFIG);
-  const eventos = fs
-    .readFileSync(config.eventos, "utf8")
-    .split("\n")
-    .filter(Boolean)
-    .map(JSON.parse);
-  const diarios = path.join(env.ESTADO_DIR, "expurgos");
+  let stdout = "",
+    stderr = "";
+  p.stdout.on("data", (c) => {
+    stdout += c;
+  });
+  p.stderr.on("data", (c) => {
+    stderr += c;
+  });
+  const timer = setTimeout(() => p.kill("SIGKILL"), 30000);
+  const r = await new Promise((resolve, reject) => {
+    p.on("error", reject);
+    p.on("close", (status, signal) => resolve({ status, signal, stdout, stderr }));
+  });
+  clearTimeout(timer);
   process.stdout.write(
-    JSON.stringify({
-      reciboEnsaioCatalogo: true,
-      status: resultado.status,
-      signal: resultado.signal,
-      errorCode: resultado.error?.code ?? null,
-      duracaoMs,
-      transporteAcumulado: Object.fromEntries(
-        ["copy", "copyto", "lsjson", "deletefile"].map((acao) => [
-          acao,
-          eventos.filter((e) => e.acao === acao).length,
-        ]),
-      ),
-      lotes: eventos.filter((e) => e.acao === "loteFalso").length,
-      diarios: fs.existsSync(diarios)
-        ? fs.readdirSync(diarios).map((nome) => ({
-            nome,
-            sha256: sha(fs.readFileSync(path.join(diarios, nome))),
-            dados: ler(path.join(diarios, nome)),
-          }))
-        : [],
-      remoto: fs
-        .readdirSync(config.raiz)
-        .map((nome) => ({ nome, sha256: sha(fs.readFileSync(path.join(config.raiz, nome))) })),
-      catalogo: fs.readdirSync(path.join(env.ESTADO_DIR, "recibos")).map((nome) => ({
-        nome,
-        sha256: sha(fs.readFileSync(path.join(env.ESTADO_DIR, "recibos", nome))),
-      })),
-    }) + "\n",
+    JSON.stringify({ reciboEnsaioCatalogo: true, status: r.status, signal: r.signal }) + "\n",
   );
-  return resultado;
+  return r;
 }
 
 // Todos os clientes externos têm despacho fechado e só escrevem na fixture.
@@ -146,7 +124,7 @@ if(tipo==='age') {
     else falhar();
   } else falhar();
 } else if(tipo==='rclone') {
-  const arquivo=process.env.RCLONE_CONFIG; const c=JSON.parse(fs.readFileSync(arquivo,'utf8'));
+  const arquivo=process.env.RCLONE_CONFIG; const linha=fs.readFileSync(arquivo,'utf8').split('\\n').find(l=>l.startsWith('#fixture=')); const c=JSON.parse(fs.readFileSync(linha.slice(9),'utf8'));
   const remoto=(n)=>{ if(!n.startsWith('falso:copias/')) falhar(); const b=n.slice('falso:copias/'.length); if(!b||b.includes('/')||b==='..') falhar(); return path.join(c.raiz,b); };
   fs.appendFileSync(c.eventos,JSON.stringify({acao:a[0],args:a.slice(1)})+'\\n');
   if(a[0]==='copy' && a[1]==='falso:copias') {
@@ -228,11 +206,12 @@ test("#391 CLI conta apenas íntegros do mesmo banco/schema/alvo/remoto", () => 
   }
 });
 
-test("#392 Bash retoma expurgo parcial exato e reconcilia histórico sem apagar catálogo", () => {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "expurgo-bash-"));
+test("#392 Bash retoma expurgo parcial exato e reconcilia histórico sem apagar catálogo", async () => {
+  const f = await fixtureDropbox(0);
+  const tmp = f.tmp;
   try {
     const local = pasta(tmp, "banco"),
-      remoto = pasta(tmp, "remoto"),
+      remoto = f.remoto,
       estado = pasta(tmp, "estado");
     const catalogo = pasta(estado, "recibos"),
       bin = pasta(tmp, "bin");
@@ -304,9 +283,16 @@ test("#392 Bash retoma expurgo parcial exato e reconcilia histórico sem apagar 
     gravar(path.join(remoto, alheio), "preservar remoto");
     const eventos = path.join(tmp, "transporte.jsonl");
     gravar(eventos, "");
-    const transporte = path.join(tmp, "rclone.conf");
+    const transporte = path.join(tmp, "transporte.json");
     const falhar = antigos[1].artefatos[1].nome;
     json(transporte, { raiz: remoto, eventos, falhar });
+    const ini = `#fixture=${transporte}\n[falso]\ntype = dropbox\nroot_namespace = 42\ntoken = {"access_token":"sintetico"}\n`;
+    gravar(f.rclone, ini);
+    f.config.alvo = identidade.trava;
+    f.config.minimoAutorizado = 5;
+    f.config.targetLock = path.join(tmp, "locks", `operacoes-${identidade.trava}.lock`);
+    f.config.rcloneConfigSha256 = sha(ini);
+    json(f.configFile, f.config);
     const env = ambiente({
       PATH: `${bin}:${process.env.PATH}`,
       SERVIDOR_AMBIENTE_INJETADO: "true",
@@ -328,215 +314,207 @@ test("#392 Bash retoma expurgo parcial exato e reconcilia histórico sem apagar 
       BACKUP_AGE_DESTINATARIOS_SHA256: sha(fs.readFileSync(path.join(tmp, "age.txt"))),
       BACKUP_INCLUIR_AMBIENTE: "true",
       BACKUP_ESPACO_MINIMO_MB: "0",
-      BACKUP_RCLONE_CONFIG: transporte,
+      BACKUP_RCLONE_CONFIG: f.rclone,
+      BACKUP_DROPBOX_CONFIG: f.configFile,
+      NODE_OPTIONS: `--import=${f.preload}`,
       BACKUP_VERIFICAR_REMOTO: "true",
       BACKUP_RETER_REMOTO: "true",
     });
-    const primeira = executarBackup(env);
-    assert.notEqual(primeira.status, 0, "falha parcial precisa ser propagada");
-    assert.match(primeira.stderr, /parcial/i, primeira.stdout + primeira.stderr);
-    assert.equal(
-      fs.existsSync(path.join(remoto, antigos[1].artefatos[0].nome)),
-      false,
-      "consumidor não atingiu exclusão real no FS falso",
+
+    let revisao = 200000000;
+    const hashes = new Map();
+    const sincronizar = () => {
+      for (const n of fs.readdirSync(remoto)) {
+        const h = sha(fs.readFileSync(path.join(remoto, n)));
+        if (!f.objects.has(n))
+          f.objects.set(n, {
+            id: `id:sintetico_${++revisao}`,
+            rev: (++revisao).toString(16).padStart(9, "0"),
+          });
+        else if (hashes.get(n) !== h)
+          f.objects.get(n).rev = (++revisao).toString(16).padStart(9, "0");
+        hashes.set(n, h);
+      }
+      for (const n of f.objects.keys())
+        if (!fs.existsSync(path.join(remoto, n))) {
+          f.objects.delete(n);
+          hashes.delete(n);
+        }
+    };
+    const exclusoes = () => f.events.filter((e) => e.route === "/2/files/delete_v2");
+    let falharDelete = true,
+      omitir = false,
+      adulterar = false,
+      omitidos = [],
+      adulterado;
+    f.state.hook = ({ req, res, arg, json }) => {
+      if (req.url === "/2/files/list_folder") sincronizar();
+      if (req.url === "/2/files/delete_v2" && falharDelete && exclusoes().length === 2) {
+        json({ error: "falha_parcial_injetada" }, 503);
+        return true;
+      }
+      if (req.url === "/2/files/download") {
+        const n = [...f.objects.keys()].find((n) => f.objects.get(n).id === arg.path);
+        if (omitir) {
+          omitir = false;
+          const r = ler(
+            path.join(catalogo, n.slice(0, antigos[0].base.length) + ".confirmado.json"),
+          );
+          omitidos = nomes(r).map((nome) => ({
+            nome,
+            bytes: fs.readFileSync(path.join(remoto, nome)),
+            meta: { ...f.objects.get(nome) },
+          }));
+          for (const a of omitidos) fs.unlinkSync(path.join(remoto, a.nome));
+          json({ error: "not_found" }, 409);
+          return true;
+        }
+        if (adulterar && n.includes(".dump.") && !n.endsWith(".sha256")) {
+          adulterar = false;
+          const arquivo = path.join(remoto, n);
+          const instante = new Date("2020-02-01T00:00:00.000Z");
+          fs.utimesSync(arquivo, instante, instante);
+          const stat = fs.statSync(arquivo);
+          adulterado = {
+            nome: n,
+            bytes: fs.readFileSync(arquivo),
+            stat,
+            downloads: f.events.filter((e) => e.route.endsWith("/download")).length,
+          };
+          res.on("finish", () => {
+            const b = Buffer.from(adulterado.bytes);
+            b[0] ^= 1;
+            gravar(arquivo, b);
+            fs.utimesSync(arquivo, stat.atime, stat.mtime);
+          });
+        }
+      }
+      return false;
+    };
+    const catalogoAntes = new Map(
+      fs.readdirSync(catalogo).map((n) => [n, sha(fs.readFileSync(path.join(catalogo, n)))]),
     );
-    assert.equal(fs.existsSync(path.join(remoto, antigos[1].base + ".confirmado.json")), true);
+    const primeira = await executarBackup(env);
+    assert.equal(primeira.signal, null);
+    assert.equal(primeira.status, 1, primeira.stderr);
+    assert.equal(
+      exclusoes().length,
+      2,
+      `exclusão parcial deve ser realmente alcançada: ${primeira.stderr}; rotas=${JSON.stringify(f.events.map((e) => e.route))}`,
+    );
+    assert.equal(fs.existsSync(path.join(remoto, antigos[0].artefatos[0].nome)), false);
     const diarios = path.join(estado, "expurgos");
-    assert.ok(
-      fs.existsSync(diarios) && fs.readdirSync(diarios).length > 0,
-      "expurgo parcial precisa de registro persistente para retomada conservadora",
-    );
-    // Uma perda do mínimo pertinente bloqueia a retomada, sem novos deletes.
-    const confirmar = antigos[5].artefatos[0].nome;
-    const salvo = fs.readFileSync(path.join(remoto, confirmar));
-    gravar(path.join(remoto, confirmar), "corrompido durante interrupcao");
-    json(transporte, { raiz: remoto, eventos, falhar: "" });
-    const antes = fs
-      .readFileSync(eventos, "utf8")
-      .split("\n")
-      .filter(Boolean)
-      .map(JSON.parse)
-      .filter((e) => e.acao === "deletefile").length;
-    const bloqueada = executarBackup(env);
-    assert.notEqual(bloqueada.status, 0, "mínimo não íntegro deve suspender retomada");
-    assert.equal(
+    const diario = () =>
       fs
-        .readFileSync(eventos, "utf8")
-        .split("\n")
-        .filter(Boolean)
-        .map(JSON.parse)
-        .filter((e) => e.acao === "deletefile").length,
-      antes,
-    );
+        .readdirSync(diarios)
+        .filter((n) => n.endsWith(".json"))
+        .map((n) => ler(path.join(diarios, n)).valor);
+    assert.equal(diario()[0].removidos, 1);
+    assert.equal(diario()[0].pendente, 1);
+    const confirmar = antigos[5].artefatos[0].nome,
+      salvo = fs.readFileSync(path.join(remoto, confirmar));
+    gravar(path.join(remoto, confirmar), "corrompido durante interrupcao");
+    falharDelete = false;
+    const antes = exclusoes().length;
+    const bloqueada = await executarBackup(env);
+    assert.equal(bloqueada.status, 1);
+    assert.equal(exclusoes().length, antes, "perda de íntegro bloqueia retomada");
     gravar(path.join(remoto, confirmar), salvo);
-    const segunda = executarBackup(env);
-    assert.equal(segunda.status, 0, segunda.stdout + segunda.stderr);
+    const segunda = await executarBackup(env);
+    assert.equal(segunda.status, 0, segunda.stderr);
+    const terceira = await executarBackup(env);
+    assert.equal(terceira.status, 0, terceira.stderr);
     for (const r of antigos.slice(0, 2)) {
       for (const n of nomes(r)) assert.equal(fs.existsSync(path.join(remoto, n)), false, n);
-      assert.ok(
-        fs.existsSync(path.join(catalogo, r.base + ".confirmado.json")),
-        "evidência independente não pode sumir",
+      assert.ok(fs.existsSync(path.join(catalogo, r.base + ".confirmado.json")));
+      const ids = new Set(
+        nomes(r).map((n) => {
+          const d = diario().find((j) => j.itens.some((i) => i.nome === n));
+          return d.itens.find((i) => i.nome === n).id;
+        }),
       );
+      const pedidos = exclusoes().filter((e) => ids.has(e.arg.path));
+      const ultimo = diario()
+        .find((j) => j.itens.some((i) => i.nome === r.base + ".confirmado.json"))
+        .itens.at(-1);
+      assert.equal(pedidos.at(-1).arg.path, ultimo.id, "recibo deve ser o último");
+      assert.ok(pedidos.every((e) => typeof e.arg.parent_rev === "string"));
     }
-    const terceira = executarBackup(env);
-    assert.equal(terceira.status, 0, terceira.stdout + terceira.stderr);
+    for (const [nome, h] of catalogoAntes)
+      assert.equal(sha(fs.readFileSync(path.join(catalogo, nome))), h);
     assert.equal(fs.readFileSync(path.join(local, alheio), "utf8"), "preservar local");
     assert.equal(fs.readFileSync(path.join(remoto, alheio), "utf8"), "preservar remoto");
     for (const n of nomes(vizinho)) assert.ok(fs.existsSync(path.join(remoto, n)));
-    const chamadas = fs.readFileSync(eventos, "utf8").trim().split("\n").map(JSON.parse);
-    for (const r of antigos.slice(0, 2)) {
-      const deletes = chamadas.filter(
-        (e) => e.acao === "deletefile" && nomes(r).includes(path.basename(e.args[0])),
-      );
-      assert.equal(
-        path.basename(deletes.at(-1).args[0]),
-        r.base + ".confirmado.json",
-        "recibo deve ser o último",
-      );
-      assert.ok(deletes.every((e) => nomes(r).includes(path.basename(e.args[0]))));
+    const semDeletes = exclusoes().length;
+    omitir = true;
+    const incompleta = await executarBackup(env);
+    assert.equal(incompleta.status, 1);
+    assert.equal(incompleta.signal, null);
+    assert.ok(omitidos.length > 0);
+    assert.equal(exclusoes().length, semDeletes);
+    for (const a of omitidos) {
+      assert.equal(fs.existsSync(path.join(remoto, a.nome)), false);
+      gravar(path.join(remoto, a.nome), a.bytes);
+      f.objects.set(a.nome, a.meta);
     }
-    for (const n of fs.readdirSync(catalogo))
-      assert.equal(ler(path.join(catalogo, n)).etapas.recuperacaoExercitada, false);
-    // Caracterizações novas da interface de lote, sem alterar os cenários originais.
-    const eventosAtuais = () => fs.readFileSync(eventos, "utf8").trim().split("\n").map(JSON.parse);
-    const lotesAtuais = () => eventosAtuais().filter((e) => e.acao === "loteFalso");
-    const deletesAtuais = () => eventosAtuais().filter((e) => e.acao === "deletefile").length;
-    assert.ok(lotesAtuais().length > 0, "o despacho de leitura em lote precisa ser atingido");
-    assert.ok(lotesAtuais().every((e) => e.status === 0 && e.ausentes.length === 0));
-    // Garante um candidato antigo para exigir reobservação antes de qualquer delete.
-    const adicional = conjunto(local, 8, "gpg", { alvo: identidade.trava });
-    copiar(adicional, local, remoto);
-    fs.copyFileSync(
-      path.join(local, adicional.base + ".confirmado.json"),
-      path.join(catalogo, adicional.base + ".confirmado.json"),
-    );
-    const guardados = new Map();
-    const instanteFixture = new Date("2020-02-01T00:00:00.000Z");
-    for (const nome of fs.readdirSync(remoto)) {
-      const arquivo = path.join(remoto, nome);
-      // Timestamp sintético exato permite restaurar e comparar sem arredondamento.
-      fs.utimesSync(arquivo, instanteFixture, instanteFixture);
-      const stat = fs.statSync(arquivo);
-      guardados.set(nome, {
-        bytes: fs.readFileSync(arquivo),
-        mode: stat.mode & 0o777,
-        atime: stat.atime,
-        mtime: stat.mtime,
-      });
-    }
-    const semDeletes = deletesAtuais();
-    const omitirNaCopia = lotesAtuais().length + 1;
-    json(transporte, { raiz: remoto, eventos, falhar: "", omitirNaCopia, omitir: "todos" });
-    const incompleta = executarBackup(env);
-    assert.notEqual(incompleta.status, 0, "copy exit 0 com membro ausente precisa bloquear");
-    assert.equal(incompleta.error, undefined);
-    assert.match(incompleta.stderr, /parcial/i);
-    const omitido = lotesAtuais().find((e) => e.numero === omitirNaCopia);
-    assert.ok(omitido, "a ausência deve ocorrer entre inventário e cópia");
-    assert.equal(omitido.status, 0);
-    assert.deepEqual(omitido.ausentes, omitido.lista);
-    assert.ok(omitido.ausentes.length > 0);
-    assert.deepEqual(omitido.copiados, []);
-    assert.equal(deletesAtuais(), semDeletes, "lote incompleto não autoriza novos deletes");
-    for (const nome of omitido.ausentes) {
-      const salvo = guardados.get(nome);
-      assert.ok(salvo, "restauro limitado às fixtures previamente guardadas");
-      const arquivo = path.join(remoto, nome);
-      assert.equal(fs.existsSync(arquivo), false);
-      gravar(arquivo, salvo.bytes);
-      fs.chmodSync(arquivo, salvo.mode);
-      fs.utimesSync(arquivo, salvo.atime, salvo.mtime);
-      assert.deepEqual(fs.readFileSync(arquivo), salvo.bytes);
-      const stat = fs.statSync(arquivo);
-      assert.equal(stat.mode & 0o777, salvo.mode);
-      assert.equal(stat.mtimeMs, salvo.mtime.getTime());
-    }
-    const adulterarAposCopia = lotesAtuais().length + 1;
-    json(transporte, {
-      raiz: remoto,
-      eventos,
-      falhar: "",
-      adulterarAposCopia,
-      adulterar: "primeiro-dump",
-    });
-    const alterada = executarBackup(env);
-    assert.notEqual(
-      alterada.status,
-      0,
-      "conteúdo alterado com tamanho/mtime iguais precisa bloquear",
-    );
-    assert.equal(alterada.error, undefined);
-    assert.match(alterada.stderr, /parcial/i);
-    const lotes = lotesAtuais();
-    const inicial = lotes.find((e) => e.numero === adulterarAposCopia);
-    assert.ok(inicial?.adulterado, "corrupção simulada deve ocorrer após uma cópia bem-sucedida");
-    const adulterado = inicial.adulterado;
-    assert.equal(inicial.status, 0);
-    assert.ok(inicial.copiados.includes(adulterado.nome));
-    assert.equal(adulterado.tamanhoDepois, adulterado.tamanhoAntes);
-    assert.equal(adulterado.mtimeDepois, adulterado.mtimeAntes);
-    const nova = lotes.find((e) => e.numero > inicial.numero && e.lista.includes(adulterado.nome));
-    assert.ok(nova, "a mesma entrada precisa ser relida no fluxo real antes do delete");
-    assert.equal(nova.status, 0);
-    assert.ok(nova.copiados.includes(adulterado.nome));
-    assert.notEqual(nova.destino, inicial.destino);
+    adulterar = true;
+    const alterada = await executarBackup(env);
+    assert.equal(alterada.status, 1);
+    assert.equal(alterada.signal, null);
+    assert.ok(adulterado, "uma leitura bem-sucedida deve preceder a corrupção");
+    assert.equal(fs.statSync(path.join(remoto, adulterado.nome)).size, adulterado.stat.size);
+    assert.equal(fs.statSync(path.join(remoto, adulterado.nome)).mtimeMs, adulterado.stat.mtimeMs);
     assert.notEqual(
       sha(fs.readFileSync(path.join(remoto, adulterado.nome))),
-      sha(guardados.get(adulterado.nome).bytes),
+      sha(adulterado.bytes),
     );
-    assert.equal(deletesAtuais(), semDeletes, "reobservação corrompida não autoriza novos deletes");
-    assert.equal(new Set(lotes.map((e) => e.destino)).size, lotes.length);
-    for (const lote of lotes) {
-      assert.deepEqual(lote.antes, [], "cada observação começa em destino vazio");
-      assert.deepEqual(lote.pulados, [], "nenhum membro pode aproveitar tamanho/mtime anteriores");
-      assert.ok(lote.lista.length > 0);
-      assert.equal(new Set(lote.lista).size, lote.lista.length);
-      const recibo = ler(
-        path.join(catalogo, lote.lista[0].slice(0, antigos[0].base.length) + ".confirmado.json"),
-      );
-      assert.ok(
-        lote.lista.every((nome) => nomes(recibo).includes(nome)),
-        "lista literal limitada aos membros do recibo",
-      );
-    }
+    assert.equal(
+      exclusoes().length,
+      semDeletes,
+      "revisão mudou depois da leitura; nenhum novo delete",
+    );
+    assert.ok(f.events.filter((e) => e.route.endsWith("/download")).length > adulterado.downloads);
+    for (const n of fs.readdirSync(catalogo))
+      assert.equal(ler(path.join(catalogo, n)).etapas.recuperacaoExercitada, false);
     process.stdout.write(
       JSON.stringify({
-        caracterizacoesLote: true,
-        clientes: "rclone FALSO; corrupção simulada",
-        incompleta: { status: incompleta.status, evento: omitido },
-        fresca: { status: alterada.status, inicial, nova },
-        lotes: lotes.length,
-        destinosDistintos: true,
-        destinosVazios: true,
+        caracterizacoesNativas: true,
+        incompleta: true,
+        revisaoFresca: true,
         nenhumNovoDelete: true,
       }) + "\n",
     );
     process.stdout.write(
       JSON.stringify({
-        prova: "Bash/Node/FS reais",
-        clientes: "Docker/PG/age/rclone FALSOS",
+        prova: "Bash/Node/FS/HTTPS reais",
+        clientes: "Docker/PG/age/rclone/API Dropbox FALSOS",
         testemunhaCatalogo: 1,
         nonce: process.env.CATALOGO_PROVA_NONCE ?? null,
         inputs: Object.fromEntries(
           [
             "tests/unidade/infra/operacao-catalogo-cli.test.ts",
             "tests/servidor/catalogo-retomada.test.mjs",
+            "tests/servidor/dropbox-api-falso.mjs",
             "scripts/servidor/backup-recibos.mjs",
+            "scripts/servidor/dropbox-api.mjs",
+            "scripts/servidor/dropbox-estado.mjs",
+            "scripts/servidor/dropbox-autoridade.mjs",
+            "scripts/servidor/dropbox-retencao.mjs",
             "scripts/servidor/backup-banco.sh",
             "scripts/servidor/recibos.mjs",
             "scripts/servidor/comum.sh",
             "scripts/servidor/identidade.mjs",
             "scripts/servidor/identidade.sh",
-          ].map((nome) => [nome, sha(fs.readFileSync(path.join(raiz, nome)))]),
+          ].map((n) => [n, sha(fs.readFileSync(path.join(raiz, n)))]),
         ),
         casos: ["#391", "#392"],
         retomada: true,
         reciboPorUltimo: true,
         catalogoPreservado: true,
-        diarios: fs.readdirSync(diarios).map((n) => ler(path.join(diarios, n))),
+        diarios: diario().length,
       }) + "\n",
     );
   } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
+    await f.fechar();
   }
 });

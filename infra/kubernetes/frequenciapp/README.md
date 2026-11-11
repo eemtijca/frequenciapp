@@ -7,7 +7,7 @@ A decisão e o contrato portátil estão na [ADR-064](../../../docs/adr/064-auto
 ## O que o chart entrega
 
 - Deployment com initContainer de migração e checksum de ConfigMap e Secret no template do Pod.
-- Hook `pre-upgrade` e `pre-rollback` que exige backup do banco confirmado.
+- Hook `pre-upgrade` e `pre-rollback` com recibo HMAC no perfil URL explicitamente adotado; recusa sem adoção ou prova válida.
 - Service ClusterIP na porta 3000.
 - Ingress opcional.
 - ConfigMap para variáveis não sensíveis.
@@ -65,6 +65,8 @@ helm upgrade --install frequenciapp infra/kubernetes/frequenciapp \
 
 O exemplo acima usa `--set` para leitura. Em produção, usar um arquivo de valores privado, fora do Git.
 
+A primeira instalação não executa o hook e pode migrar um banco existente. Identificar o alvo, comprovar recuperação e obter autorização antes da instalação; não presumir banco vazio. `upgrade --install` pode executar um upgrade, não apenas uma instalação.
+
 ## Segredos
 
 O modo recomendado é `existingSecret`. As chaves esperadas:
@@ -121,20 +123,17 @@ O initContainer executa:
 node ./docker/app/migrar.mjs
 ```
 
-O contêiner principal recebe `MIGRAR_NA_PARTIDA=false`. O migrador usa a trava consultiva do banco e a conferência de checksum já existente.
+O contêiner principal recebe `MIGRAR_NA_PARTIDA=false`. O migrador usa a trava consultiva do banco e a conferência de checksum já existente. No perfil adotado, `origem-backup.mjs executar` valida o alvo antes de executar migrador ou entrada original do aplicativo. Os três consumidores recebem as URLs da mesma chave `url` de `backupOrigin.connectionSecret`, conferidas contra `backupOrigin.policySecret`. O HMAC de `backupOrigin.hmacSecret` só é montado no produtor e hook; `extraEnvFrom` e overrides reservados são recusados.
 
 ### Confirmação de backup antes do upgrade
 
-O `helm upgrade` e o `helm rollback` de revisões que declaram o hook executam primeiro o Job `backup-gate`. O Job usa a imagem de backup, não recebe Secret e lê o recibo `ultimo-backup.json` gravado pela rotina do banco no PVC `-backup-banco`. O gate confere:
+O chart renderiza o Job `backup-gate` para `pre-upgrade` e `pre-rollback`. Com `backupOrigin.adopted=true`, policy e CA externas imutáveis, conexão única e Secret HMAC separado, o produtor URL direto TLS exporta um snapshot e autentica identidade, escopo, timestamps e hashes exatos dos artefatos. O hook valida contra essa autoridade independente e permite o conjunto válido; sem adoção ou prova válida, recusa. O contrato, a policy, os Secrets e as premissas estão em [origem-backup.md](../../../docs/origem-backup.md).
 
-- a existência do recibo;
-- a idade do backup contra `backupGate.maxAgeHours`, com padrão de 36 horas;
-- o checksum SHA-256 do arquivo confirmado;
-- a verificação remota quando `backupGate.requireRemoteVerification=true`.
+O script também aceita `--diagnosticar-integridade`, fora do hook: confere idade, ponteiro, recibo e hashes locais e, se solicitado, a confirmação remota registrada. Não consulta o destino remoto nem comprova sua disponibilidade, a origem ou a restauração. Um diagnóstico positivo não autoriza upgrade. `backupGate.maxAgeHours` e `backupGate.requireRemoteVerification` restringem o hook autenticado, mas não substituem HMAC e policy.
 
-Sem recibo válido, o hook falha e o Helm não inicia a migração nem o rollout. A primeira instalação não executa o hook porque não há dados anteriores. O modo `backupGate.ensaioSemProtecao=true` existe apenas para ensaio explícito: ele permite o upgrade sem backup e não oferece proteção nem promessa de recuperação. O padrão é `false` e o modo é anunciado no `helm install` e no `helm upgrade`.
+`backupGate.ensaioSemProtecao=true` agora é recusado no template e a variável antiga não contorna o hook. O diagnóstico não autoriza operação protegida. A primeira instalação não executa o hook, ainda que aponte a um banco existente.
 
-O gate é sempre renderizado e exige que o backup do banco esteja habilitado e que `backup.database.persistence.enabled=true`. Um backup feito fora do chart não é reconhecido.
+O ConfigMap do script também é hook, com peso anterior ao Job. Um rollback pode executar hook ou script antigo, ou nenhum hook. Inspecionar as revisões e não presumir proteção em transições sem teste em cluster. `--no-hooks`, `kubectl apply` e operações fora do Helm também contornam o gate; não são solução para produção.
 
 Recomendações:
 
@@ -191,16 +190,18 @@ Os arquivos são montados em `/etc/frequenciapp` com modo 0440 e `fsGroup` 1000.
 
 O `backup.database.existingSecret` deve conter:
 
-| Chave                      | Uso                                           |
-| -------------------------- | --------------------------------------------- |
-| `BACKUP_DATABASE_URL`      | URL do banco para o dump                      |
-| `BACKUP_CRIPTOGRAFIA`      | `gpg` ou `age`                                |
-| `BACKUP_GPG_DESTINATARIO`  | Destinatário GPG                              |
-| `BACKUP_AGE_DESTINATARIOS` | Caminho ou conteúdo conforme a rotina         |
-| `BACKUP_REMOTO`            | Destino rclone                                |
-| `RCLONE_CONFIG_PASS`       | Senha da configuração do rclone, quando usada |
+| Chave                             | Uso                                                                                            |
+| --------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `BACKUP_DATABASE_URL`             | URL do banco para o dump                                                                       |
+| `BACKUP_CRIPTOGRAFIA`             | `gpg` ou `age`                                                                                 |
+| `BACKUP_GPG_DESTINATARIO`         | Destinatário GPG                                                                               |
+| `BACKUP_AGE_DESTINATARIOS_SHA256` | SHA-256 independente do arquivo de destinatários age, em 64 caracteres hexadecimais minúsculos |
+| `BACKUP_REMOTO`                   | Destino rclone                                                                                 |
+| `RCLONE_CONFIG_PASS`              | Senha da configuração do rclone, quando usada                                                  |
 
-A rotina usa `BACKUP_MODO=url`, `BACKUP_INCLUIR_AMBIENTE=false`, `BACKUP_RETER_DIAS`, `BACKUP_RETER_MINIMO` e `BACKUP_RETER_REMOTO` do values.
+Para age, o template fixa `BACKUP_AGE_DESTINATARIOS=/etc/frequenciapp/age-recipients.txt`, montado a partir de `backup.filesSecret`; um valor com esse nome no Secret do banco não substitui o caminho explícito do template. O pin é obrigatório, corresponde aos bytes exatos do arquivo e deve ser conferido por canal independente antes de ser configurado no Secret do banco. A conferência depende da proteção independente do pin; controlar tanto o arquivo quanto o pin não comprova a identidade dos destinatários.
+
+A rotina usa `BACKUP_MODO=url`, `BACKUP_INCLUIR_AMBIENTE=false`, `BACKUP_RETER_DIAS`, `BACKUP_RETER_MINIMO` e `BACKUP_RETER_REMOTO` do values. A retenção padrão é 30 dias e mínimo de 30 conjuntos, com overrides positivos explícitos permitidos. Autenticação do hook não habilita exclusão: no modo URL, inclusive adotado, a rotina mantém expurgos local/remoto suspensos neste recorte. Monitore capacidade do PVC e do remoto e planeje gestão independente das cópias; o acúmulo pode esgotar espaço.
 
 ### Secret das planilhas
 
@@ -217,11 +218,11 @@ O `backup.spreadsheets.existingSecret` deve conter:
 
 Cada rotina tem o próprio PVC `ReadWriteOnce`. O backup do banco usa `-backup-banco` em `/backups`. O backup das planilhas usa `-backup-planilhas` em `/backups`. Os dois CronJobs nunca compartilham o mesmo volume.
 
-A atualização de uma instalação anterior cria os dois PVCs novos e não move o conteúdo do PVC antigo `-backup`. Executar o backup do banco depois do upgrade e antes do próximo upgrade com o gate.
+Uma revisão que substitui o PVC antigo `-backup` por dois volumes não move seu conteúdo. Um hook prévio pode bloquear a criação dos novos PVCs e CronJobs, portanto não se deve pressupor que seja possível fazer backup depois do upgrade. Planejar previamente migração e recuperação comprovadas; não contornar o bloqueio em produção.
 
 O estado do backup do banco fica em `/backups/estado/ultimo-backup.json`, no PVC do banco. O backup das planilhas mantém o arquivo confirmado e o `.confirmado.json` em `/backups/planilhas`, no PVC das planilhas. Os PVCs carregam `helm.sh/resource-policy: keep` e não são removidos pelo `helm uninstall`.
 
-`backup.database.persistence.enabled` e `backup.spreadsheets.persistence.enabled` são `true` por padrão. Sem o PVC do banco, o recibo não sobrevive ao Job e o gate de upgrade falha. Sem o PVC das planilhas, a cópia local não é feita e o destino remoto precisa estar configurado.
+`backup.database.persistence.enabled` e `backup.spreadsheets.persistence.enabled` são `true` por padrão. Sem o PVC do banco, o recibo não sobrevive ao Job; o perfil de origem adotado exige esse PVC. Sem o PVC das planilhas, a cópia local não é feita e o destino remoto precisa estar configurado.
 
 ```yaml
 backup:
@@ -257,7 +258,7 @@ helm upgrade frequenciapp infra/kubernetes/frequenciapp \
   --set backupImage.tag=1.2.4
 ```
 
-O hook `backup-gate` confirma o backup antes de o initContainer aplicar as migrações. O rollout usa `RollingUpdate`. Se o gate falhar, a revisão anterior continua no ar e nenhuma migração é executada.
+Este comando exige preparação e autorização. No perfil adotado, o hook aceita somente backup autenticado, recente e compatível com a policy; sem adoção, recusa. Isso não garante a saúde do serviço já existente. Scripts de revisões anteriores podem ter comportamento diferente.
 
 Rollback do Helm:
 
@@ -266,11 +267,11 @@ helm history frequenciapp --namespace frequenciapp
 helm rollback frequenciapp <revisao> --namespace frequenciapp
 ```
 
-O rollback do Helm não desfaz migração aplicada. Em caso de migração destrutiva, usar o runbook de restauração.
+O rollback do Helm não desfaz migração aplicada e pode usar hook ou script antigos, ou nenhum hook. A compatibilidade da imagem anterior com o banco migrado não está comprovada; não executar rollback automático como recuperação presumida. A restauração exige planejamento e prova independente de recuperação.
 
 ## Testes
 
-O ensaio reproduzível roda em contêiner e não usa cluster:
+O executor usa Docker e não cria cluster. Ele depende das imagens e, para os schemas do kubeconform, pode exigir rede; não é prova de isolamento e não deve alcançar recursos de produção:
 
 ```bash
 bash tests/kubernetes/validar.sh
@@ -305,8 +306,8 @@ Os PVCs de backup não são removidos automaticamente por causa da anotação `h
 
 - O chart não instala PostgreSQL.
 - O chart não instala cert-manager, ingress controller, External Secrets ou operador de backup.
-- O backup local em PVC não é recuperação de desastre. Manter destino remoto e ativar `backupGate.requireRemoteVerification` quando a política exigir.
-- O gate reconhece apenas o recibo do backup do banco feito pelo próprio chart. Snapshots externos do PostgreSQL não contam.
+- O backup local em PVC não é recuperação de desastre. A confirmação remota registrada no diagnóstico não demonstra disponibilidade atual nem recuperação.
+- O gate aceita o produtor URL autenticado no perfil direto adotado, não recibos legados ou snapshots externos. Operador, produtor e Secrets protegidos são premissas; não há prova contra DBA ou root comprometido.
 - O CronJob de backup usa a imagem de backup, não a imagem da aplicação.
 - O `values.exemplo.yaml` é ilustrativo e não contém segredos reais.
 - A primeira instalação deve usar uma réplica. O aumento de réplicas depende de migração concluída e do limite de tentativas compartilhado no banco.
@@ -318,4 +319,4 @@ A agenda expõe `agenda.notifications`, `agenda.spreadsheets` e `agenda.indicato
 
 O backup do banco precisa de PVC (`backup.database.persistence.enabled=true`) ou de `backup.database.remote.enabled=true`. `backup.database.local=true` exige persistência; para somente remoto, usar `local=false` e `persistence.enabled=false`. Sem PVC, o chart injeta `BACKUP_EXIGIR_REMOTO=true` e a rotina recusa remoto vazio ou verificação desligada. O estado usa `/backups/estado`, persistindo junto com os dumps quando o PVC está habilitado.
 
-O gate de upgrade lê o recibo no PVC do banco. Instalação somente remota não grava esse recibo e falha no gate por padrão; manter o PVC ou usar `backupGate.ensaioSemProtecao=true` de forma explícita. Declarar um destino no Secret não comprova transporte nem recuperação.
+O diagnóstico e o hook autenticado leem os artefatos no PVC do banco. Sem PVC, não há catálogo persistente e o perfil adotado é recusado. Declarar destino no Secret não comprova transporte nem recuperação. Os testes focalizados de CLI/TLS/snapshot/cifra/hook/recuperação e Helm lint/template foram executados sem cluster ou dados reais; comandos, dependências e limites constam em [origem-backup.md](../../../docs/origem-backup.md).

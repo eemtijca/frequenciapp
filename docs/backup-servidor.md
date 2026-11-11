@@ -12,8 +12,8 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 - A chave privada fica fora do servidor, em cofre ou gerenciador de senhas.
 - A cópia remota é conferida por download e comparação com o hash local original.
 - O envio usa `rclone copy --immutable`, sem espelhar exclusões.
-- O destino remoto não tem expurgo automático, salvo `BACKUP_RETER_REMOTO=true`.
-- A retenção local preserva um mínimo configurável de cópias confirmadas, com padrão de cinco.
+- O expurgo remoto exige o perfil Dropbox adotado, pasta exclusiva, autoridade cooperativa e exclusão da revisão verificada. Outros transportes e instalações sem adoção continuam recusados. Consulte [retenção Dropbox](dropbox-retencao.md).
+- No modo Compose, a retenção local preserva um mínimo configurável de cópias confirmadas, com padrão de 30. No modo URL, ambos os expurgos ficam suspensos; monitore o espaço local e remoto.
 - Falhas de geração ou transporte não publicam recibo. Falha de expurgo pode ocorrer após a confirmação do novo conjunto e retorna erro sem anunciar limpeza completa.
 - Nenhum teste usa dados reais.
 
@@ -34,7 +34,7 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 - A imagem de backup já inclui o cliente.
 - Usar uma role somente leitura com `pg_read_all_data` quando possível.
 - A Transaction pooler do Supabase não é adequada para `pg_dump`.
-- A restauração URL exige `BACKUP_RESTAURACAO_URL_VALIDACAO` para o ensaio em banco descartável. O script confere a identidade do servidor e do banco nas duas URLs e recusa quando ambas apontam para a mesma base, mesmo com grafias diferentes. A opção `--sem-validacao` é uma decisão explícita de risco.
+- O ensaio de restauração URL exige `BACKUP_RESTAURACAO_PERFIL=postgres-direto`, PostgreSQL 17 direto e permissão `CREATEDB`. O ensaio cria o próprio banco aleatório e verifica sua propriedade. URLs externas de validação são recusadas, mesmo quando diferentes do destino. Consulte [restauração URL](restauracao-url.md).
 
 ## Imagem de backup
 
@@ -139,35 +139,40 @@ Regras:
 
 ## Variáveis do backup
 
-| Variável                           | Padrão                                | Uso                                |
-| ---------------------------------- | ------------------------------------- | ---------------------------------- |
-| `BACKUP_MODO`                      | `compose` no host, `url` no contêiner | Origem do dump                     |
-| `BACKUP_DATABASE_URL`              | vazio                                 | URL para modo `url`                |
-| `BACKUP_DIR`                       | `/var/backups/frequenciapp`           | Diretório local                    |
-| `BACKUP_BANCO_DIR`                 | `BACKUP_DIR/banco`                    | Dumps do banco                     |
-| `BACKUP_PLANILHAS_DIR`             | `BACKUP_DIR/planilhas`                | Cópias das planilhas               |
-| `BACKUP_RETER_DIAS`                | `30`                                  | Retenção local                     |
-| `BACKUP_RETER_MINIMO`              | `5`                                   | Cópias confirmadas sempre mantidas |
-| `BACKUP_RETER_REMOTO`              | `false`                               | Limpeza remota opcional            |
-| `BACKUP_RESTAURACAO_URL_VALIDACAO` | vazio                                 | Banco descartável no modo URL      |
-| `RESTAURAR_MANTER_ANTERIOR`        | `true`                                | Preserva o banco anterior          |
-| `BACKUP_ESPACO_MINIMO_MB`          | `512`                                 | Espaço mínimo antes do dump        |
-| `BACKUP_CRIPTOGRAFIA`              | `gpg`                                 | `gpg` ou `age`                     |
-| `BACKUP_GPG_DESTINATARIO`          | vazio                                 | Fingerprint completo               |
-| `BACKUP_GPG_CHAVE_PUBLICA`         | vazio                                 | Chave pública GPG                  |
-| `BACKUP_AGE_DESTINATARIOS`         | vazio                                 | Arquivo de destinatários age       |
-| `BACKUP_REMOTO`                    | vazio                                 | Destino rclone do banco            |
-| `BACKUP_RCLONE_CONFIG`             | vazio                                 | Configuração do rclone             |
-| `RCLONE_CONFIG_PASS`               | vazio                                 | Senha da configuração do rclone    |
-| `BACKUP_VERIFICAR_REMOTO`          | `true`                                | Confere o arquivo remoto           |
-| `BACKUP_EXIGIR_REMOTO`             | `false`                               | Exige destino e verificação remota |
-| `BACKUP_CATALOGO_PERSISTENTE`      | `true`                                | Exige catálogo persistente         |
-| `BACKUP_INCLUIR_AMBIENTE`          | `true` no Compose                     | Cifra o `app.env` junto            |
-| `BACKUP_AMBIENTE_ARQUIVO`          | `/etc/frequenciapp/app.env`           | Arquivo de ambiente                |
-| `BACKUP_PLANILHAS_LOCAL`           | `true`                                | Copia o ZIP confirmado para o host |
-| `BACKUP_ORIGEM`                    | vazio                                 | Origem rclone das planilhas        |
-| `BACKUP_DESTINO`                   | vazio                                 | Destino rclone das planilhas       |
-| `BACKUP_CHAVE`                     | vazio                                 | Chave do ZIP AES-256 das planilhas |
+| Variável                           | Padrão                                | Uso                                       |
+| ---------------------------------- | ------------------------------------- | ----------------------------------------- |
+| `BACKUP_MODO`                      | `compose` no host, `url` no contêiner | Origem do dump                            |
+| `BACKUP_DATABASE_URL`              | vazio                                 | URL para modo `url`                       |
+| `BACKUP_DIR`                       | `/var/backups/frequenciapp`           | Diretório local                           |
+| `BACKUP_BANCO_DIR`                 | `BACKUP_DIR/banco`                    | Dumps do banco                            |
+| `BACKUP_PLANILHAS_DIR`             | `BACKUP_DIR/planilhas`                | Cópias das planilhas                      |
+| `BACKUP_RETER_DIAS`                | `30`                                  | Retenção local                            |
+| `BACKUP_RETER_MINIMO`              | `30`                                  | Cópias confirmadas sempre mantidas        |
+| `BACKUP_RETER_REMOTO`              | `false`                               | Expurgo somente no perfil Dropbox adotado |
+| `BACKUP_DROPBOX_CONFIG`            | vazio                                 | Configuração privada da adoção Dropbox    |
+| `BACKUP_RESTAURACAO_PERFIL`        | vazio                                 | `postgres-direto` para ensaio próprio URL |
+| `BACKUP_RESTAURACAO_URL_VALIDACAO` | vazio                                 | URL externa recusada, não configurar      |
+| `BACKUP_ORIGEM_POLICY`             | vazio                                 | Policy independente para origem URL       |
+| `BACKUP_ORIGEM_CHAVE`              | vazio                                 | Chave HMAC separada do PVC                |
+| `RESTAURAR_MANTER_ANTERIOR`        | `true`                                | Preserva o banco anterior                 |
+| `BACKUP_ESPACO_MINIMO_MB`          | `512`                                 | Espaço mínimo antes do dump               |
+| `BACKUP_CRIPTOGRAFIA`              | `gpg`                                 | `gpg` ou `age`                            |
+| `BACKUP_GPG_DESTINATARIO`          | vazio                                 | Fingerprint completo                      |
+| `BACKUP_GPG_CHAVE_PUBLICA`         | vazio                                 | Chave pública GPG                         |
+| `BACKUP_AGE_DESTINATARIOS`         | vazio                                 | Arquivo de destinatários age              |
+| `BACKUP_AGE_DESTINATARIOS_SHA256`  | vazio                                 | Pin independente obrigatório para age     |
+| `BACKUP_REMOTO`                    | vazio                                 | Destino rclone do banco                   |
+| `BACKUP_RCLONE_CONFIG`             | vazio                                 | Configuração do rclone                    |
+| `RCLONE_CONFIG_PASS`               | vazio                                 | Senha da configuração do rclone           |
+| `BACKUP_VERIFICAR_REMOTO`          | `true`                                | Confere o arquivo remoto                  |
+| `BACKUP_EXIGIR_REMOTO`             | `false`                               | Exige destino e verificação remota        |
+| `BACKUP_CATALOGO_PERSISTENTE`      | `true`                                | Exige catálogo persistente                |
+| `BACKUP_INCLUIR_AMBIENTE`          | `true` no Compose                     | Cifra o `app.env` junto                   |
+| `BACKUP_AMBIENTE_ARQUIVO`          | `/etc/frequenciapp/app.env`           | Arquivo de ambiente                       |
+| `BACKUP_PLANILHAS_LOCAL`           | `true`                                | Copia o ZIP confirmado para o host        |
+| `BACKUP_ORIGEM`                    | vazio                                 | Origem rclone das planilhas               |
+| `BACKUP_DESTINO`                   | vazio                                 | Destino rclone das planilhas              |
+| `BACKUP_CHAVE`                     | vazio                                 | Chave do ZIP AES-256 das planilhas        |
 
 ## Fluxo do banco
 
@@ -190,6 +195,10 @@ Execução manual no Compose:
 scripts/servidor/backup-banco.sh
 ```
 
+No modo Compose, execute `scripts/servidor/backup-banco.sh --verificar` para conferir a última cópia. A rotina consulta o banco efetivo e valida o recibo e os arquivos locais. Quando há destino remoto configurado, ela compara cada artefato e o recibo remotos com os hashes locais. Essa verificação não substitui o ensaio de restauração.
+
+Para cópias cuja origem não pode ser comprovada, `scripts/servidor/backup-banco.sh --diagnosticar-integridade` confere apenas a integridade local do conjunto. O resultado não identifica o banco de origem, não verifica a cópia remota, não demonstra recuperação e não autoriza atualização ou retenção. No perfil URL adotado, `--verificar` valida a origem autenticada contra policy e chave independentes. Legados sem essa autenticação continuam recusados. Consulte [origem de backup](origem-backup.md).
+
 Execução no contêiner de backup, modo URL:
 
 ```bash
@@ -199,6 +208,7 @@ docker run --rm \
   -e BACKUP_DATABASE_URL='postgresql://usuario:senha@db:5432/frequencia' \
   -e BACKUP_CRIPTOGRAFIA=age \
   -e BACKUP_AGE_DESTINATARIOS=/etc/frequenciapp/age-destinatarios.txt \
+  -e BACKUP_AGE_DESTINATARIOS_SHA256="$BACKUP_AGE_DESTINATARIOS_SHA256" \
   -e BACKUP_DIR=/backups \
   -e BACKUP_RCLONE_CONFIG=/etc/frequenciapp/rclone.conf \
   -e BACKUP_REMOTO='destino:frequenciapp/banco' \
@@ -207,7 +217,7 @@ docker run --rm \
   frequenciapp-backup:local
 ```
 
-O comando exato depende do nome da rede e do projeto Compose.
+Antes do comando, obtenha por canal independente o SHA-256 esperado do arquivo de destinatários e defina-o em `BACKUP_AGE_DESTINATARIOS_SHA256` com 64 caracteres hexadecimais minúsculos. O comando exato depende do nome da rede e do projeto Compose.
 
 ## Arquivos gerados
 
@@ -226,19 +236,13 @@ frequenciapp-20261107T033000Z-a1b2c3d4-ambiente.env.gpg.sha256
 
 ## Retenção local
 
-`BACKUP_RETER_DIAS` define a idade e `BACKUP_RETER_MINIMO` protege os conjuntos confirmados mais recentes, com padrão de cinco. A confirmação exige recibo `<base>.confirmado.json` versão 1 com escopo, alvo, formato, destinatário, lista exata de artefatos, hashes e etapas tipadas. Recibo local só conta se todos os membros e checksums conferirem; nomes, legados ou uploads incompletos não contam nem autorizam exclusão por prefixo.
+`BACKUP_RETER_DIAS` define a idade e `BACKUP_RETER_MINIMO` protege os conjuntos confirmados mais recentes, com padrão de 30. Podem ser mantidas mais cópias dentro do período de retenção. A confirmação exige recibo `<base>.confirmado.json` versão 1 com escopo, alvo, formato, destinatário, lista exata de artefatos, hashes e etapas tipadas. Recibo local só conta se todos os membros e checksums conferirem; nomes, legados ou uploads incompletos não contam nem autorizam exclusão por prefixo.
 
 A etapa `recuperacaoExercitada` permanece `false`: cifra, hash, transporte e listagem não comprovam recuperação. O ensaio completo em estação isolada com chave privada separada, restauração oficial e comparação de dados, constraints e migrações continua obrigatório. Cópias legadas exigem adoção e verificação explícitas, não confirmação retroativa por nome.
 
-O catálogo em `ESTADO_DIR/recibos` é independente do provedor. Sem persistência comprovada (`BACKUP_CATALOGO_PERSISTENTE=false`), o expurgo remoto é suspenso. No modo URL, ambos os expurgos ficam conservadoramente suspensos até existir identidade operacional verificável do banco, sem usar URL ou senha como identidade.
+O catálogo em `ESTADO_DIR/recibos` é independente do provedor. O perfil Dropbox usa transporte limitado durante a recepção, revisão fixa, journal durável e exclusão condicional. A pasta precisa ser exclusivamente operada pelo contrato adotado; a configuração não prova ausência de outro administrador. No modo URL, os expurgos local e remoto continuam suspensos, inclusive com origem autenticada: a autorização de rollout não concede autorização de exclusão.
 
-A exclusão deriva apenas dos membros validados do recibo, inclusive ambiente e seu checksum com a extensão original. Recibo remoto é removido por último. A limpeza remota é opcional (`BACKUP_RETER_REMOTO=true`) e usa `backup-recibos.mjs`, chamado pelo consumidor `backup-banco.sh` sob a trava e identidade Compose já conferidas.
-
-O catálogo original em `ESTADO_DIR/recibos` não é apagado para ocultar ausência de arquivos. Cada conjunto remoto selecionado recebe um registro privado em `ESTADO_DIR/expurgos`, com cópia e SHA-256 do recibo, intenção pendente e sequência de exclusões confirmadas. O registro não confirma um backup novo nem altera o recibo versão 1. Antes de selecionar ou retomar um conjunto, a rotina confere ownership, escopo completo, bytes dos recibos e artefatos presentes, checksums associados, ausências já confirmadas e mínimo de outros conjuntos íntegros pertinentes. Um conjunto em expurgo não conta nesse mínimo.
-
-Falha parcial retorna erro e preserva catálogo, registro e membros restantes. A próxima execução configurada pode retomar somente o mesmo conjunto se todas as conferências voltarem a passar. O registro concluído só deixa de ocupar o catálogo ativo após nova prova de ausência de todos os seus membros exatos; a evidência original continua preservada. Ausência sem exclusão previamente confirmada, reaparecimento, alteração do recibo, erro de listagem ou estado desconhecido suspendem a limpeza para diagnóstico. Não há garantia de transação remota ou de execução exatamente uma vez: uma exclusão efetivada sem confirmação persistida exige reconciliação externa, não adoção automática da ausência.
-
-O expurgo local mantém o comportamento conservador anterior: erro interrompe a operação e preserva o recibo restante; este registro de retomada não cobre falhas locais. O leitor CLI `recibos.mjs` continua recusando um catálogo remoto inconsistente quando usado isoladamente; a reconciliação dos expurgos próprios pertence ao consumidor remoto acima, sem baixar ou reconstruir recibos do provedor.
+Não configure `BACKUP_RETER_REMOTO=true` sem concluir a adoção descrita em [retenção Dropbox](dropbox-retencao.md). Configuração ausente, transporte incompatível, revisão divergente ou resultado incerto podem ser recusados após a confirmação do novo conjunto. A falha retorna erro e impede anunciar limpeza completa. Preserve catálogo, journals e artefatos para reconciliação; monitore o espaço local e remoto.
 
 ## Restauração
 
@@ -253,7 +257,7 @@ scripts/servidor/restaurar.sh \
 O script:
 
 1. Monta e confere a instalação Compose.
-2. Confere o checksum, quando o arquivo `.sha256` existe.
+2. Exige checksum explícito ou arquivo `.sha256` e confere ambos quando fornecidos.
 3. Decifra com GPG ou age em diretório privado.
 4. Valida o formato com `pg_restore -l`.
 5. Cria um banco descartável e restaura o dump nele.
@@ -272,15 +276,19 @@ O banco anterior não é descartado automaticamente. Depois de conferir login, s
 
 ### URL externa
 
+No modo `url`, o perfil `BACKUP_RESTAURACAO_PERFIL=postgres-direto` cria um banco de ensaio aleatório no endpoint direto PostgreSQL 17. A role precisa de `CREATEDB`. Nome, OID, dono, servidor e marcador privado são revalidados antes de restaurar e descartar o recurso. O destino só recebe o dump após o ensaio bem-sucedido. `BACKUP_RESTAURACAO_URL_VALIDACAO` é recusada: uma URL fornecida externamente nunca é autoridade para destruir um banco de ensaio.
+
+O journal de cada rodada fica em `ESTADO_DIR/ensaios-url`. Falha, sinal ou propriedade divergente preservam o recurso para inspeção manual. Não usar esse perfil com pooler, proxy que ignore database ou topologia não revisada. Consulte os requisitos e os limites em [restauração URL](restauracao-url.md).
+
+Somente após decisão explícita registrada, a opção `--sem-validacao` permite uma restauração destrutiva sem o ensaio prévio. A aplicação precisa ser parada pela plataforma antes da operação; o script não controla o runtime externo. Preserve e confira uma cópia recuperável independente antes de prosseguir. `--sem-copia` também dispensa a cópia de segurança automática e aumenta o risco.
+
 ```bash
-BACKUP_RESTAURACAO_URL_VALIDACAO='postgresql://usuario:senha@host:5432/frequencia_validacao' \
-  scripts/servidor/restaurar.sh \
+scripts/servidor/restaurar.sh \
   --arquivo /caminho/backup.dump.age \
-  --confirmar \
-  --sem-copia
+  --confirmar --sem-validacao
 ```
 
-No modo `url`, a aplicação precisa ser parada pela plataforma antes da restauração. O script não controla o runtime externo. A URL de validação precisa apontar para um banco descartável e o script confere a identidade do servidor e do banco antes do ensaio; grafias equivalentes da mesma base são recusadas. A opção `--sem-validacao` substitui o banco sem o ensaio prévio e deve ser usada somente com uma decisão registrada.
+Uma falha após iniciar `pg_restore` pode deixar o resultado incerto. O script não executa rollback automático no modo URL: mantenha a aplicação parada, inspecione o destino e a cópia de segurança indicada e decida a recuperação manual em ambiente controlado. Mesmo quando a transação é usada, não presuma o estado do destino após falha ou perda de conexão.
 
 ### Restauração com chave offline
 
@@ -288,7 +296,7 @@ Para não copiar a chave privada para o servidor, decifrar em uma estação auto
 
 ```bash
 age --decrypt -i backup-age.txt backup.dump.age |
-  scripts/servidor/restaurar.sh --entrada - --confirmar --sem-copia
+  scripts/servidor/restaurar.sh --entrada - --checksum SHA256_DO_DUMP_DECIFRADO --confirmar --sem-copia
 ```
 
 O script aceita `--entrada -` e materializa o dump em texto claro num diretório temporário privado. Não é um fluxo sem texto claro em disco. A área é removida em sucesso, erro e sinais tratáveis; `SIGKILL` exige diagnóstico de resíduos.
@@ -312,7 +320,9 @@ O dump usa `--schema` quando `DATABASE_SCHEMA` está definida e exclui publicaç
 
 ### Privacidade dos temporários
 
-O backup cifra o dump em fluxo. A restauração decifra em um diretório temporário com permissão restrita e o remove ao final, inclusive em falha. Um arquivo recebido por `--entrada -` também é gravado apenas nesse diretório privado.
+O backup cifra o dump em fluxo. A restauração copia o arquivo de entrada e decifra a cópia em diretório temporário privado. Reserve espaço para o arquivo capturado e o dump decifrado simultaneamente, além de espaço para a cópia de segurança quando habilitada. `--entrada -` grava o dump decifrado no temporário. A limpeza ocorre no sucesso, erro e sinais tratáveis, mas não é garantida após `SIGKILL` ou queda do sistema; inspecione resíduos com segurança.
+
+O sidecar aceito atualmente deve conter exatamente uma linha `SHA256␠␠nome-do-arquivo` seguida de LF, como produzido pelo backup atual. Sidecars legados com marcador binário `*`, múltiplas entradas ou nomes escapados pelo `sha256sum` são incompatíveis e serão recusados, inclusive quando `--checksum` também for informado. Não converta ou ignore um sidecar sem verificar independentemente o arquivo e sua origem; checksum sozinho não autentica a origem.
 
 ## Backup das planilhas
 
@@ -382,12 +392,12 @@ Regras:
 - Restauração em banco separado e comparação de dados, schema e migrações.
 - Falha de dump, cifra, upload, verificação, checksum e permissões.
 - Detecção de arquivo e checksum remotos adulterados.
-- Retenção mínima de cinco cópias e preservação após falha.
+- Retenção mínima padrão de 30 cópias, valores explicitamente configurados e preservação após falha.
 - Fluxo URL separado do Compose.
 - Limpeza de temporários.
 - Verificação de permissões e ausência de segredos em log.
 
-Os comandos estão em `tests/servidor/README.md`. O fluxo `Servidor` do GitHub Actions executa ShellCheck, a validação dos arquivos de servidor e os ensaios descartáveis.
+Os comandos e os resultados por perfil estão em `tests/servidor/README.md`. Sintéticos sem rede/socket, ensaios reais PostgreSQL descartáveis e instalação privilegiada em fixture própria são provas separadas. Um autoteste do launcher não aprova a suíte inteira; uma integração legada sem ownership demonstrado continua não executada e deve ser reportada como bloqueio, não como teste aprovado ou ignorado.
 
 ## Diagnóstico
 
@@ -415,7 +425,7 @@ Os comandos estão em `tests/servidor/README.md`. O fluxo `Servidor` do GitHub A
 - Conferir se a chave privada é a mesma da cópia.
 - Conferir versão do `pg_restore`.
 - Conferir permissões da role e a permissão para criar, renomear e remover bancos.
-- Conferir `BACKUP_RESTAURACAO_URL_VALIDACAO` no modo URL.
+- No modo URL, conferir perfil direto, permissão `CREATEDB` e o journal do banco de ensaio. Uma URL externa não é aceita como destino descartável.
 - Conferir se a aplicação voltou após o rollback e se o banco anterior permanece.
 - Conferir `ultima-restauracao.json` em `/var/lib/frequenciapp`.
 
@@ -428,4 +438,4 @@ O chart aceita duas formas de durabilidade para o backup do banco:
 
 Com PVC, o chart define `BACKUP_CATALOGO_PERSISTENTE=true` e `BACKUP_EXIGIR_REMOTO=false`. Sem PVC, define `BACKUP_EXIGIR_REMOTO=true`; a rotina então recusa `BACKUP_REMOTO` vazio e exige `BACKUP_VERIFICAR_REMOTO=true`. A declaração do chart não comprova transporte nem recuperação: a prova vem do upload, da comparação do hash e do recibo gravado pela rotina.
 
-O gate de upgrade lê o recibo no PVC do banco. Uma instalação somente remota, sem PVC, não tem onde gravar esse recibo e o gate falha por padrão; para manter upgrade protegido, use o PVC do banco mesmo quando o destino remoto estiver habilitado. O modo `backupGate.ensaioSemProtecao=true` continua sendo a única exceção explícita e não oferece proteção.
+O gate protegido exige PVC e o perfil de [origem autenticada](origem-backup.md): policy independente, endpoint TLS fixado, identidade PostgreSQL esperada e recibo HMAC vinculado ao dump e aos artefatos. O diagnóstico local não autoriza a operação. Ausência de adoção, legado sem HMAC e `backupGate.ensaioSemProtecao=true` são recusados. A proteção não é retroativa: instalação inicial, hooks de revisões antigas, `--no-hooks` e alterações administrativas diretas podem não passar pelo gate. Consulte [Kubernetes](kubernetes.md).

@@ -140,7 +140,7 @@ describe("servidor auto-hospedado", () => {
       "BACKUP_CRIPTOGRAFIA=gpg",
       "BACKUP_GPG_DESTINATARIO=",
       "BACKUP_MODO=compose",
-      "BACKUP_RETER_MINIMO=5",
+      "BACKUP_RETER_MINIMO=30",
       "BACKUP_RETER_REMOTO=false",
       "ATUALIZAR_MODO=auto",
       "ATUALIZAR_VERIFICAR_IMAGEM=true",
@@ -165,7 +165,7 @@ describe("servidor auto-hospedado", () => {
     expect(instalador).toContain("servidor.template");
     expect(agenda).toContain("agenda.timeZone");
     expect(backupBanco).toContain("backup.database.timeZone");
-    expect(valores).toContain("retentionMinimum: 5");
+    expect(valores).toContain("retentionMinimum: 30");
     expect(valores).toContain("remoteRetention: false");
   });
 

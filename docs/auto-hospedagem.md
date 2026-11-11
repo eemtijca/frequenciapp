@@ -4,6 +4,8 @@ Guia para executar o FrequenciApp em um servidor Linux próprio, como VPS, servi
 
 O contrato portátil e as decisões estão na [ADR-064](adr/064-auto-hospedagem-servidor.md) e na [ADR-065](adr/065-atualizacao-e-recuperacao-verificaveis.md). O backup do banco e a restauração estão em [backup-servidor.md](backup-servidor.md). Para Kubernetes, consultar [kubernetes.md](kubernetes.md).
 
+A manutenção protegida exige [controlador estável adotado](controlador-manutencao.md), separado do checkout. A retenção remota tem [perfil Dropbox](dropbox-retencao.md); o modo URL tem contratos próprios de [origem autenticada](origem-backup.md) e [restauração](restauracao-url.md). Implementação e teste sintético não autorizam instalação, cron ou alteração de uma implantação existente.
+
 ## Contrato portátil
 
 A aplicação exige apenas:
@@ -89,9 +91,22 @@ A aplicação e o banco ficam sem portas publicadas. Apenas o proxy publica 80 e
 11. Conferir a identidade inicial com `scripts/servidor/identidade.sh --iniciar`.
 12. Subir a pilha e conferir a saúde.
 13. Adotar a identidade com `scripts/servidor/identidade.sh --adotar --confirmar`.
-14. Instalar o cron e testar backup e restauração.
+14. Testar backup e restauração; revisar e adotar o controlador antes de instalar o cron.
 
 Os arquivos de ambiente não entram no Git. O `app.env` contém `AUTH_SECRET`, credenciais do banco e opcionais do Google, push e feriados. O `ops.env` contém domínio, TLS, backup e atualização.
+
+Essas etapas de bootstrap são administrativas, com poderes diretos de Docker. Essa conta não é o operador limitado do controlador. O perfil protegido exige checkout e configuração de root, sem escrita do operador, e não altera grupos, sudoers ou permissões automaticamente. A delegação precisa ser revisada conforme [controlador de manutenção](controlador-manutencao.md).
+
+Os exemplos de bootstrap abaixo usam os arquivos Compose de referência e pressupõem ambiente carregado de arquivos administrativos confiáveis:
+
+```bash
+set -a
+. /etc/frequenciapp/app.env
+. /etc/frequenciapp/ops.env
+set +a
+```
+
+Não carregar arquivos graváveis por terceiros. Conferir projeto, arquivos, volumes e endpoint antes da primeira subida. Sobreposições próprias precisam entrar explicitamente no comando. O wrapper `compose.sh` oferece somente consultas; não é uma entrada de mutação do operador limitado.
 
 ## Variáveis principais
 
@@ -167,7 +182,8 @@ DOMINIO=frequencia.escola.local
 Subir:
 
 ```bash
-scripts/servidor/compose.sh up -d --build
+docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$APP_ENV_FILE" \
+  -f compose.yml -f compose.servidor.yml -f compose.servidor-caddy.yml up -d --build
 ```
 
 Conferir:
@@ -180,7 +196,9 @@ scripts/servidor/compose.sh ps
 No modo interno, exportar o certificado raiz do Caddy e instalá-lo nos dispositivos:
 
 ```bash
-scripts/servidor/compose.sh cp caddy:/data/caddy/pki/authorities/local/root.crt ./caddy-root.crt
+docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$APP_ENV_FILE" \
+  -f compose.yml -f compose.servidor.yml -f compose.servidor-caddy.yml \
+  cp caddy:/data/caddy/pki/authorities/local/root.crt ./caddy-root.crt
 ```
 
 O arquivo `caddy-root.crt` não entra no Git. Sem a raiz confiável, o PWA não instala e o navegador mostra aviso de certificado.
@@ -200,7 +218,8 @@ ACME_CA=https://acme-v02.api.letsencrypt.org/directory
 Subir o Nginx no modo HTTP inicial:
 
 ```bash
-scripts/servidor/compose.sh up -d --build nginx
+docker compose --project-name "$COMPOSE_PROJECT_NAME" --env-file "$APP_ENV_FILE" \
+  -f compose.yml -f compose.servidor.yml -f compose.servidor-nginx.yml up -d --build nginx
 scripts/servidor/renovar-certificado.sh --inicial
 ```
 
@@ -286,7 +305,11 @@ Modos:
 - `release`: baixa a imagem do GHCR.
 - `main`: compila o commit alvo em uma worktree isolada na máquina.
 
-Antes de aplicar:
+**Adoção obrigatória:** atualizações aplicadas são executadas somente pela entrada do controlador instalado fora do checkout. Invocação direta sem perfil válido, intenção persistida e trava herdada é recusada; `--forcar` ou `--permitir-migracoes` não concedem autoridade. Simulação, ajuda e registro têm contratos próprios; `--registrar` altera estado e não é diagnóstico sem efeitos. A instalação da revisão não desativa cron antigo nem impede administradores de executar outros scripts.
+
+O controlador fixa scripts operacionais, configuração, identidade e migrador aprovados em snapshot protegido. As entradas de backup, restauração, retenção e atualização compartilham a autoridade local do alvo. O perfil protege atores cooperativos e um operador limitado, não root, DBA ou quem pode usar Docker diretamente. Adoção e delegação não podem ser inferidas de uma variável booleana, da existência de uma pasta ou de testes com clientes falsos.
+
+No perfil adotado, o fluxo exige:
 
 1. O Compose é montado e validado com `docker compose config --quiet`.
 2. A árvore Git precisa estar limpa e o estado registrado precisa corresponder ao checkout.
@@ -296,32 +319,38 @@ Antes de aplicar:
 6. O rótulo OCI da imagem é comparado com o commit alvo.
 7. A configuração do Compose do alvo é validada antes de alterar o checkout principal.
 8. A aplicação sobe com `--wait` e a saúde pública é conferida quando configurada.
-9. Em falha, a imagem e o commit anteriores são restaurados.
+9. O controlador confere o término do filho, os recursos observados e a integridade do pin antes de persistir a conclusão. Uma intenção incompleta permanece bloqueada. Sucesso não é obtido removendo um marcador.
+
+Antes do build e da partida, o controlador mantém cópia física do conjunto de recuperação em `dados/pins`, fora da retenção. O cron adotado chama a entrada estável, não o script da revisão alvo. A adoção exige revisar todas as entradas antigas e o estado legado: instalar outro prefixo ou alterar `ATUALIZAR_HABILITADO` não reconcilia execução anterior nem remove um cron já instalado. A automação permanece desligada por padrão e só deve ser ativada após os gates da instalação real.
+
+Depois de falha de Compose ou possível migração, o controlador preserva journal, pins e IDs/imagens observados e não inicia automaticamente a imagem anterior. O alvo pode continuar ativo e migrando: a falha do cliente não comprova quiescência. Revisões antigas ou ações administrativas diretas não recebem proteção retroativa.
+
+Preserve logs, marcador, estado e evidências; identifique os processos, contêineres, imagem efetiva, checkout e estado do banco. Planeje com responsáveis e autorização explícita qualquer contenção, parada, restauração ou troca de imagem, considerando disponibilidade e a possibilidade de operações ainda em curso. Não remova o marcador nem force nova execução apenas para liberar o bloqueio. Só considere intervenção no marcador depois de comprovar o estado da operação e decidir um plano de recuperação; sua remoção não torna outras revisões ou rotinas seguras.
 
 O backup de planilhas é opcional. Quando `BACKUP_PLANILHAS_HABILITADO=false`, a imagem `backup-planilhas` não é baixada nem construída.
 
-A atualização automática pelo cron não é instalada por padrão. `ATUALIZAR_HABILITADO=false` mantém a rotina fora do cron; defina `true` somente depois de revisar a agenda e o rollback.
+A atualização automática pelo cron não é instalada por padrão. `ATUALIZAR_HABILITADO=false` impede que o instalador inclua uma nova linha, mas não desativa uma linha já instalada. Identifique e desative separadamente qualquer agendamento existente; não assuma proteção do marcador contra scripts de outras revisões.
 
 `ATUALIZAR_VERIFICAR_IMAGEM=true` confere o rótulo da imagem antes da aplicação. `ATUALIZAR_BACKUP_ANTES=false` é rejeitado porque o backup anterior é obrigatório.
 
 Quando o healthcheck usa HTTPS com CA interna, defina `ATUALIZAR_SAUDE_CA` e `RESTAURAR_SAUDE_CA` com o caminho do certificado. Sem a CA, o `curl` usa o repositório do sistema.
 
-O rollback da imagem e do commit não desfaz uma migração já aplicada. Em caso de falha após uma migração, use o backup gerado antes da atualização e o procedimento de restauração. O arquivo `falha.json` registra se havia migrações novas.
+A tentativa de retornar o checkout não reverte migrações nem comprova que a imagem anterior seja compatível com o banco. Não restaure automaticamente: a escolha do backup, seu escopo, a recuperabilidade e o procedimento devem ser verificados para o alvo real. Quando gravado, `falha.json` indica migrações possivelmente aplicadas, não apenas a existência de arquivos novos.
 
 A restauração e o backup de planilhas usam `imagem` e `imagemBackup` de `estado.json` quando o processo não recebe `APP_IMAGEM` ou `APP_IMAGEM_BACKUP` explicitamente. O estado gravado pelo último update evita voltar para a imagem local inicial.
 
 A restauração recusa um dump cujo histórico de migrações não seja um prefixo do checkout. `RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES=true` só deve ser usado em uma decisão explícita e controlada.
 
-Uso manual:
+Entrada aplicada do perfil adotado, depois de revisar e concluir a adoção:
 
 ```bash
-scripts/servidor/atualizar.sh --simular
-scripts/servidor/atualizar.sh
-scripts/servidor/atualizar.sh --permitir-migracoes
-scripts/servidor/atualizar.sh --registrar
+/opt/frequenciapp-controlador/executar estado
+/opt/frequenciapp-controlador/executar atualizar
 ```
 
-A simulação não executa `git fetch`, não altera refs nem tags e não aplica backup, build ou migração. Ela usa as referências locais; para considerar o remoto mais recente, execute `git fetch` manualmente e repita a simulação.
+O prefixo é configurável na adoção. Chamadas diretas de atualização aplicada sem a autoridade do controlador são recusadas com status 78. Não fabricar contexto de execução, editar o journal ou trocar ownership para forçar liberação.
+
+A simulação comum não executa o `git fetch` explícito do atualizador nem aplica backup, build ou migração. Ela consulta as referências locais, mas ainda carrega ambiente, consulta Docker e cria ou usa arquivos temporários e de trava. Em clones parciais, consultas Git podem buscar objetos ausentes; não trate a simulação como operação estritamente somente leitura ou sem rede. Para considerar referências mais recentes, um `git fetch` manual também altera o repositório e precisa de decisão separada. `--simular` e `--registrar` são incompatíveis e a combinação é recusada antes de carregar ambiente ou executar operações.
 
 A primeira instalação pode ser registrada com `--registrar` depois da subida manual e da adoção da identidade. O modo `auto` usa o estado em `/var/lib/frequenciapp/estado.json`.
 
@@ -329,7 +358,7 @@ O Kubernetes e as plataformas gerenciadas usam o próprio rollout. O contrato da
 
 ## Backup e restauração
 
-O backup do banco usa `pg_dump`, cifra em fluxo com GPG ou age, copia para um diretório local e envia por rclone. A cópia remota é comparada com o hash local e a retenção preserva um mínimo configurável de cópias confirmadas. O backup das planilhas usa a rotina existente dentro de um contêiner com rclone.
+O backup do banco usa `pg_dump`, cifra em fluxo com GPG ou age, copia para um diretório local e envia por rclone. A cópia remota é comparada com o hash local. No modo Compose, a retenção preserva um mínimo configurável de cópias confirmadas; no modo URL, os expurgos local e remoto ficam suspensos e exigem monitoramento de espaço. O backup das planilhas usa a rotina existente dentro de um contêiner com rclone.
 
 Ver [backup-servidor.md](backup-servidor.md) para:
 
@@ -354,7 +383,7 @@ O instalador grava:
 
 - `/etc/cron.d/frequenciapp`;
 - `/etc/logrotate.d/frequenciapp`;
-- diretórios de estado, backup e log com o proprietário da conta de implantação.
+- caminhos e execução vinculados ao perfil protegido, com as permissões exigidas pelo controlador.
 
 Horários configuráveis:
 
@@ -373,11 +402,11 @@ O cron agenda no fuso do daemon. O fuso da aplicação continua em `TZ_APP`.
 - O instalador compara o fuso do daemon com `TZ_APP` e recusa a instalação quando os dois diferem sem suporte comprovado a `CRON_TZ`.
 - `CRON_TZ` só deve ser definido em implementações que o respeitam, como o cronie do RHEL e derivados. O cron do Debian e do Ubuntu não respeita `CRON_TZ` e usa o fuso do daemon.
 - Para manter o horário esperado no Debian ou no Ubuntu, ajuste o fuso do sistema com `timedatectl set-timezone America/Fortaleza`, usando o fuso IANA da escola.
-- O modelo `infra/servidor/cron/servidor.template` é a fonte das linhas instaladas. Caminhos com espaços são citados.
+- O instalador gera as linhas a partir do perfil protegido e da configuração validada. Cada linha chama a entrada estável do controlador, não o checkout atual.
 
 ## Kubernetes
 
-O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database.timeZone` e `backup.spreadsheets.timeZone`. A agenda tem seletores próprios para notificações, planilhas e indicadores. O campo `timeZone` dos CronJobs exige Kubernetes 1.27 ou superior. Sem o valor, o agendador usa o fuso do cluster. O backup do banco exige PVC ou destino remoto explícito, e o gate de upgrade continua exigindo o recibo no PVC; o detalhamento está em [kubernetes.md](kubernetes.md).
+O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database.timeZone` e `backup.spreadsheets.timeZone`. O campo `timeZone` dos CronJobs exige Kubernetes 1.27 ou superior. O perfil protegido de upgrade exige PVC, policy independente, endpoint TLS fixado e recibo de origem autenticado. Runtime, migrador e produtor usam a conexão explicitamente adotada. Legado, configuração conflitante e ausência de adoção são recusados. Autenticação não prova recuperabilidade nem protege hooks de outra revisão ou `--no-hooks`. Veja [Kubernetes](kubernetes.md) e [origem autenticada](origem-backup.md).
 
 ## Monitoramento
 
@@ -441,6 +470,7 @@ O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database
 - Árvore Git com alterações locais.
 - Migrações novas sem `--permitir-migracoes`.
 - Falha anterior registrada em `falha.json`.
+- Perfil ausente, ownership divergente ou intenção não concluída no journal do controlador.
 - Imagem alvo indisponível no registro.
 - Espaço insuficiente para build.
 

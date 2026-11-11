@@ -15,9 +15,9 @@ Uso:
 O checksum é obrigatório: use o arquivo .sha256 ao lado do dump ou informe
 --checksum com o SHA-256 do arquivo ou do dump recebido na entrada padrão.
 
-No modo URL, informe BACKUP_RESTAURACAO_URL_VALIDACAO para validar em um banco
-descartável. A opção --sem-validacao só é aceita nesse modo e assume o risco de
-substituir o banco sem o ensaio prévio.
+No modo URL, BACKUP_RESTAURACAO_PERFIL=postgres-direto exige PostgreSQL 17 direto
+com CREATEDB e cria seu próprio banco de ensaio. URLs de validação externas são
+recusadas. --sem-validacao dispensa explicitamente o ensaio e assume esse risco.
 A entrada padrão materializa texto claro em diretório temporário privado.
 Chave GPG protegida deve ser decifrada externamente em estação autorizada;
 --entrada - recebe esse dump, sem enviar chave privada ou passphrase ao servidor.
@@ -83,9 +83,15 @@ if [ -z "$arquivo" ] && [ -z "$entrada" ]; then
 fi
 
 carregar_ambiente
+BACKUP_MODO="${BACKUP_MODO:-compose}"
+# Somente o perfil direto suportado pode criar um ensaio próprio. Uma URL
+# externa, mesmo diferente, nunca é autoridade para destruir um banco de ensaio.
+if [ "$BACKUP_MODO" = url ] && [ "$sem_validacao" = false ]; then
+  BACKUP_DATABASE_URL="${BACKUP_DATABASE_URL:-${DIRECT_URL:-}}" \
+    node "$DIR/restauracao-url.mjs" perfil || exit "$?"
+fi
 carregar_imagens_do_estado
 
-BACKUP_MODO="${BACKUP_MODO:-compose}"
 BACKUP_DATABASE_URL="${BACKUP_DATABASE_URL:-${DIRECT_URL:-}}"
 BACKUP_RESTAURACAO_URL_VALIDACAO="${BACKUP_RESTAURACAO_URL_VALIDACAO:-}"
 GPG_CHAVE_PRIVADA="${BACKUP_GPG_CHAVE_PRIVADA:-}"
@@ -113,9 +119,6 @@ case "$BACKUP_MODO" in
     ;;
   url)
     [ -n "$BACKUP_DATABASE_URL" ] || erro "Defina BACKUP_DATABASE_URL ou DIRECT_URL."
-    if [ "$sem_validacao" = false ] && [ -z "$BACKUP_RESTAURACAO_URL_VALIDACAO" ]; then
-      erro "Defina BACKUP_RESTAURACAO_URL_VALIDACAO ou use --sem-validacao com decisão explícita."
-    fi
     ;;
   *)
     erro "BACKUP_MODO inválido: $BACKUP_MODO."
@@ -136,6 +139,7 @@ usuario="${POSTGRES_USER:-frequencia}"
 banco="${POSTGRES_DB:-frequencia}"
 temp_criado=false
 banco_trocado=false
+restauracao_destino_iniciada=false
 app_parada=false
 banco_anterior=""
 
@@ -143,9 +147,15 @@ escrever_estado_restauracao() {
   local status="$1"
   local motivo="$2"
   mkdir -p "$ESTADO_DIR"
-  printf '{"em":"%s","status":"%s","modo":"%s","arquivo":"%s","motivo":"%s","bancoAnterior":"%s"}\n' \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$status" "$BACKUP_MODO" \
-    "${nome_dump:-}" "$motivo" "$banco_anterior" >"$estado_restauracao.tmp"
+  node - "$status" "$BACKUP_MODO" "${nome_dump:-}" "$motivo" "$banco_anterior" \
+    "$restauracao_destino_iniciada" >"$estado_restauracao.tmp" <<'NODE'
+const [status, modo, arquivo, motivo, bancoAnterior, iniciado] = process.argv.slice(2);
+process.stdout.write(JSON.stringify({
+  em: new Date().toISOString(), status, modo, arquivo, motivo, bancoAnterior,
+  destinoEscritaIniciada: iniciado === "true",
+  resultadoIncerto: status !== "sucesso" && iniciado === "true",
+}) + "\n");
+NODE
   mv "$estado_restauracao.tmp" "$estado_restauracao"
   chmod 600 "$estado_restauracao"
 }
@@ -276,13 +286,8 @@ SQL
       "$SERVIDOR_SERVICO_APP" || log "Não foi possível religar a aplicação."
   fi
   if [ "$status" -ne 0 ] && [ "$BACKUP_MODO" = "url" ] &&
-    [ -n "$backup_seguranca" ] && [ "${RESTAURAR_EM_RECUPERACAO:-false}" != "true" ]; then
-    log "Falha na restauração URL; tentando recuperar o banco de destino com $backup_seguranca."
-    if RESTAURAR_EM_RECUPERACAO=true "$0" --arquivo "$backup_seguranca" --confirmar --sem-copia --sem-validacao; then
-      log "Banco de destino recuperado a partir da cópia de segurança."
-    else
-      log "A recuperação automática da URL também falhou; intervenção manual necessária."
-    fi
+    [ "$restauracao_destino_iniciada" = true ]; then
+    log "Resultado da restauração URL incerto; intervenção manual necessária. Cópia indicada: ${backup_seguranca:-não identificada}."
   fi
   if [ "$temp_criado" = true ] && [ "$banco_trocado" = false ]; then
     compose exec -T "$SERVIDOR_SERVICO_DB" dropdb -U "$usuario" --force "$banco_temp" \
@@ -315,19 +320,26 @@ if [ -n "$entrada" ] && [ "$entrada" = "-" ]; then
 else
   [ -f "$arquivo" ] || erro "Arquivo não encontrado: $arquivo"
   nome_dump=$(basename "$arquivo")
+  [ -f "$arquivo.sha256" ] || [ -n "$checksum_esperado" ] ||
+    erro "Checksum não encontrado. Informe --checksum SHA256 ou mantenha o arquivo .sha256 ao lado do dump."
+  # A cópia privada é a fonte tanto do hash quanto da decifra/restauração.
+  # Não reabrir o caminho fornecido após a verificação.
+  arquivo_capturado="$tmp/arquivo-capturado"
+  cat -- "$arquivo" >"$arquivo_capturado" || erro "Não foi possível copiar o arquivo de entrada."
+  calculado=$(sha256sum <"$arquivo_capturado" | cut -d' ' -f1)
   if [ -f "$arquivo.sha256" ]; then
     log "Conferindo o checksum do arquivo."
-    (cd "$(dirname "$arquivo")" && sha256sum -c "$(basename "$arquivo").sha256" >/dev/null) ||
-      erro "O checksum não confere."
-  elif [ -n "$checksum_esperado" ]; then
+    checksum_sidecar=$(sha256sum "$arquivo.sha256" | cut -d' ' -f1)
+    checksum_linha=$(printf '%s  %s\n' "$calculado" "$nome_dump" | sha256sum | cut -d' ' -f1)
+    [ "$checksum_sidecar" = "$checksum_linha" ] ||
+      erro "O checksum não confere com o arquivo solicitado."
+  fi
+  if [ -n "$checksum_esperado" ]; then
     case "$checksum_esperado" in
       *[!0-9a-f]* | "") erro "O checksum deve ter 64 caracteres hexadecimais." ;;
     esac
     [ "${#checksum_esperado}" -eq 64 ] || erro "O checksum deve ter 64 caracteres hexadecimais."
-    calculado=$(sha256sum "$arquivo" | cut -d' ' -f1)
     [ "$calculado" = "$checksum_esperado" ] || erro "O checksum do arquivo não confere."
-  else
-    erro "Checksum não encontrado. Informe --checksum SHA256 ou mantenha o arquivo .sha256 ao lado do dump."
   fi
   case "$arquivo" in
     *.gpg)
@@ -340,17 +352,17 @@ else
       else
         erro "A decifra nativa exige BACKUP_GPG_CHAVE_PRIVADA explícita; não usa agente pessoal herdado."
       fi
-      gpg --batch --yes --pinentry-mode error --output "$dump" --decrypt "$arquivo" ||
+      gpg --batch --yes --pinentry-mode error --output "$dump" --decrypt "$arquivo_capturado" ||
         erro "Decifra GPG não interativa falhou. Para chave protegida, decifrar externamente em estação autorizada e usar --entrada -. Não enviar passphrase em argumentos ou ambiente."
       ;;
     *.age)
       log "Decifrando com age."
       [ -n "$AGE_CHAVE_PRIVADA" ] || erro "Defina BACKUP_AGE_CHAVE_PRIVADA para decifrar arquivos age."
-      age --decrypt -i "$AGE_CHAVE_PRIVADA" -o "$dump" "$arquivo" ||
+      age --decrypt -i "$AGE_CHAVE_PRIVADA" -o "$dump" "$arquivo_capturado" ||
         erro "Não foi possível decifrar o dump com age."
       ;;
     *)
-      cp "$arquivo" "$dump"
+      cp "$arquivo_capturado" "$dump"
       ;;
   esac
 fi
@@ -439,6 +451,15 @@ SQL
     log "  scripts/servidor/compose.sh exec -T db dropdb -U $usuario --force $banco_anterior"
   fi
 else
+  if [ "$sem_validacao" = false ]; then
+    log "Ensaiando o dump em banco próprio no endpoint direto."
+    BACKUP_DATABASE_URL="$BACKUP_DATABASE_URL" ESTADO_DIR="$ESTADO_DIR" APP_DIR="$APP_DIR" \
+      DATABASE_SCHEMA="$DATABASE_SCHEMA" \
+      RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES="$RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES" \
+      node "$DIR/restauracao-url.mjs" ensaio "$dump" || exit "$?"
+  else
+    log "Aviso: a validação em banco descartável foi dispensada por --sem-validacao; risco aceito explicitamente."
+  fi
   if [ "$fazer_copia" = true ]; then
     log "Criando uma cópia de segurança antes da restauração."
     if ! BACKUP_MODO="$BACKUP_MODO" "$DIR/backup-banco.sh"; then
@@ -450,31 +471,17 @@ else
     fi
   fi
 
-  if [ "$sem_validacao" = false ]; then
-    log "Conferindo a identidade do banco de validação e do destino."
-    identidade_banco() {
-      psql "$1" -X -tA -v ON_ERROR_STOP=1 \
-        -c "select current_database(), coalesce(inet_server_addr()::text, ''), coalesce(inet_server_port()::text, ''), pg_postmaster_start_time()"
-    }
-    identidade_destino=$(identidade_banco "$BACKUP_DATABASE_URL") ||
-      erro "Não foi possível conferir a identidade do banco de destino."
-    identidade_validacao=$(identidade_banco "$BACKUP_RESTAURACAO_URL_VALIDACAO") ||
-      erro "Não foi possível conferir a identidade do banco de validação."
-    if [ "$identidade_destino" = "$identidade_validacao" ]; then
-      erro "A URL de validação aponta para o mesmo banco do destino. Use um banco descartável diferente; URLs equivalentes não são prova de isolamento."
-    fi
-    log "Validando o dump no banco descartável configurado."
-    restaurar_url="$BACKUP_RESTAURACAO_URL_VALIDACAO"
-    pg_restore -d "$restaurar_url" --clean --if-exists --no-owner --no-acl \
-      --single-transaction --exit-on-error <"$dump"
-    validar_banco_restaurado "$restaurar_url"
-  else
-    log "A validação em banco descartável foi dispensada por --sem-validacao."
-  fi
-
   log "Restaurando o dump na URL de destino."
-  pg_restore -d "$BACKUP_DATABASE_URL" --clean --if-exists --no-owner --no-acl \
-    --single-transaction --exit-on-error <"$dump"
+  # O resultado da chamada pode ser incerto mesmo quando pg_restore falha.
+  restauracao_destino_iniciada=true
+  if pg_restore -d "$BACKUP_DATABASE_URL" --clean --if-exists --no-owner --no-acl \
+    --single-transaction --exit-on-error <"$dump" >"$tmp/pg-restore-destino.log" 2>&1; then
+    :
+  else
+    codigo_restore=$?
+    log "pg_restore falhou no destino (código $codigo_restore); diagnóstico bruto omitido para não divulgar SQL ou credenciais." >&2
+    exit "$codigo_restore"
+  fi
   validar_banco_restaurado "$BACKUP_DATABASE_URL"
   escrever_estado_restauracao "sucesso" ""
   log "Restauração concluída. Confira a aplicação externa, /api/saude, o login e as migrações."

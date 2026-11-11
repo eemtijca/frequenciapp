@@ -3,6 +3,8 @@
 set -Eeuo pipefail
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+SERVIDOR_SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export SERVIDOR_SCRIPTS_DIR
 APP_ENV_FILE="${APP_ENV_FILE:-/etc/frequenciapp/app.env}"
 OPS_ENV_FILE="${OPS_ENV_FILE:-/etc/frequenciapp/ops.env}"
 ESTADO_DIR="${ESTADO_DIR:-/var/lib/frequenciapp}"
@@ -191,7 +193,7 @@ conferir_identidade() {
       const ler = nome => JSON.parse(fs.readFileSync(p+"/"+nome+".json", "utf8"));
       process.stdout.write(JSON.stringify({config:ler("config"),daemon:ler("daemon"),containers:ler("containers"),parametros:{projeto,app,db}}));
     ' "$captura" "$COMPOSE_PROJECT_NAME" "$SERVIDOR_SERVICO_APP" "$SERVIDOR_SERVICO_DB" |
-      node "$APP_DIR/scripts/servidor/identidade.mjs" "$acao" "$registro" >"$captura/chave" || exit 1
+      node "$SERVIDOR_SCRIPTS_DIR/identidade.mjs" "$acao" "$registro" >"$captura/chave" || exit 1
     cat "$captura/chave"
   ) >"$captura.chave"; then
     rm -rf "$captura" "$captura.chave"
@@ -223,8 +225,12 @@ travar() {
   else
     mkdir -p "$base"
   fi
-  [ ! -L "$base" ] && [ "$(stat -c %u "$base")" = "$uid_operador" ] &&
-    [ "$(stat -c %a "$base")" = 700 ] || erro "Diretório de locks deve pertencer ao operador e ter modo 700."
+  if ! {
+    [ ! -L "$base" ] && [ "$(stat -c %u "$base")" = "$uid_operador" ] &&
+      [ "$(stat -c %a "$base")" = 700 ]
+  }; then
+    erro "Diretório de locks deve pertencer ao operador e ter modo 700."
+  fi
   # O nome do lock deriva da identidade do projeto, não do tipo de operação.
   local arquivo="$base/operacoes-$chave.lock"
   [ ! -L "$arquivo" ] || erro "Lock não pode ser um link."
@@ -236,15 +242,22 @@ travar() {
       [ -f "$arquivo" ] || erro "Não foi possível provisionar a trava do operador."
   fi
   if [ -n "${SERVIDOR_LOCK_HERDADO:-}" ]; then
-    [ "$SERVIDOR_LOCK_HERDADO" = "$arquivo" ] && [ -f "$arquivo" ] &&
-      [ "$(stat -Lc '%d:%i' /proc/self/fd/9 2>/dev/null)" = "$(stat -c '%d:%i' "$arquivo")" ] ||
+    if ! {
+      [ "$SERVIDOR_LOCK_HERDADO" = "$arquivo" ] && [ -f "$arquivo" ] &&
+        [ "$(stat -Lc '%d:%i' /proc/self/fd/9 2>/dev/null)" = "$(stat -c '%d:%i' "$arquivo")" ]
+    }; then
       erro "Descritor herdado não corresponde à trava do alvo."
+    fi
   else
     exec 9>>"$arquivo"
   fi
-  [ -f "$arquivo" ] && [ ! -L "$arquivo" ] &&
-    [ "$(stat -c %u "$arquivo")" = "$uid_operador" ] &&
-    [ "$(stat -c %a "$arquivo")" = 600 ] || erro "Arquivo de lock deve pertencer ao operador e ter modo 600."
+  if ! {
+    [ -f "$arquivo" ] && [ ! -L "$arquivo" ] &&
+      [ "$(stat -c %u "$arquivo")" = "$uid_operador" ] &&
+      [ "$(stat -c %a "$arquivo")" = 600 ]
+  }; then
+    erro "Arquivo de lock deve pertencer ao operador e ter modo 600."
+  fi
   if [ "$espera" -gt 0 ]; then
     flock -w "$espera" 9 || erro "Outra operação incompatível com $nome está em andamento."
   else
@@ -255,6 +268,21 @@ travar() {
   if [ "${#COMPOSE[@]}" -gt 0 ]; then
     conferir_identidade auto
     [ "$SERVIDOR_ALVO_CHAVE" = "$chave" ] || erro "A identidade mudou enquanto a trava era adquirida."
+  fi
+  local perfil_controlador="${SERVIDOR_CONTROLADOR_PERFIL:-/opt/frequenciapp-controlador/perfil.json}"
+  if [ -e "$perfil_controlador" ] || [ -L "$perfil_controlador" ]; then
+    node "$SERVIDOR_SCRIPTS_DIR/controlador/contrato.mjs" autorizar "$perfil_controlador" "$nome" ||
+      erro "Controlador não autorizou a mutação deste alvo."
+  elif [ -n "${SERVIDOR_CONTROLADOR_PERFIL:-}${SERVIDOR_CONTROLADOR_OPERACAO:-}" ]; then
+    erro "Perfil do controlador não existe; nenhum fallback é permitido."
+  fi
+  # Mesmo fora do perfil adotado, uma versão atual não ignora a incerteza legada.
+  if [ -e "$ESTADO_DIR/atualizacao-em-andamento.json" ] || [ -L "$ESTADO_DIR/atualizacao-em-andamento.json" ]; then
+    erro "Atualização anterior em andamento ou incerta; mutações bloqueadas."
+  fi
+  if [ -e "$ESTADO_DIR/falha.json" ] || [ -L "$ESTADO_DIR/falha.json" ]; then
+    jq -e '.migracoesPossivelmenteAplicadas == false' "$ESTADO_DIR/falha.json" >/dev/null 2>&1 ||
+      erro "A falha anterior pode ter aplicado migrações; mutações bloqueadas."
   fi
 }
 
@@ -273,8 +301,12 @@ iniciar_home_gpg() {
   GPG_HOME_ANTERIOR="${GNUPGHOME:-}"
   GPG_HOME_OPERACAO=$(mktemp -d "$base/gpg.XXXXXXXX") || erro "Não foi possível criar home GPG privado."
   chmod 700 "$GPG_HOME_OPERACAO"
-  [ "$(stat -c %u "$GPG_HOME_OPERACAO")" = "$(id -u)" ] &&
-    [ "$(stat -c %a "$GPG_HOME_OPERACAO")" = 700 ] || erro "Home GPG não é privado."
+  if ! {
+    [ "$(stat -c %u "$GPG_HOME_OPERACAO")" = "$(id -u)" ] &&
+      [ "$(stat -c %a "$GPG_HOME_OPERACAO")" = 700 ]
+  }; then
+    erro "Home GPG não é privado."
+  fi
   GPG_HOME_INODE=$(stat -c '%d:%i' "$GPG_HOME_OPERACAO")
   export GNUPGHOME="$GPG_HOME_OPERACAO"
   local socket
@@ -303,7 +335,7 @@ validar_destinatario_gpg() {
   local chaves
   chaves=$(gpg --batch --with-colons --with-fingerprint --with-subkey-fingerprint --list-keys "$BACKUP_GPG_DESTINATARIO") ||
     erro "Não foi possível listar o destinatário GPG."
-  BACKUP_DESTINATARIO_VERIFICADO=$(printf '%s\n' "$chaves" | node "$APP_DIR/scripts/servidor/destinatario.mjs") ||
+  BACKUP_DESTINATARIO_VERIFICADO=$(printf '%s\n' "$chaves" | node "$SERVIDOR_SCRIPTS_DIR/destinatario.mjs") ||
     erro "Identidade do destinatário GPG não conferida."
   export BACKUP_DESTINATARIO_VERIFICADO
 }

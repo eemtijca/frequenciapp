@@ -16,11 +16,18 @@ on:
       - "tests/servidor/**"
       - "tests/kubernetes/**"
       - "package.json"
+      - "pnpm-lock.yaml"
+      - "pnpm-workspace.yaml"
       - "docs/auto-hospedagem.md"
       - "docs/backup-servidor.md"
       - "docs/kubernetes.md"
       - ".github/workflows/servidor.yml"
   workflow_dispatch:
+    inputs:
+      integracao:
+        description: "Solicita integrações; bloqueios de ownership mantêm status não zero"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -37,21 +44,36 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - name: Verificar configuração e migrações sintéticas
-        run: node --test tests/servidor/configuracao-segura.test.mjs tests/servidor/migrar-incompleta.test.mjs
+      - name: Node dos validadores
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.22.2"
 
+      - name: Capturar somente fontes públicas versionadas
+        run: |
+          destino=$(mktemp -d "$RUNNER_TEMP/servidor-fontes.XXXXXX")
+          git ls-files -z -- infra/servidor infra/kubernetes scripts/servidor tests/servidor tests/kubernetes \
+            docker/app src/infra/schema-postgres.mjs Dockerfile .dockerignore 'compose*.yml' \
+            package.json pnpm-lock.yaml pnpm-workspace.yaml .env.example .github/workflows \
+            | tar --null --files-from=- -cf - | tar -xf - -C "$destino"
+          printf 'SERVIDOR_FONTES=%s\n' "$destino" >> "$GITHUB_ENV"
       - name: Validar servidor
-        run: bash infra/servidor/validar.sh
+        run: |
+          cd "$SERVIDOR_FONTES"
+          bash infra/servidor/validar.sh
 
       - name: Validar chart Helm
         run: |
+          cd "$SERVIDOR_FONTES"
           mkdir -p "$RUNNER_TEMP/helm"
-          docker run --rm -v "$PWD:/repo" -w /repo alpine/helm:latest@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e \
+          docker run --rm -v "$PWD:/repo:ro" -w /repo alpine/helm:latest@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e \
             lint infra/kubernetes/frequenciapp \
             --set existingSecret=frequenciapp-segredos
           docker run --rm \
-            -v "$PWD:/repo" \
+            -v "$PWD:/repo:ro" \
             -v "$RUNNER_TEMP/helm:/out" \
             -w /repo \
             alpine/helm:latest@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e \
@@ -72,53 +94,109 @@ jobs:
 
       - name: Ensaiar chart Kubernetes
         run: |
-          docker run --rm -v "$PWD:/repo" -w /repo koalaman/shellcheck:stable \
+          cd "$SERVIDOR_FONTES"
+          docker run --rm -v "$PWD:/repo:ro" -w /repo koalaman/shellcheck:stable \
             -x tests/kubernetes/validar.sh \
             infra/kubernetes/frequenciapp/files/verificar-backup.sh
           bash tests/kubernetes/validar.sh
 
       - name: Validar workflows
-        run: docker run --rm -v "$PWD:/repo" -w /repo rhysd/actionlint:latest@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color
-
-      - name: Instalar ferramentas dos ensaios
         run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck jq rclone age postgresql-common
-          sudo install -d /usr/share/postgresql-common/pgdg
-          sudo curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
-            -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
-          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" |
-            sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
-          sudo apt-get update
-          sudo apt-get install -y postgresql-client-17
+          cd "$SERVIDOR_FONTES"
+          docker run --rm -v "$PWD:/repo:ro" -w /repo rhysd/actionlint:latest@sha256:b1934ee5f1c509618f2508e6eb47ee0d3520686341fec936f3b79331f9315667 -color .github/workflows/*.yml
 
-      - name: Sintaxe e ShellCheck
+      - name: Sintaxe e ShellCheck sem instalar no host
         run: |
-          for script in scripts/servidor/*.sh; do
+          cd "$SERVIDOR_FONTES"
+          for script in scripts/servidor/*.sh tests/servidor/*.sh; do
             bash -n "$script"
           done
-          shellcheck -x -P scripts/servidor scripts/servidor/*.sh
-          shellcheck -x -P tests/servidor tests/servidor/*.sh
+          docker run --rm -v "$PWD:/repo:ro" -w /repo \
+            koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d \
+            -x -P scripts/servidor scripts/servidor/*.sh
+          docker run --rm -v "$PWD:/repo:ro" -w /repo \
+            koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d \
+            -x -P tests/servidor tests/servidor/*.sh
 
-      - name: Ensaio de atualização com dublês
-        run: bash tests/servidor/atualizacao.sh
-
-      - name: Ensaio de backup e restauração em Compose
-        run: bash tests/servidor/backup-restauracao.sh
-
-      - name: Ensaio do desafio ACME no Nginx
-        run: bash tests/servidor/nginx-acme.sh
-
-      - name: Ensaio de restauração por URL
-        run: bash tests/servidor/restauracao-url.sh
-
-      - name: Ensaio de privilégios do schema de preview
-        run: bash tests/servidor/privilegios-preview.sh
-
-      - name: Ensaio de atualização em Compose descartável
-        run: bash tests/servidor/atualizacao-integracao.sh
-
-      - name: Derrubar contêineres remanescentes
+  sinteticos:
+    name: Regressões sintéticas isoladas
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Node do launcher
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.22.2"
+      - name: Preparar destino exclusivo dos resultados
+        run: |
+          destino=$(mktemp -d "$RUNNER_TEMP/servidor-sinteticos.XXXXXX")
+          printf 'SINTETICOS_RESULTADOS=%s\n' "$destino" >> "$GITHUB_ENV"
+      - name: Executar sintéticos em ferramentas descartáveis
+        run: node tests/servidor/sinteticos.mjs --report "$SINTETICOS_RESULTADOS/resultado.json"
+      - name: Coletar somente enums e contagens públicas
         if: always()
         run: |
-          docker ps -aq --filter "name=frequenciapp-" | xargs -r docker rm -f
+          node tests/servidor/sinteticos.mjs --export-report \
+            "${SINTETICOS_RESULTADOS:?}/resultado.json" "$SINTETICOS_RESULTADOS/publico.json"
+      - name: Conferir resultado completo
+        if: always()
+        run: node tests/servidor/sinteticos.mjs --check-report "${SINTETICOS_RESULTADOS:?}/publico.json"
+      - name: Preservar relatório público, inclusive após falha
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: servidor-sinteticos
+          path: ${{ env.SINTETICOS_RESULTADOS }}/publico.json
+          if-no-files-found: error
+          retention-days: 7
+
+  e2e:
+    name: E2E isolado / ${{ matrix.perfil }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        perfil: [origem-cli, controlador-root, restauracao-url]
+    steps:
+      - name: Checkout sem credencial persistida
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Node do launcher, sem aplicação
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.22.2"
+      - name: Inventariar todos os perfis e executar o E2E obrigatório
+        env:
+          PERFIL_E2E: ${{ matrix.perfil }}
+        run: |
+          export TMPDIR="$RUNNER_TEMP"
+          node tests/servidor/sinteticos.mjs --inventario
+          bash tests/servidor/executar.sh "$PERFIL_E2E"
+      - name: Declarar limite de cobertura mesmo após falha
+        if: always()
+        run: |
+          printf '%s\n' 'Este job não aprova os quatro legados administrativos sem ownership.' >> "$GITHUB_STEP_SUMMARY"
+          printf '%s\n' 'backup-restauracao.sh; nginx-acme.sh; privilegios-preview.sh; atualizacao-integracao.sh: BLOQUEADOS, não executados.' >> "$GITHUB_STEP_SUMMARY"
+
+  integracao:
+    name: Integrações solicitadas e bloqueios explícitos
+    if: github.event_name == 'workflow_dispatch' && inputs.integracao
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Node do harness de integração
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24.22.2"
+      - name: Executar integrações e registrar bloqueios sem skips verdes
+        run: bash tests/servidor/executar.sh integracao

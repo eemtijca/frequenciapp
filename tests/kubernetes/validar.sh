@@ -69,12 +69,28 @@ executar_gate() {
   local dados="$1"
   shift
   docker_run \
+    --network none \
     -v "$(host_path "$REPO"):/repo:ro" \
     -v "$(host_path "$dados"):/dados" \
+    -w /repo \
     -e ESTADO_DIR=/dados/estado \
     -e BACKUP_BANCO_DIR=/dados/banco \
     "$@" \
     "$NODE_IMAGE" bash /repo/infra/kubernetes/frequenciapp/files/verificar-backup.sh
+}
+
+executar_diagnostico_gate() {
+  local dados="$1"
+  shift
+  docker_run \
+    --network none \
+    -v "$(host_path "$REPO"):/repo:ro" \
+    -v "$(host_path "$dados"):/dados" \
+    -w /repo \
+    -e ESTADO_DIR=/dados/estado \
+    -e BACKUP_BANCO_DIR=/dados/banco \
+    "$@" \
+    "$NODE_IMAGE" bash /repo/infra/kubernetes/frequenciapp/files/verificar-backup.sh --diagnosticar-integridade
 }
 
 valores_backup=(
@@ -136,6 +152,9 @@ kubeconform_file "$TMP/instalacao.yaml"
 kubeconform_file "$TMP/upgrade.yaml"
 
 printf '[kubernetes] Gate de backup\n'
+# Fixtures isoladas no diretório temporário montado; nenhum cliente externo é usado.
+docker_run --network none -v "$(host_path "$REPO"):/repo:ro" -v "$(host_path "$TMP"):/sintetico" \
+  -w /repo -e TMPDIR=/sintetico "$NODE_IMAGE" node --test tests/kubernetes/gate-backup.test.mjs
 exigir_texto 'helm.sh/hook: pre-upgrade,pre-rollback' "$TMP/upgrade.yaml"
 exigir_texto 'name: frequenciapp-backup-gate' "$TMP/upgrade.yaml"
 exigir_texto 'verificar-backup.sh' "$TMP/upgrade.yaml"
@@ -152,23 +171,32 @@ exigir_ausencia 'secretRef' "$TMP/hook.yaml"
 exigir_ausencia 'valueFrom' "$TMP/hook.yaml"
 
 mkdir -p "$TMP/gate/vazio/estado" "$TMP/gate/vazio/banco"
-if executar_gate "$TMP/gate/vazio" >"$TMP/gate-vazio.txt" 2>&1; then
+if executar_diagnostico_gate "$TMP/gate/vazio" >"$TMP/gate-vazio.txt" 2>&1; then
   falhar "O gate aceitou a ausência de recibo de backup."
 fi
 exigir_texto 'Não há recibo de backup confirmado' "$TMP/gate-vazio.txt"
 
 mkdir -p "$TMP/gate/valido/estado" "$TMP/gate/valido/banco"
-arquivo_backup="frequenciapp-20260101T020000Z.dump.gpg"
+base_backup="frequenciapp-20260101T020000Z-abcdef01"
+arquivo_backup="${base_backup}.dump.gpg"
 printf 'conteudo sintetico do backup\n' >"$TMP/gate/valido/banco/$arquivo_backup"
 sha_backup=$(sha256sum "$TMP/gate/valido/banco/$arquivo_backup" | cut -d' ' -f1)
+printf '%s  %s\n' "$sha_backup" "$arquivo_backup" >"$TMP/gate/valido/banco/$arquivo_backup.sha256"
+sha_lista=$(sha256sum "$TMP/gate/valido/banco/$arquivo_backup.sha256" | cut -d' ' -f1)
 em_backup=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-printf '{"em":"%s","arquivo":"%s","sha256":"%s","verificadoRemoto":false}\n' \
-  "$em_backup" "$arquivo_backup" "$sha_backup" >"$TMP/gate/valido/estado/ultimo-backup.json"
-executar_gate "$TMP/gate/valido" >"$TMP/gate-valido.txt" 2>&1 ||
-  falhar "O gate recusou um backup confirmado."
-exigir_texto 'Backup confirmado' "$TMP/gate-valido.txt"
+printf '{"versao":1,"base":"%s","em":"%s","escopo":{"tipo":"schema","schema":"public","alvo":"url-conservador","banco":null},"criptografia":"gpg","destinatario":"sintetico","remoto":"","etapas":{"local":true,"remotoVerificado":false,"recuperacaoExercitada":false},"artefatos":[{"nome":"%s","sha256":"%s"},{"nome":"%s.sha256","sha256":"%s"}]}\n' \
+  "$base_backup" "$em_backup" "$arquivo_backup" "$sha_backup" "$arquivo_backup" "$sha_lista" >"$TMP/gate/valido/banco/$base_backup.confirmado.json"
+printf '{"em":"%s","modo":"url","criptografia":"gpg","arquivo":"%s","sha256":"%s","schema":"public","ambiente":"","ambienteSha256":"","remoto":"","verificadoRemoto":false,"recibo":"%s.confirmado.json"}\n' \
+  "$em_backup" "$arquivo_backup" "$sha_backup" "$base_backup" >"$TMP/gate/valido/estado/ultimo-backup.json"
+if executar_gate "$TMP/gate/valido" >"$TMP/gate-protegido.txt" 2>&1; then
+  falhar "O gate autorizou operação protegida sem prova de origem."
+fi
+exigir_texto 'Adoção ausente' "$TMP/gate-protegido.txt"
+executar_diagnostico_gate "$TMP/gate/valido" >"$TMP/gate-valido.txt" 2>&1 ||
+  falhar "O diagnóstico recusou um conjunto sintético íntegro."
+exigir_texto 'Integridade local conferida' "$TMP/gate-valido.txt"
 
-if executar_gate "$TMP/gate/valido" -e BACKUP_GATE_EXIGIR_REMOTO=true \
+if executar_diagnostico_gate "$TMP/gate/valido" -e BACKUP_GATE_EXIGIR_REMOTO=true \
   >"$TMP/gate-remoto.txt" 2>&1; then
   falhar "O gate aceitou um recibo sem verificação remota."
 fi
@@ -176,22 +204,24 @@ exigir_texto 'não confirma a verificação da cópia remota' "$TMP/gate-remoto.
 
 cp -R "$TMP/gate/valido" "$TMP/gate/divergente"
 printf 'conteudo adulterado\n' >"$TMP/gate/divergente/banco/$arquivo_backup"
-if executar_gate "$TMP/gate/divergente" >"$TMP/gate-divergente.txt" 2>&1; then
+if executar_diagnostico_gate "$TMP/gate/divergente" >"$TMP/gate-divergente.txt" 2>&1; then
   falhar "O gate aceitou um arquivo com checksum divergente."
 fi
-exigir_texto 'diverge do recibo' "$TMP/gate-divergente.txt"
+exigir_texto 'Artefato local ausente ou divergente' "$TMP/gate-divergente.txt"
 
 cp -R "$TMP/gate/valido" "$TMP/gate/antigo"
 printf '{"em":"2000-01-01T00:00:00Z","arquivo":"%s","sha256":"%s","verificadoRemoto":false}\n' \
   "$arquivo_backup" "$sha_backup" >"$TMP/gate/antigo/estado/ultimo-backup.json"
-if executar_gate "$TMP/gate/antigo" >"$TMP/gate-antigo.txt" 2>&1; then
+if executar_diagnostico_gate "$TMP/gate/antigo" >"$TMP/gate-antigo.txt" 2>&1; then
   falhar "O gate aceitou um recibo fora da idade máxima."
 fi
 exigir_texto 'mais de 36 horas' "$TMP/gate-antigo.txt"
 
-executar_gate "$TMP/gate/vazio" -e ENSAIO_SEM_PROTECAO=true \
-  >"$TMP/gate-ensaio.txt" 2>&1 || falhar "O modo de ensaio sem proteção não foi aceito."
-exigir_texto 'ENSAIO SEM PROTECAO' "$TMP/gate-ensaio.txt"
+if executar_gate "$TMP/gate/vazio" -e ENSAIO_SEM_PROTECAO=true \
+  >"$TMP/gate-ensaio.txt" 2>&1; then
+  falhar "A flag antiga contornou a falta de adoção."
+fi
+exigir_texto 'Adoção ausente' "$TMP/gate-ensaio.txt"
 
 printf '[kubernetes] Persistência efetiva do backup do banco\n'
 recusar_renderizacao 'sem-pvc-sem-remoto' 'Backup de banco exige PVC ou remoto explicitamente habilitado' \

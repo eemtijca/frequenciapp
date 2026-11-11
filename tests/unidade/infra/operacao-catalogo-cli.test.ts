@@ -14,7 +14,12 @@ it("catálogo e retomada usam CLIs reais com transporte explicitamente falso", (
     [
       "tests/unidade/infra/operacao-catalogo-cli.test.ts",
       "tests/servidor/catalogo-retomada.test.mjs",
+      "tests/servidor/dropbox-api-falso.mjs",
       "scripts/servidor/backup-recibos.mjs",
+      "scripts/servidor/dropbox-api.mjs",
+      "scripts/servidor/dropbox-estado.mjs",
+      "scripts/servidor/dropbox-autoridade.mjs",
+      "scripts/servidor/dropbox-retencao.mjs",
       "scripts/servidor/backup-banco.sh",
       "scripts/servidor/recibos.mjs",
       "scripts/servidor/comum.sh",
@@ -88,9 +93,10 @@ it("catálogo e retomada usam CLIs reais com transporte explicitamente falso", (
   expect(provas.filter((p) => p.reciboEnsaioCatalogo === true).length, "WRAPPER:bash-count").toBe(
     6,
   );
-  expect(provas.filter((p) => p.caracterizacoesLote === true).length, "WRAPPER:batch-count").toBe(
-    1,
-  );
+  expect(
+    provas.filter((p) => p.caracterizacoesNativas === true).length,
+    "WRAPPER:native-count",
+  ).toBe(1);
   expect(provas.filter((p) => p.testemunhaCatalogo === 1).length, "WRAPPER:final-count").toBe(1);
   const prova = provas.at(-1);
   expect(prova.nonce, "WRAPPER:nonce").toBe(nonce);
@@ -98,8 +104,8 @@ it("catálogo e retomada usam CLIs reais com transporte explicitamente falso", (
   expect(prova, "WRAPPER:final").toMatchObject({
     testemunhaCatalogo: 1,
     casos: ["#391", "#392"],
-    prova: "Bash/Node/FS reais",
-    clientes: "Docker/PG/age/rclone FALSOS",
+    prova: "Bash/Node/FS/HTTPS reais",
+    clientes: "Docker/PG/age/rclone/API Dropbox FALSOS",
     retomada: true,
     reciboPorUltimo: true,
     catalogoPreservado: true,
