@@ -53,6 +53,15 @@ A correção precisa continuar portátil entre instalações Linux suportadas, s
 - `CRON_TZ` só é gravado quando a implementação comprova suporte. Do contrário, o instalador recusa a configuração em vez de agendar no horário errado.
 - Os CronJobs do Kubernetes aceitam `timeZone` por valor configurável, com exigência documentada de Kubernetes 1.27 ou superior.
 
+### Controlador opt-in
+
+- O controlador de manutenção é opcional. Sem perfil, `atualizar.sh`, `compose.sh` e `instalar-rotinas.sh` mantêm o comportamento anterior; artefatos do controlador não bloqueiam esse caminho.
+- A adoção grava perfil e snapshot físico fora do checkout, com hashes de configuração, identidade e `migradorSha256`, além da entrada estável `executar`.
+- Cada operação registra intenção, observação e conclusão em journal durável. Falha ou sinal sem conclusão gera estado incerto, que bloqueia novas mutações até revisão administrativa.
+- A atualização fixa o backup confirmado em pins antes de aplicar. A retenção local não remove pins.
+- Mudança no `migradorSha256`, na configuração, na identidade ou no snapshot exige readoção administrativa em novo prefixo; o perfil existente não é sobrescrito.
+- A proteção é cooperativa: root, DBA, grupo `docker` e acesso direto ao daemon ficam fora da garantia. O detalhamento está em [controlador-manutencao.md](../controlador-manutencao.md).
+
 ## Alternativas consideradas
 
 ### Manter o build no checkout principal

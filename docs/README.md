@@ -2,33 +2,34 @@
 
 Índice da documentação do FrequenciApp. Comece pelo [README](../README.md) para o uso rápido; os documentos abaixo aprofundam cada frente.
 
-| Documento                                            | Conteúdo                                                   |
-| ---------------------------------------------------- | ---------------------------------------------------------- |
-| [arquitetura.md](arquitetura.md)                     | Camadas, fluxo de requisição e organização do código.      |
-| [ambiente.md](ambiente.md)                           | Variáveis de ambiente e execução local.                    |
-| [floci.md](floci.md)                                 | Uso exclusivo do Floci para AWS, Azure e GCP, com guardas. |
-| [banco.md](banco.md)                                 | Esquema, migrações e rotinas de banco.                     |
-| [modelo-de-dados.md](modelo-de-dados.md)             | Entidades, regras de frequência e derivações.              |
-| [api.md](api.md)                                     | Contratos das rotas HTTP e Swagger UI em /api/docs.        |
-| [llms.txt](../public/llms.txt)                       | Índice da documentação para agentes de IA.                 |
-| [interface.md](interface.md)                         | Interface, movimento, PWA e acessibilidade.                |
-| [textos.md](textos.md)                               | Regras de texto, glossário e exemplos antes e depois.      |
-| [planilha.md](planilha.md)                           | Integração com Planilhas por OAuth e Sheets API.           |
-| [testes.md](testes.md)                               | Suítes, convenções e cobertura.                            |
-| [deploy.md](deploy.md)                               | Docker Compose, Vercel e outras formas de publicar.        |
-| [auto-hospedagem.md](auto-hospedagem.md)             | Servidor próprio com Caddy, Nginx, agenda e atualização.   |
-| [kubernetes.md](kubernetes.md)                       | Chart Helm, Ingress, migração, agenda e backup.            |
-| [backup-servidor.md](backup-servidor.md)             | Dump do banco, cifra, rclone, retenção e restauração.      |
-| [implantacao-nuvem.md](implantacao-nuvem.md)         | AWS, Azure e GCP com Terraform, modo local e produção.     |
-| [seguranca.md](seguranca.md)                         | Autenticação, sessões, papéis, CSRF e cabeçalhos.          |
-| [seguranca-preview.md](seguranca-preview.md)         | Roles, PUBLIC e privilégios do schema de preview.          |
-| [lgpd.md](lgpd.md)                                   | Dados tratados, minimização e direitos do titular.         |
-| [beneficios-frequencia.md](beneficios-frequencia.md) | Regras de frequência mínima dos benefícios e alerta.       |
-| [operacao.md](operacao.md)                           | Backup, restauração e rotinas do operador.                 |
-| [backup-externo.md](backup-externo.md)               | Backup portátil de arquivos com transporte externo.        |
-| [Contribuir](../CONTRIBUTING.md)                     | Fluxo de issues, etiquetas, commits e pull requests.       |
-| [adr/](adr/)                                         | Decisões de arquitetura registradas.                       |
-| [ADR-026](adr/026-origem-configuravel-na-chamada.md) | Exibição de origem configurável por escola, série e turma. |
+| Documento                                              | Conteúdo                                                               |
+| ------------------------------------------------------ | ---------------------------------------------------------------------- |
+| [arquitetura.md](arquitetura.md)                       | Camadas, fluxo de requisição e organização do código.                  |
+| [ambiente.md](ambiente.md)                             | Variáveis de ambiente e execução local.                                |
+| [floci.md](floci.md)                                   | Uso exclusivo do Floci para AWS, Azure e GCP, com guardas.             |
+| [banco.md](banco.md)                                   | Esquema, migrações e rotinas de banco.                                 |
+| [modelo-de-dados.md](modelo-de-dados.md)               | Entidades, regras de frequência e derivações.                          |
+| [api.md](api.md)                                       | Contratos das rotas HTTP e Swagger UI em /api/docs.                    |
+| [llms.txt](../public/llms.txt)                         | Índice da documentação para agentes de IA.                             |
+| [interface.md](interface.md)                           | Interface, movimento, PWA e acessibilidade.                            |
+| [textos.md](textos.md)                                 | Regras de texto, glossário e exemplos antes e depois.                  |
+| [planilha.md](planilha.md)                             | Integração com Planilhas por OAuth e Sheets API.                       |
+| [testes.md](testes.md)                                 | Suítes, convenções e cobertura.                                        |
+| [deploy.md](deploy.md)                                 | Docker Compose, Vercel e outras formas de publicar.                    |
+| [auto-hospedagem.md](auto-hospedagem.md)               | Servidor próprio com Caddy, Nginx, agenda e atualização.               |
+| [controlador-manutencao.md](controlador-manutencao.md) | Controlador opt-in, journal, pins, limites e volta ao caminho simples. |
+| [kubernetes.md](kubernetes.md)                         | Chart Helm, Ingress, migração, agenda e backup.                        |
+| [backup-servidor.md](backup-servidor.md)               | Dump do banco, cifra, rclone, retenção e restauração.                  |
+| [implantacao-nuvem.md](implantacao-nuvem.md)           | AWS, Azure e GCP com Terraform, modo local e produção.                 |
+| [seguranca.md](seguranca.md)                           | Autenticação, sessões, papéis, CSRF e cabeçalhos.                      |
+| [seguranca-preview.md](seguranca-preview.md)           | Roles, PUBLIC e privilégios do schema de preview.                      |
+| [lgpd.md](lgpd.md)                                     | Dados tratados, minimização e direitos do titular.                     |
+| [beneficios-frequencia.md](beneficios-frequencia.md)   | Regras de frequência mínima dos benefícios e alerta.                   |
+| [operacao.md](operacao.md)                             | Backup, restauração e rotinas do operador.                             |
+| [backup-externo.md](backup-externo.md)                 | Backup portátil de arquivos com transporte externo.                    |
+| [Contribuir](../CONTRIBUTING.md)                       | Fluxo de issues, etiquetas, commits e pull requests.                   |
+| [adr/](adr/)                                           | Decisões de arquitetura registradas.                                   |
+| [ADR-026](adr/026-origem-configuravel-na-chamada.md)   | Exibição de origem configurável por escola, série e turma.             |
 
 - [ADR-027](adr/027-entradas-atrasadas.md): entradas independentes da chamada e envio conservador em aba própria.
 - [Notificações push](notificacoes.md): adesão por dispositivo, chaves VAPID, agenda e compatibilidade.
