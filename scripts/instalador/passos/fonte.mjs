@@ -124,9 +124,14 @@ export function executar(ctx) {
     ctx.migradorSha256 = sha256Arquivo(migrador);
   }
   if (ctx.uid === 0 && !ctx.modoTeste) {
-    const resultado = executarEtapa(ctx, "chown", ["-R", "root:root", destino], {
-      timeout: 120000,
-    });
+    const resultado = executarEtapa(
+      ctx,
+      "chown",
+      ["-R", `${ctx.usuarioServico}:${ctx.usuarioServico}`, destino],
+      {
+        timeout: 120000,
+      },
+    );
     if (resultado.status !== 0) {
       throw falha("E_VALIDACAO", "Não foi possível ajustar o proprietário do checkout.", {
         dica: "Confira a permissão do diretório de origem.",
@@ -138,7 +143,7 @@ export function executar(ctx) {
     acoes.push(
       acao(
         "Ajusta o proprietário e as permissões do checkout",
-        `chown -R root:root ${destino}`,
+        `chown -R ${ctx.usuarioServico}:${ctx.usuarioServico} ${destino}`,
         true,
       ),
     );
