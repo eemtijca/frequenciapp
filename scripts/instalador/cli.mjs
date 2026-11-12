@@ -717,18 +717,29 @@ function processarPlanejar(opcoes, io, deps) {
     avisosConfig,
     agora: deps.agora(),
     permitirInstavel: Boolean(opcoes.booleanos.get("--permitir-instavel")),
+    modoTeste: Boolean(opcoes.booleanas.has("--modo-teste")),
+    exigirConfiguracao: opcoes.valores.has("--salvar-config"),
   });
   if (opcoes.valores.has("--salvar-config")) {
-    const caminho = salvarConfig(opcoes, valores, deps);
-    documento.avisos = deduplicarAvisos([
-      ...documento.avisos,
-      aviso(
-        "A_CONFIG_SALVA",
-        `A configuração efetiva foi gravada em ${caminho}.`,
-        `${DOCUMENTACAO}#arquivo-de-configuração`,
-      ),
-    ]);
-    if (documento.ok) {
+    if (!documento.ok) {
+      documento.avisos = deduplicarAvisos([
+        ...documento.avisos,
+        aviso(
+          "A_CONFIG_NAO_SALVA",
+          "A configuração não foi gravada porque o plano tem erros bloqueantes.",
+          `${DOCUMENTACAO}#arquivo-de-configuração`,
+        ),
+      ]);
+    } else {
+      const caminho = salvarConfig(opcoes, valores, deps);
+      documento.avisos = deduplicarAvisos([
+        ...documento.avisos,
+        aviso(
+          "A_CONFIG_SALVA",
+          `A configuração efetiva foi gravada em ${caminho}.`,
+          `${DOCUMENTACAO}#arquivo-de-configuração`,
+        ),
+      ]);
       documento.proximos = [
         `sudo ./instalar.sh aplicar --config ${caminho} --sim`,
         ...documento.proximos.slice(1),
