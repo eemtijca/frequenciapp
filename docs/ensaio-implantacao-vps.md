@@ -20,6 +20,7 @@ Roteiro para validar o instalador auto-hospedado em uma VPS Ubuntu 26.04 LTS des
 # Valores fictícios: substituir pelos insumos do ensaio.
 export DOMINIO="frequencia-ensaio.exemplo.br" EMAIL_ACME="acme@escola.exemplo.br"
 export EMAIL_ADMIN="direcao@escola.exemplo.br" EMAIL_COORD="coordenacao@escola.exemplo.br"
+export OPERADOR_CONTROLADOR="operador-ensaio"
 export TAG_ESTAVEL="vX.Y.10" TAG_NOVA="vX.Y.11" TAG_ANTERIOR="vX.Y.9"
 export COMMIT_MAIN="<sha-da-main>" FONTE="/srv/ensaio/fonte" EVIDENCIAS="/var/tmp/ensaio/evidencias"
 export ARQ_SENHA_ADMIN="/var/tmp/ensaio/senha-admin" ARQ_SENHA_COORD="/var/tmp/ensaio/senha-coordenacao"
@@ -66,7 +67,8 @@ cd "$FONTE" && sudo ./instalar.sh versao > "$EVIDENCIAS/00-versao.txt" && sudo .
 ```
 
 - Criar os arquivos `ARQ_SENHA_ADMIN` e `ARQ_SENHA_COORD` com senhas descartáveis, modo 600, por entrada segura. Não usar `echo` com a senha. Gerar o par age na estação de operação e copiar somente o arquivo de destinatários para `ARQ_AGE_DESTINATARIOS`; a chave privada fica no cofre ou na estação e nunca na VPS.
-- Criar `/etc/frequenciapp` com modo 700 e os arquivos de destinatários, `rclone.conf` e configuração Dropbox com modo 600 antes do primeiro `planejar`. O `aplicar` também cria o diretório, mas os insumos precisam existir antes da auditoria.
+- Criar a conta `OPERADOR_CONTROLADOR` sem privilégio administrativo e sem acesso ao grupo `docker`. O instalador não cria essa conta nem regra de `sudo`. Ela é obrigatória nos perfis `controlador` e `completo`.
+- Criar `/etc/frequenciapp` com modo 700 e os arquivos de destinatários, `rclone.conf` e configuração Dropbox com modo 600 antes do primeiro `planejar`. O `aplicar` também cria o diretório, mas os insumos precisam existir antes da auditoria. O JSON de adoção do Dropbox precisa apontar `tokenFile` e `rcloneConfig` para os mesmos caminhos das flags e repetir o `destino` do rclone; o contrato está em [dropbox-retencao.md](dropbox-retencao.md).
 - Criar o remote `destino` com a pasta exclusiva do ensaio, gravar `ARQ_RCLONE` com modo 600 e testar `rclone lsd destino:` da estação. Criar o aplicativo Dropbox de teste, o `ARQ_DROPBOX_CONFIG` e o `ARQ_DROPBOX_TOKEN`, modo 600; a pasta do Dropbox e o remote rclone devem ser a mesma.
 - Criar o snapshot base depois da preparação e antes de instalar Docker ou o FrequenciApp. Registrar o identificador e a data.
 
@@ -96,10 +98,10 @@ FLAGS_BACKUP=(
 )
 FLAGS_DROPBOX_EXTRA=(--config-dropbox "$ARQ_DROPBOX_CONFIG" --arquivo-token-dropbox "$ARQ_DROPBOX_TOKEN")
 FLAGS_SIMPLES=(--perfil simples --canal release --tag "$TAG_ESTAVEL")
-FLAGS_CONTROLADOR=(--perfil controlador --canal release --tag "$TAG_ESTAVEL")
+FLAGS_CONTROLADOR=(--perfil controlador --operador-controlador "$OPERADOR_CONTROLADOR" --canal release --tag "$TAG_ESTAVEL")
 FLAGS_DROPBOX=(--perfil dropbox --canal release --tag "$TAG_ESTAVEL" "${FLAGS_DROPBOX_EXTRA[@]}")
-FLAGS_COMPLETO=(--perfil completo --canal release --tag "$TAG_ESTAVEL" "${FLAGS_DROPBOX_EXTRA[@]}")
-FLAGS_COMPLETO_MAIN=(--perfil completo --canal main --permitir-instavel --ref "$COMMIT_MAIN" "${FLAGS_DROPBOX_EXTRA[@]}")
+FLAGS_COMPLETO=(--perfil completo --operador-controlador "$OPERADOR_CONTROLADOR" --canal release --tag "$TAG_ESTAVEL" "${FLAGS_DROPBOX_EXTRA[@]}")
+FLAGS_COMPLETO_MAIN=(--perfil completo --operador-controlador "$OPERADOR_CONTROLADOR" --canal main --permitir-instavel --ref "$COMMIT_MAIN" "${FLAGS_DROPBOX_EXTRA[@]}")
 ```
 
 - Antes de cada perfil, conferir o checkout: `git -C "$FONTE" checkout "$TAG_ESTAVEL"` para `release` e `git -C "$FONTE" checkout "$COMMIT_MAIN"` para `main`.
@@ -132,7 +134,7 @@ sudo ./instalar.sh aplicar "${FLAGS_COMUNS[@]}" "${FLAGS_BACKUP[@]}" "${FLAGS_CO
 sudo ./instalar.sh backup --json > "$EVIDENCIAS/$PREFIXO-backup.json"
 ```
 
-- Executar `situacao` e `diagnosticar` e conferir `journal/`, `pins/` e `migradorSha256` em `/var/lib/frequenciapp`; o backup e o `situacao` não podem ser bloqueados pelo controlador. Conferir que `atualizacao-em-andamento.json` não existe em repouso e que o `diagnosticar` mostra o perfil e o hash. A segunda execução do `aplicar` deve informar `sem mudanças`.
+- Executar `situacao` e `diagnosticar` e conferir `journal/`, `pins/` e `migradorSha256` em `/opt/frequenciapp-controlador/dados`; o backup e o `situacao` não podem ser bloqueados pelo controlador. Conferir que `atualizacao-em-andamento.json` não existe em repouso e que o `diagnosticar` mostra o perfil e o hash. A segunda execução do `aplicar` deve informar `sem mudanças`.
 
 ### 7.2 Dropbox
 
@@ -148,10 +150,11 @@ sudo ./instalar.sh aplicar "${FLAGS_COMUNS[@]}" "${FLAGS_BACKUP[@]}" "${FLAGS_DR
 
 ```bash
 PREFIXO="04-completo-main"
-sudo ./instalar.sh aplicar "${FLAGS_COMUNS[@]}" "${FLAGS_BACKUP[@]}" "${FLAGS_COMPLETO_MAIN[@]}" --seed --sim --json --arquivo-log "$EVIDENCIAS/$PREFIXO-aplicar.log" > "$EVIDENCIAS/$PREFIXO-aplicar.json"
+sudo ./instalar.sh aplicar "${FLAGS_COMUNS[@]}" "${FLAGS_BACKUP[@]}" "${FLAGS_COMPLETO_MAIN[@]}" --sim --json --arquivo-log "$EVIDENCIAS/$PREFIXO-aplicar.log" > "$EVIDENCIAS/$PREFIXO-aplicar.json"
 ```
 
-- Executar `situacao` e `diagnosticar` e conferir canal `main` marcado como instável, controlador ativo, backup Dropbox verificado e dados sintéticos do `--seed`. A instalação em `main` é a base para a troca de canal da seção 8; não usar `main` como estado final.
+- Executar `situacao` e `diagnosticar` e conferir canal `main` marcado como instável, controlador ativo e backup Dropbox verificado. A instalação em `main` é a base para a troca de canal da seção 8; não usar `main` como estado final.
+- O `--seed` não é aplicado pelo `aplicar`; carregar a massa sintética com o procedimento de semente do projeto antes das verificações que dependem de alunos. Nenhum dado real entra no ensaio.
 
 ## 8. Troca do canal main para release
 

@@ -368,18 +368,6 @@ Regras para a execução:
 
 As saídas seguem o contrato: 0 para sucesso, 1 para falha interna, 2 a 10 para erros classificados, 78 para bloqueio de política e 130 ou 143 para sinais. Um sinal 130 ou 143 preserva a etapa em andamento, e a retomada usa `--retomar`. O contrato completo, com as chaves JSON e as etapas, está em [docs/instalador.md](docs/instalador.md).
 
-### VPS único de produção
-
-O VPS Ubuntu 26.04 LTS é o único destino de produção. A Vercel fica como ambiente de preview ou desligada, sem deploy automático da `main`. O corte no repositório começa pelas variáveis de operação:
-
-```bash
-gh variable set DEPLOY_TARGET --body servidor
-gh variable set AGENDA_EXTERNA --body servidor
-gh variable set BACKUP_EXTERNO --body servidor
-```
-
-Com esses valores, os workflows de implantação, migração, agenda e backup da nuvem são pulados. O instalador não configura o GitHub nem a Vercel. O passo a passo, o checklist e a reversão estão no [roteiro do ensaio em VPS](docs/ensaio-implantacao-vps.md) e no guia de [auto-hospedagem](docs/auto-hospedagem.md).
-
 ## Privacidade
 
 O aplicativo registra cadastro escolar, frequência e os registros operacionais necessários, incluindo presença parcial e autoria da confirmação manual da Seduc. A integração opcional com Google Planilhas, desligada por padrão, envia os campos de cada finalidade aos arquivos escolhidos pela escola. A confirmação manual não transmite dados ao sistema da Seduc. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. Detalhes e orientações em [docs/lgpd.md](docs/lgpd.md).
