@@ -33,6 +33,44 @@ function prepararRaiz() {
   return { raiz, appDir, senhaAdmin };
 }
 
+function prepararDropbox(raiz) {
+  const diretorio = path.join(raiz, "etc", "frequenciapp", "dropbox");
+  fs.mkdirSync(diretorio, { recursive: true });
+  fs.chmodSync(diretorio, 0o700);
+  const token = path.join(diretorio, "token.json");
+  const rclone = path.join(diretorio, "rclone.conf");
+  const adocao = path.join(diretorio, "adocao.json");
+  fs.writeFileSync(token, "{}\n", { mode: 0o600 });
+  fs.chmodSync(token, 0o600);
+  const rcloneTexto = "[dropbox]\ntype = dropbox\nroot_namespace = 123\n";
+  fs.writeFileSync(rclone, rcloneTexto, { mode: 0o600 });
+  fs.chmodSync(rclone, 0o600);
+  const destino = "dropbox:frequenciapp/banco";
+  fs.writeFileSync(
+    adocao,
+    `${JSON.stringify({
+      versao: 1,
+      adocao: "pasta-exclusiva-frequenciapp-v1",
+      accountId: "dbid:conta",
+      namespaceId: "123",
+      folderId: "id:pasta",
+      folderPath: "/frequenciapp/banco",
+      destino,
+      alvo: "alvo",
+      banco: "frequencia",
+      schema: "public",
+      limiteBytes: 1024 * 1024,
+      timeoutMs: 30000,
+      tokenFile: token,
+      rcloneConfig: rclone,
+      rcloneConfigSha256: crypto.createHash("sha256").update(rcloneTexto).digest("hex"),
+    })}\n`,
+    { mode: 0o600 },
+  );
+  fs.chmodSync(adocao, 0o600);
+  return { adocao, token, rclone, destino };
+}
+
 function deteccaoFalsa() {
   return {
     distro: "ubuntu",
@@ -191,6 +229,18 @@ function simular(contexto, comando, argumentos, opcoes) {
       }
       return ok("");
     }
+    if (script.endsWith("instalar-controlador.sh")) {
+      if (resto.includes("--confirmar")) {
+        const prefixo = resto[resto.indexOf("--prefixo") + 1];
+        fs.mkdirSync(prefixo, { recursive: true });
+        fs.writeFileSync(path.join(prefixo, "perfil.json"), JSON.stringify({ versao: 1 }), {
+          mode: 0o600,
+        });
+        cenario.controlador = true;
+      }
+      return ok("");
+    }
+    if (script.endsWith("instalar-rotinas.sh")) return ok("");
     if (script.endsWith("backup-banco.sh")) return simularBackup(contexto, opcoes);
     return ok("");
   }
@@ -291,7 +341,7 @@ function simularBackup(contexto, opcoes) {
       arquivo: DUMP,
       sha256,
       recibo: RECIBO,
-      verificadoRemoto: false,
+      verificadoRemoto: cenario.verificadoRemoto === true,
     })}\n`,
     { mode: 0o600 },
   );
@@ -299,7 +349,7 @@ function simularBackup(contexto, opcoes) {
   return ok("Backup concluído.\n");
 }
 
-function argumentos(_raiz, senhaAdmin, extras = []) {
+function argumentos(_raiz, senhaAdmin, extras = [], perfil = "simples") {
   return [
     "aplicar",
     "--sim",
@@ -307,7 +357,7 @@ function argumentos(_raiz, senhaAdmin, extras = []) {
     "--json",
     "--nao-interativo",
     "--perfil",
-    "simples",
+    perfil,
     "--canal",
     "release",
     "--tag",
@@ -450,6 +500,47 @@ describe("aplicar do perfil simples", () => {
     }
     assert.equal(cenario.up, 1);
     assert.equal(cenario.backups, 1);
+  });
+
+  it("aplica o perfil completo com Dropbox e controlador", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const dropbox = prepararDropbox(raiz);
+    const cenario = cenarioPadrao();
+    cenario.verificadoRemoto = true;
+    const resultado = executar(
+      argumentos(
+        raiz,
+        senhaAdmin,
+        [
+          "--operador-controlador",
+          "operador",
+          "--config-dropbox",
+          dropbox.adocao,
+          "--arquivo-token-dropbox",
+          dropbox.token,
+          "--config-rclone",
+          dropbox.rclone,
+          "--destino",
+          dropbox.destino,
+        ],
+        "completo",
+      ),
+      criarDeps({ raiz, cenario, chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+    const estado = JSON.parse(fs.readFileSync(estadoDaRaiz(raiz), "utf8"));
+    assert.equal(estado.perfil, "completo");
+    assert.equal(estado.controlador.adotado, true);
+    const ids = estado.etapas.map((etapa) => etapa.id);
+    assert.equal(ids.length, 18);
+    assert.equal(ids.indexOf("dropbox"), ids.indexOf("backup-inicial") - 1);
+    assert.equal(ids.at(-1), "controlador");
+    assert.equal(estado.etapas.find((etapa) => etapa.id === "agendador").estado, "pulada");
+    assert.equal(estado.etapas.find((etapa) => etapa.id === "dropbox").detalhes.adotado, true);
+    const ops = fs.readFileSync(path.join(raiz, "etc/frequenciapp/ops.env"), "utf8");
+    assert.match(ops, /^BACKUP_DROPBOX_CONFIG=/m);
+    assert.equal(fs.statSync(path.join(raiz, "etc/frequenciapp/ops.env")).mode & 0o777, 0o600);
+    assert.equal(cenario.controlador, true);
   });
 
   it("na segunda execução não reinstala, não recria container, não reescreve ambiente e não refaz backup", () => {
