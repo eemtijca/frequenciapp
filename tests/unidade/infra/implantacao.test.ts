@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  executorVercel,
   orquestrar,
   prepararAmbienteDeBuild,
   selecionarEvento,
@@ -94,5 +95,81 @@ describe("proprietário único de implantação", () => {
     } finally {
       rmSync(pasta, { recursive: true, force: true });
     }
+  });
+});
+
+describe("saúde da implantação", () => {
+  const ambiente = { GITHUB_SHA: sha, APP_URL: "https://frequencia.exemplo.br" };
+
+  function resposta(status: number, corpo?: unknown) {
+    return {
+      status,
+      ok: status >= 200 && status < 300,
+      json: async () => corpo,
+    } as unknown as Response;
+  }
+
+  function executor(buscar: typeof fetch, esperas: number[] = []) {
+    const opcoes = {
+      buscar,
+      dormir: async (ms: number) => {
+        esperas.push(ms);
+      },
+    } as unknown as Parameters<typeof executorVercel>[1];
+    return executorVercel(ambiente, opcoes);
+  }
+
+  it("repete a saúde até a revisão promovida", async () => {
+    const esperas: number[] = [];
+    let chamadas = 0;
+    const buscar = (async () => {
+      chamadas += 1;
+      if (chamadas === 1) return resposta(200, { ok: true, commit: "b".repeat(40) });
+      if (chamadas === 2) return resposta(503);
+      return resposta(200, { ok: true, commit: sha });
+    }) as unknown as typeof fetch;
+    await expect(executor(buscar, esperas)("saude")).resolves.toBeUndefined();
+    expect(chamadas).toBe(3);
+    expect(esperas).toEqual([2000, 4000]);
+  });
+
+  it("aceita redirecionamento transitório e erro de rede", async () => {
+    const esperas: number[] = [];
+    let chamadas = 0;
+    const buscar = (async () => {
+      chamadas += 1;
+      if (chamadas === 1) return resposta(302);
+      if (chamadas === 2) throw new TypeError("fetch failed");
+      return resposta(200, { ok: true, commit: sha });
+    }) as unknown as typeof fetch;
+    await expect(executor(buscar, esperas)("saude")).resolves.toBeUndefined();
+    expect(chamadas).toBe(3);
+    expect(esperas).toEqual([2000, 4000]);
+  });
+
+  it("falha após o limite com a última causa", async () => {
+    const esperas: number[] = [];
+    let chamadas = 0;
+    const buscar = (async () => {
+      chamadas += 1;
+      return resposta(503);
+    }) as unknown as typeof fetch;
+    await expect(executor(buscar, esperas)("saude")).rejects.toThrow(
+      /Saúde indisponível após 6 tentativas \(HTTP 503\)/,
+    );
+    expect(chamadas).toBe(6);
+    expect(esperas).toEqual([2000, 4000, 8000, 16000, 30000]);
+  });
+
+  it("não repete proteção por autenticação", async () => {
+    const esperas: number[] = [];
+    let chamadas = 0;
+    const buscar = (async () => {
+      chamadas += 1;
+      return resposta(401);
+    }) as unknown as typeof fetch;
+    await expect(executor(buscar, esperas)("saude")).rejects.toThrow(/Deployment Protection/);
+    expect(chamadas).toBe(1);
+    expect(esperas).toEqual([]);
   });
 });
