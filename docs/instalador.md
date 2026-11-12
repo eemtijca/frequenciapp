@@ -174,19 +174,19 @@ O `atualizar` aceita apenas os canais `release` e `main`. O canal `auto` do `atu
 6. confere a saúde e atualiza `instalacao.json`, `estado.json` e `ops.env`;
 7. preserva a imagem anterior apenas para rollback de imagem, sem desfazer migração.
 
-O backup é obrigatório no caminho simples e no controlador. A atualização automática por timer fica desabilitada por padrão e só é instalada com `--habilitar-atualizacoes`. Em modo não interativo, a aplicação exige `--sim`.
+O backup é obrigatório no caminho simples e no controlador. A atualização automática por timer fica desabilitada por padrão e só é instalada com `--habilitar-atualizacoes`. Em modo não interativo, a aplicação exige `--sim`. O canal `release` exige `--tag` com uma tag `vX.Y.Z`; o canal `main` exige `--permitir-instavel`. A tag escolhida é repassada ao `atualizar.sh` e prevalece sobre a referência gravada no `ops.env`.
 
 ### backup
 
 O `backup` chama a rotina existente, espera o recibo confirmado e atualiza o ponteiro do último backup. Ele aceita os modos `compose` e `url`, as cifras GPG e age, o destino rclone e a retenção configurada em [backup-servidor.md](backup-servidor.md).
 
-O comando não publica recibo quando a geração, a cifra, o upload ou a verificação falham. A retenção preserva o mínimo de cópias confirmadas. Na cifra GPG, `--destinatario-gpg` é obrigatório; na cifra age, `--destinatarios-age` é obrigatório. O backup das planilhas continua no caminho rclone atual e não é movido para o Dropbox.
+O comando não publica recibo quando a geração, a cifra, o upload ou a verificação falham. A retenção preserva o mínimo de cópias confirmadas. Na cifra GPG, `--destinatario-gpg` é obrigatório; na cifra age, `--destinatarios-age` é obrigatório. O backup das planilhas continua no caminho rclone atual e não é movido para o Dropbox. Em instalação real, o comando exige `--sim`; `--simular` mostra a ação sem executar.
 
 ### restaurar
 
 O `restaurar` aceita um arquivo local com `--arquivo` ou baixa a cópia remota com `--do-remoto`. Antes de qualquer operação destrutiva, ele confere o checksum, decifra em diretório privado, valida o dump e chama `restaurar.sh`.
 
-A restauração preserva o banco anterior por padrão. A remoção do banco anterior é uma decisão posterior, depois da conferência de login, saúde e migrações. A falta de chave privada, checksum divergente ou dump incompatível produz `E_RESTAURACAO`.
+A restauração preserva o banco anterior por padrão. A remoção do banco anterior é uma decisão posterior, depois da conferência de login, saúde e migrações. A falta de chave privada, checksum divergente ou dump incompatível produz `E_RESTAURACAO`. Em instalação real, o comando exige `--sim`; `--simular` mostra a ação sem executar.
 
 ### desinstalar
 
