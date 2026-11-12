@@ -79,17 +79,17 @@ export function executar(ctx) {
       documentacao: "docs/instalador.md#testes-em-docker",
     });
   }
+  if (!ctx.sim && !ctx.modoTeste) {
+    throw erroUso("O aplicar altera o sistema e exige confirmação explícita.", {
+      dica: "Repita o comando com --sim.",
+      documentacao: "docs/instalador.md#aplicar",
+    });
+  }
   if (!ctx.modoTeste && ctx.uid !== 0) {
     throw erroValidacao("O aplicar exige root ou uma conta com sudo.", {
       dica: "Repita o comando com sudo.",
       documentacao: "docs/instalador.md#segurança",
       saida: 5,
-    });
-  }
-  if (!ctx.sim && !ctx.modoTeste) {
-    throw erroUso("O aplicar altera o sistema e exige confirmação explícita.", {
-      dica: "Repita o comando com --sim.",
-      documentacao: "docs/instalador.md#aplicar",
     });
   }
   if (configuracao.canal === "main" && !ctx.permitirInstavel) {

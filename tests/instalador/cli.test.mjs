@@ -383,7 +383,7 @@ describe("planejar", () => {
 });
 
 describe("comandos indisponíveis e uso incorreto", () => {
-  it("recusa aplicar nesta versão com E_USO", () => {
+  it("recusa aplicar sem confirmação explícita com E_USO", () => {
     const resultado = executar(["aplicar", "--json"]);
     assert.equal(resultado.status, 2);
     const documento = JSON.parse(resultado.stdout);
@@ -391,8 +391,8 @@ describe("comandos indisponíveis e uso incorreto", () => {
     assert.equal(documento.codigo, "E_USO");
   });
 
-  it("recusa os demais comandos mutáveis sem alterar o host", () => {
-    for (const comando of ["aplicar", "atualizar", "backup", "restaurar", "desinstalar"]) {
+  it("recusa os comandos ainda indisponíveis sem alterar o host", () => {
+    for (const comando of ["atualizar", "backup", "restaurar", "desinstalar"]) {
       const resultado = executar([comando, "--json"]);
       assert.equal(resultado.status, 2, comando);
       const documento = JSON.parse(resultado.stdout);
