@@ -131,7 +131,7 @@ Em cada perfil, repetir `planejar` com a matriz correspondente antes do `aplicar
 ```bash
 PREFIXO="02-controlador"
 sudo ./instalar.sh aplicar "${FLAGS_COMUNS[@]}" "${FLAGS_BACKUP[@]}" "${FLAGS_CONTROLADOR[@]}" --sim --json --arquivo-log "$EVIDENCIAS/$PREFIXO-aplicar.log" > "$EVIDENCIAS/$PREFIXO-aplicar.json"
-sudo ./instalar.sh backup --json > "$EVIDENCIAS/$PREFIXO-backup.json"
+sudo ./instalar.sh backup --sim --json > "$EVIDENCIAS/$PREFIXO-backup.json"
 ```
 
 - Executar `situacao` e `diagnosticar` e conferir `journal/`, `pins/` e `migradorSha256` em `/opt/frequenciapp-controlador/dados`; o backup e o `situacao` não podem ser bloqueados pelo controlador. Conferir que `atualizacao-em-andamento.json` não existe em repouso e que o `diagnosticar` mostra o perfil e o hash. A segunda execução do `aplicar` deve informar `sem mudanças`.
@@ -160,7 +160,7 @@ sudo ./instalar.sh aplicar "${FLAGS_COMUNS[@]}" "${FLAGS_BACKUP[@]}" "${FLAGS_CO
 
 ```bash
 sudo ./instalar.sh canal mostrar --json > "$EVIDENCIAS/05-canal-antes.json"
-sudo ./instalar.sh backup --json > "$EVIDENCIAS/05-backup-antes-canal.json"
+sudo ./instalar.sh backup --sim --json > "$EVIDENCIAS/05-backup-antes-canal.json"
 sudo jq -e '.verificadoRemoto == true' /var/lib/frequenciapp/ultimo-backup.json
 git -C "$FONTE" status --porcelain
 git -C "$FONTE" merge-base --is-ancestor "$COMMIT_MAIN" "$TAG_ESTAVEL^{commit}"
@@ -193,7 +193,7 @@ sudo find /var/lib/frequenciapp/journal /var/lib/frequenciapp/pins -maxdepth 2 -
 ### 9.1 Atualização
 
 ```bash
-sudo ./instalar.sh backup --json > "$EVIDENCIAS/06-backup-antes-update.json"
+sudo ./instalar.sh backup --sim --json > "$EVIDENCIAS/06-backup-antes-update.json"
 sudo jq -e '.verificadoRemoto == true' /var/lib/frequenciapp/ultimo-backup.json
 sudo ./instalar.sh atualizar --canal release --tag "$TAG_NOVA" --sim --json --arquivo-log "$EVIDENCIAS/06-update.log" > "$EVIDENCIAS/06-update.json"
 sudo jq -e '.ok == true' "$EVIDENCIAS/06-update.json"
@@ -205,7 +205,7 @@ sudo jq -e '.ok == true' "$EVIDENCIAS/06-update.json"
 ### 9.2 Backup manual e restauração
 
 ```bash
-sudo ./instalar.sh backup --json > "$EVIDENCIAS/07-backup.json"
+sudo ./instalar.sh backup --sim --json > "$EVIDENCIAS/07-backup.json"
 sudo jq -e '.ok == true' "$EVIDENCIAS/07-backup.json"
 sudo jq '{verificadoRemoto, criadoEm}' /var/lib/frequenciapp/ultimo-backup.json
 sudo rclone --config "$ARQ_RCLONE" ls "$DESTINO_RCLONE"
