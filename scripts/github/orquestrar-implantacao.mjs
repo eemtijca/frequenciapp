@@ -15,6 +15,13 @@ const AMBIENTE_DE_BUILD = [
   "",
 ].join("\n");
 
+// A promoção do alias é eventualmente consistente: a primeira resposta pode vir
+// do deployment anterior ou de um redirecionamento temporário. A saúde repete
+// com espera crescente e só aceita a revisão promovida.
+const TENTATIVAS_SAUDE = 6;
+const ESPERAS_SAUDE_MS = [2000, 4000, 8000, 16000, 30000];
+const dormirPadrao = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export function prepararAmbienteDeBuild(diretorio = ".vercel") {
   mkdirSync(diretorio, { recursive: true });
   writeFileSync(path.join(diretorio, ".env.production.local"), AMBIENTE_DE_BUILD, "utf8");
@@ -59,7 +66,18 @@ export async function orquestrar({ sha, destino, executar }) {
 }
 
 // Apenas o executor de Vercel está habilitado. Outros destinos exigem adaptador e aceite próprios.
-export function executorVercel(ambiente, { comando = execFileSync, buscar = fetch } = {}) {
+/**
+ * @param {Record<string, string | undefined>} ambiente
+ * @param {{
+ *   comando?: (...args: unknown[]) => unknown,
+ *   buscar?: typeof fetch,
+ *   dormir?: (ms: number) => Promise<unknown>
+ * }} [opcoes]
+ */
+export function executorVercel(
+  ambiente,
+  { comando = execFileSync, buscar = fetch, dormir = dormirPadrao } = {},
+) {
   const sha = ambiente.GITHUB_SHA;
   const base = Object.fromEntries(
     ["PATH", "HOME", "TMPDIR", "CI", "VERCEL_ORG_ID", "VERCEL_PROJECT_ID"]
@@ -133,15 +151,54 @@ export function executorVercel(ambiente, { comando = execFileSync, buscar = fetc
         vercel(["promote", deployment, "--yes"]);
         break;
       case "saude": {
-        const resposta = await buscar(new URL("/api/saude", ambiente.APP_URL), {
-          redirect: "error",
-          signal: AbortSignal.timeout(15000),
-        });
-        if (!resposta.ok) throw new Error("Saúde indisponível.");
-        const corpo = await resposta.json();
-        if (corpo.ok !== true || corpo.commit !== sha)
-          throw new Error("Saúde não corresponde à revisão promovida.");
-        break;
+        const url = new URL("/api/saude", ambiente.APP_URL);
+        let ultimo = "sem resposta";
+        for (let tentativa = 0; tentativa < TENTATIVAS_SAUDE; tentativa++) {
+          try {
+            const resposta = await buscar(url, {
+              redirect: "manual",
+              signal: AbortSignal.timeout(15000),
+            });
+            if (resposta.status === 401 || resposta.status === 403) {
+              const erro = new Error(
+                `Saúde protegida por autenticação (HTTP ${resposta.status}); confira o Deployment Protection e a APP_URL.`,
+              );
+              erro.permanente = true;
+              throw erro;
+            }
+            if (resposta.status >= 300 && resposta.status < 400) {
+              ultimo = `redirecionamento HTTP ${resposta.status}`;
+            } else if (!resposta.ok) {
+              ultimo = `HTTP ${resposta.status}`;
+            } else {
+              let corpo;
+              try {
+                corpo = await resposta.json();
+              } catch {
+                ultimo = "resposta JSON inválida";
+              }
+              if (corpo) {
+                if (corpo.ok !== true) {
+                  ultimo = "ok diferente de true";
+                } else if (corpo.commit !== sha) {
+                  ultimo = `commit ${String(corpo.commit ?? "ausente").slice(0, 12)} diferente de ${sha.slice(0, 12)}`;
+                } else {
+                  return;
+                }
+              }
+            }
+          } catch (erro) {
+            if (erro?.permanente) throw erro;
+            ultimo = erro?.name === "TimeoutError" ? "tempo esgotado" : "falha de rede";
+          }
+          if (tentativa < TENTATIVAS_SAUDE - 1) {
+            await dormir(ESPERAS_SAUDE_MS[tentativa] ?? 30000);
+          }
+        }
+        throw new Error(
+          `Saúde indisponível após ${TENTATIVAS_SAUDE} tentativas (${ultimo}). ` +
+            "Confira a propagação do alias, o Deployment Protection e a APP_URL.",
+        );
       }
       default:
         throw new Error("Etapa desconhecida.");
