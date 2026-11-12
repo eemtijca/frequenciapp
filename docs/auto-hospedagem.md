@@ -39,6 +39,19 @@ Sistemas testados: Linux com Docker Compose v2.24 ou superior. O script não sub
 
 O host não precisa de Node nem pnpm para executar a aplicação. A imagem da aplicação contém o runtime e os scripts.
 
+## Instalador e perfis
+
+O `instalar.sh` é o caminho recomendado para preparar o host. Ele segue o contrato de [instalador.md](instalador.md), com `planejar`, `aplicar`, `situacao`, `diagnosticar`, `atualizar`, `backup`, `restaurar`, `desinstalar` e `canal`.
+
+| Perfil        | Requisitos                                                                | Rotinas                                               |
+| ------------- | ------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `simples`     | Docker, domínio e contas iniciais                                         | systemd timers ou cron                                |
+| `controlador` | `--operador-controlador` com conta sem privilégio e identidade já adotada | cron estável em `/etc/cron.d/frequenciapp`            |
+| `dropbox`     | Adoção, token, `rclone.conf` e destino Dropbox iguais à pasta adotada     | systemd timers ou cron; backup com verificação nativa |
+| `completo`    | Requisitos do controlador e do Dropbox                                    | cron estável e backup Dropbox                         |
+
+O perfil simples é o padrão. Os demais são opt-in e não podem bloquear o caminho simples. A troca de canal está em [instalador.md](instalador.md#canal-release-e-main). O controlador e a readoção estão em [controlador-manutencao.md](controlador-manutencao.md). O Dropbox, o token e a retenção estão em [dropbox-retencao.md](dropbox-retencao.md).
+
 ## Arquivos de referência
 
 ```text

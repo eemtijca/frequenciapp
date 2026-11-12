@@ -37,6 +37,9 @@ As decisões consolidadas D10 a D14 do plano fixam o desenho: bootstrap Bash e C
 - O perfil `simples` é o padrão. Os perfis `controlador`, `dropbox` e `completo` são opt-in e não podem ser obrigatórios.
 - O instalador orquestra os scripts existentes de Compose, identidade, backup, restauração, atualização e rotinas. Não reimplementa essas operações.
 - O perfil simples não depende de artefato do controlador. O controlador só é criado depois da adoção explícita.
+- A ordem das etapas é fixa por perfil. O perfil simples executa 16 etapas. O perfil Dropbox insere a etapa `dropbox` antes de `backup-inicial`. O perfil controlador pula o `agendador` e executa `controlador` depois de `firewall`. O perfil completo combina as duas alterações.
+- O perfil controlador exige `--operador-controlador` e instala as rotinas estáveis em cron. A readoção após troca de canal arquiva o prefixo e o cron anteriores antes da nova confirmação.
+- O perfil Dropbox exige adoção, token, `rclone.conf` e destino iguais à pasta adotada. O upload continua no rclone, a verificação nativa fica no backup e as planilhas permanecem no caminho rclone.
 - A instalação é dividida em etapas com identificadores estáveis. Cada etapa tem limite de tempo, ações previstas, avisos e detalhes.
 
 ### Estado e execução
