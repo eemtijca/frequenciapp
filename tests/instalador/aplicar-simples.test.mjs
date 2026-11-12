@@ -407,6 +407,7 @@ describe("aplicar do perfil simples", () => {
         "contas",
         "saude",
         "backup-inicial",
+        "agendador",
         "firewall",
       ],
     );
@@ -522,7 +523,7 @@ describe("aplicar do perfil simples", () => {
     assert.equal(segunda.json.ok, true);
     const etapaMigracoes = segunda.json.etapas.find((item) => item.id === "migracoes");
     assert.equal(etapaMigracoes.estado, "concluida");
-    assert.equal(new Set(segunda.json.etapas.map((item) => item.id)).size, 15);
+    assert.equal(new Set(segunda.json.etapas.map((item) => item.id)).size, 16);
     assert.equal(
       chamadas.filter((item) => item.comando === "apt-get" && item.argumentos.includes("install"))
         .length,

@@ -45,6 +45,7 @@ import * as migracoes from "./passos/migracoes.mjs";
 import * as contas from "./passos/contas.mjs";
 import * as saude from "./passos/saude.mjs";
 import * as backupInicial from "./passos/backup-inicial.mjs";
+import * as agendador from "./passos/agendador.mjs";
 import * as firewall from "./passos/firewall.mjs";
 
 const RAIZ_INSTALADOR = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
@@ -64,6 +65,7 @@ export const MODULOS = [
   contas,
   saude,
   backupInicial,
+  agendador,
   firewall,
 ];
 
@@ -404,6 +406,9 @@ function prepararContexto(deps, configuracao, deteccao, auditoria, estadoResulta
     forcar: Boolean(opcoes.booleanos.get("--forcar")),
     forcarPacotes: Boolean(opcoes.booleanos.get("--forcar-pacotes")),
     permitirInstavel: Boolean(opcoes.booleanos.get("--permitir-instavel")),
+    permitirFusoDivergente: Boolean(
+      deps.permitirFusoDivergente ?? process.env.INSTALADOR_PERMITIR_FUSO_DIVERGENTE === "1",
+    ),
     uid: (deps.uid ?? (() => (typeof process.getuid === "function" ? process.getuid() : 0)))(),
     usuarioServico: deps.usuarioServico ?? USUARIO_PADRAO,
     etapasConhecidas: ETAPAS_CONHECIDAS,

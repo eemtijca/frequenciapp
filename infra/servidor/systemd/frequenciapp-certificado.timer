@@ -1,0 +1,12 @@
+[Unit]
+Description=Executa a renovação diária do certificado do FrequenciApp
+
+[Timer]
+OnCalendar=@ON_CALENDAR@
+Persistent=true
+RandomizedDelaySec=@RANDOMIZED_DELAY@
+AccuracySec=1min
+Unit=frequenciapp-certificado.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,12 @@
+[Unit]
+Description=Executa a agenda do FrequenciApp a cada cinco minutos
+
+[Timer]
+OnCalendar=@ON_CALENDAR@
+Persistent=true
+RandomizedDelaySec=@RANDOMIZED_DELAY@
+AccuracySec=1min
+Unit=frequenciapp-agenda.service
+
+[Install]
+WantedBy=timers.target

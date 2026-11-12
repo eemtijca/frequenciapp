@@ -1,0 +1,23 @@
+[Unit]
+Description=Notifica a falha da unidade %i do FrequenciApp
+
+[Service]
+Type=oneshot
+User=@USUARIO@
+Group=@USUARIO@
+WorkingDirectory=@APP_DIR@
+Environment=APP_DIR=@APP_DIR@
+Environment=APP_ENV_FILE=@CONFIG_DIR@/app.env
+Environment=OPS_ENV_FILE=@CONFIG_DIR@/ops.env
+EnvironmentFile=-@CONFIG_DIR@/ops.env
+Environment=ESTADO_DIR=@ESTADO_DIR@
+Environment=LOG_DIR=@LOG_DIR@
+Environment=SERVIDOR_LOCK_DIR=@LOCK_DIR@
+ExecStart=/bin/bash @APP_DIR@/scripts/servidor/notificar-falha.sh %i
+TimeoutStartSec=2min
+UMask=0077
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=@ESTADO_DIR@ @LOG_DIR@

@@ -121,7 +121,7 @@ O `aplicar` executa o plano com trava exclusiva e estado durável. A ordem das e
 
 O `aplicar` interrompe na etapa exata da falha, preserva estado e recursos e não faz limpeza destrutiva. Depois de uma migração aplicada, ele não inicia automaticamente a imagem anterior. A recuperação usa o backup e `restaurar.sh`.
 
-No perfil `simples`, as etapas de Dropbox, controlador e agendador não são executadas; elas pertencem aos perfis opt-in e às tarefas seguintes do instalador. O primeiro backup usa a cifra configurada e exige a chave pública em `BACKUP_GPG_CHAVE_PUBLICA` ou o arquivo de destinatários age. O fingerprint de `--destinatario-gpg` também é usado como pin; quando a chave de cifra for uma subchave, definir `BACKUP_GPG_FINGERPRINT` com o fingerprint da chave primária. Nesta versão, o `aplicar` do perfil simples aceita apenas `--modo-backup compose`; o modo URL fica para a evolução do instalador.
+No perfil `simples`, as etapas de Dropbox e controlador não são executadas; elas pertencem aos perfis opt-in e às tarefas seguintes do instalador. A etapa `agendador` instala as rotinas do perfil simples com systemd ou cron. O primeiro backup usa a cifra configurada e exige a chave pública em `BACKUP_GPG_CHAVE_PUBLICA` ou o arquivo de destinatários age. O fingerprint de `--destinatario-gpg` também é usado como pin; quando a chave de cifra for uma subchave, definir `BACKUP_GPG_FINGERPRINT` com o fingerprint da chave primária. Nesta versão, o `aplicar` do perfil simples aceita apenas `--modo-backup compose`; o modo URL fica para a evolução do instalador.
 
 Ações destrutivas exigem `--sim`. Com `--nao-interativo` e sem `--sim`, a execução falha com `E_USO` antes de qualquer alteração. O `--forcar` repete a etapa selecionada, mas não ignora estado incerto, política de canal, downgrade nem hash do controlador.
 
@@ -131,6 +131,18 @@ As flags de teste têm efeito restrito:
 - `--pular-saude` não espera o health check e registra aviso;
 - `--modo-teste` usa caminhos e nomes de projeto de teste, exige `INSTALADOR_RAIZ` apontando para um diretório sintético e é recusado em instalação real;
 - `--autoteste` valida CLI, detecção, schema e estado sem alterar o host.
+
+### Agendador
+
+A etapa `agendador` roda entre `backup-inicial` e `firewall`. Com `--agendador auto`, o padrão, ela usa systemd quando o host é systemd e cai para cron quando o iniciador não é systemd ou o `systemctl` não está disponível. `--agendador systemd` exige systemd em execução; `--agendador cron` usa `scripts/servidor/instalar-rotinas.sh`.
+
+No systemd, o instalador grava units e timers em `/etc/systemd/system` para a agenda, o backup do banco, o backup das planilhas, a renovação do certificado e a atualização. Os timers usam `Persistent=true`, `RandomizedDelaySec`, `AccuracySec=1min` e um usuário de serviço; as units usam `OnFailure` para a unidade `frequenciapp-falha@.service`, `WorkingDirectory` e `ReadWritePaths`. A agenda, o backup do banco e o backup das planilhas respeitam `AGENDA_HABILITADA`, `BACKUP_HABILITADO` e `BACKUP_PLANILHAS_HABILITADO` em `ops.env`. A renovação do certificado só é agendada com Nginx e TLS `acme`; o Caddy renova os certificados sozinho. As expressões `OnCalendar` são validadas com `systemd-analyze calendar` quando a ferramenta existe.
+
+O fuso do host é conferido com `timedatectl`. Uma divergência em relação a `--fuso` é recusada, salvo confirmação explícita com `INSTALADOR_PERMITIR_FUSO_DIVERGENTE=1` ou, no cron, com `CRON_TZ`.
+
+A atualização automática fica desabilitada por padrão. O timer de atualização só é instalado com `--habilitar-atualizacoes`, e o canal `main` exige `--permitir-instavel`. O timer usa o canal definido em `--canal-atualizacao` e a referência de `--ref-atualizacao`. No fallback cron, a linha gerada por `instalar-rotinas.sh` recebe o mesmo modo de atualização e a referência vem de `ATUALIZAR_REF` em `ops.env`.
+
+A segunda execução não reescreve uma unit igual, não duplica a linha de cron e não reinicia um timer que já está ativo e sem mudanças. A falha de uma unidade é registrada no journal e, quando `NOTIFICAR_URL` existe em `ops.env`, enviada por HTTP sem expor a URL no journal ou nos argumentos do processo.
 
 ### situacao
 
