@@ -37,6 +37,8 @@ A correção precisa continuar portátil entre instalações Linux suportadas, s
 - A limpeza remota é opcional, usa o mesmo mínimo e só ocorre depois de upload e verificação bem-sucedidos.
 - O checksum remoto é um manifesto não assinado. A comparação com o hash local cobre a adulteração do provedor, mas não substitui assinatura de manifesto em modelos de ameaça mais fortes.
 
+O perfil Dropbox é opt-in e não substitui o rclone. O upload do banco continua por `rclone copy --immutable --checksum`; o cliente nativo do provedor só verifica, lista, baixa e exclui com revisão condicional. Sem `BACKUP_DROPBOX_CONFIG`, o caminho rclone existente permanece o padrão, e as planilhas continuam no rclone. A adoção, o token, a pasta exclusiva, a autoridade local e o journal separado estão em [dropbox-retencao.md](../dropbox-retencao.md).
+
 ### Restauração
 
 - O dump é conferido, decifrado em diretório privado e validado com `pg_restore -l` antes de qualquer operação destrutiva.
