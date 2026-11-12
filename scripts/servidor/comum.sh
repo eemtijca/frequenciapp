@@ -3,6 +3,8 @@
 set -Eeuo pipefail
 
 APP_DIR="${APP_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+SERVIDOR_SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export SERVIDOR_SCRIPTS_DIR
 APP_ENV_FILE="${APP_ENV_FILE:-/etc/frequenciapp/app.env}"
 OPS_ENV_FILE="${OPS_ENV_FILE:-/etc/frequenciapp/ops.env}"
 ESTADO_DIR="${ESTADO_DIR:-/var/lib/frequenciapp}"
@@ -200,7 +202,7 @@ conferir_identidade() {
       const ler = nome => JSON.parse(fs.readFileSync(p+"/"+nome+".json", "utf8"));
       process.stdout.write(JSON.stringify({config:ler("config"),daemon:ler("daemon"),containers:ler("containers"),parametros:{projeto,app,db}}));
     ' "$captura" "$COMPOSE_PROJECT_NAME" "$SERVIDOR_SERVICO_APP" "$SERVIDOR_SERVICO_DB" |
-      node "$APP_DIR/scripts/servidor/identidade.mjs" "$acao" "$registro" >"$captura/chave" || exit 1
+      node "$SERVIDOR_SCRIPTS_DIR/identidade.mjs" "$acao" "$registro" >"$captura/chave" || exit 1
     cat "$captura/chave"
   ) >"$captura.chave"; then
     rm -rf "$captura" "$captura.chave"
@@ -265,6 +267,25 @@ travar() {
     conferir_identidade auto
     [ "$SERVIDOR_ALVO_CHAVE" = "$chave" ] || erro "A identidade mudou enquanto a trava era adquirida."
   fi
+  local perfil_controlador="${SERVIDOR_CONTROLADOR_PERFIL:-/opt/frequenciapp-controlador/perfil.json}"
+  local controlador_ativo=false
+  if [ -e "$perfil_controlador" ] || [ -L "$perfil_controlador" ] ||
+    [ -n "${SERVIDOR_CONTROLADOR_PERFIL:-}${SERVIDOR_CONTROLADOR_OPERACAO:-}${SERVIDOR_CONTROLADOR_PREPARACAO:-}${SERVIDOR_CONTROLADOR_LEITURA:-}" ]; then
+    controlador_ativo=true
+  fi
+  if [ "$controlador_ativo" = true ]; then
+    if [ -e "$perfil_controlador" ] || [ -L "$perfil_controlador" ]; then
+      node "$SERVIDOR_SCRIPTS_DIR/controlador/contrato.mjs" autorizar "$perfil_controlador" "$nome" ||
+        erro "Controlador não autorizou a mutação deste alvo."
+    else
+      erro "Perfil do controlador não existe; nenhum fallback é permitido."
+    fi
+    # O marcador pertence ao controlador e só bloqueia quando o perfil está ativo.
+    if [ -e "$ESTADO_DIR/atualizacao-em-andamento.json" ] ||
+      [ -L "$ESTADO_DIR/atualizacao-em-andamento.json" ]; then
+      erro "Atualização anterior em andamento ou incerta; mutações bloqueadas."
+    fi
+  fi
 }
 
 conferir_banco_compose() {
@@ -312,7 +333,7 @@ validar_destinatario_gpg() {
   local chaves
   chaves=$(gpg --batch --with-colons --with-fingerprint --with-subkey-fingerprint --list-keys "$BACKUP_GPG_DESTINATARIO") ||
     erro "Não foi possível listar o destinatário GPG."
-  BACKUP_DESTINATARIO_VERIFICADO=$(printf '%s\n' "$chaves" | node "$APP_DIR/scripts/servidor/destinatario.mjs") ||
+  BACKUP_DESTINATARIO_VERIFICADO=$(printf '%s\n' "$chaves" | node "$SERVIDOR_SCRIPTS_DIR/destinatario.mjs") ||
     erro "Identidade do destinatário GPG não conferida."
   export BACKUP_DESTINATARIO_VERIFICADO
 }

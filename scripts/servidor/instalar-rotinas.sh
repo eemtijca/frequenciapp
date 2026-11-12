@@ -1,12 +1,58 @@
 #!/usr/bin/env bash
-# Instala o cron e o logrotate das rotinas do servidor auto-hospedado.
+# Instala o cron do caminho simples ou das entradas estáveis do controlador.
 set -Eeuo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+perfil="${SERVIDOR_CONTROLADOR_PERFIL:-/opt/frequenciapp-controlador/perfil.json}"
+controlador=false
+controlador_args=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --controlador)
+      controlador=true
+      shift
+      ;;
+    --perfil)
+      [ "$#" -ge 2 ] || {
+        printf 'ERRO: --perfil exige um caminho.\n' >&2
+        exit 78
+      }
+      perfil="$2"
+      controlador=true
+      shift 2
+      ;;
+    *)
+      controlador_args+=("$1")
+      shift
+      ;;
+  esac
+done
+
+[ "$(id -u)" -eq 0 ] || {
+  printf 'ERRO: Execute este instalador como root.\n' >&2
+  exit 78
+}
+
+if [ "$controlador" = true ]; then
+  if [ ! -e "$perfil" ] || [ -L "$perfil" ]; then
+    printf 'ERRO: Perfil do controlador não existe em %s.\n' "$perfil" >&2
+    exit 78
+  fi
+  exec node "$DIR/controlador/cli.mjs" executar "$perfil" instalar-rotinas "${controlador_args[@]}"
+fi
+
+if [ -e "$perfil" ] || [ -L "$perfil" ]; then
+  printf 'ERRO: Perfil do controlador existe em %s; use --controlador para instalar as rotinas estáveis.\n' "$perfil" >&2
+  exit 78
+fi
+
+if [ "${#controlador_args[@]}" -gt 0 ]; then
+  printf 'ERRO: O caminho simples não aceita opções; use --controlador para o perfil adotado.\n' >&2
+  exit 78
+fi
+
 # shellcheck source=comum.sh
 . "$DIR/comum.sh"
-
-[ "$(id -u)" -eq 0 ] || erro "Execute este instalador como root."
 
 carregar_ambiente
 SERVIDOR_USUARIO="${SERVIDOR_USUARIO:-frequenciapp}"
