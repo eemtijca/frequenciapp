@@ -1,0 +1,95 @@
+# Sobreposição local do CI para o executor: rede do projeto no lugar da rede
+# do host e suítes na mesma pilha de rede do aplicativo. Uso apenas em testes.
+
+x-ambiente-testes: &ambiente-testes
+  CI: "1"
+  TZ_APP: America/Fortaleza
+  AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
+  DATABASE_URL: postgresql://frequencia:frequencia@db:5432/frequencia
+  DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
+
+services:
+  app:
+    image: ${APP_IMAGEM:-frequenciapp:local}
+    network_mode: !reset null
+    ports: !reset []
+    environment:
+      # O aplicativo é alcançado por http://localhost dentro da própria pilha
+      # de rede; sem TLS, o cookie não usa Secure.
+      PERMITIR_HTTP: "true"
+      DATABASE_URL: postgresql://frequencia:frequencia@db:5432/frequencia
+      DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
+
+  db:
+    ports: !reset []
+
+  api:
+    image: node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+    network_mode: "service:app"
+    working_dir: /work
+    entrypoint: ["/bin/bash", "-lc"]
+    volumes:
+      - .:/work
+      - node_modules:/work/node_modules
+      - pnpm_store:/pnpm-store
+    environment:
+      <<: *ambiente-testes
+      APP_URL: http://localhost:3000
+      PNPM_HOME: /pnpm
+      PNPM_STORE_DIR: /pnpm-store
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+
+  e2e:
+    image: ${EXECUTOR_IMAGEM_PLAYWRIGHT:-mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f}
+    network_mode: "service:app"
+    ipc: host
+    working_dir: /work
+    entrypoint: ["/bin/bash", "-lc"]
+    volumes:
+      - .:/work
+      - playwright_node_modules:/work/node_modules
+      - pnpm_store:/pnpm-store
+      - npm_cache:/tmp/npm-cache
+    environment:
+      <<: *ambiente-testes
+      HOME: /tmp
+      npm_config_cache: /tmp/npm-cache
+      PNPM_STORE_DIR: /pnpm-store
+      TEST_BASE_URL: http://localhost:3000
+      E2E_BANCO_SINTETICO: "true"
+      PLAYWRIGHT_SKIP_WEBSERVER: "1"
+
+  pwa:
+    image: ${EXECUTOR_IMAGEM_PLAYWRIGHT:-mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f}
+    network_mode: "service:app"
+    ipc: host
+    working_dir: /work
+    entrypoint: ["/bin/bash", "-lc"]
+    volumes:
+      - .:/work
+      - playwright_node_modules:/work/node_modules
+      - pnpm_store:/pnpm-store
+      - npm_cache:/tmp/npm-cache
+    environment:
+      <<: *ambiente-testes
+      HOME: /tmp
+      npm_config_cache: /tmp/npm-cache
+      PNPM_STORE_DIR: /pnpm-store
+      TEST_BASE_URL: http://localhost:3000
+      E2E_BANCO_SINTETICO: "true"
+      PLAYWRIGHT_SKIP_WEBSERVER: "1"
+
+volumes:
+  node_modules:
+    name: ${EXECUTOR_VOLUME_NODE_MODULES:-frequenciapp-plan-local-node_modules}
+    external: true
+  pnpm_store:
+    name: ${EXECUTOR_VOLUME_PNPM_STORE:-frequenciapp-plan-local-pnpm-store}
+    external: true
+  playwright_node_modules:
+    name: ${EXECUTOR_VOLUME_PLAYWRIGHT_NODE_MODULES:-frequenciapp-plan-local-playwright-node_modules}
+    external: true
+  npm_cache:
+    name: ${EXECUTOR_VOLUME_NPM_CACHE:-frequenciapp-plan-local-npm-cache}
+    external: true
