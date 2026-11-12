@@ -161,7 +161,7 @@ describe("etapa Dropbox", () => {
     assert.equal(resultado.detalhes.adotado, true);
     assert.equal(resultado.detalhes.destino, adocao.destino);
     assert.equal(resultado.detalhes.folderPath, adocao.folderPath);
-    assert.equal(resultado.detalhes.rcloneConfig, caminhos.rclone);
+    assert.equal(resultado.detalhes.caminhoTransporte, caminhos.rclone);
     assert.equal(resultado.detalhes.semMudancas, false);
     assert.equal(resultado.detalhes.backupPendente, true);
     assert.equal(resultado.detalhes.identidade.validadaContraAmbiente, false);

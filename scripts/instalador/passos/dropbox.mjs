@@ -349,7 +349,7 @@ function executarPasso(ctx) {
       adotado: true,
       destino: adocao.destino,
       folderPath: adocao.folderPath,
-      rcloneConfig: adocao.rcloneConfig,
+      caminhoTransporte: adocao.rcloneConfig,
       semMudancas: !alterou,
       backupPendente: true,
       identidade: {
