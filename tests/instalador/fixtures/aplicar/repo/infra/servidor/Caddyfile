@@ -1,0 +1,4 @@
+# Fixture do Caddyfile público.
+{$DOMINIO} {
+	reverse_proxy app:3000
+}

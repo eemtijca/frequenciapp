@@ -1,0 +1,8 @@
+# Fixture mínima do Compose para os testes do aplicar.
+services:
+  db:
+    image: postgres:17-alpine
+  app:
+    image: frequenciapp:local
+  caddy:
+    image: caddy:2.11-alpine

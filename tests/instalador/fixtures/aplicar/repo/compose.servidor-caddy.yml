@@ -1,0 +1,3 @@
+# Fixture da sobreposição do Caddy.
+services:
+  caddy: {}

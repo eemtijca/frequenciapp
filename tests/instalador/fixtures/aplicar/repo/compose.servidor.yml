@@ -1,0 +1,4 @@
+# Fixture da sobreposição comum de servidor.
+services:
+  db: {}
+  app: {}

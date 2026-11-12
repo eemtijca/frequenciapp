@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { executarPadrao } from "./detectar.mjs";
 import { comandoInstalacao } from "./pacotes.mjs";
 import { SCHEMA_ESTADO, SCHEMA_SAIDA, aviso, erroObjeto, codigoSaida } from "./json.mjs";
+import { lerEstadoAtualizador } from "./estado.mjs";
 import { redigirObjeto } from "./redigir.mjs";
 
 export const VERSAO_INSTALADOR = "1.0.0";
@@ -530,6 +531,119 @@ function resumoEstado(estadoResultado) {
   return { presente: true, ...estadoResultado.estado };
 }
 
+function commitDaTag(executar, diretorio, tag) {
+  if (!diretorio || !tag) return "";
+  const resultado = executar(
+    "git",
+    ["-C", diretorio, "rev-parse", "--verify", `refs/tags/${tag}^{commit}`],
+    { timeout: 15000 },
+  );
+  return resultado.status === 0 ? String(resultado.stdout).trim() : "";
+}
+
+function canalDoAtualizador(informado) {
+  if (!informado) return "";
+  if (informado.modo === "release" || informado.modo === "main") return informado.modo;
+  if (/^v\d+\.\d+\.\d+$/.test(informado.ref)) return "release";
+  if (informado.ref) return "main";
+  return "";
+}
+
+function resumoCanal(estadoResultado, estadoAtualizador, configuracao, executar) {
+  const estado = estadoResultado?.estado ?? null;
+  const preferido = {
+    canal: estado?.canal ?? configuracao?.canal ?? "release",
+    tag: estado?.tag ?? configuracao?.tag ?? "",
+  };
+  let instalado;
+  if (estadoAtualizador?.estado) {
+    instalado = {
+      canal: canalDoAtualizador(estadoAtualizador.estado),
+      tag: estadoAtualizador.estado.ref,
+      commit: estadoAtualizador.estado.commit,
+      imagem: estadoAtualizador.estado.imagem,
+      digest: estado?.digest ?? "",
+      atualizadoEm: estadoAtualizador.estado.atualizadoEm,
+    };
+  } else if (estado) {
+    instalado = {
+      canal: estado.canal,
+      tag: estado.tag,
+      commit: estado.commit,
+      imagem: estado.imagem,
+      digest: estado.digest,
+      atualizadoEm: estado.atualizadoEm,
+    };
+  } else {
+    instalado = null;
+  }
+  let divergente = false;
+  if (estado && instalado) {
+    if (instalado.canal && preferido.canal !== instalado.canal) divergente = true;
+    if (
+      preferido.canal === "release" &&
+      preferido.tag &&
+      instalado.canal === "release" &&
+      instalado.tag &&
+      preferido.tag !== instalado.tag
+    ) {
+      divergente = true;
+    }
+    if (
+      estadoAtualizador?.estado &&
+      estado.commit &&
+      estadoAtualizador.estado.commit &&
+      estado.commit !== estadoAtualizador.estado.commit
+    ) {
+      divergente = true;
+    }
+    if (!estadoAtualizador?.estado && preferido.tag) {
+      const appDir = estado.origem?.diretorioFonte ?? configuracao?.diretorioFonte ?? "";
+      const commit = commitDaTag(executar, appDir, preferido.tag);
+      if (commit && estado.commit && commit !== estado.commit) divergente = true;
+    }
+  }
+  return { preferido, instalado, divergente };
+}
+
+function registrarCanal(verificacoes, erros, avisos, canalInfo, estadoAtualizador) {
+  if (estadoAtualizador?.erro) {
+    registrar(verificacoes, erros, avisos, {
+      ...verificacao("canal_atualizador", "Estado do atualizador", "aviso", {
+        codigo: "A_ESTADO_ATUALIZADOR",
+        mensagem: estadoAtualizador.erro,
+        dica: "Confira /var/lib/frequenciapp/estado.json.",
+        comando: null,
+        documentacao: `${DOCUMENTACAO}#estado-durável`,
+      }),
+    });
+  }
+  const emExecucao = canalInfo.instalado?.canal || canalInfo.preferido.canal;
+  if (canalInfo.divergente) {
+    registrar(verificacoes, erros, avisos, {
+      ...verificacao("canal", "Canal de atualização", "aviso", {
+        codigo: "A_CANAL_DIVERGENTE",
+        mensagem: "A preferência de canal diverge da instalação em execução.",
+        dica: "Aplique a preferência com canal definir --aplicar ou revise o estado.",
+        comando: "sudo ./instalar.sh canal mostrar --json",
+        documentacao: `${DOCUMENTACAO}#troca-de-canal`,
+      }),
+    });
+    return;
+  }
+  if (emExecucao === "main") {
+    registrar(verificacoes, erros, avisos, {
+      ...verificacao("canal", "Canal de atualização", "aviso", {
+        codigo: "A_CANAL_MAIN",
+        mensagem: "A instalação está no canal main e é considerada instável.",
+        dica: "Migre para uma tag estável quando houver release compatível.",
+        comando: "sudo ./instalar.sh canal definir release --tag vX.Y.Z --planejar",
+        documentacao: `${DOCUMENTACAO}#canal-release-e-main`,
+      }),
+    });
+  }
+}
+
 function verificacao(id, titulo, estado, dados = {}) {
   return {
     id,
@@ -918,11 +1032,14 @@ export function montarSituacao(opcoes) {
   const estadoResultado = opcoes.estadoResultado ?? { presente: false };
   const executar = opcoes.executar ?? executarPadrao;
   const comandoExiste = opcoes.comandoExiste;
+  const configuracao = opcoes.configuracao ?? {};
   const agora = opcoes.agora ?? agoraPadrao();
   const raiz = opcoes.raiz ?? "/";
   const verificacoes = [];
   const erros = [];
   const avisos = [...(deteccao?.avisos ?? []), ...(estadoResultado.avisos ?? [])];
+  const estadoAtualizador = lerEstadoAtualizador({ raiz });
+  const canalInfo = resumoCanal(estadoResultado, estadoAtualizador, configuracao, executar);
 
   if (estadoResultado.erro) {
     registrar(verificacoes, erros, avisos, {
@@ -974,17 +1091,7 @@ export function montarSituacao(opcoes) {
       }),
     });
   }
-  if (estadoResultado.estado?.canal === "main") {
-    registrar(verificacoes, erros, avisos, {
-      ...verificacao("canal", "Canal de atualização", "aviso", {
-        codigo: "A_CANAL_MAIN",
-        mensagem: "A instalação está no canal main e é considerada instável.",
-        dica: "Migre para uma tag estável quando houver release compatível.",
-        comando: "sudo ./instalar.sh canal definir release --tag vX.Y.Z --planejar",
-        documentacao: `${DOCUMENTACAO}#canal-release-e-main`,
-      }),
-    });
-  }
+  registrarCanal(verificacoes, erros, avisos, canalInfo, estadoAtualizador);
   const app = identificarAplicacao(coleta.containers);
   const banco = identificarBanco(coleta.containers);
   let saude = { estado: "aviso", codigo: "A_SEM_APLICACAO", mensagem: "Não verificada." };
@@ -1092,6 +1199,8 @@ export function montarSituacao(opcoes) {
 
   const detalhes = {
     estado: resumoEstado(estadoResultado),
+    atualizador: estadoAtualizador.estado,
+    canal: canalInfo,
     docker: resumoDocker(deteccao),
     containers: coleta.containers,
     saude,
@@ -1794,6 +1903,8 @@ export function montarDiagnostico(opcoes) {
   const verificacoes = [];
   const erros = [];
   const avisos = [...(deteccao?.avisos ?? []), ...(estadoResultado.avisos ?? [])];
+  const estadoAtualizador = lerEstadoAtualizador({ raiz });
+  const canalInfo = resumoCanal(estadoResultado, estadoAtualizador, configuracao, executar);
 
   if (deteccao?.tier === 3) {
     registrar(verificacoes, erros, avisos, {
@@ -1908,17 +2019,7 @@ export function montarDiagnostico(opcoes) {
     }
   }
 
-  if (estadoResultado.estado?.canal === "main") {
-    registrar(verificacoes, erros, avisos, {
-      ...verificacao("canal", "Canal de atualização", "aviso", {
-        codigo: "A_CANAL_MAIN",
-        mensagem: "A instalação está no canal main e é considerada instável.",
-        dica: "Migre para uma tag estável quando houver release compatível.",
-        comando: "sudo ./instalar.sh canal definir release --tag vX.Y.Z --planejar",
-        documentacao: `${DOCUMENTACAO}#canal-release-e-main`,
-      }),
-    });
-  }
+  registrarCanal(verificacoes, erros, avisos, canalInfo, estadoAtualizador);
 
   if (estadoResultado.erro) {
     registrar(verificacoes, erros, avisos, {
@@ -2204,6 +2305,8 @@ export function montarDiagnostico(opcoes) {
 
   const detalhes = {
     estado: resumoEstado(estadoResultado),
+    atualizador: estadoAtualizador.estado,
+    canal: canalInfo,
     docker: resumoDocker(deteccao),
     containers: coleta.containers,
     saude,

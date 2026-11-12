@@ -1,0 +1,12 @@
+[Unit]
+Description=Executa o backup diário das planilhas do FrequenciApp
+
+[Timer]
+OnCalendar=@ON_CALENDAR@
+Persistent=true
+RandomizedDelaySec=@RANDOMIZED_DELAY@
+AccuracySec=1min
+Unit=frequenciapp-backup-planilhas.service
+
+[Install]
+WantedBy=timers.target

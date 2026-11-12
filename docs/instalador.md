@@ -121,14 +121,28 @@ O `aplicar` executa o plano com trava exclusiva e estado durável. A ordem das e
 
 O `aplicar` interrompe na etapa exata da falha, preserva estado e recursos e não faz limpeza destrutiva. Depois de uma migração aplicada, ele não inicia automaticamente a imagem anterior. A recuperação usa o backup e `restaurar.sh`.
 
+No perfil `simples`, as etapas de Dropbox e controlador não são executadas; elas pertencem aos perfis opt-in e às tarefas seguintes do instalador. A etapa `agendador` instala as rotinas do perfil simples com systemd ou cron. O primeiro backup usa a cifra configurada e exige a chave pública em `BACKUP_GPG_CHAVE_PUBLICA` ou o arquivo de destinatários age. O fingerprint de `--destinatario-gpg` também é usado como pin; quando a chave de cifra for uma subchave, definir `BACKUP_GPG_FINGERPRINT` com o fingerprint da chave primária. Nesta versão, o `aplicar` do perfil simples aceita apenas `--modo-backup compose`; o modo URL fica para a evolução do instalador.
+
 Ações destrutivas exigem `--sim`. Com `--nao-interativo` e sem `--sim`, a execução falha com `E_USO` antes de qualquer alteração. O `--forcar` repete a etapa selecionada, mas não ignora estado incerto, política de canal, downgrade nem hash do controlador.
 
 As flags de teste têm efeito restrito:
 
 - `--nao-iniciar` instala e valida a configuração sem subir a pilha;
 - `--pular-saude` não espera o health check e registra aviso;
-- `--modo-teste` usa caminhos e nomes de projeto de teste, e é recusado em instalação real;
+- `--modo-teste` usa caminhos e nomes de projeto de teste, exige `INSTALADOR_RAIZ` apontando para um diretório sintético e é recusado em instalação real;
 - `--autoteste` valida CLI, detecção, schema e estado sem alterar o host.
+
+### Agendador
+
+A etapa `agendador` roda entre `backup-inicial` e `firewall`. Com `--agendador auto`, o padrão, ela usa systemd quando o host é systemd e cai para cron quando o iniciador não é systemd ou o `systemctl` não está disponível. `--agendador systemd` exige systemd em execução; `--agendador cron` usa `scripts/servidor/instalar-rotinas.sh`.
+
+No systemd, o instalador grava units e timers em `/etc/systemd/system` para a agenda, o backup do banco, o backup das planilhas, a renovação do certificado e a atualização. Os timers usam `Persistent=true`, `RandomizedDelaySec`, `AccuracySec=1min` e um usuário de serviço; as units usam `OnFailure` para a unidade `frequenciapp-falha@.service`, `WorkingDirectory` e `ReadWritePaths`. A agenda, o backup do banco e o backup das planilhas respeitam `AGENDA_HABILITADA`, `BACKUP_HABILITADO` e `BACKUP_PLANILHAS_HABILITADO` em `ops.env`. A renovação do certificado só é agendada com Nginx e TLS `acme`; o Caddy renova os certificados sozinho. As expressões `OnCalendar` são validadas com `systemd-analyze calendar` quando a ferramenta existe.
+
+O fuso do host é conferido com `timedatectl`. Uma divergência em relação a `--fuso` é recusada, salvo confirmação explícita com `INSTALADOR_PERMITIR_FUSO_DIVERGENTE=1` ou, no cron, com `CRON_TZ`.
+
+A atualização automática fica desabilitada por padrão. O timer de atualização só é instalado com `--habilitar-atualizacoes`, e o canal `main` exige `--permitir-instavel`. O timer usa o canal definido em `--canal-atualizacao` e a referência de `--ref-atualizacao`. No fallback cron, a linha gerada por `instalar-rotinas.sh` recebe o mesmo modo de atualização e a referência vem de `ATUALIZAR_REF` em `ops.env`.
+
+A segunda execução não reescreve uma unit igual, não duplica a linha de cron e não reinicia um timer que já está ativo e sem mudanças. A falha de uma unidade é registrada no journal e, quando `NOTIFICAR_URL` existe em `ops.env`, enviada por HTTP sem expor a URL no journal ou nos argumentos do processo.
 
 ### situacao
 
@@ -463,7 +477,7 @@ A troca de `main` para `release` é permitida quando a tag contém o commit atua
 
 Downgrade é a tag cujo commit é ancestral do commit instalado. Também é tratado como downgrade o alvo sem relação de ancestralidade comprovada, porque não há como garantir a ordem das migrações.
 
-O instalador recusa downgrade com `E_CANAL` e saída 78. A exceção exige `--permitir-downgrade`, backup confirmado e confirmação explícita. Mesmo com a flag, o instalador recusa quando:
+O instalador recusa downgrade com `E_CANAL` e saída 78. A exceção exige `--permitir-downgrade`, backup confirmado e confirmação explícita com `--sim`. A mesma regra vale para a preferência registrada sem `--aplicar`. Mesmo com a flag, o instalador recusa quando:
 
 - o release alvo não contém todas as migrações já aplicadas;
 - o estado do banco é incerto;
@@ -476,6 +490,8 @@ Migração aplicada não é desfeita por downgrade de imagem. A recuperação do
 ### Migrações incompatíveis
 
 Se o release alvo não contiver as migrações atuais, a troca espera um release compatível ou exige a restauração do backup anterior. O instalador não aplica a imagem antiga sobre um banco migrado e não remove migração do banco.
+
+Com `--aplicar`, o instalador executa um backup novo e confirma o recibo antes de delegar ao `atualizar.sh`. O digest da imagem é obrigatório e `latest` é recusado por não ser imutável. Migrações novas no alvo exigem `--permitir-migracoes`.
 
 O `--permitir-migracoes` confirma a aplicação de migrações novas em `atualizar`, mas não autoriza downgrade nem ignorar a ordem. A compatibilidade é conferida pelo histórico de migrações do alvo, pelo schema do banco e pelo `migradorSha256`.
 
@@ -665,9 +681,11 @@ sudo ./instalar.sh planejar \
   --tag v1.0.0 \
   --dominio frequencia.exemplo.br \
   --email-acme administracao@escola.exemplo.br \
+  --email-admin direcao@escola.exemplo.br \
   --proxy caddy \
   --tls acme \
   --arquivo-senha-admin /root/senha-admin \
+  --destinatario-gpg 0123456789ABCDEF0123456789ABCDEF01234567 \
   --salvar-config /root/instalador.json \
   --json
 ```
@@ -713,11 +731,13 @@ sudo ./instalar.sh planejar \
   --tag v1.0.0 \
   --dominio frequencia.exemplo.br \
   --email-acme administracao@escola.exemplo.br \
+  --email-admin direcao@escola.exemplo.br \
   --proxy caddy \
   --tls acme \
   --agendador systemd \
   --firewall sim \
   --arquivo-senha-admin /root/senha-admin \
+  --destinatario-gpg 0123456789ABCDEF0123456789ABCDEF01234567 \
   --salvar-config /root/instalador.json \
   --json
 sudo ./instalar.sh aplicar \
@@ -819,7 +839,7 @@ O instalador não configura a Vercel nem o GitHub sozinho. Ele pode mostrar os c
 
 ## Testes em Docker
 
-Nenhum teste do instalador roda no Windows, no WSL ou diretamente no host. A matriz usa Docker, worktree em LF e imagens oficiais. As evidências registram imagem, comando, código de saída e caminho do log.
+Nenhum teste do instalador roda no Windows, no WSL ou diretamente no host. A matriz usa Docker, worktree em LF e imagens oficiais. As evidências registram imagem, comando, código de saída e caminho do log. O executor `scripts/dev/executar-container.sh` concentra as chamadas: `instalador-plano` percorre a matriz de `planejar` e `instalador-aplicar` usa o contêiner systemd descartável.
 
 ### Matriz de plano
 
