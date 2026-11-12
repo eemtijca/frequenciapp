@@ -24,6 +24,7 @@ import {
 } from "./estado.mjs";
 import { executarAplicacao, ORDEM_ETAPAS } from "./executor.mjs";
 import { executarCanal } from "./canal.mjs";
+import { COMANDOS_OPERACAO, executarOperacao } from "./operacao.mjs";
 import {
   DOCUMENTACAO,
   VERSAO_INSTALADOR,
@@ -298,11 +299,13 @@ const COMANDOS_DISPONIVEIS = new Set([
   "esquema",
   "situacao",
   "diagnosticar",
+  "atualizar",
+  "backup",
+  "restaurar",
+  "desinstalar",
   "canal mostrar",
   "canal definir",
 ]);
-
-const COMANDOS_RECUSADOS = new Set(["atualizar", "backup", "restaurar", "desinstalar"]);
 
 function validarValor(flag, valor) {
   const texto = String(valor);
@@ -878,6 +881,25 @@ function processarCanal(opcoes, io, deps) {
   return emitir(documento, opcoes, io);
 }
 
+function processarOperacao(opcoes, io, deps) {
+  recusarSalvarConfig(opcoes);
+  const avisosConfig = carregarConfig(opcoes);
+  const modoTeste = opcoes.booleanas.has("--modo-teste");
+  const raiz = modoTeste ? deps.raiz || process.env.INSTALADOR_RAIZ || "/" : "/";
+  const deteccao = deps.detectarBasico(raiz);
+  const estadoResultado = lerEstadoSeguro({ ...deps, raiz });
+  const { valores } = resolverConfiguracao(opcoes, estadoResultado);
+  const documento = executarOperacao(opcoes, deps, {
+    raiz,
+    configuracao: valores,
+    deteccao,
+    estadoResultado,
+    avisosConfig,
+  });
+  documento.avisos = deduplicarAvisos([...avisosConfig, ...documento.avisos]);
+  return emitir(documento, opcoes, io);
+}
+
 function processarEsquema(opcoes, io) {
   if (opcoes.valores.has("--salvar-config")) {
     throw erroUso("A opção --salvar-config não se aplica ao comando esquema.", {
@@ -1211,6 +1233,52 @@ function formatarCanalHumano(documentoFinal) {
   return `${linhas.join("\n")}\n`;
 }
 
+function formatarOperacaoHumana(documentoFinal) {
+  const linhas = [];
+  linhas.push(`FrequenciApp - ${documentoFinal.comando}`);
+  linhas.push("");
+  linhas.push(`Comando: ${documentoFinal.comando}`);
+  linhas.push(`Simulação: ${documentoFinal.dry_run ? "sim" : "não"}`);
+  linhas.push(`Perfil: ${documentoFinal.perfil}  Canal: ${documentoFinal.canal}`);
+  if (documentoFinal.tag) linhas.push(`Tag: ${documentoFinal.tag}`);
+  if (documentoFinal.commit) linhas.push(`Commit: ${documentoFinal.commit}`);
+  linhas.push("");
+  linhas.push("Etapas:");
+  for (const etapa of documentoFinal.etapas) {
+    linhas.push(`- ${etapa.id}: ${etapa.estado}${etapa.codigo ? ` (${etapa.codigo})` : ""}`);
+    for (const acao of etapa.acoes) {
+      linhas.push(`  ${acao.altera ? "altera" : "confere"}: ${acao.descricao}`);
+    }
+    for (const aviso of etapa.avisos) {
+      linhas.push(`  aviso: ${aviso.mensagem}`);
+    }
+  }
+  if (documentoFinal.avisos.length) {
+    linhas.push("");
+    linhas.push("Avisos:");
+    for (const item of documentoFinal.avisos) {
+      linhas.push(`- ${item.codigo ? `${item.codigo}: ` : ""}${item.mensagem}`);
+    }
+  }
+  if (documentoFinal.erros.length) {
+    linhas.push("");
+    linhas.push("Erros:");
+    for (const item of documentoFinal.erros) {
+      linhas.push(`- ${item.codigo}: ${item.mensagem}`);
+      if (item.dica) linhas.push(`  Dica: ${item.dica}`);
+      if (item.comando) linhas.push(`  Comando: ${item.comando}`);
+    }
+  }
+  if (documentoFinal.proximos.length) {
+    linhas.push("");
+    linhas.push("Próximos passos:");
+    for (const item of documentoFinal.proximos) linhas.push(`- ${item}`);
+  }
+  linhas.push("");
+  linhas.push(`Resultado: ${documentoFinal.ok ? "ok" : documentoFinal.codigo}`);
+  return `${linhas.join("\n")}\n`;
+}
+
 function formatarHumano(documentoFinal) {
   if (documentoFinal.comando === "situacao") {
     return formatarLeituraHumana(documentoFinal, "situação");
@@ -1223,6 +1291,9 @@ function formatarHumano(documentoFinal) {
   }
   if (documentoFinal.comando === "canal mostrar" || documentoFinal.comando === "canal definir") {
     return formatarCanalHumano(documentoFinal);
+  }
+  if (COMANDOS_OPERACAO.has(documentoFinal.comando)) {
+    return formatarOperacaoHumana(documentoFinal);
   }
   return formatarPlanoHumano(documentoFinal);
 }
@@ -1344,13 +1415,12 @@ function determinarComando(opcoes) {
     if (opcoes.booleanas.has("--autoteste")) return "aplicar";
     if (opcoes.booleanas.has("--simular")) return "planejar";
     throw erroUso(
-      "Comando ausente. Use planejar, aplicar, situacao, diagnosticar, canal, versao ou esquema.",
+      "Comando ausente. Use planejar, aplicar, situacao, diagnosticar, atualizar, backup, restaurar, desinstalar, canal, versao ou esquema.",
     );
   }
   if (!COMANDOS_CONHECIDOS.has(primeiro)) {
     throw erroUso("Comando desconhecido.");
   }
-  if (COMANDOS_RECUSADOS.has(primeiro)) return primeiro;
   if (!COMANDOS_DISPONIVEIS.has(primeiro)) {
     throw erroUso(`O comando ${primeiro} ainda não está disponível nesta versão.`);
   }
@@ -1375,21 +1445,6 @@ function comandoParaErro(argv) {
   return "planejar";
 }
 
-function processarRecusa(comando) {
-  const mensagens = {
-    atualizar: "O comando atualizar ainda não está disponível nesta versão.",
-    backup: "O comando backup ainda não está disponível nesta versão.",
-    restaurar: "O comando restaurar ainda não está disponível nesta versão.",
-    desinstalar: "O comando desinstalar ainda não está disponível nesta versão.",
-    "canal mostrar": "O comando canal ainda não está disponível nesta versão.",
-    "canal definir": "O comando canal ainda não está disponível nesta versão.",
-  };
-  throw erroUso(mensagens[comando] ?? "O comando ainda não está disponível nesta versão.", {
-    dica: "Use planejar, situacao, diagnosticar, versao ou esquema.",
-    documentacao: `${DOCUMENTACAO}#comandos`,
-  });
-}
-
 function textoAjuda() {
   return [
     "FrequenciApp - instalador auto-hospedado",
@@ -1402,6 +1457,10 @@ function textoAjuda() {
     "  aplicar       Executa o plano com trava, estado e retomada",
     "  situacao      Mostra containers, saúde, versão, backup, timers e disco",
     "  diagnosticar  Verifica dependências, portas, DNS, TLS, banco e backup",
+    "  atualizar     Atualiza por tag estável ou pela main, com backup",
+    "  backup        Executa e confere um backup do banco",
+    "  restaurar     Restaura um backup local ou baixado do remoto",
+    "  desinstalar   Remove serviços e preserva dados por padrão",
     "  canal mostrar Mostra a preferência, a instalação e o controlador",
     "  canal definir Troca o canal, com backup e validação",
     "  versao        Mostra a versão do instalador, do projeto e a detecção básica",
@@ -1446,6 +1505,10 @@ function textoAjuda() {
     "  sudo ./instalar.sh aplicar --retomar --sim",
     "  ./instalar.sh situacao --json",
     "  ./instalar.sh diagnosticar --json",
+    "  sudo ./instalar.sh atualizar --canal release --tag v1.0.0 --sim",
+    "  sudo ./instalar.sh backup --json",
+    "  sudo ./instalar.sh restaurar --do-remoto --sim",
+    "  sudo ./instalar.sh desinstalar --remover-dados --sim",
     "  ./instalar.sh canal mostrar --json",
     "  sudo ./instalar.sh canal definir release --tag v1.0.0 --aplicar --sim",
     "  ./instalar.sh versao --json",
@@ -1551,13 +1614,13 @@ export function principal(
       return 0;
     }
     const comando = determinarComando(opcoes);
-    if (COMANDOS_RECUSADOS.has(comando)) processarRecusa(comando);
     if (comando === "planejar") return processarPlanejar(opcoes, io, deps);
     if (comando === "aplicar") return processarAplicar(opcoes, io, deps);
     if (comando === "versao") return processarVersao(opcoes, io, deps);
     if (comando === "esquema") return processarEsquema(opcoes, io);
     if (comando === "situacao") return processarSituacao(opcoes, io, deps);
     if (comando === "diagnosticar") return processarDiagnosticar(opcoes, io, deps);
+    if (COMANDOS_OPERACAO.has(comando)) return processarOperacao(opcoes, io, deps);
     if (comando === "canal mostrar" || comando === "canal definir") {
       return processarCanal(opcoes, io, deps);
     }
