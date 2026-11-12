@@ -401,7 +401,6 @@ describe("comandos indisponíveis e uso incorreto", () => {
     }
     for (const argumentos of [
       ["canal", "--json"],
-      ["canal", "mostrar", "--json"],
       ["canal", "definir", "release", "--json"],
     ]) {
       const resultado = executar(argumentos);
@@ -409,6 +408,11 @@ describe("comandos indisponíveis e uso incorreto", () => {
       const documento = JSON.parse(resultado.stdout);
       assert.equal(documento.codigo, "E_USO", argumentos.join(" "));
     }
+    const mostrar = executar(["canal", "mostrar", "--json"]);
+    assert.equal(mostrar.status, 7);
+    const documentoMostrar = JSON.parse(mostrar.stdout);
+    assert.equal(documentoMostrar.codigo, "E_VALIDACAO");
+    assert.equal(documentoMostrar.ok, false);
   });
 
   it("recusa comando desconhecido", () => {

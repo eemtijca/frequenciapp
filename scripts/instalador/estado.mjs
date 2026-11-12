@@ -82,6 +82,83 @@ export function caminhoEstado(raiz = "/") {
   return path.join(raiz, "var/lib/frequenciapp/instalacao.json");
 }
 
+// Resolve o caminho do estado do atualizador, opcionalmente dentro de uma raiz de teste.
+export function caminhoEstadoAtualizador(raiz = "/") {
+  if (!raiz || raiz === "/") return "/var/lib/frequenciapp/estado.json";
+  return path.join(raiz, "var/lib/frequenciapp/estado.json");
+}
+
+// Lê o estado.json do atualizar.sh sem interpretar segredo e sem falhar na leitura.
+export function lerEstadoAtualizador(opcoes = {}) {
+  const caminho = opcoes.caminho ?? caminhoEstadoAtualizador(opcoes.raiz ?? "/");
+  let informacao;
+  try {
+    informacao = fs.lstatSync(caminho);
+  } catch (erro) {
+    if (erro.code === "ENOENT") return { presente: false, estado: null, caminho, erro: null };
+    return { presente: false, estado: null, caminho, erro: "Não foi possível consultar o estado." };
+  }
+  if (informacao.isSymbolicLink() || !informacao.isFile() || informacao.size > LIMITE_ESTADO) {
+    return {
+      presente: true,
+      estado: null,
+      caminho,
+      erro: "O estado do atualizador precisa ser um arquivo regular de até 1 MiB.",
+    };
+  }
+  let dados;
+  try {
+    dados = JSON.parse(fs.readFileSync(caminho, "utf8"));
+  } catch {
+    return {
+      presente: true,
+      estado: null,
+      caminho,
+      erro: "O estado do atualizador está corrompido.",
+    };
+  }
+  if (!dados || typeof dados !== "object" || Array.isArray(dados)) {
+    return {
+      presente: true,
+      estado: null,
+      caminho,
+      erro: "O estado do atualizador não contém um objeto JSON.",
+    };
+  }
+  const textos = ["modo", "ref", "commit", "imagem", "imagemBackup", "atualizadoEm"];
+  for (const campo of textos) {
+    if (dados[campo] !== undefined && dados[campo] !== null && typeof dados[campo] !== "string") {
+      return {
+        presente: true,
+        estado: null,
+        caminho,
+        erro: "O estado do atualizador tem um campo de tipo inválido.",
+      };
+    }
+  }
+  if (dados.modo !== undefined && !["auto", "release", "main"].includes(dados.modo)) {
+    return {
+      presente: true,
+      estado: null,
+      caminho,
+      erro: "O estado do atualizador tem um modo inválido.",
+    };
+  }
+  return {
+    presente: true,
+    estado: {
+      modo: dados.modo ?? "",
+      ref: dados.ref ?? "",
+      commit: dados.commit ?? "",
+      imagem: dados.imagem ?? "",
+      imagemBackup: dados.imagemBackup ?? "",
+      atualizadoEm: dados.atualizadoEm ?? "",
+    },
+    caminho,
+    erro: null,
+  };
+}
+
 // Resolve o caminho da trava local, respeitando o diretório do bootstrap.
 export function caminhoTrava(dir = process.env.INSTALADOR_LOCK_DIR || "/var/lock/frequenciapp") {
   return path.join(dir, "instalador.lock");

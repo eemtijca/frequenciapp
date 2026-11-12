@@ -465,7 +465,7 @@ A troca de `main` para `release` é permitida quando a tag contém o commit atua
 
 Downgrade é a tag cujo commit é ancestral do commit instalado. Também é tratado como downgrade o alvo sem relação de ancestralidade comprovada, porque não há como garantir a ordem das migrações.
 
-O instalador recusa downgrade com `E_CANAL` e saída 78. A exceção exige `--permitir-downgrade`, backup confirmado e confirmação explícita. Mesmo com a flag, o instalador recusa quando:
+O instalador recusa downgrade com `E_CANAL` e saída 78. A exceção exige `--permitir-downgrade`, backup confirmado e confirmação explícita com `--sim`. A mesma regra vale para a preferência registrada sem `--aplicar`. Mesmo com a flag, o instalador recusa quando:
 
 - o release alvo não contém todas as migrações já aplicadas;
 - o estado do banco é incerto;
@@ -478,6 +478,8 @@ Migração aplicada não é desfeita por downgrade de imagem. A recuperação do
 ### Migrações incompatíveis
 
 Se o release alvo não contiver as migrações atuais, a troca espera um release compatível ou exige a restauração do backup anterior. O instalador não aplica a imagem antiga sobre um banco migrado e não remove migração do banco.
+
+Com `--aplicar`, o instalador executa um backup novo e confirma o recibo antes de delegar ao `atualizar.sh`. O digest da imagem é obrigatório e `latest` é recusado por não ser imutável. Migrações novas no alvo exigem `--permitir-migracoes`.
 
 O `--permitir-migracoes` confirma a aplicação de migrações novas em `atualizar`, mas não autoriza downgrade nem ignorar a ordem. A compatibilidade é conferida pelo histórico de migrações do alvo, pelo schema do banco e pelo `migradorSha256`.
 

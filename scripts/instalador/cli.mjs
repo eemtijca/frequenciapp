@@ -23,6 +23,7 @@ import {
   lerEstado,
 } from "./estado.mjs";
 import { executarAplicacao, ORDEM_ETAPAS } from "./executor.mjs";
+import { executarCanal } from "./canal.mjs";
 import {
   DOCUMENTACAO,
   VERSAO_INSTALADOR,
@@ -293,16 +294,11 @@ const COMANDOS_DISPONIVEIS = new Set([
   "esquema",
   "situacao",
   "diagnosticar",
-]);
-
-const COMANDOS_RECUSADOS = new Set([
-  "atualizar",
-  "backup",
-  "restaurar",
-  "desinstalar",
   "canal mostrar",
   "canal definir",
 ]);
+
+const COMANDOS_RECUSADOS = new Set(["atualizar", "backup", "restaurar", "desinstalar"]);
 
 function validarValor(flag, valor) {
   const texto = String(valor);
@@ -858,6 +854,26 @@ function processarDiagnosticar(opcoes, io, deps) {
   return emitir(documento, opcoes, io);
 }
 
+function processarCanal(opcoes, io, deps) {
+  const avisosConfig = carregarConfig(opcoes);
+  const deteccao = deps.detectarBasico(deps.raiz);
+  const estadoResultado = lerEstadoSeguro(deps);
+  const { valores } = resolverConfiguracao(opcoes, estadoResultado);
+  const documento = executarCanal(
+    opcoes,
+    { ...deps, detectarBasico: deps.detectarBasico },
+    {
+      raiz: deps.raiz,
+      configuracao: valores,
+      deteccao,
+      estadoResultado,
+      avisosConfig,
+    },
+  );
+  documento.avisos = deduplicarAvisos([...avisosConfig, ...documento.avisos]);
+  return emitir(documento, opcoes, io);
+}
+
 function processarEsquema(opcoes, io) {
   if (opcoes.valores.has("--salvar-config")) {
     throw erroUso("A opção --salvar-config não se aplica ao comando esquema.", {
@@ -997,6 +1013,24 @@ function formatarLeituraHumana(documentoFinal, titulo) {
   if (documentoFinal.commit) linhas.push(`Commit: ${documentoFinal.commit}`);
   if (documentoFinal.imagem) linhas.push(`Imagem: ${documentoFinal.imagem}`);
   if (documentoFinal.digest) linhas.push(`Digest: ${documentoFinal.digest}`);
+  const canalDetalhes = detalhes.canal;
+  if (canalDetalhes?.preferido) {
+    linhas.push(
+      `Preferência: ${canalDetalhes.preferido.canal}${
+        canalDetalhes.preferido.tag ? ` ${canalDetalhes.preferido.tag}` : ""
+      }`,
+    );
+  }
+  if (canalDetalhes?.instalado) {
+    linhas.push(
+      `Instalação: ${canalDetalhes.instalado.canal}${
+        canalDetalhes.instalado.tag ? ` ${canalDetalhes.instalado.tag}` : ""
+      }`,
+    );
+  }
+  if (canalDetalhes) {
+    linhas.push(`Divergência de canal: ${canalDetalhes.divergente ? "sim" : "não"}`);
+  }
   if (documentoFinal.comando === "situacao") {
     const estado = detalhes.estado ?? {};
     linhas.push(`Instalação: ${estado.presente ? "presente" : "ausente"}`);
@@ -1102,6 +1136,77 @@ function formatarAplicacaoHumana(documentoFinal) {
   return `${linhas.join("\n")}\n`;
 }
 
+function formatarCanalHumano(documentoFinal) {
+  const etapa = documentoFinal.etapas[0];
+  const detalhes = etapa?.detalhes ?? {};
+  const preferencia = detalhes.preferencia ?? {};
+  const instalacao = detalhes.instalacao ?? {};
+  const controlador = detalhes.controlador ?? {};
+  const linhas = [];
+  linhas.push("FrequenciApp - canal");
+  linhas.push("");
+  linhas.push(`Comando: ${documentoFinal.comando}`);
+  linhas.push(
+    `Preferência: ${preferencia.canal ?? documentoFinal.canal}${
+      preferencia.tag ? ` ${preferencia.tag}` : ""
+    }`,
+  );
+  linhas.push(
+    `Instalação: ${instalacao.canal ?? documentoFinal.canal}${
+      instalacao.tag ? ` ${instalacao.tag}` : ""
+    }`,
+  );
+  if (documentoFinal.commit) linhas.push(`Commit instalado: ${documentoFinal.commit}`);
+  if (documentoFinal.imagem) linhas.push(`Imagem: ${documentoFinal.imagem}`);
+  if (documentoFinal.digest) linhas.push(`Digest: ${documentoFinal.digest}`);
+  linhas.push(`Schema: ${detalhes.schema ?? SCHEMA_ESTADO}`);
+  if (detalhes.migradorSha256) linhas.push(`Migrador: ${detalhes.migradorSha256}`);
+  if (detalhes.instaladoEm) linhas.push(`Instalado em: ${detalhes.instaladoEm}`);
+  if (detalhes.atualizadoEm) linhas.push(`Atualizado em: ${detalhes.atualizadoEm}`);
+  linhas.push(
+    `Divergência: ${detalhes.divergente ? "sim, a preferência ainda não foi aplicada" : "não"}`,
+  );
+  if (controlador?.adotado) {
+    linhas.push(`Controlador: adotado${controlador.readocaoPendente ? ", readoção pendente" : ""}`);
+  } else {
+    linhas.push("Controlador: não adotado");
+  }
+  if (documentoFinal.etapas.length && documentoFinal.comando === "canal definir") {
+    linhas.push("");
+    linhas.push("Etapas:");
+    for (const item of documentoFinal.etapas) {
+      linhas.push(`- ${item.id}: ${item.estado}${item.codigo ? ` (${item.codigo})` : ""}`);
+      for (const acao of item.acoes) {
+        linhas.push(`  ${acao.altera ? "altera" : "confere"}: ${acao.descricao}`);
+      }
+    }
+  }
+  if (documentoFinal.avisos.length) {
+    linhas.push("");
+    linhas.push("Avisos:");
+    for (const item of documentoFinal.avisos) {
+      linhas.push(`- ${item.codigo ? `${item.codigo}: ` : ""}${item.mensagem}`);
+    }
+  }
+  if (documentoFinal.erros.length) {
+    linhas.push("");
+    linhas.push("Erros:");
+    for (const item of documentoFinal.erros) {
+      linhas.push(`- ${item.codigo}: ${item.mensagem}`);
+      if (item.dica) linhas.push(`  Dica: ${item.dica}`);
+      if (item.comando) linhas.push(`  Comando: ${item.comando}`);
+    }
+  }
+  if (documentoFinal.proximos.length) {
+    linhas.push("");
+    linhas.push("Próximos passos:");
+    for (const item of documentoFinal.proximos) linhas.push(`- ${item}`);
+  }
+  linhas.push("");
+  linhas.push(`Resultado: ${documentoFinal.ok ? "ok" : documentoFinal.codigo}`);
+  return `${linhas.join("\n")}\n`;
+}
+
 function formatarHumano(documentoFinal) {
   if (documentoFinal.comando === "situacao") {
     return formatarLeituraHumana(documentoFinal, "situação");
@@ -1111,6 +1216,9 @@ function formatarHumano(documentoFinal) {
   }
   if (documentoFinal.comando === "aplicar") {
     return formatarAplicacaoHumana(documentoFinal);
+  }
+  if (documentoFinal.comando === "canal mostrar" || documentoFinal.comando === "canal definir") {
+    return formatarCanalHumano(documentoFinal);
   }
   return formatarPlanoHumano(documentoFinal);
 }
@@ -1208,20 +1316,13 @@ function emitir(documento, opcoes, io) {
 }
 
 function determinarComando(opcoes) {
-  if (opcoes.booleanas.has("--planejar") && opcoes.booleanas.has("--aplicar")) {
-    throw erroUso("As opções --planejar e --aplicar são mutuamente exclusivas.");
-  }
-  if (opcoes.booleanas.has("--planejar")) return "planejar";
-  if (opcoes.booleanas.has("--aplicar")) return "aplicar";
   const primeiro = opcoes.operandos[0];
-  if (!primeiro) {
-    if (opcoes.booleanas.has("--autoteste")) return "aplicar";
-    if (opcoes.booleanas.has("--simular")) return "planejar";
-    throw erroUso(
-      "Comando ausente. Use planejar, aplicar, situacao, diagnosticar, versao ou esquema.",
-    );
-  }
   if (primeiro === "canal") {
+    if (opcoes.booleanas.has("--planejar") && opcoes.booleanas.has("--aplicar")) {
+      throw erroUso("As opções --planejar e --aplicar são mutuamente exclusivas.", {
+        documentacao: `${DOCUMENTACAO}#troca-de-canal`,
+      });
+    }
     const subcomando = opcoes.operandos[1];
     if (subcomando !== "mostrar" && subcomando !== "definir") {
       throw erroUso("O comando canal exige mostrar ou definir.", {
@@ -1229,6 +1330,18 @@ function determinarComando(opcoes) {
       });
     }
     return `canal ${subcomando}`;
+  }
+  if (opcoes.booleanas.has("--planejar") && opcoes.booleanas.has("--aplicar")) {
+    throw erroUso("As opções --planejar e --aplicar são mutuamente exclusivas.");
+  }
+  if (opcoes.booleanas.has("--planejar")) return "planejar";
+  if (opcoes.booleanas.has("--aplicar")) return "aplicar";
+  if (!primeiro) {
+    if (opcoes.booleanas.has("--autoteste")) return "aplicar";
+    if (opcoes.booleanas.has("--simular")) return "planejar";
+    throw erroUso(
+      "Comando ausente. Use planejar, aplicar, situacao, diagnosticar, canal, versao ou esquema.",
+    );
   }
   if (!COMANDOS_CONHECIDOS.has(primeiro)) {
     throw erroUso("Comando desconhecido.");
@@ -1285,6 +1398,8 @@ function textoAjuda() {
     "  aplicar       Executa o plano com trava, estado e retomada",
     "  situacao      Mostra containers, saúde, versão, backup, timers e disco",
     "  diagnosticar  Verifica dependências, portas, DNS, TLS, banco e backup",
+    "  canal mostrar Mostra a preferência, a instalação e o controlador",
+    "  canal definir Troca o canal, com backup e validação",
     "  versao        Mostra a versão do instalador, do projeto e a detecção básica",
     "  esquema       Mostra o JSON Schema da saída",
     "",
@@ -1307,6 +1422,8 @@ function textoAjuda() {
     "  --relatorio, --report <arquivo>     Grava o relatório com modo 600",
     "  --arquivo-log <arquivo>             Grava o log com modo 600",
     "  --permitir-instavel                 Confirma o uso do canal main",
+    "  --permitir-downgrade                Autoriza a descida com backup e confirmação",
+    "  --permitir-migracoes                Confirma migrações novas no alvo",
     "  --simular, --dry-run                Não altera o host",
     "  --perfil, --profile <nome>          Perfil de instalação (padrão: simples)",
     "  --canal, --channel <nome>           Canal de atualização (padrão: release)",
@@ -1317,6 +1434,8 @@ function textoAjuda() {
     "  sudo ./instalar.sh aplicar --retomar --sim",
     "  ./instalar.sh situacao --json",
     "  ./instalar.sh diagnosticar --json",
+    "  ./instalar.sh canal mostrar --json",
+    "  sudo ./instalar.sh canal definir release --tag v1.0.0 --aplicar --sim",
     "  ./instalar.sh versao --json",
     "  ./instalar.sh esquema",
     "",
@@ -1353,7 +1472,8 @@ function documentoErro(erro, argv, deps) {
     dryRun:
       comandoParaErro(argv) === "planejar" ||
       argv.includes("--simular") ||
-      argv.includes("--dry-run"),
+      argv.includes("--dry-run") ||
+      (comandoParaErro(argv) === "canal definir" && argv.includes("--planejar")),
     etapas: [],
     avisos: [],
     erros: [erroObjeto(erro)],
@@ -1426,6 +1546,9 @@ export function principal(
     if (comando === "esquema") return processarEsquema(opcoes, io);
     if (comando === "situacao") return processarSituacao(opcoes, io, deps);
     if (comando === "diagnosticar") return processarDiagnosticar(opcoes, io, deps);
+    if (comando === "canal mostrar" || comando === "canal definir") {
+      return processarCanal(opcoes, io, deps);
+    }
     throw erroUso("Comando desconhecido.");
   } catch (erro) {
     if (erro instanceof ErroInstalador) {

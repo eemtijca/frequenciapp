@@ -96,7 +96,7 @@ function travaHerdada(caminho) {
 }
 
 // Adquire a trava exclusiva do instalador por flock, preservando a herança do bootstrap.
-function adquirirTravaPadrao(caminho) {
+export function adquirirTravaPadrao(caminho) {
   garantirDiretorio(path.dirname(caminho), 0o700);
   let informacao;
   try {
