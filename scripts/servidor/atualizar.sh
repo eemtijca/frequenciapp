@@ -3,13 +3,45 @@
 set -Eeuo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+controlador_ativo=false
+
+# O perfil não é criado aqui. Quando ele existe, a entrada estável assume a
+# operação; quando o controlador chama este script, o contrato autoriza o filho.
+verificar_controlador() {
+  local perfil="${SERVIDOR_CONTROLADOR_PERFIL:-/opt/frequenciapp-controlador/perfil.json}"
+  local entrada
+  if [ -n "${SERVIDOR_CONTROLADOR_OPERACAO:-}${SERVIDOR_CONTROLADOR_PREPARACAO:-}${SERVIDOR_CONTROLADOR_LEITURA:-}" ]; then
+    [ -f "$DIR/controlador/contrato.mjs" ] ||
+      {
+        printf 'ERRO: Contrato do controlador ausente no snapshot.\n' >&2
+        exit 78
+      }
+    node "$DIR/controlador/contrato.mjs" autorizar "$perfil" atualizar || exit 78
+    controlador_ativo=true
+    return 0
+  fi
+  if [ -e "$perfil" ] || [ -L "$perfil" ]; then
+    entrada="$(dirname "$perfil")/executar"
+    exec "$entrada" atualizar "$@"
+  fi
+  if [ -n "${SERVIDOR_CONTROLADOR_PERFIL:-}" ]; then
+    printf 'ERRO: Perfil do controlador não existe em %s.\n' "$perfil" >&2
+    exit 78
+  fi
+}
+verificar_controlador "$@"
+
 # shellcheck source=comum.sh
 . "$DIR/comum.sh"
 
 carregar_ambiente
+if [ "$controlador_ativo" = false ]; then
+  # A configuração protegida também pode informar o perfil adotado.
+  verificar_controlador "$@"
+fi
 
 if [ -n "${DATABASE_URL:-}${DIRECT_URL:-}${BACKUP_DATABASE_URL:-}" ]; then
-  node "$APP_DIR/scripts/servidor/validar-banco.mjs" || erro "A identidade do banco não confere."
+  node "$SERVIDOR_SCRIPTS_DIR/validar-banco.mjs" || erro "A identidade do banco não confere."
 fi
 
 if [ -z "${ATUALIZAR_SAUDE_URL:-}" ] && [ -n "${DOMINIO:-}" ] &&
@@ -85,6 +117,27 @@ esac
 estado="$ESTADO_DIR/estado.json"
 falha="$ESTADO_DIR/falha.json"
 estado_backup="$ESTADO_DIR/ultimo-backup.json"
+operacao="$ESTADO_DIR/atualizacao-em-andamento.json"
+operacao_iniciada=false
+
+# O journal e os pins pertencem ao controlador. No caminho simples, nada é
+# criado e o marcador legado não bloqueia a operação.
+registrar_operacao() {
+  [ "$controlador_ativo" = true ] || return 0
+  [ "$operacao_iniciada" = false ] || return 0
+  if [ -n "${SERVIDOR_CONTROLADOR_PREPARACAO:-}" ]; then
+    node "$DIR/controlador/cli.mjs" iniciar "$SERVIDOR_CONTROLADOR_PERFIL" || return 1
+    export SERVIDOR_CONTROLADOR_OPERACAO="$SERVIDOR_CONTROLADOR_PREPARACAO"
+    export SERVIDOR_CONTROLADOR_ACAO=atualizar
+  fi
+  node "$DIR/controlador/contrato.mjs" autorizar "$SERVIDOR_CONTROLADOR_PERFIL" atualizar || return 1
+  operacao_iniciada=true
+}
+
+fixar_backup_controlador() {
+  [ "$controlador_ativo" = true ] || return 0
+  node "$DIR/controlador/cli.mjs" fixar "$SERVIDOR_CONTROLADOR_PERFIL"
+}
 
 escrever_estado() {
   local modo="$1"
@@ -180,6 +233,8 @@ executar_backup_obrigatorio() {
     erro "O backup falhou; a atualização foi cancelada."
   fi
   validar_backup_obrigatorio "$marco"
+  fixar_backup_controlador ||
+    erro "Não foi possível fixar backup, recibo e checksums fora da retenção."
   rm -f "$marco"
 }
 
@@ -272,6 +327,12 @@ garantir_imagem_anterior() {
 falhar_atualizacao() {
   local motivo="$1"
   local migracoes="$2"
+  if [ "$controlador_ativo" = true ]; then
+    log "$motivo As migrações não são revertidas; revisão manual do banco e da aplicação é obrigatória. Nenhuma imagem anterior será iniciada automaticamente."
+    escrever_falha "$alvo_ref" "$alvo_commit" "$motivo" "$migracoes"
+    notificar falha "Atualização falhou; intervenção manual necessária."
+    exit 1
+  fi
   log "$motivo Iniciando rollback."
   git -C "$APP_DIR" checkout --detach "$ANTERIOR_COMMIT"
   APP_IMAGEM="$ANTERIOR_IMAGEM" APP_IMAGEM_BACKUP="$ANTERIOR_BACKUP" \
@@ -290,6 +351,12 @@ falhar_atualizacao() {
 verificar_instalacao
 travar atualizacao 0
 
+# Só o controlador adota o marcador; no caminho simples ele é ignorado para
+# não transformar um resíduo de perfil removido em bloqueio permanente.
+if [ "$controlador_ativo" = true ] && { [ -e "$operacao" ] || [ -L "$operacao" ]; }; then
+  erro "Atualização anterior em andamento ou incerta; revise manualmente $operacao antes de qualquer nova operação."
+fi
+
 if [ "$registrar" = true ]; then
   if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
     erro "A árvore de trabalho tem alterações. Faça commit ou descarte antes de registrar."
@@ -307,6 +374,11 @@ if [ "$registrar" = true ]; then
   escrever_estado "$modo_registro" "$ref" "$commit" "$imagem" "$imagem_backup"
   log "Estado registrado em $estado."
   exit 0
+fi
+
+if [ "$simular" = false ] && [ "$controlador_ativo" = true ] &&
+  [ "$ATUALIZAR_MIGRACAO_EXTERNA" = true ]; then
+  registrar_operacao || erro "Não foi possível registrar a operação; nenhuma atualização será iniciada."
 fi
 
 if [ -n "$(git -C "$APP_DIR" status --porcelain)" ]; then
@@ -462,15 +534,22 @@ if [ "${livre:-0}" -lt "$ATUALIZAR_ESPACO_MINIMO_MB" ]; then
   erro "Espaço insuficiente em $APP_DIR: ${livre:-0} MB livres."
 fi
 
+registrar_operacao || erro "Não foi possível registrar a operação; nenhuma atualização será iniciada."
 executar_backup_obrigatorio
 
 ANTERIOR_COMMIT="$commit_atual"
 ANTERIOR_IMAGEM=""
 ANTERIOR_BACKUP="$imagem_backup_atual"
-garantir_imagem_anterior "$ANTERIOR_COMMIT" "$imagem_atual" "$imagem_backup_atual"
+if [ "$controlador_ativo" = false ]; then
+  garantir_imagem_anterior "$ANTERIOR_COMMIT" "$imagem_atual" "$imagem_backup_atual"
+fi
 
 log "Preparando o commit alvo em worktree isolada."
 criar_worktree "$alvo_commit"
+if [ "$controlador_ativo" = true ]; then
+  node "$DIR/controlador/cli.mjs" validar-fonte "$SERVIDOR_CONTROLADOR_PERFIL" "$worktree" ||
+    erro "Fonte alvo sem guard de migração aprovado."
+fi
 
 validar_compose_na_worktree "$alvo_imagem" "$alvo_backup" "$alvo_commit" ||
   erro "A configuração ou identidade do Compose alvo não foi conferida."
@@ -497,6 +576,10 @@ fi
 if [ "$ATUALIZAR_VERIFICAR_IMAGEM" = "true" ]; then
   verificar_imagem_alvo "$alvo_imagem" "$alvo_commit"
 fi
+if [ "$controlador_ativo" = true ]; then
+  node "$DIR/controlador/cli.mjs" validar-imagem "$SERVIDOR_CONTROLADOR_PERFIL" "$alvo_imagem" ||
+    erro "Imagem alvo sem guard de migração aprovado."
+fi
 
 validar_compose_na_worktree "$alvo_imagem" "$alvo_backup" "$alvo_commit" ||
   erro "A configuração do Compose não é válida na versão alvo."
@@ -513,20 +596,28 @@ if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
   erro "A configuração do Compose não é válida no checkout alvo."
 fi
 
+# Mesmo sem diff de migração, a imagem pode aplicar migrações pendentes.
+migracao_possivel="$migracoes_novas"
+if [ "$controlador_ativo" = true ]; then
+  migracao_possivel=true
+fi
 if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
   COMMIT_SHA="$alvo_commit" compose up -d --wait --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE"; then
-  falhar_atualizacao "Falha de saúde após a atualização." "$migracoes_novas"
+  falhar_atualizacao "Falha de saúde após a atualização." "$migracao_possivel"
 fi
 
 if [ -n "${ATUALIZAR_SAUDE_URL:-}" ]; then
   log "Conferindo $ATUALIZAR_SAUDE_URL."
   curl_args=(-fsS --retry 12 --retry-delay 5 --retry-all-errors --max-time 15)
   if [ -n "$ATUALIZAR_SAUDE_CA" ]; then
+    if [ ! -f "$ATUALIZAR_SAUDE_CA" ] && [ "$controlador_ativo" = true ]; then
+      falhar_atualizacao "CA de saúde não encontrada após a subida." "$migracao_possivel"
+    fi
     [ -f "$ATUALIZAR_SAUDE_CA" ] || erro "CA de saúde não encontrada: $ATUALIZAR_SAUDE_CA."
     curl_args+=(--cacert "$ATUALIZAR_SAUDE_CA")
   fi
   if ! curl "${curl_args[@]}" "$ATUALIZAR_SAUDE_URL" >/dev/null; then
-    falhar_atualizacao "Falha na saúde pública após a atualização." "$migracoes_novas"
+    falhar_atualizacao "Falha na saúde pública após a atualização." "$migracao_possivel"
   fi
 fi
 

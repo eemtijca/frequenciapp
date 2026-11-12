@@ -104,6 +104,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- A auto-hospedagem passa a oferecer um controlador de manutenção opt-in, com perfil próprio, snapshot imutável, journal durável, pins de backup e entrada estável `executar`. O caminho simples continua o padrão e ignora os artefatos do controlador, inclusive o marcador de atualização. A transição entre simples e controlador instala e remove rotinas de forma explícita, e a atualização recusa a aplicação quando o guard de migração muda, exigindo readoção administrativa. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
+
 - A chamada retroativa passa a ser permitida com confirmação explícita e auditoria quando a composição da turma não pode ser comprovada. A ordem das listas históricas fica estável, o retrato de aulas é usado na classificação e a exclusão de aula com histórico é recusada. A decisão está na [ADR-066](docs/adr/066-politica-retroativa.md).
 
 - O repositório passa a ter uma referência de auto-hospedagem para VPS, servidor dedicado e máquina on-premises. O Compose de produção remove a publicação das portas da aplicação e do banco, aceita credenciais próprias e oferece Caddy ou Nginx, com TLS público por ACME ou CA interna. A aplicação aceita `MIGRAR_NA_PARTIDA=false` para plataformas que executam a migração em Job separado. O backup do banco usa `pg_dump`, GPG de chave pública ou age, rclone, conferência por SHA-256 e restauração com script. A agenda, a atualização e a renovação do certificado do Nginx são agendadas por cron. A decisão está na [ADR-064](docs/adr/064-auto-hospedagem-servidor.md).

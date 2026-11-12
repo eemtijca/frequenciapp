@@ -22,6 +22,7 @@
     "test:graficos-visibilidade": "playwright test --config=playwright.graficos-visibilidade.config.ts",
     "test:api": "vitest run --config vitest.api.config.ts",
     "test:servidor": "bash tests/servidor/executar.sh",
+    "test:servidor:controlador": "node --test tests/servidor/controlador/*.test.mjs && bash tests/servidor/perfis.sh",
     "test:servidor:rapido": "bash tests/servidor/atualizacao.sh",
     "test:instalador:unit": "node --test tests/instalador/*.test.mjs",
     "test:instalador:matriz": "node --test tests/instalador/matriz.test.mjs",
