@@ -1,6 +1,7 @@
 // Etapa de preflight: revalida o plano, o estado e os pré-requisitos antes de mutar o host.
 import { erroUso, erroValidacao } from "../json.mjs";
 import { acao, avisoEtapa, falha } from "./contexto.mjs";
+import { validarConfiguracaoEstatica } from "../validacao.mjs";
 
 export const id = "preflight";
 export const titulo = "Confere distro, arquitetura, dependências, estado e portas";
@@ -66,36 +67,15 @@ export function executar(ctx) {
   const estadoResultado = ctx.estadoResultado ?? { presente: false, estado: null, avisos: [] };
   const acoes = [];
   const avisos = [...(estadoResultado.avisos ?? [])];
+  const validacao = validarConfiguracaoEstatica(configuracao, {
+    permitirInstavel: ctx.permitirInstavel,
+    modoTeste: ctx.modoTeste,
+  });
+  avisos.push(...validacao.avisos);
+  if (validacao.bloqueios.length) {
+    throw validacao.bloqueios[0].erro;
+  }
 
-  if (!["simples", "controlador", "dropbox", "completo"].includes(configuracao.perfil)) {
-    throw erroUso("O perfil informado não é reconhecido.", {
-      dica: "Use simples, controlador, dropbox ou completo.",
-      documentacao: "docs/instalador.md#perfis",
-    });
-  }
-  const comControlador = ["controlador", "completo"].includes(configuracao.perfil);
-  const comDropbox = ["dropbox", "completo"].includes(configuracao.perfil);
-  if (comControlador && !configuracao.operadorControlador) {
-    throw erroUso("O perfil com controlador exige uma conta de operação.", {
-      dica: "Informe --operador-controlador com uma conta sem privilégio administrativo.",
-      documentacao: "docs/controlador-manutencao.md#pré-requisitos",
-    });
-  }
-  if (comDropbox) {
-    for (const [campo, flag] of [
-      [configuracao.configDropbox, "--config-dropbox"],
-      [configuracao.arquivoTokenDropbox, "--arquivo-token-dropbox"],
-      [configuracao.configRclone, "--config-rclone"],
-      [configuracao.destino, "--destino"],
-    ]) {
-      if (!campo) {
-        throw erroUso("O perfil Dropbox exige a configuração completa.", {
-          dica: `Informe ${flag} junto das demais flags do perfil Dropbox.`,
-          documentacao: "docs/dropbox-retencao.md#adoção",
-        });
-      }
-    }
-  }
   if (ctx.modoTeste && ctx.raiz === "/") {
     throw erroUso("O modo de teste exige um diretório de raiz isolado.", {
       dica: "Defina INSTALADOR_RAIZ para um diretório sintético.",
@@ -115,18 +95,6 @@ export function executar(ctx) {
       saida: 5,
     });
   }
-  if (configuracao.canal === "main" && !ctx.permitirInstavel) {
-    throw falha("E_CANAL", "O canal main exige confirmação explícita.", {
-      dica: "Repita o comando com --permitir-instavel.",
-      documentacao: "docs/instalador.md#canal-release-e-main",
-    });
-  }
-  if (configuracao.canal === "release" && !configuracao.tag && !ctx.modoTeste) {
-    throw erroUso("O canal release exige uma tag estável para aplicar.", {
-      dica: "Informe --tag vX.Y.Z.",
-      documentacao: "docs/instalador.md#canal-release-e-main",
-    });
-  }
   if (deteccao.tier === 3) {
     throw falha("E_DISTRO", `A distribuição ${deteccao.distro} não é suportada.`, {
       dica: "Use uma distribuição Tier 1 ou Tier 2 da matriz do instalador.",
@@ -137,70 +105,6 @@ export function executar(ctx) {
     throw falha("E_PACOTE", "Nenhum gerenciador de pacotes reconhecido foi encontrado.", {
       dica: "Confira a instalação do apt, dnf, pacman, zypper ou apk.",
       documentacao: "docs/instalador.md#auditoria-de-pacotes",
-    });
-  }
-  if (!configuracao.dominio) {
-    throw erroUso("O domínio é obrigatório para configurar o proxy e o TLS.", {
-      dica: "Informe --dominio.",
-      documentacao: "docs/instalador.md#flags",
-    });
-  }
-  if (configuracao.tls === "acme" && !configuracao.emailAcme) {
-    throw erroUso("O modo TLS acme exige um e-mail para a autoridade certificadora.", {
-      dica: "Informe --email-acme.",
-      documentacao: "docs/instalador.md#flags",
-    });
-  }
-  if (!configuracao.pularContas && !configuracao.emailAdmin) {
-    throw erroUso("A criação do administrador exige um e-mail.", {
-      dica: "Informe --email-admin ou use --pular-contas.",
-      documentacao: "docs/instalador.md#flags",
-    });
-  }
-  if (configuracao.modoBackup !== "compose") {
-    throw erroUso("O modo de backup url ainda não é aplicado pelo perfil simples.", {
-      dica: "Use --modo-backup compose nesta versão.",
-      documentacao: "docs/instalador.md#backup",
-    });
-  }
-  if (configuracao.seed) {
-    avisos.push(
-      avisoEtapa(
-        "A_SEED",
-        "A semente sintética não é criada pelo aplicar; use o comando de semente do projeto.",
-        "docs/instalador.md#flags",
-      ),
-    );
-  }
-  if (configuracao.agendador !== "auto" || configuracao.habilitarAtualizacoes) {
-    avisos.push(
-      avisoEtapa(
-        "A_AGENDADOR_LIMITADO",
-        "O agendador e as atualizações automáticas ficam para a etapa de systemd e cron.",
-        "docs/instalador.md#aplicar",
-      ),
-    );
-  }
-  if (configuracao.criptografia === "gpg" && !configuracao.destinatarioGpg) {
-    throw falha("E_BACKUP", "A cifra GPG exige o fingerprint completo do destinatário.", {
-      dica: "Informe --destinatario-gpg com o fingerprint completo.",
-      documentacao: "docs/instalador.md#backup",
-    });
-  }
-  if (
-    configuracao.criptografia === "gpg" &&
-    configuracao.destinatarioGpg &&
-    !/^(?:[A-Fa-f0-9]{40}|[A-Fa-f0-9]{64})$/.test(configuracao.destinatarioGpg)
-  ) {
-    throw falha("E_BACKUP", "O fingerprint GPG informado não tem formato completo.", {
-      dica: "Use 40 ou 64 caracteres hexadecimais.",
-      documentacao: "docs/instalador.md#backup",
-    });
-  }
-  if (configuracao.criptografia === "age" && !configuracao.destinatariosAge) {
-    throw falha("E_BACKUP", "A cifra age exige um arquivo de destinatários.", {
-      dica: "Informe --destinatarios-age.",
-      documentacao: "docs/instalador.md#backup",
     });
   }
 
@@ -267,15 +171,6 @@ export function executar(ctx) {
     acao("Confere espaço em disco, memória e portas públicas", null, false),
     acao("Confere a confirmação, o perfil, o canal e os pré-requisitos de backup", null, false),
   );
-  if (configuracao.criptografia === "gpg") {
-    avisos.push(
-      avisoEtapa(
-        "A_BACKUP_CHAVE",
-        "O primeiro backup exige a chave pública GPG em BACKUP_GPG_CHAVE_PUBLICA.",
-        "docs/instalador.md#backup",
-      ),
-    );
-  }
 
   return {
     estado: "concluida",

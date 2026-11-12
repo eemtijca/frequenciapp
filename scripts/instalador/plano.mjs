@@ -8,6 +8,7 @@ import { comandoInstalacao } from "./pacotes.mjs";
 import { SCHEMA_ESTADO, SCHEMA_SAIDA, aviso, erroObjeto, codigoSaida } from "./json.mjs";
 import { lerEstadoAtualizador } from "./estado.mjs";
 import { redigirObjeto } from "./redigir.mjs";
+import { validarConfiguracaoEstatica } from "./validacao.mjs";
 
 export const VERSAO_INSTALADOR = "1.0.0";
 export const DOCUMENTACAO = "docs/instalador.md";
@@ -336,16 +337,6 @@ function erroPacote(mensagem, dica) {
   };
 }
 
-function erroCanal(mensagem, dica) {
-  return {
-    codigo: "E_CANAL",
-    mensagem,
-    dica,
-    comando: null,
-    documentacao: `${DOCUMENTACAO}#canal-release-e-main`,
-  };
-}
-
 function proximosPlano(erros) {
   if (!erros.length) {
     return ["sudo ./instalar.sh aplicar --config /etc/frequenciapp/instalador.json --sim"];
@@ -378,6 +369,11 @@ export function montarPlano(opcoes) {
     ...(deteccao?.avisos ?? []),
     ...(estadoResultado.avisos ?? []),
   ];
+  const validacao = validarConfiguracaoEstatica(configuracao, {
+    permitirInstavel: Boolean(opcoes.permitirInstavel),
+    modoTeste: Boolean(opcoes.modoTeste),
+  });
+  avisos.push(...validacao.avisos);
 
   if (deteccao?.tier === 3) {
     const erro = erroDistro(deteccao);
@@ -406,16 +402,14 @@ export function montarPlano(opcoes) {
     erros.push(erro);
     errosPreflight.push(erro);
   }
-  if (
-    (configuracao.canal === "main" || configuracao.canalAtualizacao === "main") &&
-    !opcoes.permitirInstavel
-  ) {
-    erros.push(
-      erroCanal(
-        "O canal main exige confirmação explícita.",
-        "Repita o comando com --permitir-instavel para usar o canal main.",
-      ),
-    );
+  for (const item of validacao.bloqueios) {
+    if (opcoes.exigirConfiguracao || item.sempreErro) {
+      const objeto = erroObjeto(item.erro);
+      erros.push(objeto);
+      errosPreflight.push(objeto);
+    } else {
+      avisos.push(aviso(item.avisoCodigo, item.erro.message, item.erro.documentacao));
+    }
   }
 
   if (estadoResultado.presente) {
@@ -424,68 +418,6 @@ export function montarPlano(opcoes) {
         "A_INSTALACAO_EXISTENTE",
         "Uma instalação existente foi detectada. O plano preserva o estado atual.",
         `${DOCUMENTACAO}#estado-durável`,
-      ),
-    );
-  }
-  if (configuracao.perfil && configuracao.perfil !== "simples") {
-    avisos.push(
-      aviso(
-        "A_PERFIL_LIMITADO",
-        "Os perfis controlador, dropbox e completo ainda não alteram o plano nesta versão.",
-        `${DOCUMENTACAO}#perfis`,
-      ),
-    );
-  }
-  if (configuracao.canal === "release" && !configuracao.tag) {
-    avisos.push(
-      aviso(
-        "A_TAG_AUSENTE",
-        "O canal release exige uma tag estável para aplicar a instalação.",
-        `${DOCUMENTACAO}#canal-release-e-main`,
-      ),
-    );
-  }
-  if (configuracao.canal === "main" && configuracao.tag) {
-    erros.push(
-      erroCanal(
-        "O canal main não usa tag estável.",
-        "Remova --tag ou use o canal release com uma tag vX.Y.Z.",
-      ),
-    );
-  }
-  if (configuracao.canal === "main" && opcoes.permitirInstavel) {
-    avisos.push(
-      aviso(
-        "A_CANAL_MAIN",
-        "O canal main é instável e não é recomendado para produção.",
-        `${DOCUMENTACAO}#canal-release-e-main`,
-      ),
-    );
-  }
-  if (configuracao.canalAtualizacao === "main" && opcoes.permitirInstavel) {
-    avisos.push(
-      aviso(
-        "A_CANAL_ATUALIZACAO_MAIN",
-        "As atualizações agendadas usarão o canal main e são instáveis.",
-        `${DOCUMENTACAO}#canal-release-e-main`,
-      ),
-    );
-  }
-  if (configuracao.tls === "acme" && !configuracao.dominio) {
-    avisos.push(
-      aviso(
-        "A_DOMINIO_AUSENTE",
-        "O modo TLS acme exige um domínio para o certificado público.",
-        `${DOCUMENTACAO}#flags`,
-      ),
-    );
-  }
-  if (configuracao.tls === "acme" && !configuracao.emailAcme) {
-    avisos.push(
-      aviso(
-        "A_EMAIL_ACME_AUSENTE",
-        "O modo TLS acme exige um endereço de e-mail para a autoridade certificadora.",
-        `${DOCUMENTACAO}#flags`,
       ),
     );
   }

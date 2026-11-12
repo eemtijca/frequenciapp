@@ -251,6 +251,16 @@ describe("planejar", () => {
         "--tag",
         "",
         "--permitir-instavel",
+        "--operador-controlador",
+        "operador",
+        "--dominio",
+        "frequencia.teste",
+        "--email-acme",
+        "acme@escola.teste",
+        "--email-admin",
+        "direcao@escola.teste",
+        "--destinatario-gpg",
+        "A".repeat(40),
       ]),
     );
     assert.equal(documento.perfil, "controlador");
@@ -331,21 +341,25 @@ describe("planejar", () => {
     const config = path.join(diretorio, "instalador.json");
     const log = path.join(diretorio, "instalador.log");
     const ambiente = { ...process.env, INSTALADOR_LOCK_DIR: path.join(diretorio, "trava") };
+    const comuns = [
+      "--json",
+      "--perfil",
+      "simples",
+      "--canal",
+      "release",
+      "--tag",
+      "v1.0.0",
+      "--dominio",
+      "frequencia.teste",
+      "--email-acme",
+      "acme@escola.teste",
+      "--email-admin",
+      "direcao@escola.teste",
+      "--destinatario-gpg",
+      "A".repeat(40),
+    ];
     const primeiro = executar(
-      [
-        "planejar",
-        "--json",
-        "--perfil",
-        "simples",
-        "--canal",
-        "release",
-        "--tag",
-        "v1.0.0",
-        "--salvar-config",
-        config,
-        "--arquivo-log",
-        log,
-      ],
+      ["planejar", ...comuns, "--salvar-config", config, "--arquivo-log", log],
       { env: ambiente },
     );
     const documento = lerJson(primeiro);
@@ -358,17 +372,66 @@ describe("planejar", () => {
     assert.equal("senha" in gravado, false);
     assert.equal("AUTH_SECRET" in gravado, false);
 
-    const segundo = executar(["planejar", "--json", "--salvar-config", config], {
+    const segundo = executar(["planejar", ...comuns, "--salvar-config", config], {
       env: ambiente,
     });
     assert.equal(segundo.status, 2);
     assert.equal(JSON.parse(segundo.stdout).codigo, "E_USO");
 
-    const terceiro = executar(["planejar", "--json", "--salvar-config", config, "--forcar"], {
+    const terceiro = executar(["planejar", ...comuns, "--salvar-config", config, "--forcar"], {
       env: ambiente,
     });
     assert.equal(terceiro.status, 0, terceiro.stderr);
     assert.equal(fs.statSync(config).mode & 0o777, 0o600);
+  });
+
+  it("não grava a configuração sem e-mail administrativo ou destinatário GPG", () => {
+    const diretorio = temporario();
+    const ambiente = { ...process.env, INSTALADOR_LOCK_DIR: path.join(diretorio, "trava") };
+    const base = [
+      "planejar",
+      "--json",
+      "--perfil",
+      "simples",
+      "--canal",
+      "release",
+      "--tag",
+      "v1.0.0",
+      "--dominio",
+      "frequencia.teste",
+      "--email-acme",
+      "acme@escola.teste",
+    ];
+    const semEmail = path.join(diretorio, "sem-email.json");
+    const primeiro = executar(
+      [...base, "--destinatario-gpg", "A".repeat(40), "--salvar-config", semEmail],
+      { env: ambiente },
+    );
+    assert.equal(primeiro.status, 2);
+    const documentoEmail = JSON.parse(primeiro.stdout);
+    assert.equal(documentoEmail.ok, false);
+    assert.equal(documentoEmail.codigo, "E_USO");
+    assert.ok(documentoEmail.avisos.some((item) => item.codigo === "A_CONFIG_NAO_SALVA"));
+    assert.equal(fs.existsSync(semEmail), false);
+
+    const semGpg = path.join(diretorio, "sem-gpg.json");
+    const segundo = executar(
+      [...base, "--email-admin", "direcao@escola.teste", "--salvar-config", semGpg],
+      { env: ambiente },
+    );
+    assert.equal(segundo.status, 10);
+    const documentoGpg = JSON.parse(segundo.stdout);
+    assert.equal(documentoGpg.ok, false);
+    assert.equal(documentoGpg.codigo, "E_BACKUP");
+    assert.equal(fs.existsSync(semGpg), false);
+
+    const inventario = executar([...base, "--destinatario-gpg", "A".repeat(40)], {
+      env: ambiente,
+    });
+    assert.equal(inventario.status, 0, inventario.stderr);
+    const documentoInventario = JSON.parse(inventario.stdout);
+    assert.equal(documentoInventario.ok, true);
+    assert.ok(documentoInventario.avisos.some((item) => item.codigo === "A_EMAIL_ADMIN_AUSENTE"));
   });
 
   it("recusa flag desconhecida sem ecoar o valor", () => {

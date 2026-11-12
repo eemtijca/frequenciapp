@@ -102,6 +102,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - O build da Vercel passa a usar valores descartáveis para as variáveis de runtime, porque o `vercel pull` não devolve os segredos do projeto. A Vercel injeta os valores reais na execução e nenhum segredo é copiado para o runner.
 
+- O `planejar --salvar-config` passa a recusar e não gravar configurações que o `aplicar` bloquearia no preflight, incluindo e-mail administrativo, fingerprint GPG, domínio, tag de release, perfil e modo de backup. A instalação rápida do README passa a declarar Node.js 24 e a incluir `--email-admin` e `--destinatario-gpg`, com valores fictícios.
+
 ### Adicionado
 
 - A auto-hospedagem passa a oferecer um controlador de manutenção opt-in, com perfil próprio, snapshot imutável, journal durável, pins de backup e entrada estável `executar`. O caminho simples continua o padrão e ignora os artefatos do controlador, inclusive o marcador de atualização. A transição entre simples e controlador instala e remove rotinas de forma explícita, e a atualização recusa a aplicação quando o guard de migração muda, exigindo readoção administrativa. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
