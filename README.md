@@ -189,16 +189,16 @@ No caminho de nuvem, o build da Vercel apenas gera o cliente Prisma; as migraç�
 
 ### Instalação rápida em VPS Ubuntu 26.04
 
-Pré-requisitos: VPS com Ubuntu 26.04 LTS, DNS do domínio apontando para o servidor, portas 80 e 443 liberadas no provedor e uma conta com `sudo`.
+Pré-requisitos: VPS com Ubuntu 26.04 LTS, DNS do domínio apontando para o servidor, portas 80 e 443 liberadas no provedor, uma conta com `sudo` e Node.js 24 ou superior no `PATH` para executar `planejar`. O bootstrap só instala o runtime oficial em comandos que alteram o host; o procedimento do Node 24 está em [docs/instalador.md](docs/instalador.md).
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y git
+sudo apt-get install -y git curl ca-certificates
 sudo git clone https://github.com/eemtijca/frequenciapp.git /opt/frequenciapp
 cd /opt/frequenciapp
 ```
 
-Gravar a senha inicial da administração em um arquivo com modo 600, como `/root/senha-admin`, sem digitar o valor na linha de comando. A tag `vX.Y.Z` é ilustrativa e deve ser substituída pela tag estável publicada no momento da instalação.
+Gravar a senha inicial da administração em um arquivo com modo 600, como `/root/senha-admin`, sem digitar o valor na linha de comando. A tag `vX.Y.Z` é ilustrativa e deve ser substituída pela tag estável publicada no momento da instalação. O fingerprint GPG do exemplo também é fictício.
 
 ```bash
 sudo ./instalar.sh planejar \
@@ -207,9 +207,11 @@ sudo ./instalar.sh planejar \
   --tag vX.Y.Z \
   --dominio frequencia.exemplo.br \
   --email-acme administracao@escola.exemplo.br \
+  --email-admin direcao@escola.exemplo.br \
   --proxy caddy \
   --tls acme \
   --arquivo-senha-admin /root/senha-admin \
+  --destinatario-gpg 0123456789ABCDEF0123456789ABCDEF01234567 \
   --salvar-config /root/instalador.json \
   --json
 
@@ -217,6 +219,8 @@ sudo ./instalar.sh aplicar \
   --config /root/instalador.json \
   --sim
 ```
+
+O `--salvar-config` só grava a configuração quando o plano não tem erro bloqueante. Se preferir não criar contas na instalação, use `--pular-contas`; para backup com age, troque `--destinatario-gpg` por `--criptografia age --destinatarios-age <arquivo>`.
 
 Conferir o plano, os avisos e os códigos antes do `aplicar`. O `aplicar` grava a configuração efetiva em `/etc/frequenciapp/instalador.json`, sem segredos. Depois da subida:
 
@@ -226,7 +230,7 @@ sudo ./instalar.sh diagnosticar --json
 curl -fsS https://frequencia.exemplo.br/api/saude
 ```
 
-O domínio e o e-mail acima são fictícios. O `--seed` não entra no caminho de produção, porque cria massa sintética. As demais flags, como backup e agendador, estão no [contrato do instalador](docs/instalador.md) e no [guia de auto-hospedagem](docs/auto-hospedagem.md).
+O domínio, os e-mails e o fingerprint acima são fictícios. O `--seed` não entra no caminho de produção, porque cria massa sintética. As demais flags, como backup e agendador, estão no [contrato do instalador](docs/instalador.md) e no [guia de auto-hospedagem](docs/auto-hospedagem.md).
 
 ### Perfis
 

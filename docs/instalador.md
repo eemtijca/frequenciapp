@@ -96,6 +96,8 @@ O plano contém:
 
 O `planejar` não exige `--sim`. Achados bloqueantes produzem `ok: false`, código `E_*` e saída diferente de zero, sem alterar o host. Avisos não bloqueantes mantêm `ok: true`.
 
+O `planejar` exige Node.js 24 no `PATH`. Com `--salvar-config`, os requisitos estáticos que o `aplicar` cobraria no preflight, como e-mail administrativo, fingerprint GPG, domínio, tag de release e configuração de perfil, são tratados como erros e a configuração não é gravada. Sem `--salvar-config`, esses mesmos requisitos aparecem como avisos e o inventário do host continua disponível para revisão.
+
 ### aplicar
 
 O `aplicar` executa o plano com trava exclusiva e estado durável. A ordem das etapas é fixa por perfil e os identificadores são estáveis para retomada e automação.
