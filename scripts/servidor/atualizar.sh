@@ -68,6 +68,8 @@ simular=false
 forcar=false
 modo_override=""
 registrar=false
+tag_override=""
+ref_override=""
 permitir_migracoes="$ATUALIZAR_PERMITIR_MIGRACOES"
 
 while [ "$#" -gt 0 ]; do
@@ -92,9 +94,19 @@ while [ "$#" -gt 0 ]; do
       modo_override="${2:-}"
       shift 2
       ;;
+    --tag)
+      tag_override="${2:-}"
+      [ -n "$tag_override" ] || erro "Informe uma tag para --tag."
+      shift 2
+      ;;
+    --ref)
+      ref_override="${2:-}"
+      [ -n "$ref_override" ] || erro "Informe uma referência para --ref."
+      shift 2
+      ;;
     --ajuda | -h)
       cat <<'TEXTO'
-Uso: atualizar.sh [--simular] [--forcar] [--registrar] [--permitir-migracoes] [--modo auto|release|main]
+Uso: atualizar.sh [--simular] [--forcar] [--registrar] [--permitir-migracoes] [--modo auto|release|main] [--tag vX.Y.Z] [--ref REF]
 TEXTO
       exit 0
       ;;
@@ -436,18 +448,25 @@ alvo_imagem=""
 alvo_backup=""
 
 definir_release() {
-  [ -n "$tag_estavel" ] || erro "Não há tag estável disponível para o modo release."
+  local alvo_tag="${tag_override:-$tag_estavel}"
+  [ -n "$alvo_tag" ] || erro "Não há tag estável disponível para o modo release."
+  case "$alvo_tag" in
+    v[0-9]*.[0-9]*.[0-9]*) ;;
+    *) erro "A tag $alvo_tag não segue o formato vX.Y.Z." ;;
+  esac
+  git -C "$APP_DIR" rev-parse "$alvo_tag^{commit}" >/dev/null 2>&1 ||
+    erro "A tag $alvo_tag não existe no checkout local; busque as tags antes de atualizar."
   alvo_modo="release"
-  alvo_ref="$tag_estavel"
-  alvo_commit=$(git -C "$APP_DIR" rev-parse "$tag_estavel^{commit}")
-  alvo_imagem="${APP_IMAGEM_REPOSITORIO}:${tag_estavel#v}"
-  alvo_backup="${APP_IMAGEM_BACKUP_REPOSITORIO}:${tag_estavel#v}"
+  alvo_ref="$alvo_tag"
+  alvo_commit=$(git -C "$APP_DIR" rev-parse "$alvo_tag^{commit}")
+  alvo_imagem="${APP_IMAGEM_REPOSITORIO}:${alvo_tag#v}"
+  alvo_backup="${APP_IMAGEM_BACKUP_REPOSITORIO}:${alvo_tag#v}"
 }
 
 definir_main() {
   alvo_modo="main"
-  alvo_ref="$ATUALIZAR_REF"
-  alvo_commit=$(git -C "$APP_DIR" rev-parse "$ATUALIZAR_REF")
+  alvo_ref="${ref_override:-$ATUALIZAR_REF}"
+  alvo_commit=$(git -C "$APP_DIR" rev-parse "$alvo_ref")
   alvo_imagem="${APP_IMAGEM_REPOSITORIO}:main-${alvo_commit:0:12}"
   alvo_backup="${APP_IMAGEM_BACKUP_REPOSITORIO}:main-${alvo_commit:0:12}"
 }

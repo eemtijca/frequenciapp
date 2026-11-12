@@ -81,6 +81,10 @@ describe("ajuda e versão", () => {
     assert.equal(resultado.status, 0);
     assert.match(resultado.stdout, /planejar/);
     assert.match(resultado.stdout, /esquema/);
+    assert.match(resultado.stdout, /atualizar/);
+    assert.match(resultado.stdout, /backup/);
+    assert.match(resultado.stdout, /restaurar/);
+    assert.match(resultado.stdout, /desinstalar/);
     assert.match(resultado.stdout, /--nao-interativo/);
     assert.doesNotMatch(resultado.stdout, /[\u2026\u2014\u2013\u201C\u201D\u2192]/);
   });
@@ -382,7 +386,7 @@ describe("planejar", () => {
   });
 });
 
-describe("comandos indisponíveis e uso incorreto", () => {
+describe("comandos de operação e uso incorreto", () => {
   it("recusa aplicar sem confirmação explícita com E_USO", () => {
     const resultado = executar(["aplicar", "--json"]);
     assert.equal(resultado.status, 2);
@@ -391,14 +395,19 @@ describe("comandos indisponíveis e uso incorreto", () => {
     assert.equal(documento.codigo, "E_USO");
   });
 
-  it("recusa os comandos ainda indisponíveis sem alterar o host", () => {
-    for (const comando of ["atualizar", "backup", "restaurar", "desinstalar"]) {
+  it("recusa os comandos de operação sem a confirmação exigida", () => {
+    for (const comando of ["atualizar", "backup", "restaurar"]) {
       const resultado = executar([comando, "--json"]);
       assert.equal(resultado.status, 2, comando);
       const documento = JSON.parse(resultado.stdout);
       assert.equal(documento.codigo, "E_USO", comando);
       assert.equal(documento.ok, false, comando);
     }
+    const desinstalar = executar(["desinstalar", "--json", "--remover-dados"]);
+    assert.equal(desinstalar.status, 2);
+    const documentoDesinstalar = JSON.parse(desinstalar.stdout);
+    assert.equal(documentoDesinstalar.codigo, "E_USO");
+    assert.equal(documentoDesinstalar.ok, false);
     for (const argumentos of [
       ["canal", "--json"],
       ["canal", "definir", "release", "--json"],
