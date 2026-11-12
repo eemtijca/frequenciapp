@@ -111,10 +111,12 @@ export function segredoAleatorio(bytes = 32) {
 
 export function senhaAleatoria(tamanho = 20) {
   const alfabeto = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  const bytes = crypto.randomBytes(tamanho);
+  const comprimento = Math.max(8, tamanho);
   let senha = "A1";
-  for (const byte of bytes) senha += alfabeto[byte % alfabeto.length];
-  return senha.slice(0, Math.max(8, tamanho));
+  for (let indice = 2; indice < comprimento; indice += 1) {
+    senha += alfabeto[crypto.randomInt(alfabeto.length)];
+  }
+  return senha;
 }
 
 export function sha256Texto(texto) {
