@@ -573,6 +573,20 @@ function instalarCron(ctx, fuso, avisos) {
 }
 
 export function executar(ctx) {
+  if (["controlador", "completo"].includes(ctx.configuracao.perfil)) {
+    return {
+      estado: "pulada",
+      acoes: [acao("As rotinas do controlador são instaladas na etapa controlador", null, false)],
+      avisos: [
+        avisoEtapa(
+          "A_AGENDADOR_CONTROLADOR",
+          "O perfil com controlador usa as entradas estáveis em cron.",
+          "docs/controlador-manutencao.md#rotinas-estáveis",
+        ),
+      ],
+      detalhes: { semMudancas: true, agendador: "controlador" },
+    };
+  }
   const agendador = resolverAgendador(ctx);
   validarAtualizacoes(ctx);
   const fuso = conferirFuso(ctx, agendador);

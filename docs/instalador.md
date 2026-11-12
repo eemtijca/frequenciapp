@@ -40,6 +40,8 @@ O instalador orquestra os scripts existentes do servidor: `compose.sh`, `identid
 
 O perfil `simples` não pode ser bloqueado por artefato do controlador. Os perfis `controlador`, `dropbox` e `completo` são opt-in e exigem configuração explícita.
 
+O perfil `controlador` exige `--operador-controlador` com uma conta sem privilégio administrativo e instala as rotinas estáveis em cron. O perfil `dropbox` exige `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino`; o upload continua no rclone e a verificação nativa fica no backup. O perfil `completo` executa os dois. A adoção do Dropbox e o perfil do controlador são validados antes de qualquer mutação.
+
 ### Escopo
 
 | Item           | Contrato                                                        |
@@ -96,7 +98,7 @@ O `planejar` não exige `--sim`. Achados bloqueantes produzem `ok: false`, códi
 
 ### aplicar
 
-O `aplicar` executa o plano com trava exclusiva e estado durável. A ordem das etapas é fixa e os identificadores são estáveis para retomada e automação.
+O `aplicar` executa o plano com trava exclusiva e estado durável. A ordem das etapas é fixa por perfil e os identificadores são estáveis para retomada e automação.
 
 | Ordem | Etapa            | Papel                                                            | Limite padrão |
 | ----- | ---------------- | ---------------------------------------------------------------- | ------------- |
@@ -107,21 +109,23 @@ O `aplicar` executa o plano com trava exclusiva e estado durável. A ordem das e
 | 5     | `diretorios`     | Cria estado, backup, log e configuração com modo restrito        | 5 min         |
 | 6     | `fonte`          | Prepara o checkout ou a origem da imagem e ajusta o proprietário | 15 min        |
 | 7     | `ambiente`       | Gera `app.env` e `ops.env` com segredos e permissões corretas    | 5 min         |
-| 8     | `dropbox`        | Configura o destino Dropbox quando o perfil exige                | 15 min        |
-| 9     | `proxy`          | Configura Caddy ou Nginx, TLS e portas públicas                  | 15 min        |
-| 10    | `compose`        | Monta, valida e sobe a pilha                                     | 30 min        |
-| 11    | `banco`          | Valida o PostgreSQL 17 e a conexão                               | 10 min        |
-| 12    | `migracoes`      | Aplica as migrações pendentes                                    | 30 min        |
-| 13    | `contas`         | Cria administração e coordenação quando solicitado               | 10 min        |
-| 14    | `saude`          | Aguarda `/api/saude` e confere a versão                          | 10 min        |
-| 15    | `controlador`    | Adota o controlador quando o perfil exige                        | 20 min        |
-| 16    | `backup-inicial` | Executa e confere o primeiro backup                              | 60 min        |
-| 17    | `agendador`      | Instala systemd timers ou cron                                   | 10 min        |
-| 18    | `firewall`       | Ajusta o firewall somente com consentimento explícito            | 5 min         |
+| 8     | `proxy`          | Configura Caddy ou Nginx, TLS e portas públicas                  | 15 min        |
+| 9     | `compose`        | Monta, valida e sobe a pilha                                     | 30 min        |
+| 10    | `banco`          | Valida o PostgreSQL 17 e a conexão                               | 10 min        |
+| 11    | `migracoes`      | Aplica as migrações pendentes                                    | 30 min        |
+| 12    | `contas`         | Cria administração e coordenação quando solicitado               | 10 min        |
+| 13    | `saude`          | Aguarda `/api/saude` e confere a versão                          | 10 min        |
+| 14    | `dropbox`        | Valida a adoção e liga a retenção Dropbox no `ops.env`           | 5 min         |
+| 15    | `backup-inicial` | Executa e confere o primeiro backup                              | 60 min        |
+| 16    | `agendador`      | Instala systemd timers ou cron                                   | 10 min        |
+| 17    | `firewall`       | Ajusta o firewall somente com consentimento explícito            | 5 min         |
+| 18    | `controlador`    | Adota o controlador e instala as rotinas estáveis em cron        | 30 min        |
+
+O perfil `simples` executa 16 etapas, sem `dropbox` e sem `controlador`. O perfil `dropbox` insere a etapa `dropbox` antes de `backup-inicial`. O perfil `controlador` pula a etapa `agendador` e executa `controlador` depois de `firewall`. O perfil `completo` combina as duas alterações e executa 18 etapas.
 
 O `aplicar` interrompe na etapa exata da falha, preserva estado e recursos e não faz limpeza destrutiva. Depois de uma migração aplicada, ele não inicia automaticamente a imagem anterior. A recuperação usa o backup e `restaurar.sh`.
 
-No perfil `simples`, as etapas de Dropbox e controlador não são executadas; elas pertencem aos perfis opt-in e às tarefas seguintes do instalador. A etapa `agendador` instala as rotinas do perfil simples com systemd ou cron. O primeiro backup usa a cifra configurada e exige a chave pública em `BACKUP_GPG_CHAVE_PUBLICA` ou o arquivo de destinatários age. O fingerprint de `--destinatario-gpg` também é usado como pin; quando a chave de cifra for uma subchave, definir `BACKUP_GPG_FINGERPRINT` com o fingerprint da chave primária. Nesta versão, o `aplicar` do perfil simples aceita apenas `--modo-backup compose`; o modo URL fica para a evolução do instalador.
+No perfil `dropbox`, a etapa `dropbox` exige `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino`, valida a adoção e o hash do `rclone.conf` e grava a configuração no `ops.env` antes do primeiro backup. O upload continua no rclone e a verificação nativa fica no `backup-banco.sh`. O perfil `controlador` exige `--operador-controlador`, adota o snapshot e instala o cron estável; a readoção após troca de canal arquiva o prefixo e o cron anteriores. O primeiro backup usa a cifra configurada e exige a chave pública em `BACKUP_GPG_CHAVE_PUBLICA` ou o arquivo de destinatários age. O fingerprint de `--destinatario-gpg` também é usado como pin; quando a chave de cifra for uma subchave, definir `BACKUP_GPG_FINGERPRINT` com o fingerprint da chave primária. Nesta versão, o `aplicar` dos perfis disponíveis aceita apenas `--modo-backup compose`; o modo URL fica para a evolução do instalador.
 
 Ações destrutivas exigem `--sim`. Com `--nao-interativo` e sem `--sim`, a execução falha com `E_USO` antes de qualquer alteração. O `--forcar` repete a etapa selecionada, mas não ignora estado incerto, política de canal, downgrade nem hash do controlador.
 
@@ -135,6 +139,8 @@ As flags de teste têm efeito restrito:
 ### Agendador
 
 A etapa `agendador` roda entre `backup-inicial` e `firewall`. Com `--agendador auto`, o padrão, ela usa systemd quando o host é systemd e cai para cron quando o iniciador não é systemd ou o `systemctl` não está disponível. `--agendador systemd` exige systemd em execução; `--agendador cron` usa `scripts/servidor/instalar-rotinas.sh`.
+
+Nos perfis com controlador, a etapa `agendador` é pulada. A etapa `controlador` instala as rotinas estáveis com `instalar-rotinas.sh --controlador --perfil /opt/frequenciapp-controlador/perfil.json`, sempre em cron. A readoção após troca de canal arquiva o prefixo e o cron anteriores antes de confirmar a nova adoção.
 
 No systemd, o instalador grava units e timers em `/etc/systemd/system` para a agenda, o backup do banco, o backup das planilhas, a renovação do certificado e a atualização. Os timers usam `Persistent=true`, `RandomizedDelaySec`, `AccuracySec=1min` e um usuário de serviço; as units usam `OnFailure` para a unidade `frequenciapp-falha@.service`, `WorkingDirectory` e `ReadWritePaths`. A agenda, o backup do banco e o backup das planilhas respeitam `AGENDA_HABILITADA`, `BACKUP_HABILITADO` e `BACKUP_PLANILHAS_HABILITADO` em `ops.env`. A renovação do certificado só é agendada com Nginx e TLS `acme`; o Caddy renova os certificados sozinho. As expressões `OnCalendar` são validadas com `systemd-analyze calendar` quando a ferramenta existe.
 
@@ -215,25 +221,25 @@ O `esquema` escreve no stdout o JSON Schema da saída do instalador, em draft 20
 
 As flags de domínio são em português. As flags universais têm alias em inglês. `--json`, `--tag`, `--config` e `--ref` permanecem técnicos. `--image` e `--image-digest` permanecem técnicos e são aceitos ao lado de `--imagem` e `--imagem-digest`.
 
-| Grupo           | Flags                                                                                                                                                                                                 | Uso                                                    |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| Ajuda e versão  | `--ajuda`, `-h`, `--versao`                                                                                                                                                                           | Ajuda e versão do instalador                           |
-| Perfil e origem | `--perfil`, `--canal`, `--tag`, `--ref`, `--diretorio-fonte`, `--imagem`, `--imagem-digest`                                                                                                           | Perfil, canal, tag, commit, fonte e imagem             |
-| Proxy e TLS     | `--proxy`, `--tls`, `--dominio`, `--email-acme`, `--acme-staging`                                                                                                                                     | Caddy ou Nginx, TLS público ou interno                 |
-| Contas e Google | `--email-admin`, `--arquivo-senha-admin`, `--email-coordenacao`, `--arquivo-senha-coordenacao`, `--arquivo-google`, `--pular-contas`, `--seed`                                                        | Contas iniciais e credencial do Google                 |
-| Backup          | `--modo-backup`, `--criptografia`, `--destinatario-gpg`, `--destinatarios-age`, `--config-rclone`, `--destino`, `--retencao-dias`, `--retencao-minimo`, `--config-dropbox`, `--arquivo-token-dropbox` | Banco, cifra, transporte, retenção e Dropbox           |
-| Agendador       | `--agendador`, `--fuso`, `--habilitar-atualizacoes`, `--canal-atualizacao`, `--ref-atualizacao`                                                                                                       | systemd, cron, fuso e atualização agendada             |
-| Rede            | `--firewall`, `--porta-ssh`, `--porta-http`, `--porta-https`                                                                                                                                          | Firewall e portas públicas                             |
-| Saída           | `--json`, `--relatorio`, `--arquivo-log`, `--sem-cor`, `--silencioso`, `--verboso`                                                                                                                    | Formato, relatório, log e verbosidade                  |
-| Execução        | `--nao-interativo`, `--sim`, `--forcar`, `--retomar`, `--desde-etapa`, `--tempo-limite`, `--config`, `--salvar-config [arquivo]`                                                                      | Confirmação, retomada, tempo e configuração            |
-| Teste           | `--autoteste`, `--nao-iniciar`, `--pular-saude`, `--modo-teste`                                                                                                                                       | Validação isolada e execução sem subir a pilha         |
-| Canal e risco   | `--permitir-instavel`, `--permitir-downgrade`, `--permitir-migracoes`                                                                                                                                 | Uso consciente de `main`, descida e migração           |
-| Pacotes         | `--forcar-pacotes`                                                                                                                                                                                    | Reinstalação explícita de pacote                       |
-| Restauração     | `--do-remoto`, `--arquivo`                                                                                                                                                                            | Origem do dump                                         |
-| Desinstalação   | `--remover-dados`                                                                                                                                                                                     | Remoção irreversível de dados                          |
-| Compatibilidade | `--planejar`, `--aplicar`, `--simular`, `--sem-firewall`                                                                                                                                              | Subcomando alternativo, simulação e firewall desligado |
+| Grupo           | Flags                                                                                                                                                                                                 | Uso                                                                 |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Ajuda e versão  | `--ajuda`, `-h`, `--versao`                                                                                                                                                                           | Ajuda e versão do instalador                                        |
+| Perfil e origem | `--perfil`, `--operador-controlador`, `--canal`, `--tag`, `--ref`, `--diretorio-fonte`, `--imagem`, `--imagem-digest`                                                                                 | Perfil, operador do controlador, canal, tag, commit, fonte e imagem |
+| Proxy e TLS     | `--proxy`, `--tls`, `--dominio`, `--email-acme`, `--acme-staging`                                                                                                                                     | Caddy ou Nginx, TLS público ou interno                              |
+| Contas e Google | `--email-admin`, `--arquivo-senha-admin`, `--email-coordenacao`, `--arquivo-senha-coordenacao`, `--arquivo-google`, `--pular-contas`, `--seed`                                                        | Contas iniciais e credencial do Google                              |
+| Backup          | `--modo-backup`, `--criptografia`, `--destinatario-gpg`, `--destinatarios-age`, `--config-rclone`, `--destino`, `--retencao-dias`, `--retencao-minimo`, `--config-dropbox`, `--arquivo-token-dropbox` | Banco, cifra, transporte, retenção e Dropbox                        |
+| Agendador       | `--agendador`, `--fuso`, `--habilitar-atualizacoes`, `--canal-atualizacao`, `--ref-atualizacao`                                                                                                       | systemd, cron, fuso e atualização agendada                          |
+| Rede            | `--firewall`, `--porta-ssh`, `--porta-http`, `--porta-https`                                                                                                                                          | Firewall e portas públicas                                          |
+| Saída           | `--json`, `--relatorio`, `--arquivo-log`, `--sem-cor`, `--silencioso`, `--verboso`                                                                                                                    | Formato, relatório, log e verbosidade                               |
+| Execução        | `--nao-interativo`, `--sim`, `--forcar`, `--retomar`, `--desde-etapa`, `--tempo-limite`, `--config`, `--salvar-config [arquivo]`                                                                      | Confirmação, retomada, tempo e configuração                         |
+| Teste           | `--autoteste`, `--nao-iniciar`, `--pular-saude`, `--modo-teste`                                                                                                                                       | Validação isolada e execução sem subir a pilha                      |
+| Canal e risco   | `--permitir-instavel`, `--permitir-downgrade`, `--permitir-migracoes`                                                                                                                                 | Uso consciente de `main`, descida e migração                        |
+| Pacotes         | `--forcar-pacotes`                                                                                                                                                                                    | Reinstalação explícita de pacote                                    |
+| Restauração     | `--do-remoto`, `--arquivo`                                                                                                                                                                            | Origem do dump                                                      |
+| Desinstalação   | `--remover-dados`                                                                                                                                                                                     | Remoção irreversível de dados                                       |
+| Compatibilidade | `--planejar`, `--aplicar`, `--simular`, `--sem-firewall`                                                                                                                                              | Subcomando alternativo, simulação e firewall desligado              |
 
-Valores aceitos: `--perfil` aceita `simples`, `controlador`, `dropbox` ou `completo`; `--canal` aceita `release` ou `main`; `--proxy` aceita `caddy` ou `nginx`; `--tls` aceita `acme` ou `interno`; `--agendador` aceita `auto`, `systemd` ou `cron`; `--modo-backup` aceita `compose` ou `url`; `--criptografia` aceita `gpg` ou `age`; `--firewall` aceita `auto`, `sim` ou `nao`, com padrão `nao`. O `--sem-firewall` equivale a `--firewall nao`. O `--dominio` é obrigatório nos dois modos de TLS e o `--email-acme` é obrigatório no modo `acme`. O `--pular-contas` deixa a criação das contas para o operador. O `--seed` cria massa sintética e não deve ser usado em produção. O `--acme-staging` usa a autoridade de teste.
+Valores aceitos: `--perfil` aceita `simples`, `controlador`, `dropbox` ou `completo`; `--canal` aceita `release` ou `main`; `--proxy` aceita `caddy` ou `nginx`; `--tls` aceita `acme` ou `interno`; `--agendador` aceita `auto`, `systemd` ou `cron`; `--modo-backup` aceita `compose` ou `url`; `--criptografia` aceita `gpg` ou `age`; `--firewall` aceita `auto`, `sim` ou `nao`, com padrão `nao`. O `--sem-firewall` equivale a `--firewall nao`. O `--dominio` é obrigatório nos dois modos de TLS e o `--email-acme` é obrigatório no modo `acme`. O `--pular-contas` deixa a criação das contas para o operador. O `--seed` cria massa sintética e não deve ser usado em produção. O `--acme-staging` usa a autoridade de teste. O `--operador-controlador` é obrigatório nos perfis `controlador` e `completo`. As flags `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino` são obrigatórias nos perfis `dropbox` e `completo`.
 
 Padrões: perfil `simples`, canal `release`, canal de atualização `release`, proxy `caddy`, TLS `acme`, agendador `auto`, atualização agendada desabilitada, modo de backup `compose`, criptografia `gpg`, retenção de 30 dias com mínimo de 5 cópias confirmadas, firewall `nao`, fuso `America/Fortaleza`, porta SSH 22, portas HTTP e HTTPS 80 e 443. O `--canal-atualizacao main` exige `--permitir-instavel`.
 
@@ -716,6 +722,33 @@ sudo ./instalar.sh backup
 ```
 
 A tag `v1.0.0` é ilustrativa. Usar a tag estável publicada no momento da instalação. O `--seed` não entra no caminho de produção, porque cria massa sintética.
+
+### Perfis opt-in
+
+O perfil controlador exige uma conta de operação existente, sem privilégio administrativo e sem acesso ao grupo `docker`. O instalador não cria essa conta. Depois de revisar o journal, os pins e a identidade da pilha:
+
+```bash
+sudo ./instalar.sh aplicar \
+  --perfil controlador \
+  --operador-controlador conta-de-operacao \
+  --config /root/instalador.json \
+  --sim
+```
+
+O perfil Dropbox exige a adoção privada, o token do cliente nativo e o `rclone.conf` com modo 600, além do destino `remoto:caminho` que coincide com a pasta adotada:
+
+```bash
+sudo ./instalar.sh aplicar \
+  --perfil dropbox \
+  --config-dropbox /etc/frequenciapp/dropbox/adocao.json \
+  --arquivo-token-dropbox /etc/frequenciapp/dropbox/token.json \
+  --config-rclone /etc/frequenciapp/dropbox/rclone.conf \
+  --destino dropbox:frequenciapp/banco \
+  --config /root/instalador.json \
+  --sim
+```
+
+O perfil completo usa as duas configurações no mesmo comando. A etapa Dropbox roda antes do primeiro backup, e a etapa controlador roda depois do firewall. Em uma readoção, o prefixo e o cron anteriores são arquivados com o sufixo `.anterior-<data>` antes da nova confirmação.
 
 ### Rocky Linux 9
 

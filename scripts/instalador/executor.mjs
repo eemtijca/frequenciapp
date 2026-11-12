@@ -47,10 +47,12 @@ import * as saude from "./passos/saude.mjs";
 import * as backupInicial from "./passos/backup-inicial.mjs";
 import * as agendador from "./passos/agendador.mjs";
 import * as firewall from "./passos/firewall.mjs";
+import * as dropbox from "./passos/dropbox.mjs";
+import * as controlador from "./passos/controlador.mjs";
 
 const RAIZ_INSTALADOR = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 
-export const MODULOS = [
+const MODULOS_BASE = [
   preflight,
   pacotes,
   docker,
@@ -69,7 +71,31 @@ export const MODULOS = [
   firewall,
 ];
 
-export const ORDEM_ETAPAS = MODULOS.map((modulo) => modulo.id);
+const PERFIS_DROPBOX = new Set(["dropbox", "completo"]);
+const PERFIS_CONTROLADOR = new Set(["controlador", "completo"]);
+
+// Ordem visível no contrato: inclui todas as etapas de todos os perfis.
+const MODULOS_ORDEM = [
+  ...MODULOS_BASE.slice(0, MODULOS_BASE.indexOf(backupInicial)),
+  dropbox,
+  ...MODULOS_BASE.slice(MODULOS_BASE.indexOf(backupInicial)),
+  controlador,
+];
+
+export const ORDEM_ETAPAS = MODULOS_ORDEM.map((modulo) => modulo.id);
+
+export function ordemEtapasPara(perfil) {
+  const modulos = [];
+  for (const modulo of MODULOS_BASE) {
+    if (modulo === backupInicial && PERFIS_DROPBOX.has(perfil)) modulos.push(dropbox);
+    modulos.push(modulo);
+  }
+  if (PERFIS_CONTROLADOR.has(perfil)) modulos.push(controlador);
+  return modulos.map((modulo) => modulo.id);
+}
+
+export const MODULOS = [...MODULOS_BASE, dropbox, controlador];
+
 const ETAPAS_CONHECIDAS = new Set(ORDEM_ETAPAS);
 const MODULOS_POR_ID = new Map(MODULOS.map((modulo) => [modulo.id, modulo]));
 
@@ -334,16 +360,19 @@ function validarAutoteste(configuracao, deteccao, estadoResultado, opcoes) {
 }
 
 function montarSimulacao(ctx, configuracao) {
-  const etapas = MODULOS.map((modulo) => ({
-    id: modulo.id,
-    estado: "pendente",
-    inicio: null,
-    fim: null,
-    codigo: null,
-    acoes: [criarAcao(modulo.titulo, null, modulo.id !== "preflight")],
-    avisos: [],
-    detalhes: { limiteSegundos: modulo.limiteSegundos },
-  }));
+  const etapas = ctx.ordemEtapas
+    .map((id) => MODULOS_POR_ID.get(id))
+    .filter(Boolean)
+    .map((modulo) => ({
+      id: modulo.id,
+      estado: "pendente",
+      inicio: null,
+      fim: null,
+      codigo: null,
+      acoes: [criarAcao(modulo.titulo, null, modulo.id !== "preflight")],
+      avisos: [],
+      detalhes: { limiteSegundos: modulo.limiteSegundos },
+    }));
   return montarDocumento({
     comando: "aplicar",
     configuracao,
@@ -363,23 +392,45 @@ function etapaAnteriorValida(estado, id) {
 }
 
 function artefatoAnteriorAusente(ctx, idEtapa) {
-  const indice = ORDEM_ETAPAS.indexOf(idEtapa);
-  if (indice >= ORDEM_ETAPAS.indexOf("diretorios") && !fs.existsSync(ctx.caminhos.configDir)) {
+  const indice = ctx.ordemEtapas.indexOf(idEtapa);
+  if (indice >= ctx.ordemEtapas.indexOf("diretorios") && !fs.existsSync(ctx.caminhos.configDir)) {
     return "diretório de configuração";
   }
   if (
-    indice >= ORDEM_ETAPAS.indexOf("fonte") &&
+    indice >= ctx.ordemEtapas.indexOf("fonte") &&
     !fs.existsSync(path.join(ctx.caminhos.appDir, "compose.yml"))
   ) {
     return "checkout da aplicação";
   }
   if (
-    indice >= ORDEM_ETAPAS.indexOf("ambiente") &&
+    indice >= ctx.ordemEtapas.indexOf("ambiente") &&
     (!fs.existsSync(ctx.caminhos.appEnv) || !fs.existsSync(ctx.caminhos.opsEnv))
   ) {
     return "arquivos de ambiente";
   }
+  if (
+    ctx.ordemEtapas.includes(dropbox.id) &&
+    indice >= ctx.ordemEtapas.indexOf(dropbox.id) &&
+    !textoContemChave(ctx.caminhos.opsEnv, "BACKUP_DROPBOX_CONFIG")
+  ) {
+    return "configuração Dropbox no ops.env";
+  }
+  if (
+    ctx.ordemEtapas.includes(controlador.id) &&
+    indice >= ctx.ordemEtapas.indexOf(controlador.id) &&
+    !fs.existsSync(ctx.caminhos.controladorPerfil)
+  ) {
+    return "perfil do controlador";
+  }
   return null;
+}
+
+function textoContemChave(caminho, chave) {
+  try {
+    return new RegExp(`^${chave}=`, "m").test(fs.readFileSync(caminho, "utf8"));
+  } catch {
+    return false;
+  }
 }
 
 function prepararContexto(deps, configuracao, deteccao, auditoria, estadoResultado, opcoes, raiz) {
@@ -412,7 +463,7 @@ function prepararContexto(deps, configuracao, deteccao, auditoria, estadoResulta
     uid: (deps.uid ?? (() => (typeof process.getuid === "function" ? process.getuid() : 0)))(),
     usuarioServico: deps.usuarioServico ?? USUARIO_PADRAO,
     etapasConhecidas: ETAPAS_CONHECIDAS,
-    ordemEtapas: ORDEM_ETAPAS,
+    ordemEtapas: ordemEtapasPara(configuracao.perfil),
     etapaSelecionada: null,
     executar: deps.executar ?? executarPadrao,
     comandoExiste:
@@ -519,6 +570,16 @@ function executarEtapaSelecionada(ctx, deps, modulo) {
   etapa.avisos = Array.isArray(resultado.avisos) ? resultado.avisos : [];
   etapa.detalhes =
     resultado.detalhes && typeof resultado.detalhes === "object" ? resultado.detalhes : {};
+  if (modulo.id === controlador.id && etapa.detalhes.adotado === true) {
+    ctx.estado.controlador = {
+      adotado: true,
+      migradorSha256: etapa.detalhes.migradorSha256 ?? null,
+      readocaoPendente: false,
+    };
+    if (typeof etapa.detalhes.migradorSha256 === "string") {
+      ctx.migradorSha256 = etapa.detalhes.migradorSha256;
+    }
+  }
   registrarEtapa(ctx.estado, etapa);
   gravarEstadoAtual(ctx, deps);
   ctx.registrarLog(
@@ -528,10 +589,10 @@ function executarEtapaSelecionada(ctx, deps, modulo) {
 }
 
 function selecionarInicio(ctx) {
-  if (ctx.desdeEtapa) return ORDEM_ETAPAS.indexOf(ctx.desdeEtapa);
+  if (ctx.desdeEtapa) return ctx.ordemEtapas.indexOf(ctx.desdeEtapa);
   if (ctx.retomar && ctx.estado) {
-    const indice = ORDEM_ETAPAS.findIndex((id) => !etapaAnteriorValida(ctx.estado, id));
-    if (indice === -1) return ORDEM_ETAPAS.length;
+    const indice = ctx.ordemEtapas.findIndex((id) => !etapaAnteriorValida(ctx.estado, id));
+    if (indice === -1) return ctx.ordemEtapas.length;
     return indice;
   }
   return 0;
@@ -640,7 +701,7 @@ export function executarAplicacao(opcoes, deps, dados) {
       ctx.registrarLog(`etapa=preflight estado=${etapaPreflight.estado}`);
       inicio = 1;
     }
-    if (inicio >= ORDEM_ETAPAS.length) {
+    if (inicio >= ctx.ordemEtapas.length) {
       const documento = documentoAplicacao(
         ctx,
         ctx.estado,
@@ -656,8 +717,8 @@ export function executarAplicacao(opcoes, deps, dados) {
       );
       return documento;
     }
-    for (let indice = 0; indice < ORDEM_ETAPAS.length; indice += 1) {
-      const idEtapa = ORDEM_ETAPAS[indice];
+    for (let indice = 0; indice < ctx.ordemEtapas.length; indice += 1) {
+      const idEtapa = ctx.ordemEtapas[indice];
       const modulo = MODULOS_POR_ID.get(idEtapa);
       if (indice < inicio) {
         if (!etapaAnteriorValida(ctx.estado, idEtapa)) {

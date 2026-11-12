@@ -54,6 +54,10 @@ Substituir `conta-de-operacao` pela conta existente. O campo `--fonte` aponta pa
 
 O plano imprime um JSON com prefixo, aplicação, operador, alvo da identidade, quantidade de arquivos do snapshot e a indicação de que cron e `sudo` não serão instalados. Depois da revisão, repetir o comando com `--confirmar`.
 
+O instalador pode executar a mesma adoção com `sudo ./instalar.sh aplicar --perfil controlador --operador-controlador conta-de-operacao --sim`. Ele valida a conta, adota o snapshot, confere o hash do migrador e instala as rotinas estáveis em cron. A etapa `agendador` é pulada nesse perfil.
+
+Depois de uma troca de canal que mude o `migradorSha256`, a readoção usa `sudo ./instalar.sh aplicar --retomar --sim`. O instalador arquiva o prefixo e o cron anteriores com o sufixo `.anterior-<data>` e confirma a nova adoção. O journal e os pins antigos permanecem no diretório arquivado para revisão.
+
 O instalador grava:
 
 | Caminho                                                 | Papel                                                                                           |

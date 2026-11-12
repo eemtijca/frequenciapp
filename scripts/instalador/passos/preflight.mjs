@@ -67,11 +67,34 @@ export function executar(ctx) {
   const acoes = [];
   const avisos = [...(estadoResultado.avisos ?? [])];
 
-  if (configuracao.perfil !== "simples") {
-    throw erroUso("O perfil informado ainda não é aplicado por esta versão do instalador.", {
-      dica: "Use --perfil simples nesta etapa.",
+  if (!["simples", "controlador", "dropbox", "completo"].includes(configuracao.perfil)) {
+    throw erroUso("O perfil informado não é reconhecido.", {
+      dica: "Use simples, controlador, dropbox ou completo.",
       documentacao: "docs/instalador.md#perfis",
     });
+  }
+  const comControlador = ["controlador", "completo"].includes(configuracao.perfil);
+  const comDropbox = ["dropbox", "completo"].includes(configuracao.perfil);
+  if (comControlador && !configuracao.operadorControlador) {
+    throw erroUso("O perfil com controlador exige uma conta de operação.", {
+      dica: "Informe --operador-controlador com uma conta sem privilégio administrativo.",
+      documentacao: "docs/controlador-manutencao.md#pré-requisitos",
+    });
+  }
+  if (comDropbox) {
+    for (const [campo, flag] of [
+      [configuracao.configDropbox, "--config-dropbox"],
+      [configuracao.arquivoTokenDropbox, "--arquivo-token-dropbox"],
+      [configuracao.configRclone, "--config-rclone"],
+      [configuracao.destino, "--destino"],
+    ]) {
+      if (!campo) {
+        throw erroUso("O perfil Dropbox exige a configuração completa.", {
+          dica: `Informe ${flag} junto das demais flags do perfil Dropbox.`,
+          documentacao: "docs/dropbox-retencao.md#adoção",
+        });
+      }
+    }
   }
   if (ctx.modoTeste && ctx.raiz === "/") {
     throw erroUso("O modo de teste exige um diretório de raiz isolado.", {
@@ -194,9 +217,9 @@ export function executar(ctx) {
       documentacao: "docs/instalador.md#estado-durável",
     });
   }
-  if (ctx.desdeEtapa && !ctx.etapasConhecidas.has(ctx.desdeEtapa)) {
-    throw erroUso(`A etapa ${ctx.desdeEtapa} não existe no aplicar.`, {
-      dica: "Use uma etapa da ordem do contrato.",
+  if (ctx.desdeEtapa && !ctx.ordemEtapas.includes(ctx.desdeEtapa)) {
+    throw erroUso(`A etapa ${ctx.desdeEtapa} não existe no perfil ${configuracao.perfil}.`, {
+      dica: "Use uma etapa da ordem do perfil escolhido.",
       documentacao: "docs/instalador.md#aplicar",
     });
   }

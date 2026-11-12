@@ -14,6 +14,8 @@ O cliente nativo não tem rota de upload. As rotas fixas são limitadas a token,
 
 O perfil Dropbox não altera o backup das planilhas. As planilhas continuam no caminho rclone atual, com origem, destino e retenção próprios.
 
+O instalador executa a adoção com `sudo ./instalar.sh aplicar --perfil dropbox --config-dropbox <adocao> --arquivo-token-dropbox <token> --config-rclone <rclone> --destino <remoto> --sim`. A etapa `dropbox` roda antes do primeiro backup, valida a adoção e o hash do `rclone.conf`, grava `BACKUP_DROPBOX_CONFIG`, `BACKUP_RCLONE_CONFIG`, `BACKUP_REMOTO` e `BACKUP_RETER_REMOTO` no `ops.env` com modo 600 e mantém as planilhas no rclone. O primeiro backup continua sendo feito por `backup-banco.sh`, com upload rclone e verificação nativa.
+
 ## Banco no Dropbox e planilhas no rclone
 
 | Conteúdo  | Transporte de envio | Variáveis principais                                             | Retenção                                                   |
