@@ -4,7 +4,7 @@ Rotina de backup do banco e das planilhas em servidor auto-hospedado ou Kubernet
 
 O banco é a fonte de verdade do aplicativo. As planilhas contêm fórmulas e edições manuais que não existem no banco. A cópia JSON da Gestão serve para migração e conferência, mas não substitui o `pg_dump`.
 
-A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalação do servidor está em [auto-hospedagem.md](auto-hospedagem.md).
+A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalação do servidor está em [auto-hospedagem.md](auto-hospedagem.md). O perfil Dropbox opt-in, com token, pasta exclusiva, autoridade e journal próprios, está em [dropbox-retencao.md](dropbox-retencao.md).
 
 ## Proteções
 
@@ -13,6 +13,8 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 - A cópia remota é conferida por download e comparação com o hash local original.
 - O envio usa `rclone copy --immutable`, sem espelhar exclusões.
 - O destino remoto não tem expurgo automático, salvo `BACKUP_RETER_REMOTO=true`.
+- O perfil Dropbox é opt-in. Sem `BACKUP_DROPBOX_CONFIG`, o caminho rclone continua sendo o padrão; com a adoção, o upload continua por rclone e o cliente nativo só verifica, lista, baixa e exclui de forma condicional.
+- O backup das planilhas permanece no caminho rclone atual e não compartilha a pasta do banco.
 - A retenção local preserva um mínimo configurável de cópias confirmadas, com padrão de cinco.
 - Falhas de geração ou transporte não publicam recibo. Falha de expurgo pode ocorrer após a confirmação do novo conjunto e retorna erro sem anunciar limpeza completa.
 - Nenhum teste usa dados reais.
@@ -137,6 +139,22 @@ Regras:
 - Não colocar o arquivo no Git.
 - O diretório remoto do banco e o das planilhas são diferentes.
 
+### Dropbox opt-in
+
+O perfil Dropbox é opcional e não substitui o rclone. A variável `BACKUP_DROPBOX_CONFIG` aponta para um arquivo de adoção privado. Quando ela não existe ou está vazia, o caminho rclone acima continua sendo usado sem erro.
+
+Com a adoção:
+
+- o upload do banco continua em `rclone copy --immutable --checksum`;
+- o cliente nativo do provedor faz apenas identidade de conta e pasta, listagem, download de conferência e exclusão condicional;
+- não existe upload nativo;
+- `BACKUP_REMOTO` e o destino Dropbox precisam apontar para a mesma pasta, e o remote rclone precisa ser do tipo `dropbox`, com o mesmo namespace da adoção;
+- `BACKUP_RETER_REMOTO=true` é necessário para qualquer exclusão remota;
+- a retenção usa o journal separado em `ESTADO_DIR/expurgos/dropbox` e falha de forma fechada quando o marcador de upload, a autoridade ou o journal estão incertos;
+- as planilhas continuam no rclone, com `BACKUP_ORIGEM` e `BACKUP_DESTINO` próprios, e nunca usam a pasta do banco.
+
+O contrato completo do token, do arquivo de adoção, da autoridade e da retenção está em [dropbox-retencao.md](dropbox-retencao.md). O modo `url` e o backup do Kubernetes não usam o perfil Dropbox; eles continuam com rclone, PVC ou o transporte definido pela instalação.
+
 ## Variáveis do backup
 
 | Variável                           | Padrão                                | Uso                                |
@@ -157,6 +175,7 @@ Regras:
 | `BACKUP_GPG_CHAVE_PUBLICA`         | vazio                                 | Chave pública GPG                  |
 | `BACKUP_AGE_DESTINATARIOS`         | vazio                                 | Arquivo de destinatários age       |
 | `BACKUP_REMOTO`                    | vazio                                 | Destino rclone do banco            |
+| `BACKUP_DROPBOX_CONFIG`            | vazio                                 | Adoção Dropbox opt-in              |
 | `BACKUP_RCLONE_CONFIG`             | vazio                                 | Configuração do rclone             |
 | `RCLONE_CONFIG_PASS`               | vazio                                 | Senha da configuração do rclone    |
 | `BACKUP_VERIFICAR_REMOTO`          | `true`                                | Confere o arquivo remoto           |
@@ -241,6 +260,26 @@ Falha parcial retorna erro e preserva catálogo, registro e membros restantes. A
 O expurgo local mantém o comportamento conservador anterior: erro interrompe a operação e preserva o recibo restante; este registro de retomada não cobre falhas locais. O leitor CLI `recibos.mjs` continua recusando um catálogo remoto inconsistente quando usado isoladamente; a reconciliação dos expurgos próprios pertence ao consumidor remoto acima, sem baixar ou reconstruir recibos do provedor.
 
 ## Restauração
+
+### Download remoto
+
+Antes de restaurar, o conjunto remoto precisa ser baixado e conferido. O acesso remoto do helper usa apenas rclone, então funciona com qualquer destino, inclusive o Dropbox adotado, e não depende do cliente nativo nem de `BACKUP_DROPBOX_CONFIG`.
+
+Baixar e conferir sem restaurar:
+
+```bash
+scripts/servidor/baixar-backup.sh --destino /var/backups/frequenciapp/restauracao
+```
+
+Baixar, conferir e encaminhar o dump para `restaurar.sh`:
+
+```bash
+scripts/servidor/baixar-backup.sh --destino /var/backups/frequenciapp/restauracao --restaurar
+```
+
+O helper lê `ultimo-backup.json`, recusa destino divergente do estado, baixa o recibo e os artefatos para um estágio privado, confere o recibo, os nomes, os hashes e os checksums e só então move o conjunto para `--destino` ou imprime o caminho do estágio. Com `--restaurar`, encaminha `--arquivo`, `--checksum` e `--confirmar` para `restaurar.sh` e repassa as opções seguintes, como `--sem-copia`.
+
+Sem `--destino`, o estágio é mantido após o sucesso e o caminho é impresso. Em falha, o estágio é removido para não ser confundido com um backup válido. O download exige `BACKUP_REMOTO`, `BACKUP_RCLONE_CONFIG` e o estado local; o procedimento completo está em [dropbox-retencao.md](dropbox-retencao.md).
 
 ### Compose
 
@@ -340,6 +379,7 @@ O inventário deve listar:
 
 - chave GPG ou age do dump;
 - chave `BACKUP_CHAVE` do ZIP das planilhas;
+- token de atualização e segredo do aplicativo Dropbox, quando o perfil opt-in estiver adotado;
 - senha `RCLONE_CONFIG_PASS`, quando usada;
 - `AUTH_SECRET` da aplicação;
 - credenciais da role de backup.
@@ -370,6 +410,8 @@ Regras:
 - Retenção e descarte definidos pela escola.
 - Nenhum dado real em teste automatizado.
 - O `app.env` cifrado contém `AUTH_SECRET`, credenciais Google e senha do banco.
+- O token Dropbox, o segredo do aplicativo e o `rclone.conf` são segredos de custódia equivalente à das chaves de backup.
+- O dump continua cifrado antes do upload; o provedor armazena o arquivo cifrado, mas ainda vê nomes, tamanhos e horários.
 - O backup não substitui a política de resposta a incidentes da escola.
 
 ## Testes
@@ -383,6 +425,8 @@ Regras:
 - Falha de dump, cifra, upload, verificação, checksum e permissões.
 - Detecção de arquivo e checksum remotos adulterados.
 - Retenção mínima de cinco cópias e preservação após falha.
+- Retenção Dropbox opt-in com servidor TLS local e token sintético, incluindo identidade, autoridade, journal, exclusão condicional, limite, timeout e estado incerto.
+- Fallback rclone sem `BACKUP_DROPBOX_CONFIG`, destino divergente e download remoto com rclone falso encaminhado para `restaurar.sh`.
 - Fluxo URL separado do Compose.
 - Limpeza de temporários.
 - Verificação de permissões e ausência de segredos em log.
@@ -409,6 +453,18 @@ Os comandos estão em `tests/servidor/README.md`. O fluxo `Servidor` do GitHub A
 - Conferir `RCLONE_CONFIG_PASS`.
 - Testar com `rclone lsd destino:`.
 
+### Retenção Dropbox suspensa
+
+- Conferir o marcador `${authorityLock}.upload.json` e restos `.tmp` de upload. Preservar o marcador até o conjunto ser conferido por `baixar-backup.sh`.
+- Conferir o journal em `ESTADO_DIR/expurgos/dropbox`. Journal incompleto, `pendente` com objeto ausente ou `.tmp` no diretório suspendem a retenção; não editar o journal à mão.
+- Conferir modo 600 dos arquivos e 700 dos diretórios do token, da adoção, do `rclone.conf` e das travas.
+- Conferir `accountId`, `namespaceId`, `folderId`, `folderPath` e o estado somente leitura da pasta.
+- Conferir o hash `rcloneConfigSha256` e o mapeamento da seção `dropbox` no `rclone.conf`.
+- Conferir se `SERVIDOR_LOCK_HERDADO` e `targetLock` apontam para a mesma trava e se outra operação mantém o `flock`.
+- Não imprimir token, segredo do aplicativo ou o `rclone.conf` integral no diagnóstico.
+
+O procedimento detalhado está em [dropbox-retencao.md](dropbox-retencao.md).
+
 ### Restauração falha
 
 - Conferir checksum.
@@ -429,3 +485,5 @@ O chart aceita duas formas de durabilidade para o backup do banco:
 Com PVC, o chart define `BACKUP_CATALOGO_PERSISTENTE=true` e `BACKUP_EXIGIR_REMOTO=false`. Sem PVC, define `BACKUP_EXIGIR_REMOTO=true`; a rotina então recusa `BACKUP_REMOTO` vazio e exige `BACKUP_VERIFICAR_REMOTO=true`. A declaração do chart não comprova transporte nem recuperação: a prova vem do upload, da comparação do hash e do recibo gravado pela rotina.
 
 O gate de upgrade lê o recibo no PVC do banco. Uma instalação somente remota, sem PVC, não tem onde gravar esse recibo e o gate falha por padrão; para manter upgrade protegido, use o PVC do banco mesmo quando o destino remoto estiver habilitado. O modo `backupGate.ensaioSemProtecao=true` continua sendo a única exceção explícita e não oferece proteção.
+
+O perfil Dropbox opt-in exige `BACKUP_MODO=compose` e não se aplica ao modo `url` nem ao backup do Kubernetes. Nessas instalações, o banco continua com o transporte rclone, o PVC ou o banco externo definidos pela plataforma.
