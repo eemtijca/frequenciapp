@@ -20,6 +20,44 @@ function erroControlador(mensagem, dica) {
   return falha("E_CONTROLADOR", mensagem, { dica, documentacao: DOCUMENTACAO });
 }
 
+function arquivarCaminho(ctx, caminho, rotulo, acoes) {
+  if (typeof caminho !== "string" || !caminho) return false;
+  let informacao;
+  try {
+    informacao = fs.lstatSync(caminho);
+  } catch (erro) {
+    if (erro?.code === "ENOENT") return false;
+    throw erroControlador(
+      `Não foi possível consultar ${rotulo} anterior.`,
+      "Confira a permissão do caminho e repita a adoção.",
+    );
+  }
+  if (informacao.isSymbolicLink()) {
+    throw erroControlador(
+      `${rotulo} anterior não pode ser um link simbólico.`,
+      "Remova o link e repita a adoção em um caminho regular.",
+    );
+  }
+  const sufixo = String(ctx.agora()).replace(/\D/g, "").slice(0, 14) || String(Date.now());
+  let destino = `${caminho}.anterior-${sufixo}`;
+  let tentativa = 1;
+  while (fs.existsSync(destino)) {
+    destino = `${caminho}.anterior-${sufixo}-${tentativa}`;
+    tentativa += 1;
+  }
+  try {
+    fs.renameSync(caminho, destino);
+  } catch {
+    throw erroControlador(
+      `Não foi possível arquivar ${rotulo} anterior.`,
+      "Preserve o diretório e repita a adoção depois de revisar as permissões.",
+    );
+  }
+  acoes.push(acao(`Arquiva ${rotulo} anterior em ${path.basename(destino)}`, null, true));
+  registrar(ctx, `etapa=controlador arquivado=${rotulo}`);
+  return true;
+}
+
 function consultarPerfil(caminho) {
   try {
     const informacao = fs.lstatSync(caminho);
@@ -223,6 +261,20 @@ export function executar(ctx) {
     };
   }
 
+  const acoes = [];
+  const readocao = estadoControlador?.readocaoPendente === true;
+  if (perfil.existe && !readocao) {
+    throw erroControlador(
+      "O prefixo do controlador já existe e não está marcado para readoção.",
+      "Arquive o prefixo parcial e repita a adoção em um caminho limpo.",
+    );
+  }
+  if (readocao) {
+    arquivarCaminho(ctx, ctx.caminhos.controladorPrefixo, "prefixo do controlador", acoes);
+    arquivarCaminho(ctx, ctx.caminhos.cronFrequenciapp, "cron do controlador", acoes);
+    acoes.push(acao("Readota o controlador após a troca de canal", null, true));
+  }
+
   const operador = String(ctx.configuracao.operadorControlador ?? "").trim();
   if (!operador) {
     throw erroControlador(
@@ -231,7 +283,6 @@ export function executar(ctx) {
     );
   }
 
-  const acoes = [];
   registrar(ctx, "etapa=controlador fase=controlador-plano");
   executarComando(ctx, argumentosControlador(ctx, operador, "--plano"), {
     timeout: TIMEOUT_ADOCAO_MS,

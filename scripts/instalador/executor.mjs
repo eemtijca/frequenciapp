@@ -360,16 +360,19 @@ function validarAutoteste(configuracao, deteccao, estadoResultado, opcoes) {
 }
 
 function montarSimulacao(ctx, configuracao) {
-  const etapas = MODULOS.map((modulo) => ({
-    id: modulo.id,
-    estado: "pendente",
-    inicio: null,
-    fim: null,
-    codigo: null,
-    acoes: [criarAcao(modulo.titulo, null, modulo.id !== "preflight")],
-    avisos: [],
-    detalhes: { limiteSegundos: modulo.limiteSegundos },
-  }));
+  const etapas = ctx.ordemEtapas
+    .map((id) => MODULOS_POR_ID.get(id))
+    .filter(Boolean)
+    .map((modulo) => ({
+      id: modulo.id,
+      estado: "pendente",
+      inicio: null,
+      fim: null,
+      codigo: null,
+      acoes: [criarAcao(modulo.titulo, null, modulo.id !== "preflight")],
+      avisos: [],
+      detalhes: { limiteSegundos: modulo.limiteSegundos },
+    }));
   return montarDocumento({
     comando: "aplicar",
     configuracao,
