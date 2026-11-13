@@ -277,7 +277,7 @@ Os seletores aceitam apenas `true` ou `false`; ausência conserva `true` e qualq
 
 O VPS Ubuntu 26.04 LTS é o único destino de produção. A Vercel fica como ambiente de preview ou desligada, sem deploy automático da `main`. Manter os dois caminhos ativos cria dois bancos, duas agendas e duas origens de dados para o mesmo domínio, com divergência crescente de schema e de dados.
 
-O instalador não autentica no GitHub nem na Vercel, não define variáveis de repositório e não altera o projeto da Vercel. O corte é executado pelo operador, conferido item a item e registrado no [roteiro do ensaio em VPS](ensaio-implantacao-vps.md).
+O instalador não autentica no GitHub nem na Vercel, não define variáveis de repositório e não altera o projeto da Vercel. O corte é executado pelo operador, conferido item a item e registrado conforme o checklist deste guia.
 
 ### Variáveis do repositório
 
