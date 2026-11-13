@@ -1,7 +1,9 @@
 # Ferramentas do executor: Node fixo com Docker CLI, Buildx e Compose.
 # Uso exclusivo em testes descartáveis; não é imagem de produção.
 
-FROM node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
+
+RUN npm install --global corepack@0.36.0 && corepack enable
 
 ARG DOCKER_VERSION=27.5.1
 ARG DOCKER_SHA256=4f798b3ee1e0140eab5bf30b0edc4e84f4cdb53255a429dc3bbae9524845d640

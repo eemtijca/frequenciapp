@@ -1,7 +1,7 @@
 // Configuração automática de Web Push: chaves estáveis por instalação,
 // compatibilidade com pares explícitos e validação sem envio externo.
 import { createECDH, randomBytes } from "node:crypto";
-import webpush from "web-push";
+import * as webpush from "web-push";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const SEGREDO = "segredo-sintetico-da-instalacao-com-32-caracteres";

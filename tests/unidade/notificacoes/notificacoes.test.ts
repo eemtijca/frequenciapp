@@ -3,7 +3,12 @@
 import { createECDH, randomBytes } from "node:crypto";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { endpointPushValido, mensagemDoResumo, MENSAGEM_TESTE } from "@/domain/notificacoes";
-import webpush from "web-push";
+import * as webpush from "web-push";
+
+vi.mock("web-push", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("web-push")>()),
+  sendNotification: vi.fn(),
+}));
 
 beforeAll(() => {
   const chaves = webpush.generateVAPIDKeys();
@@ -15,7 +20,7 @@ beforeAll(() => {
   vi.stubEnv("CRON_SECRET", "segredo-ficticio-da-agenda-para-testes-0000");
 });
 beforeEach(() => {
-  vi.restoreAllMocks();
+  vi.mocked(webpush.sendNotification).mockReset();
 });
 
 describe("destinos e conteúdo de push", () => {
@@ -67,7 +72,7 @@ describe("transporte de push", () => {
   };
   it("assina o envio, limita a conexão e a validade", async () => {
     const enviar = vi
-      .spyOn(webpush, "sendNotification")
+      .mocked(webpush.sendNotification)
       .mockResolvedValue({ statusCode: 201, headers: {}, body: "" });
     const { enviarPush } = await import("@/infra/web-push");
     expect(await enviarPush(assinatura, MENSAGEM_TESTE)).toBe("enviada");
@@ -91,7 +96,7 @@ describe("transporte de push", () => {
         auth: randomBytes(16).toString("base64url"),
       },
     };
-    vi.spyOn(webpush, "sendNotification").mockImplementation(async (alvo, conteudo, opcoes) => {
+    vi.mocked(webpush.sendNotification).mockImplementation(async (alvo, conteudo, opcoes) => {
       if (conteudo === undefined || conteudo === null)
         throw new Error("O aviso precisa ter conteúdo.");
       const requisicao = webpush.generateRequestDetails(alvo, conteudo, opcoes);
@@ -105,7 +110,7 @@ describe("transporte de push", () => {
     expect(await enviarPush(dispositivo, MENSAGEM_TESTE)).toBe("enviada");
   });
   it("descarta 404 e 410, mas permite repetir uma falha temporária", async () => {
-    const enviar = vi.spyOn(webpush, "sendNotification");
+    const enviar = vi.mocked(webpush.sendNotification);
     const { enviarPush } = await import("@/infra/web-push");
     for (const status of [404, 410]) {
       enviar.mockRejectedValueOnce(
@@ -119,7 +124,7 @@ describe("transporte de push", () => {
     expect(await enviarPush(assinatura, MENSAGEM_TESTE)).toBe("enviada");
   });
   it("não tenta enviar para endereço fora da lista permitida", async () => {
-    const enviar = vi.spyOn(webpush, "sendNotification");
+    const enviar = vi.mocked(webpush.sendNotification);
     const { enviarPush } = await import("@/infra/web-push");
     expect(
       await enviarPush({ ...assinatura, endpoint: "https://localhost/segredo" }, MENSAGEM_TESTE),

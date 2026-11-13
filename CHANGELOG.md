@@ -14,7 +14,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A simulação da atualização deixa de buscar referências e não altera refs ou tags; usa as refs locais e orienta a buscar manualmente para considerar o remoto.
 
-- As ferramentas do build passam a usar Node 24 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. O `esbuild` é autorizado no `allowBuilds`.
+- As ferramentas do build e do CI passam a usar Node 26 e referências fixadas por SHA ou digest, com inventário e scanner que recusam referências móveis. A imagem instala Corepack em versão explícita para habilitar o pnpm, pois Node 26 não o inclui. O bootstrap independente do instalador mantém Node 24. O `esbuild` é autorizado no `allowBuilds`.
+- As atualizações pendentes do Dependabot são consolidadas em um único lockfile, incluindo Next.js, Playwright, Tailwind CSS, Lucide, Motion, dotenv, resolvers de formulário, TypeScript e ferramentas de documentação. As actions e imagens são conciliadas com o inventário, e a imagem Playwright acompanha a versão do pacote de testes.
 
 - A agenda permite selecionar notificações, planilhas e indicadores de forma independente, com timeout validado em cada chamada. O chart Helm recusa backup do banco em `emptyDir` sem destino remoto explícito e exige PVC quando a cópia local está habilitada.
 - A publicação passa a conciliar versão, tag, commit, ancestralidade na `main` e `package.json` antes do registry, e o canal `latest` só avança. `implantacao.yml` centraliza a sequência de produção, `migracoes.yml` delega a mesma ordem e a trava impede migração e implantação simultâneas. A decisão está na [ADR-072](docs/adr/072-publicacao-e-implantacao-coordenadas.md).
@@ -98,6 +99,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- A integração de notificações usa os exports ESM do web-push 4, preserva a derivação das chaves VAPID e mantém a criptografia real nos testes. O exemplo do campo de entrada usa tamanho próprio no placeholder, preservando a fonte de 16 px do texto digitado e a área de toque de 48 px. A alteração acomoda a medição de largura do Chromium novo sem reduzir os requisitos da regressão.
 - O instalador preserva controles de agenda desativados, oferece escolhas explícitas para cada rotina e não vincula o backup de planilhas ao destino remoto do banco. O plano legível e o JSON mostram os seletores efetivos, e a validação recusa valores inválidos ou duplicados antes de alterar o ambiente. A reconfiguração do controlador preserva a trava física, persiste as escolhas e admite retomada comprovada. Valores citados não gerenciados são preservados e os horários cron gerados recebem aspas. As consultas Compose usam o snapshot ativo. A decisão está na [ADR-078](docs/adr/078-reconfiguracao-restrita-das-rotinas.md).
 
 - O fluxo da Vercel volta a publicar a `main` em cada commit e aplica a migração antes da publicação, sem o atestado de backup e recuperação da auto-hospedagem. O auto-deploy nativo da `main` fica desligado no `vercel.json`, para o workflow ser o único caminho de produção. A decisão está na [ADR-075](docs/adr/075-vercel-continuo-e-auto-hospedagem-com-backup.md).

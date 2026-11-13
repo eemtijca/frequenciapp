@@ -1,5 +1,5 @@
 # Prepara os ensaios administrativos com clientes falsos e fontes públicas de root.
-FROM node:24.22.3-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54
+FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
 RUN apt-get update && apt-get install -y --no-install-recommends git util-linux passwd \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /repo

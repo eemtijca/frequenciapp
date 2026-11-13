@@ -1,7 +1,7 @@
 // Chaves sintéticas e segredo da agenda para testes isolados. Escreve
 // somente no arquivo indicado, sem mostrar chaves privadas nos logs.
 import { appendFileSync } from "node:fs";
-import webpush from "web-push";
+import * as webpush from "web-push";
 
 const destino = process.argv[2];
 if (!destino) throw new Error("Informe o arquivo de ambiente dos testes.");

@@ -54,14 +54,27 @@ test("o script passa na análise sintática do Bash", () => {
 test("as imagens Node e Playwright estão fixas por digest", () => {
   assert.match(
     SCRIPT,
-    /mcr\.microsoft\.com\/playwright:v1\.64\.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f/,
+    /mcr\.microsoft\.com\/playwright:v1\.65\.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe/,
   );
   assert.match(
     QUALIDADE,
-    /node:24\.22\.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9/,
+    /node:26\.13\.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68/,
   );
   assert.match(QUALIDADE, /\bgit\b/);
   assert.match(QUALIDADE, /\bopenssl\b/);
+});
+
+test("o executor prepara Corepack explícito antes de usar Node 26", () => {
+  assert.match(QUALIDADE, /npm install --global corepack@0\.36\.0/);
+  const ferramentas = readFileSync(
+    path.join(RAIZ, "scripts", "dev", "img", "ferramentas.Dockerfile"),
+    "utf8",
+  );
+  assert.match(ferramentas, /npm install --global corepack@0\.36\.0/);
+  assert.match(
+    SCRIPT,
+    /rodar_suite api '[\s\S]*?npm install --global corepack@0\.36\.0\ncorepack enable/,
+  );
 });
 
 test("a sobreposição local não usa a rede do host", () => {

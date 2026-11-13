@@ -261,6 +261,14 @@ Crie migrações com `pnpm exec prisma migrate dev --name ajuste`. Nunca edite u
 
 O Prettier cuida do estilo, com `prettier-plugin-tailwindcss` para ordenar as classes, e o ESLint cobre as regras do Next e do projeto. Rode `pnpm run format` e `pnpm run lint` antes de commitar. Não desative regras sem justificativa registrada em ADR.
 
+### Atualizações de dependências e ferramentas
+
+Antes de consolidar atualizações, confira os logs de cada pull request com `gh run view --log-failed`. Um cancelamento não comprova incompatibilidade, e checks aprovados não devem ser descritos como falhas.
+
+Referências externas fixadas por SHA ou digest também aparecem em `scripts/github/ferramentas.json`. Atualize os consumidores e o inventário na mesma mudança e execute `node scripts/github/conferir-ferramentas.mjs`; não remova o scanner para aceitar uma referência nova. O CI e as imagens da aplicação usam Node 26. Como esse runtime não inclui Corepack, a imagem instala uma versão explícita antes de habilitar o pnpm definido em `packageManager`. O bootstrap do instalador é independente e mantém Node 24.
+
+Mantenha a versão da imagem Playwright igual à de `@playwright/test` e regenere um único `pnpm-lock.yaml`. Atualizações de versão principal também exigem conferir exports, tipos e consumidores reais, além de adaptar os dublês ao contrato do pacote. Os PRs substituídos só são fechados depois do merge do consolidado e da conferência de cobertura das atualizações.
+
 ### Contribuições assistidas por IA
 
 Ferramentas de IA são bem-vindas como apoio, mas a responsabilidade pela mudança é de quem envia, e a autoria dos commits é humana. Revise o resultado linha a linha, garanta que ele segue as convenções do repositório, rode as verificações locais e nunca cole segredos, credenciais ou dados reais em ferramentas externas, issues ou commits. Commits com geração relevante levam o rodapé `Assisted-by: ferramenta:modelo`, e o template de pull request tem a seção "Uso de IA". Agentes seguem o [AGENTS.md](AGENTS.md), com as mesmas obrigações de etiquetas, commits atômicos, um único pull request e ciclo de rascunho.
