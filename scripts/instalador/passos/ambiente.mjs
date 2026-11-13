@@ -40,6 +40,95 @@ function valor(mapa, chave, padrao) {
   return atual && atual.trim() ? atual : padrao;
 }
 
+export function rotinasPrevistas(ctx) {
+  const textoApp = textoExistente(ctx.caminhos.appEnv, "app.env");
+  const textoOps = textoExistente(ctx.caminhos.opsEnv, "ops.env");
+  const app = lerEnv(textoApp).mapa;
+  const ops = lerEnv(textoOps).mapa;
+  const chaves = [
+    "AGENDA_HABILITADA",
+    "AGENDA_NOTIFICACOES",
+    "AGENDA_PLANILHAS",
+    "AGENDA_INDICADORES",
+    "BACKUP_PLANILHAS_HABILITADO",
+  ];
+  for (const [rotulo, texto] of [
+    ["app.env", textoApp],
+    ["ops.env", textoOps],
+  ]) {
+    const vistas = new Set();
+    for (const linha of texto.split(/\r?\n/)) {
+      const chave = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=/.exec(linha)?.[1];
+      if (!chaves.includes(chave)) continue;
+      if (vistas.has(chave)) {
+        throw falha("E_VALIDACAO", `${chave} está duplicada em ${rotulo}.`, {
+          documentacao: "docs/instalador.md#agendador",
+        });
+      }
+      vistas.add(chave);
+    }
+  }
+  for (const [rotulo, mapa] of [
+    ["app.env", app],
+    ["ops.env", ops],
+  ]) {
+    for (const chave of chaves) {
+      if (mapa.has(chave) && !["true", "false"].includes(mapa.get(chave))) {
+        throw falha("E_VALIDACAO", `${chave} em ${rotulo} deve ser true ou false.`, {
+          documentacao: "docs/instalador.md#agendador",
+        });
+      }
+    }
+  }
+  const config = ctx.configuracao ?? {};
+  const seletor = (chave, campo, padrao = "true") =>
+    config[campo] ??
+    (app.get(chave) === "false" || ops.get(chave) === "false"
+      ? "false"
+      : (ops.get(chave) ?? app.get(chave) ?? padrao));
+  return {
+    agenda: seletor("AGENDA_HABILITADA", "agendaHabilitada") === "true",
+    notificacoes: seletor("AGENDA_NOTIFICACOES", "agendaNotificacoes") === "true",
+    planilhas: seletor("AGENDA_PLANILHAS", "agendaPlanilhas") === "true",
+    indicadores: seletor("AGENDA_INDICADORES", "agendaIndicadores") === "true",
+    backupPlanilhas:
+      seletor("BACKUP_PLANILHAS_HABILITADO", "backupPlanilhasHabilitado", "false") === "true",
+  };
+}
+
+export function validarRotinasSemAmbiente(ctx) {
+  const app = lerEnv(textoExistente(ctx.caminhos.appEnv, "app.env")).mapa;
+  const ops = lerEnv(textoExistente(ctx.caminhos.opsEnv, "ops.env")).mapa;
+  const previsto = rotinasPrevistas(ctx);
+  for (const [chave, campo] of [
+    ["AGENDA_NOTIFICACOES", "notificacoes"],
+    ["AGENDA_PLANILHAS", "planilhas"],
+    ["AGENDA_INDICADORES", "indicadores"],
+  ]) {
+    if (
+      (app.get(chave) ?? "true") !== (ops.get(chave) ?? "true") ||
+      (ops.get(chave) ?? app.get(chave) ?? "true") !== String(previsto[campo])
+    ) {
+      throw falha("E_VALIDACAO", `${chave} exige reconciliar os arquivos de ambiente.`, {
+        dica: "Retome a partir da etapa ambiente.",
+        documentacao: "docs/instalador.md#retomada",
+      });
+    }
+  }
+  for (const [chave, campo] of [
+    ["AGENDA_HABILITADA", "agenda"],
+    ["BACKUP_PLANILHAS_HABILITADO", "backupPlanilhas"],
+  ]) {
+    const padrao = campo === "backupPlanilhas" ? "false" : "true";
+    if ((ops.get(chave) ?? app.get(chave) ?? padrao) !== String(previsto[campo])) {
+      throw falha("E_VALIDACAO", `${chave} exige reconciliar os arquivos de ambiente.`, {
+        dica: "Retome a partir da etapa ambiente.",
+        documentacao: "docs/instalador.md#retomada",
+      });
+    }
+  }
+}
+
 function ajustarProprietario(ctx, caminho) {
   if (ctx.modoTeste || ctx.uid !== 0) return false;
   const usuario = ctx.usuarioServico;
@@ -111,6 +200,7 @@ export function executar(ctx) {
   const appExistente = textoExistente(ctx.caminhos.appEnv, "app.env");
   const opsExistente = textoExistente(ctx.caminhos.opsEnv, "ops.env");
   const appAtual = lerEnv(appExistente).mapa;
+  const rotinas = rotinasPrevistas(ctx);
   const acoes = [];
   const avisos = [];
 
@@ -156,11 +246,23 @@ export function executar(ctx) {
     ["MIGRAR_NA_PARTIDA", "true"],
     ["AGENDA_URL", "http://127.0.0.1:3000"],
     ["AGENDA_TIMEOUT", "300"],
-    ["AGENDA_NOTIFICACOES", "true"],
-    ["AGENDA_PLANILHAS", "true"],
-    ["AGENDA_INDICADORES", "true"],
+    ["AGENDA_NOTIFICACOES", String(rotinas.notificacoes)],
+    ["AGENDA_PLANILHAS", String(rotinas.planilhas)],
+    ["AGENDA_INDICADORES", String(rotinas.indicadores)],
   ]);
-  for (const [chave, item] of google) appDesejado.set(chave, item);
+  for (const [chave, item] of google) {
+    if (
+      ![
+        "AGENDA_HABILITADA",
+        "AGENDA_NOTIFICACOES",
+        "AGENDA_PLANILHAS",
+        "AGENDA_INDICADORES",
+        "BACKUP_PLANILHAS_HABILITADO",
+      ].includes(chave)
+    ) {
+      appDesejado.set(chave, item);
+    }
+  }
 
   const dominio = configuracao.dominio;
   const tls = configuracao.tls;
@@ -224,7 +326,7 @@ export function executar(ctx) {
     ["BACKUP_ESPACO_MINIMO_MB", "512"],
     ["BACKUP_INCLUIR_AMBIENTE", "true"],
     ["BACKUP_AMBIENTE_ARQUIVO", ctx.caminhos.appEnv],
-    ["BACKUP_PLANILHAS_HABILITADO", configuracao.destino ? "true" : "false"],
+    ["BACKUP_PLANILHAS_HABILITADO", String(rotinas.backupPlanilhas)],
     ["ATUALIZAR_HABILITADO", "false"],
     ["ATUALIZAR_MODO", "auto"],
     ["ATUALIZAR_REF", "origin/main"],
@@ -235,10 +337,10 @@ export function executar(ctx) {
     ["ATUALIZAR_SAUDE_URL", `https://${dominio}/api/saude`],
     ["ATUALIZAR_TIMEOUT_SAUDE", "180"],
     ["ATUALIZAR_ESPACO_MINIMO_MB", "2048"],
-    ["AGENDA_HABILITADA", "true"],
-    ["AGENDA_NOTIFICACOES", "true"],
-    ["AGENDA_PLANILHAS", "true"],
-    ["AGENDA_INDICADORES", "true"],
+    ["AGENDA_HABILITADA", String(rotinas.agenda)],
+    ["AGENDA_NOTIFICACOES", String(rotinas.notificacoes)],
+    ["AGENDA_PLANILHAS", String(rotinas.planilhas)],
+    ["AGENDA_INDICADORES", String(rotinas.indicadores)],
     ["AGENDA_URL", "http://127.0.0.1:3000"],
     ["AGENDA_TIMEOUT", "300"],
     ["AGENDA_HORARIO", "*/5 * * * *"],
@@ -333,6 +435,11 @@ export function executar(ctx) {
     "retencaoDias",
     "retencaoMinimo",
     "agendador",
+    "agendaHabilitada",
+    "agendaNotificacoes",
+    "agendaPlanilhas",
+    "agendaIndicadores",
+    "backupPlanilhasHabilitado",
     "fuso",
     "habilitarAtualizacoes",
     "canalAtualizacao",

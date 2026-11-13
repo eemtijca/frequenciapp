@@ -1,22 +1,9 @@
 // Gera cron e logrotate apenas para a entrada fixa do perfil adotado.
 import fs from "node:fs";
-import { exigir, protegido, exclusivo, lerAmbiente, sincronizar } from "./contrato.mjs";
+import { exigir, protegido, exclusivo, lerAmbiente, sincronizar, hash } from "./contrato.mjs";
 
-export function instalarRotinas(p, args) {
-  let plano = false,
-    confirmar = false,
-    destino = "/etc";
-  while (args.length) {
-    const n = args.shift();
-    if (n === "--plano") plano = true;
-    else if (n === "--confirmar") confirmar = true;
-    else if (n === "--destino") destino = args.shift();
-    else throw new Error("Opção de cron desconhecida.");
-  }
-  exigir(plano !== confirmar, "Escolher --plano ou --confirmar.");
-  protegido(destino, "diretorio");
-  const e = lerAmbiente(p),
-    entrada = `${p.prefixo}/executar`;
+export function gerarRotinas(p, e = lerAmbiente(p)) {
+  const entrada = `${p.prefixo}/executar`;
   const horario = (nome, padrao) => {
     const valor = e[nome] ?? padrao;
     exigir(
@@ -68,7 +55,26 @@ export function instalarRotinas(p, args) {
     linhas.push(
       `${horario("CERTBOT_RENOVAR_HORARIO", "15 2 * * *")} root ${entrada} renovar-certificado >>${p.logs}/certificado.log 2>&1`,
     );
-  const cron = linhas.join("\n") + "\n";
+  return {
+    cron: linhas.join("\n") + "\n",
+    logrotate: `# Logs das entradas estáveis.\n${p.logs}/*.log {\n    weekly\n    rotate 12\n    compress\n    delaycompress\n    missingok\n    notifempty\n    copytruncate\n}\n`,
+  };
+}
+
+export function instalarRotinas(p, args) {
+  let plano = false,
+    confirmar = false,
+    destino = "/etc";
+  while (args.length) {
+    const n = args.shift();
+    if (n === "--plano") plano = true;
+    else if (n === "--confirmar") confirmar = true;
+    else if (n === "--destino") destino = args.shift();
+    else throw new Error("Opção de cron desconhecida.");
+  }
+  exigir(plano !== confirmar, "Escolher --plano ou --confirmar.");
+  protegido(destino, "diretorio");
+  const { cron, logrotate } = gerarRotinas(p);
   if (plano) {
     process.stdout.write(cron);
     return;
@@ -82,12 +88,14 @@ export function instalarRotinas(p, args) {
   }
   // Não substituir agendamento antigo implicitamente, inclusive na adoção inicial.
   exclusivo(`${destino}/cron.d/frequenciapp`, Buffer.from(cron));
-  exclusivo(
-    `${destino}/logrotate.d/frequenciapp`,
-    Buffer.from(
-      `# Logs das entradas estáveis.\n${p.logs}/*.log {\n    weekly\n    rotate 12\n    compress\n    delaycompress\n    missingok\n    notifempty\n    copytruncate\n}\n`,
-    ),
-  );
+  exclusivo(`${destino}/logrotate.d/frequenciapp`, Buffer.from(logrotate));
+  exclusivo(`${p.dados}/rotinas.json`, {
+    versao: 1,
+    alvo: p.alvo,
+    destino,
+    cronSha256: hash(Buffer.from(cron)),
+    logrotateSha256: hash(Buffer.from(logrotate)),
+  });
   for (const sub of ["cron.d", "logrotate.d"]) {
     fs.chmodSync(`${destino}/${sub}/frequenciapp`, 0o644);
     sincronizar(`${destino}/${sub}/frequenciapp`);

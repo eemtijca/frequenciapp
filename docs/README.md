@@ -92,3 +92,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-075](adr/075-vercel-continuo-e-auto-hospedagem-com-backup.md): Vercel contínua na `main`, sem atestado de backup, e auto-hospedagem com backup obrigatório antes da migração.
 - [ADR-076](adr/076-instalador-cross-distro.md): instalador cross-distro com bootstrap Bash, CLI Node, detecção e testes em Docker.
 - [ADR-077](adr/077-canais-de-atualizacao.md): canais `release` e `main`, estado, downgrade, backup e readoção do controlador.
+- [ADR-078](adr/078-reconfiguracao-restrita-das-rotinas.md): seletores explícitos, cron reconhecido e reconfiguração recuperável sem mover a trava.

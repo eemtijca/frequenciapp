@@ -16,10 +16,18 @@ exigir_consulta() {
   esac
 }
 
+delegar_consulta() {
+  exigir_consulta "${1:-}"
+  if [ -n "${SERVIDOR_CONTROLADOR_OPERACAO:-}${SERVIDOR_CONTROLADOR_PREPARACAO:-}${SERVIDOR_CONTROLADOR_LEITURA:-}" ]; then
+    return 0
+  fi
+  exec node "$DIR/controlador/cli.mjs" consultar-compose "$perfil" "$@"
+}
+
 if [ -e "$perfil" ] || [ -L "$perfil" ] ||
   [ -n "${SERVIDOR_CONTROLADOR_PERFIL:-}${SERVIDOR_CONTROLADOR_OPERACAO:-}${SERVIDOR_CONTROLADOR_PREPARACAO:-}${SERVIDOR_CONTROLADOR_LEITURA:-}" ]; then
   controlador_ativo=true
-  exigir_consulta "${1:-}"
+  delegar_consulta "$@"
 fi
 
 # shellcheck source=comum.sh
@@ -30,7 +38,7 @@ if [ "$controlador_ativo" = false ]; then
   perfil="${SERVIDOR_CONTROLADOR_PERFIL:-$perfil}"
   if [ -e "$perfil" ] || [ -L "$perfil" ] || [ -n "${SERVIDOR_CONTROLADOR_PERFIL:-}" ]; then
     controlador_ativo=true
-    exigir_consulta "${1:-}"
+    delegar_consulta "$@"
   fi
 fi
 montar_compose

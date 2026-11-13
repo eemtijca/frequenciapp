@@ -49,6 +49,7 @@ import * as agendador from "./passos/agendador.mjs";
 import * as firewall from "./passos/firewall.mjs";
 import * as dropbox from "./passos/dropbox.mjs";
 import * as controlador from "./passos/controlador.mjs";
+import { reconfigurarControlador } from "./rotinas-controlador.mjs";
 
 const RAIZ_INSTALADOR = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 
@@ -360,19 +361,33 @@ function validarAutoteste(configuracao, deteccao, estadoResultado, opcoes) {
 }
 
 function montarSimulacao(ctx, configuracao) {
+  const inicio = selecionarInicio(ctx);
   const etapas = ctx.ordemEtapas
     .map((id) => MODULOS_POR_ID.get(id))
     .filter(Boolean)
-    .map((modulo) => ({
-      id: modulo.id,
-      estado: "pendente",
-      inicio: null,
-      fim: null,
-      codigo: null,
-      acoes: [criarAcao(modulo.titulo, null, modulo.id !== "preflight")],
-      avisos: [],
-      detalhes: { limiteSegundos: modulo.limiteSegundos },
-    }));
+    .map((modulo) => {
+      const selecionada = modulo.id === "preflight" || ctx.ordemEtapas.indexOf(modulo.id) >= inicio;
+      const agendadorPulado =
+        modulo.id === "agendador" && PERFIS_CONTROLADOR.has(configuracao.perfil);
+      return {
+        id: modulo.id,
+        estado: selecionada && !agendadorPulado ? "pendente" : "pulada",
+        inicio: null,
+        fim: null,
+        codigo: null,
+        acoes:
+          selecionada && !agendadorPulado
+            ? [criarAcao(modulo.titulo, null, modulo.id !== "preflight")]
+            : [],
+        avisos: [],
+        detalhes: {
+          limiteSegundos: modulo.limiteSegundos,
+          ...(selecionada && !agendadorPulado && modulo.id === "agendador"
+            ? { rotinas: ambiente.rotinasPrevistas(ctx) }
+            : {}),
+        },
+      };
+    });
   return montarDocumento({
     comando: "aplicar",
     configuracao,
@@ -592,8 +607,17 @@ function selecionarInicio(ctx) {
   if (ctx.desdeEtapa) return ctx.ordemEtapas.indexOf(ctx.desdeEtapa);
   if (ctx.retomar && ctx.estado) {
     const indice = ctx.ordemEtapas.findIndex((id) => !etapaAnteriorValida(ctx.estado, id));
-    if (indice === -1) return ctx.ordemEtapas.length;
-    return indice;
+    const pendente = indice === -1 ? ctx.ordemEtapas.length : indice;
+    const escolhas = [
+      "agendaHabilitada",
+      "agendaNotificacoes",
+      "agendaPlanilhas",
+      "agendaIndicadores",
+      "backupPlanilhasHabilitado",
+    ];
+    return escolhas.some((campo) => ctx.configuracao[campo] !== undefined)
+      ? Math.min(pendente, ctx.ordemEtapas.indexOf("ambiente"))
+      : pendente;
   }
   return 0;
 }
@@ -631,6 +655,57 @@ export function executarAplicacao(opcoes, deps, dados) {
     opcoes,
     raiz,
   );
+  if (
+    !opcoes.booleanas.has("--autoteste") &&
+    (fs.existsSync(ctx.caminhos.controladorPerfil) || ctx.estado?.controlador?.adotado === true)
+  ) {
+    const simular = opcoes.booleanas.has("--simular");
+    const etapa = etapaVazia("controlador", "executando");
+    etapa.inicio = ctx.agora();
+    try {
+      if (!PERFIS_CONTROLADOR.has(configuracao.perfil))
+        throw erroValidacao(
+          "O controlador adotado exige o perfil controlador para reconfigurar rotinas.",
+        );
+      Object.assign(etapa, reconfigurarControlador(ctx, simular));
+      etapa.fim = ctx.agora();
+      return documentoAplicacao(ctx, ctx.estado, [etapa], [], [], simular);
+    } catch (erro) {
+      const classificado =
+        erro instanceof ErroInstalador
+          ? erro
+          : erroValidacao("Não foi possível validar as rotinas do controlador adotado.");
+      etapa.estado = "falhou";
+      etapa.fim = ctx.agora();
+      etapa.codigo = classificado.codigo;
+      return documentoAplicacao(ctx, ctx.estado, [etapa], [erroObjeto(classificado)], [], simular);
+    }
+  }
+  ambiente.rotinasPrevistas(ctx);
+  const escolhasRotinas = [
+    "agendaHabilitada",
+    "agendaNotificacoes",
+    "agendaPlanilhas",
+    "agendaIndicadores",
+    "backupPlanilhasHabilitado",
+  ];
+  if (
+    ctx.desdeEtapa &&
+    ctx.ordemEtapas.indexOf(ctx.desdeEtapa) > ctx.ordemEtapas.indexOf("ambiente") &&
+    escolhasRotinas.some((campo) => configuracao[campo] !== undefined)
+  ) {
+    throw erroValidacao("As escolhas de agenda exigem executar a etapa ambiente.", {
+      dica: "Use --desde-etapa ambiente ou uma etapa anterior.",
+      documentacao: "docs/instalador.md#retomada",
+    });
+  }
+  const inicioPlanejado = selecionarInicio(ctx);
+  if (
+    inicioPlanejado > ctx.ordemEtapas.indexOf("ambiente") &&
+    inicioPlanejado <= ctx.ordemEtapas.indexOf("agendador")
+  ) {
+    ambiente.validarRotinasSemAmbiente(ctx);
+  }
   if (opcoes.booleanas.has("--autoteste")) {
     return validarAutoteste(configuracao, deteccao, estadoResultado, opcoes);
   }

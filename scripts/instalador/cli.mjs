@@ -23,6 +23,8 @@ import {
   lerEstado,
 } from "./estado.mjs";
 import { executarAplicacao, ORDEM_ETAPAS } from "./executor.mjs";
+import { caminhosOperacao } from "./passos/contexto.mjs";
+import { rotinasPrevistas } from "./passos/ambiente.mjs";
 import { executarCanal } from "./canal.mjs";
 import { COMANDOS_OPERACAO, executarOperacao } from "./operacao.mjs";
 import {
@@ -119,7 +121,13 @@ const FLAGS_VALOR = new Map([
   ["--config-dropbox", "configDropbox"],
   ["--arquivo-token-dropbox", "arquivoTokenDropbox"],
   ["--operador-controlador", "operadorControlador"],
+  ["--adotar-cron-sha256", "adotarCronSha256"],
   ["--agendador", "agendador"],
+  ["--agenda-habilitada", "agendaHabilitada"],
+  ["--agenda-notificacoes", "agendaNotificacoes"],
+  ["--agenda-planilhas", "agendaPlanilhas"],
+  ["--agenda-indicadores", "agendaIndicadores"],
+  ["--backup-planilhas-habilitado", "backupPlanilhasHabilitado"],
   ["--fuso", "fuso"],
   ["--canal-atualizacao", "canalAtualizacao"],
   ["--ref-atualizacao", "refAtualizacao"],
@@ -165,7 +173,13 @@ const CHAVES_CONFIG = new Map([
   ["configDropbox", "--config-dropbox"],
   ["arquivoTokenDropbox", "--arquivo-token-dropbox"],
   ["operadorControlador", "--operador-controlador"],
+  ["adotarCronSha256", "--adotar-cron-sha256"],
   ["agendador", "--agendador"],
+  ["agendaHabilitada", "--agenda-habilitada"],
+  ["agendaNotificacoes", "--agenda-notificacoes"],
+  ["agendaPlanilhas", "--agenda-planilhas"],
+  ["agendaIndicadores", "--agenda-indicadores"],
+  ["backupPlanilhasHabilitado", "--backup-planilhas-habilitado"],
   ["fuso", "--fuso"],
   ["habilitarAtualizacoes", "--habilitar-atualizacoes"],
   ["canalAtualizacao", "--canal-atualizacao"],
@@ -184,6 +198,11 @@ const VALORES_ACEITOS = new Map([
   ["--proxy", ["caddy", "nginx"]],
   ["--tls", ["acme", "interno"]],
   ["--agendador", ["auto", "systemd", "cron"]],
+  ["--agenda-habilitada", ["true", "false"]],
+  ["--agenda-notificacoes", ["true", "false"]],
+  ["--agenda-planilhas", ["true", "false"]],
+  ["--agenda-indicadores", ["true", "false"]],
+  ["--backup-planilhas-habilitado", ["true", "false"]],
   ["--modo-backup", ["compose", "url"]],
   ["--criptografia", ["gpg", "age"]],
   ["--firewall", ["auto", "sim", "nao"]],
@@ -265,6 +284,11 @@ const CAMPOS_CONFIG = [
   "arquivoTokenDropbox",
   "operadorControlador",
   "agendador",
+  "agendaHabilitada",
+  "agendaNotificacoes",
+  "agendaPlanilhas",
+  "agendaIndicadores",
+  "backupPlanilhasHabilitado",
   "fuso",
   "habilitarAtualizacoes",
   "canalAtualizacao",
@@ -333,6 +357,9 @@ function validarValor(flag, valor) {
   }
   if (flag === "--imagem-digest" && !/^sha256:[a-f0-9]{64}$/.test(texto)) {
     throw erroUso("A opção --imagem-digest exige sha256: seguido de 64 hexadecimais.");
+  }
+  if (flag === "--adotar-cron-sha256" && !/^[a-f0-9]{64}$/.test(texto)) {
+    throw erroUso("A opção --adotar-cron-sha256 exige 64 hexadecimais minúsculos.");
   }
   if (contemSegredo(texto)) {
     throw erroUso("A opção recebeu um valor que parece segredo. Use um arquivo com modo 600.");
@@ -525,6 +552,25 @@ function carregarConfig(opcoes) {
       }
       continue;
     }
+    if (
+      [
+        "--agenda-habilitada",
+        "--agenda-notificacoes",
+        "--agenda-planilhas",
+        "--agenda-indicadores",
+        "--backup-planilhas-habilitado",
+      ].includes(flag)
+    ) {
+      if (typeof valor !== "boolean" && typeof valor !== "string") {
+        throw erroUso(`A chave ${chave} exige true ou false.`);
+      }
+      const texto = validarValor(flag, valor);
+      if (!opcoes.valores.has(flag)) {
+        opcoes.valores.set(flag, texto);
+        opcoes.origem.set(flag, "config");
+      }
+      continue;
+    }
     if (!["string", "number"].includes(typeof valor)) {
       throw erroUso(`A chave ${chave} exige texto ou número.`);
     }
@@ -709,6 +755,12 @@ function processarPlanejar(opcoes, io, deps) {
   const estadoResultado = lerEstadoSeguro(deps);
   const { valores } = resolverConfiguracao(opcoes, estadoResultado);
   const { auditoria } = auditarSeguro(deps, deteccao);
+  const caminhos = caminhosOperacao(
+    deps.raiz ?? "/",
+    valores,
+    Boolean(opcoes.booleanas.has("--modo-teste")),
+  );
+  const rotinas = rotinasPrevistas({ caminhos, configuracao: valores });
   const documento = montarPlano({
     configuracao: valores,
     deteccao,
@@ -720,6 +772,7 @@ function processarPlanejar(opcoes, io, deps) {
     modoTeste: Boolean(opcoes.booleanas.has("--modo-teste")),
     exigirConfiguracao: opcoes.valores.has("--salvar-config"),
   });
+  documento.etapas[0].detalhes.rotinas = rotinas;
   if (opcoes.valores.has("--salvar-config")) {
     if (!documento.ok) {
       documento.avisos = deduplicarAvisos([
@@ -970,6 +1023,27 @@ function formatarVersaoHumana(documentoFinal) {
   ].join("\n");
 }
 
+function formatarRotinasHumanas(documentoFinal) {
+  const etapa = documentoFinal.etapas.find(
+    (item) => typeof item.detalhes?.rotinas === "object" || item.detalhes?.seletores,
+  );
+  if (!etapa) return [];
+  const rotinas = etapa.detalhes.rotinas;
+  const seletores = etapa.detalhes.seletores;
+  const linhas = ["", "Rotinas:"];
+  for (const [rotulo, campo, variavel] of [
+    ["Agenda geral", "agenda", "AGENDA_HABILITADA"],
+    ["Notificações", "notificacoes", "AGENDA_NOTIFICACOES"],
+    ["Planilhas", "planilhas", "AGENDA_PLANILHAS"],
+    ["Indicadores", "indicadores", "AGENDA_INDICADORES"],
+    ["Backup de planilhas", "backupPlanilhas", "BACKUP_PLANILHAS_HABILITADO"],
+  ]) {
+    const ligado = seletores ? seletores[variavel] === "true" : rotinas[campo];
+    linhas.push(`- ${rotulo}: ${ligado ? "habilitada" : "desabilitada"}`);
+  }
+  return linhas;
+}
+
 function formatarPlanoHumano(documentoFinal) {
   const linhas = [];
   const preflight = documentoFinal.etapas.find((etapa) => etapa.id === "preflight");
@@ -991,6 +1065,7 @@ function formatarPlanoHumano(documentoFinal) {
   linhas.push(`SELinux: ${documentoFinal.selinux}  AppArmor: ${documentoFinal.apparmor}`);
   linhas.push(`Perfil: ${documentoFinal.perfil}  Canal: ${documentoFinal.canal}`);
   if (documentoFinal.tag) linhas.push(`Tag: ${documentoFinal.tag}`);
+  linhas.push(...formatarRotinasHumanas(documentoFinal));
   linhas.push("");
   linhas.push("Pacotes:");
   if (pacotes?.detalhes?.pacotes?.length) {
@@ -1135,6 +1210,7 @@ function formatarAplicacaoHumana(documentoFinal) {
   linhas.push(`Distribuição: ${documentoFinal.distro}  Tier: ${documentoFinal.tier}`);
   if (documentoFinal.tag) linhas.push(`Tag: ${documentoFinal.tag}`);
   if (documentoFinal.commit) linhas.push(`Commit: ${documentoFinal.commit}`);
+  linhas.push(...formatarRotinasHumanas(documentoFinal));
   linhas.push("");
   linhas.push("Etapas:");
   for (const etapa of documentoFinal.etapas) {
@@ -1504,7 +1580,13 @@ function textoAjuda() {
     "  --config-dropbox <arquivo>          Adoção do Dropbox para o banco",
     "  --arquivo-token-dropbox <arquivo>   Token privado do cliente Dropbox",
     "  --operador-controlador <conta>      Conta sem privilégio do controlador",
+    "  --adotar-cron-sha256 <hash>          Adota explicitamente o cron legado conferido",
     "  --agendador <modo>                  Agendador: auto, systemd ou cron (padrão: auto)",
+    "  --agenda-habilitada <true|false>     Controla a execução periódica da agenda",
+    "  --agenda-notificacoes <true|false>   Seleciona a rotina de notificações",
+    "  --agenda-planilhas <true|false>      Seleciona a rotina de planilhas",
+    "  --agenda-indicadores <true|false>    Seleciona a rotina de indicadores",
+    "  --backup-planilhas-habilitado <true|false>  Autoriza o backup separado das planilhas",
     "  --fuso <zona>                       Fuso do host e da aplicação (padrão: America/Fortaleza)",
     "  --habilitar-atualizacoes            Instala o timer de atualização (padrão: não)",
     "  --canal-atualizacao <nome>          Canal da atualização agendada: release ou main",

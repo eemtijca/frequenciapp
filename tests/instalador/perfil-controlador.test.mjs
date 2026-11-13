@@ -231,7 +231,7 @@ describe("perfil controlador", () => {
     assert.ok(logs.some((linha) => linha.includes("fase=controlador-confirmar")));
   });
 
-  it("não executa comandos quando o controlador já está adotado sem readoção pendente", () => {
+  it("revalida as rotinas quando o controlador já está adotado sem readoção pendente", () => {
     const { ctx, chamadas, caminhos, migrador } = criarContexto();
     const hash = hashArquivo(migrador);
     ctx.estado = {
@@ -246,22 +246,24 @@ describe("perfil controlador", () => {
     assert.equal(resultado.detalhes.adotado, true);
     assert.equal(resultado.detalhes.migradorSha256, hash);
     assert.equal(resultado.detalhes.rotinas, "cron");
-    assert.equal(chamadas.length, 0);
+    assert.equal(chamadas.length, 1);
+    assert.ok(chamadas[0].argumentos.includes("--plano"));
   });
 
-  it("readota quando o estado marca readoção pendente", () => {
+  it("preserva prefixo e trava quando o estado exige readoção administrativa", () => {
     const { ctx, chamadas, caminhos, migrador } = criarContexto();
     const hash = hashArquivo(migrador);
     ctx.estado = {
       controlador: { adotado: true, migradorSha256: hash, readocaoPendente: true },
     };
     adotarPerfil(caminhos, hash);
-
-    const resultado = controlador.executar(ctx);
-
-    assert.equal(resultado.estado, "concluida");
-    assert.equal(resultado.detalhes.semMudancas, false);
-    assert.equal(chamadas.length, 4);
+    const antes = fs.readFileSync(caminhos.controladorPerfil);
+    assert.throws(
+      () => controlador.executar(ctx),
+      erroControlador((erro) => assert.match(erro.message, /readoção|administrativa/i)),
+    );
+    assert.deepEqual(fs.readFileSync(caminhos.controladorPerfil), antes);
+    assert.equal(chamadas.length, 0);
   });
 
   it("recusa o perfil controlador sem operador de manutenção", () => {
