@@ -1,4 +1,4 @@
-// Testa a readoção do controlador após a troca de canal, com rotação do prefixo e do cron.
+// Confere a recusa da readoção ampla sem mover prefixo, cron ou trava ativa.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -63,38 +63,28 @@ function prepararContexto({ readocao }) {
 }
 
 describe("readoção do controlador", () => {
-  it("arquiva prefixo e cron antigos e confirma a nova adoção", () => {
+  it("recusa readoção ampla preservando prefixo, cron, estado e inode da trava", () => {
     const { ctx, chamadas, controladorPrefixo, controladorPerfil, cronFrequenciapp } =
       prepararContexto({ readocao: true });
-    const resultado = executar(ctx);
-    assert.equal(resultado.estado, "concluida");
-    assert.equal(resultado.detalhes.adotado, true);
-    assert.equal(resultado.detalhes.rotinas, "cron");
-    assert.ok(
-      fs.existsSync(`${controladorPrefixo}.anterior-20261112120000`),
-      "prefixo anterior arquivado",
+    const lock = path.join(controladorPrefixo, "trava.lock");
+    fs.writeFileSync(lock, "", { mode: 0o600 });
+    const inode = fs.statSync(lock).ino;
+    const arquivos = [controladorPerfil, cronFrequenciapp];
+    const antes = arquivos.map((nome) => fs.readFileSync(nome));
+    const estado = JSON.stringify(ctx.estado);
+    assert.throws(
+      () => executar(ctx),
+      (erro) => erro.codigo === "E_CONTROLADOR" && /revisão administrativa/.test(erro.message),
     );
-    assert.ok(
-      fs.existsSync(`${cronFrequenciapp}.anterior-20261112120000`),
-      "cron anterior arquivado",
+    assert.deepEqual(
+      arquivos.map((nome) => fs.readFileSync(nome)),
+      antes,
     );
-    assert.ok(fs.existsSync(controladorPerfil), "novo perfil criado");
-    assert.ok(
-      chamadas.some(
-        (item) =>
-          String(item.argumentos[0]).endsWith("instalar-controlador.sh") &&
-          item.argumentos.includes("--confirmar"),
-      ),
-      "adoção confirmada",
-    );
-    assert.ok(
-      chamadas.some(
-        (item) =>
-          String(item.argumentos[0]).endsWith("instalar-rotinas.sh") &&
-          item.argumentos.includes("--confirmar"),
-      ),
-      "rotinas confirmadas",
-    );
+    assert.equal(fs.statSync(lock).ino, inode);
+    assert.equal(JSON.stringify(ctx.estado), estado);
+    assert.equal(fs.existsSync(`${controladorPrefixo}.anterior-20261112120000`), false);
+    assert.equal(fs.existsSync(`${cronFrequenciapp}.anterior-20261112120000`), false);
+    assert.deepEqual(chamadas, []);
   });
 
   it("recusa prefixo existente quando a readoção não foi marcada", () => {

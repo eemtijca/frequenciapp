@@ -56,7 +56,7 @@ O plano imprime um JSON com prefixo, aplicação, operador, alvo da identidade, 
 
 O instalador pode executar a mesma adoção com `sudo ./instalar.sh aplicar --perfil controlador --operador-controlador conta-de-operacao --sim`. Ele valida a conta, adota o snapshot, confere o hash do migrador e instala as rotinas estáveis em cron. A etapa `agendador` é pulada nesse perfil.
 
-Depois de uma troca de canal que mude o `migradorSha256`, a readoção usa `sudo ./instalar.sh aplicar --retomar --sim`. O instalador arquiva o prefixo e o cron anteriores com o sufixo `.anterior-<data>` e confirma a nova adoção. O journal e os pins antigos permanecem no diretório arquivado para revisão.
+Depois de uma troca de canal que mude o `migradorSha256`, a readoção ampla exige revisão administrativa. O instalador recusa essa readoção automática e não move o prefixo, o cron nem a trava ativa. A reconfiguração restrita de seletores descrita abaixo não troca o migrador nem substitui essa revisão.
 
 O instalador grava:
 
@@ -111,6 +111,24 @@ O cron do controlador usa a entrada `executar` e as ações estáveis `agenda`, 
 | Certificado          | `renovar-certificado` | Nginx com ACME, horário de `CERTBOT_RENOVAR_HORARIO`.           |
 
 O instalador exige confirmação do fuso. `CRON_FUSO_SISTEMA` precisa ser igual a `TZ_APP`, ou `CRON_TZ` precisa ser aceito com `CRON_SUPORTA_TZ=true`. O cron do controlador não recarrega serviço nenhum; o daemon lê `/etc/cron.d`. O logrotate também não é recarregado.
+
+### Reconfiguração dos seletores
+
+Com controlador adotado, o `aplicar` usa um caminho restrito antes das etapas de ambiente, Compose ou banco. Ele altera apenas os cinco seletores documentados em [instalador.md](instalador.md#seleção-das-rotinas), o cron correspondente e os metadados necessários. Não instala pacotes, recria o aplicativo, executa migração ou faz backup nessa operação. Os demais valores do JSON existente são preservados, não reaplicados; flags de outras mudanças são recusadas. Os seletores são persistidos em `instalador.json` na mesma transição recuperável.
+
+```bash
+sudo ./instalar.sh aplicar --perfil controlador \
+  --agenda-planilhas false --backup-planilhas-habilitado false \
+  --simular --json
+```
+
+Depois de conferir o plano, substituir `--simular` por `--sim`. A reconfiguração exige perfil, ambientes, identidade efetiva, snapshot, journal e pins íntegros. O inode e o caminho da trava original são mantidos; as verificações são repetidas após adquirir a trava. O comando não aceita uma readoção ampla pendente.
+
+A instalação das rotinas grava `dados/rotinas.json`, com alvo, destino e hashes de cron e logrotate. Arquivo que diverge do recibo é recusado, mesmo com `--adotar-cron-sha256`. No legado sem recibo, o administrador precisa revisar o arquivo exato e informar seu SHA-256 com `--adotar-cron-sha256 <hash>`, em 64 caracteres hexadecimais minúsculos, tanto no plano quanto na confirmação. O logrotate legado também precisa corresponder ao modelo reconhecido. Igualdade de texto, sozinha, não autoriza assumir a propriedade do cron.
+
+A primeira transição cria uma geração física em `geracoes/<uuid>/` e um perfil versão 2. Perfis versão 1 continuam aceitos como origem. A entrada estável aponta para a geração nova, e uma chamada da geração anterior é recusada depois da trava. O snapshot anterior, o journal e os pins permanecem no mesmo prefixo. A agenda transmite os seletores atuais por `compose exec -e`, sem depender de recriar o aplicativo.
+
+Antes de publicar qualquer arquivo ativo, uma intenção versão 1 registra em diretório privado os bytes e hashes anteriores e desejados. Cada publicação é atômica por arquivo e sincronizada; o conjunto não é uma troca atômica única. Uma interrupção bloqueia a entrada normal. A retomada repete o `aplicar --retomar` com as mesmas escolhas e só aceita arquivos que ainda correspondam exatamente ao estado antigo ou novo comprovado. Um terceiro valor, identidade divergente ou operação incerta alheia exige revisão, sem rollback nem limpeza automática. Os bytes da configuração na intenção são sensíveis e não devem entrar em logs públicos ou issues.
 
 ## Journal
 
@@ -201,7 +219,7 @@ Quando o controlador está ativo e a atualização falha, a imagem e o commit an
 | Sem perfil | Executa o Compose genérico, com as opções e os arquivos do chamador.                                                                                                                                          |
 | Com perfil | Aceita apenas `config`, `ps`, `images`, `version` e `logs`. Qualquer mutação, como `up`, `down`, `build`, `pull` ou `exec`, é recusada com código 78. As leituras conferem identidade e usam a trava do alvo. |
 
-A restrição impede que uma mutação arbitrária contorne o journal, a trava e a identidade. A saída de `config` e de `logs` pode conter configuração resolvida ou dados operacionais; evitar colar essa saída em issue ou relatório.
+A restrição impede que uma mutação arbitrária contorne o journal, a trava e a identidade. O wrapper do checkout despacha as consultas para o `compose.sh` do snapshot ativo, com ambiente reconstruído do perfil e autorização repetida sob a trava; não executa o contrato de uma geração antiga nem abre intenção de mutação. A saída de `config` e de `logs` pode conter configuração resolvida ou dados operacionais; evitar colar essa saída em issue ou relatório.
 
 ### instalar-rotinas.sh
 
@@ -380,7 +398,7 @@ Os testes do controlador são separados da suíte padrão do servidor:
 pnpm run test:servidor:controlador
 ```
 
-O comando executa `node --test tests/servidor/controlador/*.test.mjs` e `bash tests/servidor/perfis.sh`. O smoke root de `tests/servidor/controlador/operacional-minimo.test.mjs` instala o controlador, consulta o estado, simula uma atualização delegada, gera o plano de cron e volta ao caminho simples. Ele é pulado quando o processo não é root. O ensaio usa dublês de Docker e um invólucro de Git para o fetch, sempre em diretórios sintéticos, e exige que `/var/run/docker.sock` não exista.
+O comando executa `node --test tests/servidor/controlador/*.test.mjs` e `bash tests/servidor/perfis.sh`. O smoke de `operacional-minimo.test.mjs` instala o controlador, consulta o estado, simula uma atualização delegada, gera o plano de cron e volta ao caminho simples. `reconfigurar-rotinas.test.mjs` e `instalador.test.mjs` verificam a reconfiguração administrativa e a integração pública do instalador, incluindo persistência, retomada e recusas. Esses testes exigem root interno isolado e ausência de `/var/run/docker.sock`; não pertencem a `test:instalador:unit`. O smoke antigo continua pulado fora de root, mas a fixture administrativa recusa esse ambiente em vez de produzir aprovação parcial.
 
 `tests/servidor/perfis.sh` verifica que o controlador é opt-in, que o marcador não bloqueia o caminho simples sem perfil, que o Compose simples continua funcionando, que a delegação usa a entrada estável, que o instalador simples recusa um perfil existente e que a volta ao simples funciona. O ensaio também pode ser executado isoladamente:
 
@@ -388,22 +406,21 @@ O comando executa `node --test tests/servidor/controlador/*.test.mjs` e `bash te
 bash tests/servidor/perfis.sh
 ```
 
-O smoke root e os testes de perfil não montam o socket Docker. Executar em um contêiner Node 24 com Git, Bash e `flock`, sem o socket:
+O job `controlador` de `instalador.yml` constrói `tests/servidor/controlador/Dockerfile` com uma cópia apenas das fontes públicas versionadas. A imagem contém Node 24, Git, Bash e `flock`; o runtime usa root interno sem capacidades adicionais, rede ou socket Docker, com raiz somente leitura e `/tmp` executável descartável. O comando abaixo testa a revisão já commitada, não as alterações locais pendentes:
 
 ```bash
-docker run --rm \
-  -v "<worktree>:/work" \
-  -v "frequenciapp-p2.4-node_modules:/work/node_modules" \
-  -v "frequenciapp-p2.4-pnpm-store:/pnpm-store" \
-  -w /work \
-  -e CI=1 \
-  -e PNPM_HOME=/pnpm \
-  -e PNPM_STORE_DIR=/pnpm-store \
-  node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 \
-  bash -lc 'corepack enable && pnpm install --frozen-lockfile && pnpm run test:servidor:controlador'
+contexto=$(mktemp -d)
+git archive --format=tar HEAD scripts/servidor scripts/instalador \
+  tests/servidor/controlador docker/app/migrar.mjs package.json | tar -x -C "$contexto"
+docker build --network default -f "$contexto/tests/servidor/controlador/Dockerfile" \
+  -t frequenciapp-controlador-teste:local "$contexto"
+docker run --rm --network none --read-only --cap-drop ALL \
+  --security-opt no-new-privileges --user 0:0 \
+  --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777 \
+  frequenciapp-controlador-teste:local
 ```
 
-O comando acima pressupõe Git e `flock` na imagem. Se a imagem mínima não os tiver, instalar os pacotes no contêiner antes do ensaio, sem alterar o host.
+A preparação da imagem pode baixar pacotes; a execução dos testes não tem rede. O contexto não inclui `.git`, ambientes reais ou autenticação. Os clientes Docker são falsos e o resultado não comprova serviços, DNS, TLS ou recuperação real.
 
 A validação de servidor cobre sintaxe, ShellCheck dos scripts e do controlador, configuração Compose, Caddy e Nginx:
 

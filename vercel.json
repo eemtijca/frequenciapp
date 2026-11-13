@@ -3,7 +3,8 @@
   "framework": "nextjs",
   "git": {
     "deploymentEnabled": {
-      "main": false
+      "main": false,
+      "fix/instalador-preserva-rotinas": false
     }
   },
   "buildCommand": "pnpm run vercel-build",

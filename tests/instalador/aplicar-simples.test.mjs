@@ -1,6 +1,7 @@
 // Testa o aplicar do perfil simples com dublês de Docker, systemd, banco, rede, backup e saúde.
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -429,6 +430,560 @@ after(() => {
 });
 
 describe("aplicar do perfil simples", () => {
+  it("propaga os seletores gerados ao Compose real sem iniciar serviços", (t) => {
+    const env = { PATH: process.env.PATH, HOME: os.tmpdir() };
+    const versao = spawnSync("docker", ["compose", "version"], { env, encoding: "utf8" });
+    if (versao.error?.code === "ENOENT" || versao.status !== 0) {
+      t.skip("Docker Compose não disponível para validar a configuração.");
+      return;
+    }
+    assert.equal(versao.error, undefined);
+    assert.equal(versao.signal, null);
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, [
+        "--agenda-notificacoes",
+        "false",
+        "--agenda-planilhas",
+        "false",
+        "--agenda-indicadores",
+        "false",
+        "--backup-planilhas-habilitado",
+        "false",
+      ]),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    const dir = path.join(raiz, "etc/frequenciapp");
+    const resolvido = spawnSync(
+      "docker",
+      [
+        "compose",
+        "--project-directory",
+        RAIZ,
+        "--env-file",
+        path.join(dir, "app.env"),
+        "--env-file",
+        path.join(dir, "ops.env"),
+        "-f",
+        path.join(RAIZ, "compose.yml"),
+        "-f",
+        path.join(RAIZ, "compose.servidor.yml"),
+        "-f",
+        path.join(RAIZ, "compose.servidor-caddy.yml"),
+        "config",
+        "--format",
+        "json",
+      ],
+      { env, encoding: "utf8", timeout: 30000 },
+    );
+    assert.equal(resolvido.error, undefined);
+    assert.equal(resolvido.signal, null);
+    assert.equal(resolvido.status, 0, "O Compose recusou os ambientes sintéticos gerados.");
+    const configuracao = JSON.parse(resolvido.stdout);
+    for (const chave of ["AGENDA_NOTIFICACOES", "AGENDA_PLANILHAS", "AGENDA_INDICADORES"]) {
+      assert.equal(configuracao.services.app.environment[chave], "false", chave);
+    }
+  });
+  it("recusa aspas aninhadas que não representam um booleano literal", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const dir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(dir, { recursive: true });
+    const texto = `AGENDA_PLANILHAS="'false'"\n`;
+    const arquivo = path.join(dir, "app.env");
+    fs.writeFileSync(arquivo, texto);
+    const chamadas = [];
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas }),
+    );
+    assert.equal(resultado.json.codigo, "E_VALIDACAO");
+    assert.equal(fs.readFileSync(arquivo, "utf8"), texto);
+    assert.equal(chamadas.length, 0);
+  });
+  for (const [chave, campo, timer] of [
+    ["AGENDA_HABILITADA", "agenda", "frequenciapp-agenda.timer"],
+    ["BACKUP_PLANILHAS_HABILITADO", "backupPlanilhas", "frequenciapp-backup-planilhas.timer"],
+  ]) {
+    it(`preserva ${chave} desativada em app.env apesar de ops.env ativo`, () => {
+      const { raiz, senhaAdmin } = prepararRaiz();
+      const dir = path.join(raiz, "etc/frequenciapp");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "app.env"), `${chave}=false\n`);
+      fs.writeFileSync(path.join(dir, "ops.env"), `${chave}=true\n`);
+      const deps = criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] });
+      const plano = argumentos(raiz, senhaAdmin);
+      plano[0] = "planejar";
+      const previsto = executar(plano, deps);
+      assert.equal(previsto.codigo, 0);
+      assert.equal(previsto.json.etapas[0].detalhes.rotinas[campo], false);
+      const resultado = executar(argumentos(raiz, senhaAdmin), deps);
+      assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+      assert.equal(valorEnv(fs.readFileSync(path.join(dir, "ops.env"), "utf8"), chave), "false");
+      assert.equal(
+        resultado.json.etapas
+          .find((etapa) => etapa.id === "agendador")
+          .detalhes.timers.includes(timer),
+        false,
+      );
+    });
+  }
+  it("mostra os cinco seletores no plano e na simulação legíveis", () => {
+    for (const comando of ["planejar", "aplicar"]) {
+      for (const habilitar of [true, false]) {
+        const { raiz, senhaAdmin } = prepararRaiz();
+        const args = argumentos(raiz, senhaAdmin, [
+          "--simular",
+          "--agenda-habilitada",
+          String(habilitar),
+          "--agenda-notificacoes",
+          String(!habilitar),
+          "--agenda-planilhas",
+          String(habilitar),
+          "--agenda-indicadores",
+          String(!habilitar),
+          "--backup-planilhas-habilitado",
+          String(!habilitar),
+        ]).filter((arg) => arg !== "--json");
+        args[0] = comando;
+        const resultado = executar(
+          args,
+          criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+        );
+        assert.equal(resultado.codigo, 0, resultado.stdout + resultado.stderr);
+        for (const [rotulo, ligado] of [
+          ["Agenda geral", habilitar],
+          ["Notificações", !habilitar],
+          ["Planilhas", habilitar],
+          ["Indicadores", !habilitar],
+          ["Backup de planilhas", !habilitar],
+        ]) {
+          assert.ok(
+            resultado.stdout.includes(`- ${rotulo}: ${ligado ? "habilitada" : "desabilitada"}`),
+            resultado.stdout,
+          );
+        }
+      }
+    }
+  });
+
+  it("preserva valores citados não gerenciados ao alterar um seletor", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const dir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(dir, { recursive: true });
+    const ops = path.join(dir, "ops.env");
+    const preservado =
+      "BACKUP_ORIGEM='drive:pasta com espaço'\nOUTRA_CONFIGURACAO=\"literal com espaço\"\n";
+    fs.writeFileSync(ops, "AGENDA_PLANILHAS=true\n" + preservado, { mode: 0o600 });
+    const cenario = cenarioPadrao();
+    for (const extras of [
+      ["--agenda-planilhas", "false"],
+      ["--retomar", "--agenda-planilhas", "false"],
+    ]) {
+      const resultado = executar(
+        argumentos(raiz, senhaAdmin, extras),
+        criarDeps({ raiz, cenario, chamadas: [] }),
+      );
+      assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+      assert.ok(fs.readFileSync(ops, "utf8").includes(preservado));
+      const validado = spawnSync(
+        process.execPath,
+        [path.join(RAIZ, "scripts/servidor/ambiente-seguro.mjs"), ops],
+        { encoding: "utf8" },
+      );
+      assert.equal(validado.error, undefined);
+      assert.equal(validado.signal, null);
+      assert.equal(validado.status, 0, validado.stderr);
+      const consumido = spawnSync(
+        "/bin/bash",
+        [
+          "--noprofile",
+          "--norc",
+          "-c",
+          '. "$1"; printf "%s\\n" "$BACKUP_ORIGEM" "$OUTRA_CONFIGURACAO"',
+          "consumo",
+          ops,
+        ],
+        { encoding: "utf8", env: { PATH: process.env.PATH } },
+      );
+      assert.equal(consumido.error, undefined);
+      assert.equal(consumido.signal, null);
+      assert.equal(consumido.status, 0, consumido.stderr);
+      assert.equal(consumido.stdout, "drive:pasta com espaço\nliteral com espaço\n");
+    }
+  });
+
+  it("preserva seletores literais exportados pelo shell", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const dir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "app.env"), "export AGENDA_PLANILHAS='false'\n");
+    fs.writeFileSync(
+      path.join(dir, "ops.env"),
+      "export AGENDA_HABILITADA=false\nexport BACKUP_PLANILHAS_HABILITADO='false'\n",
+    );
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    for (const nome of ["app.env", "ops.env"]) {
+      assert.equal(
+        valorEnv(fs.readFileSync(path.join(dir, nome), "utf8"), "AGENDA_PLANILHAS"),
+        "false",
+      );
+    }
+    const ops = fs.readFileSync(path.join(dir, "ops.env"), "utf8");
+    assert.equal(valorEnv(ops, "AGENDA_HABILITADA"), "false");
+    assert.equal(valorEnv(ops, "BACKUP_PLANILHAS_HABILITADO"), "false");
+    const timers = resultado.json.etapas.find((etapa) => etapa.id === "agendador").detalhes.timers;
+    assert.equal(timers.includes("frequenciapp-agenda.timer"), false);
+    assert.equal(timers.includes("frequenciapp-backup-planilhas.timer"), false);
+  });
+  for (const [flag, chave] of [
+    ["--agenda-notificacoes", "AGENDA_NOTIFICACOES"],
+    ["--agenda-planilhas", "AGENDA_PLANILHAS"],
+    ["--agenda-indicadores", "AGENDA_INDICADORES"],
+  ]) {
+    it(`propaga a escolha ${flag} aos dois arquivos`, () => {
+      const { raiz, senhaAdmin } = prepararRaiz();
+      const resultado = executar(
+        argumentos(raiz, senhaAdmin, [flag, "false"]),
+        criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+      );
+      assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+      for (const nome of ["app.env", "ops.env"]) {
+        assert.equal(
+          valorEnv(fs.readFileSync(path.join(raiz, "etc/frequenciapp", nome), "utf8"), chave),
+          "false",
+        );
+      }
+    });
+  }
+  it("recusa seletor duplicado antes de adquirir a trava", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const dir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "app.env"), "AGENDA_PLANILHAS=false\nAGENDA_PLANILHAS=true\n");
+    let travou = false;
+    const deps = criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] });
+    deps.adquirirTrava = () => {
+      travou = true;
+      return { liberar() {} };
+    };
+    const resultado = executar(argumentos(raiz, senhaAdmin), deps);
+    assert.equal(resultado.json.codigo, "E_VALIDACAO");
+    assert.equal(travou, false);
+  });
+  it("arquivo Google não injeta controles operacionais adicionais", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const google = path.join(raiz, "google.env");
+    fs.writeFileSync(google, "AGENDA_HABILITADA=true\nBACKUP_PLANILHAS_HABILITADO=true\n", {
+      mode: 0o600,
+    });
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--arquivo-google", google, "--agenda-habilitada", "false"]),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    const app = fs.readFileSync(path.join(raiz, "etc/frequenciapp/app.env"), "utf8");
+    assert.doesNotMatch(app, /^AGENDA_HABILITADA=/m);
+    assert.doesNotMatch(app, /^BACKUP_PLANILHAS_HABILITADO=/m);
+  });
+  it("simulação de retomada concluída não anuncia agendador pendente", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    assert.equal(
+      executar(argumentos(raiz, senhaAdmin), criarDeps({ raiz, cenario, chamadas: [] })).codigo,
+      0,
+    );
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--retomar", "--simular"]),
+      criarDeps({ raiz, cenario, chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0);
+    const agendador = resultado.json.etapas.find((etapa) => etapa.id === "agendador");
+    assert.equal(agendador.estado, "pulada");
+    assert.equal(agendador.detalhes.rotinas, undefined);
+  });
+  it("recusa retomada que deixaria ambientes conflitantes sem reconciliar", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    assert.equal(
+      executar(argumentos(raiz, senhaAdmin), criarDeps({ raiz, cenario, chamadas: [] })).codigo,
+      0,
+    );
+    const dir = path.join(raiz, "etc/frequenciapp");
+    const app = path.join(dir, "app.env");
+    fs.writeFileSync(
+      app,
+      fs.readFileSync(app, "utf8").replace(/^AGENDA_PLANILHAS=true$/m, "AGENDA_PLANILHAS=false"),
+    );
+    let travou = false;
+    const deps = criarDeps({ raiz, cenario, chamadas: [] });
+    deps.adquirirTrava = () => {
+      travou = true;
+      return { liberar() {} };
+    };
+    const resultado = executar(argumentos(raiz, senhaAdmin, ["--desde-etapa", "agendador"]), deps);
+    assert.notEqual(resultado.codigo, 0);
+    assert.equal(resultado.json.codigo, "E_VALIDACAO");
+    assert.equal(travou, false);
+  });
+  it("recusa valor inválido no arquivo mesmo quando uma flag o sobrepõe", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const config = path.join(raiz, "invalido.json");
+    fs.writeFileSync(config, JSON.stringify({ agendaPlanilhas: "talvez" }));
+    const chamadas = [];
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--config", config, "--agenda-planilhas", "false"]),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas }),
+    );
+    assert.notEqual(resultado.codigo, 0);
+    assert.equal(resultado.json.codigo, "E_USO");
+    assert.equal(chamadas.length, 0);
+    assert.equal(fs.existsSync(estadoDaRaiz(raiz)), false);
+  });
+  it("persiste as escolhas explícitas na configuração da instalação", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, [
+        "--agenda-planilhas",
+        "false",
+        "--backup-planilhas-habilitado",
+        "true",
+      ]),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    const config = JSON.parse(
+      fs.readFileSync(path.join(raiz, "etc/frequenciapp/instalador.json"), "utf8"),
+    );
+    assert.equal(config.agendaPlanilhas, "false");
+    assert.equal(config.backupPlanilhasHabilitado, "true");
+    assert.equal(Object.hasOwn(config, "agendaIndicadores"), false);
+  });
+  it("preserva a escolha explícita ao salvar configuração planejada", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const config = path.join(raiz, "escolhas.json");
+    const args = argumentos(raiz, senhaAdmin, [
+      "--agenda-planilhas",
+      "false",
+      "--salvar-config",
+      config,
+    ]);
+    args[0] = "planejar";
+    const deps = criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] });
+    deps.caminhoTrava = () => path.join(raiz, "plano.lock");
+    const resultado = executar(args, deps);
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    assert.equal(JSON.parse(fs.readFileSync(config, "utf8")).agendaPlanilhas, "false");
+  });
+  it("recusa escolhas quando a retomada exclui a etapa de ambiente", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    const primeiro = executar(
+      argumentos(raiz, senhaAdmin),
+      criarDeps({ raiz, cenario, chamadas: [] }),
+    );
+    assert.equal(primeiro.codigo, 0);
+    let trava = false;
+    const deps = criarDeps({ raiz, cenario, chamadas: [] });
+    deps.adquirirTrava = () => {
+      trava = true;
+      return { liberar() {} };
+    };
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--desde-etapa", "agendador", "--agenda-planilhas", "false"]),
+      deps,
+    );
+    assert.notEqual(resultado.codigo, 0);
+    assert.equal(trava, false);
+  });
+  it("retoma a partir do ambiente quando recebe uma nova escolha", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    let resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--agenda-planilhas", "false"]),
+      criarDeps({ raiz, cenario, chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--retomar", "--agenda-planilhas", "true"]),
+      criarDeps({ raiz, cenario, chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    assert.equal(
+      valorEnv(
+        fs.readFileSync(path.join(raiz, "etc/frequenciapp/app.env"), "utf8"),
+        "AGENDA_PLANILHAS",
+      ),
+      "true",
+    );
+  });
+  it("planejar mostra os seletores que serão aplicados", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const args = argumentos(raiz, senhaAdmin, ["--agenda-planilhas", "false"]);
+    args[0] = "planejar";
+    const resultado = executar(args, criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }));
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    const rotinas = resultado.json.etapas.flatMap((etapa) =>
+      etapa.detalhes?.rotinas ? [etapa.detalhes.rotinas] : [],
+    );
+    assert.equal(rotinas.length, 1);
+    assert.equal(rotinas[0].planilhas, false);
+    assert.equal(rotinas[0].backupPlanilhas, false);
+  });
+  it("recusa seletor inválido antes da trava e de qualquer mutação", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const configDir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(configDir, { recursive: true });
+    const appEnv = path.join(configDir, "app.env");
+    fs.writeFileSync(appEnv, "AGENDA_PLANILHAS=talvez\n");
+    const deps = criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] });
+    let trava = false;
+    deps.adquirirTrava = () => {
+      trava = true;
+      return { liberar() {} };
+    };
+    const resultado = executar(argumentos(raiz, senhaAdmin), deps);
+    assert.notEqual(resultado.codigo, 0);
+    assert.equal(trava, false);
+    assert.equal(fs.readFileSync(appEnv, "utf8"), "AGENDA_PLANILHAS=talvez\n");
+    assert.deepEqual(fs.readdirSync(configDir), ["app.env"]);
+  });
+  it("aceita escolha explícita para alterar seletor preservado", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const configDir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, "app.env"), "AGENDA_PLANILHAS=false\n");
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--agenda-planilhas", "true"]),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+    assert.equal(
+      valorEnv(fs.readFileSync(path.join(configDir, "app.env"), "utf8"), "AGENDA_PLANILHAS"),
+      "true",
+    );
+  });
+  it("não deixa credencial Google reativar seletor de agenda", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const configDir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, "app.env"), "AGENDA_PLANILHAS=false\n");
+    const google = path.join(raiz, "google.env");
+    fs.writeFileSync(google, "AGENDA_PLANILHAS=true\n", { mode: 0o600 });
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--arquivo-google", google]),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+    assert.equal(
+      valorEnv(fs.readFileSync(path.join(configDir, "app.env"), "utf8"), "AGENDA_PLANILHAS"),
+      "false",
+    );
+  });
+  it("preserva controles desativados ao aplicar e repetir com destino do banco", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const configDir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(configDir, { recursive: true });
+    const appEnv = path.join(configDir, "app.env");
+    const opsEnv = path.join(configDir, "ops.env");
+    const seletores = ["AGENDA_NOTIFICACOES", "AGENDA_PLANILHAS", "AGENDA_INDICADORES"];
+    fs.writeFileSync(appEnv, seletores.map((chave) => `${chave}=false\n`).join(""));
+    fs.writeFileSync(
+      opsEnv,
+      ["AGENDA_HABILITADA", ...seletores, "BACKUP_PLANILHAS_HABILITADO"]
+        .map((chave) => `${chave}=false\n`)
+        .join(""),
+    );
+    const cenario = cenarioPadrao();
+    cenario.verificadoRemoto = true;
+    for (let rodada = 0; rodada < 2; rodada += 1) {
+      const chamadas = [];
+      const resultado = executar(
+        argumentos(raiz, senhaAdmin, ["--destino", "remoto:backup-banco"]),
+        criarDeps({ raiz, cenario, chamadas }),
+      );
+      assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+      const app = fs.readFileSync(appEnv, "utf8");
+      const ops = fs.readFileSync(opsEnv, "utf8");
+      for (const chave of seletores) {
+        assert.equal(valorEnv(app, chave), "false", `app ${chave} rodada ${rodada}`);
+        assert.equal(valorEnv(ops, chave), "false", `ops ${chave} rodada ${rodada}`);
+      }
+      for (const chave of ["AGENDA_HABILITADA", "BACKUP_PLANILHAS_HABILITADO"]) {
+        assert.equal(valorEnv(ops, chave), "false", `ops ${chave} rodada ${rodada}`);
+      }
+      assert.equal(valorEnv(ops, "BACKUP_REMOTO"), "remoto:backup-banco");
+      const timers = resultado.json.etapas.find((etapa) => etapa.id === "agendador").detalhes
+        .timers;
+      assert.equal(timers.includes("frequenciapp-agenda.timer"), false);
+      assert.equal(timers.includes("frequenciapp-backup-planilhas.timer"), false);
+    }
+  });
+
+  it("não agenda backup de planilhas em instalação nova só por destino remoto do banco", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    cenario.verificadoRemoto = true;
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--destino", "remoto:backup-banco"]),
+      criarDeps({ raiz, cenario, chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+    const ops = fs.readFileSync(path.join(raiz, "etc/frequenciapp/ops.env"), "utf8");
+    assert.equal(valorEnv(ops, "BACKUP_REMOTO"), "remoto:backup-banco");
+    assert.equal(valorEnv(ops, "BACKUP_PLANILHAS_HABILITADO"), "false");
+    const timers = resultado.json.etapas.find((etapa) => etapa.id === "agendador").detalhes.timers;
+    assert.equal(timers.includes("frequenciapp-backup-planilhas.timer"), false);
+  });
+
+  it("propaga seletor desativado mesmo quando só existe em um arquivo de ambiente", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const configDir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(configDir, { recursive: true });
+    const appEnv = path.join(configDir, "app.env");
+    const opsEnv = path.join(configDir, "ops.env");
+    fs.writeFileSync(appEnv, "AGENDA_PLANILHAS=false\n");
+    fs.writeFileSync(opsEnv, "AGENDA_NOTIFICACOES=false\n");
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+    for (const caminho of [appEnv, opsEnv]) {
+      const texto = fs.readFileSync(caminho, "utf8");
+      assert.equal(valorEnv(texto, "AGENDA_PLANILHAS"), "false", caminho);
+      assert.equal(valorEnv(texto, "AGENDA_NOTIFICACOES"), "false", caminho);
+    }
+  });
+
+  it("mostra no plano de aplicar os efeitos ativos e desativados da instalação existente", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const configDir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, "app.env"), "AGENDA_PLANILHAS=false\n");
+    fs.writeFileSync(
+      path.join(configDir, "ops.env"),
+      "AGENDA_HABILITADA=true\nAGENDA_NOTIFICACOES=true\nAGENDA_INDICADORES=false\nBACKUP_PLANILHAS_HABILITADO=false\n",
+    );
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin, ["--simular"]),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+    const agendador = resultado.json.etapas.find((etapa) => etapa.id === "agendador");
+    assert.deepEqual(agendador.detalhes.rotinas, {
+      agenda: true,
+      notificacoes: true,
+      planilhas: false,
+      indicadores: false,
+      backupPlanilhas: false,
+    });
+  });
+
   it("percorre as etapas, grava estado, ambiente e primeiro backup sem vazar segredo", () => {
     const { raiz, senhaAdmin } = prepararRaiz();
     const cenario = cenarioPadrao();

@@ -20,44 +20,6 @@ function erroControlador(mensagem, dica) {
   return falha("E_CONTROLADOR", mensagem, { dica, documentacao: DOCUMENTACAO });
 }
 
-function arquivarCaminho(ctx, caminho, rotulo, acoes) {
-  if (typeof caminho !== "string" || !caminho) return false;
-  let informacao;
-  try {
-    informacao = fs.lstatSync(caminho);
-  } catch (erro) {
-    if (erro?.code === "ENOENT") return false;
-    throw erroControlador(
-      `Não foi possível consultar ${rotulo} anterior.`,
-      "Confira a permissão do caminho e repita a adoção.",
-    );
-  }
-  if (informacao.isSymbolicLink()) {
-    throw erroControlador(
-      `${rotulo} anterior não pode ser um link simbólico.`,
-      "Remova o link e repita a adoção em um caminho regular.",
-    );
-  }
-  const sufixo = String(ctx.agora()).replace(/\D/g, "").slice(0, 14) || String(Date.now());
-  let destino = `${caminho}.anterior-${sufixo}`;
-  let tentativa = 1;
-  while (fs.existsSync(destino)) {
-    destino = `${caminho}.anterior-${sufixo}-${tentativa}`;
-    tentativa += 1;
-  }
-  try {
-    fs.renameSync(caminho, destino);
-  } catch {
-    throw erroControlador(
-      `Não foi possível arquivar ${rotulo} anterior.`,
-      "Preserve o diretório e repita a adoção depois de revisar as permissões.",
-    );
-  }
-  acoes.push(acao(`Arquiva ${rotulo} anterior em ${path.basename(destino)}`, null, true));
-  registrar(ctx, `etapa=controlador arquivado=${rotulo}`);
-  return true;
-}
-
 function consultarPerfil(caminho) {
   try {
     const informacao = fs.lstatSync(caminho);
@@ -243,6 +205,11 @@ export function executar(ctx) {
     perfil.regular &&
     estadoControlador.readocaoPendente !== true
   ) {
+    executarComando(ctx, argumentosRotinas(ctx, "--plano"), {
+      timeout: TIMEOUT_ROTINAS_MS,
+      mensagem: "O plano das rotinas estáveis do controlador falhou.",
+      dica: "Confira o journal, o fuso do cron e o perfil adotado.",
+    });
     const migradorSha256 = hashAdotado(ctx);
     registrar(ctx, "etapa=controlador estado=concluida semMudancas=true");
     return {
@@ -270,9 +237,10 @@ export function executar(ctx) {
     );
   }
   if (readocao) {
-    arquivarCaminho(ctx, ctx.caminhos.controladorPrefixo, "prefixo do controlador", acoes);
-    arquivarCaminho(ctx, ctx.caminhos.cronFrequenciapp, "cron do controlador", acoes);
-    acoes.push(acao("Readota o controlador após a troca de canal", null, true));
+    throw erroControlador(
+      "A readoção exige revisão administrativa sem mover o prefixo ou a trava ativa.",
+      "Preserve journal e pins; a transição restrita de seletores usa o comando de reconfiguração.",
+    );
   }
 
   const operador = String(ctx.configuracao.operadorControlador ?? "").trim();

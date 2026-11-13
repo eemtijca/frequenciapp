@@ -48,25 +48,29 @@ export function caminhosOperacao(raiz = "/", configuracao = {}, modoTeste = fals
   };
 }
 
-// Lê um arquivo de ambiente no formato CHAVE=valor, sem interpretar shell.
+// Lê atribuições literais de ambiente, com export opcional e sem executar shell.
 export function lerEnv(texto) {
   const mapa = new Map();
+  const literais = new Map();
   const ordem = [];
   for (const linha of String(texto ?? "").split(/\r?\n/)) {
-    const combinacao = /^\s*([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(linha);
+    const combinacao = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/.exec(linha);
     if (!combinacao) continue;
     let valor = combinacao[2];
     if (valor.startsWith('"') && valor.endsWith('"') && valor.length >= 2) {
       valor = valor.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+    } else if (valor.startsWith("'") && valor.endsWith("'") && valor.length >= 2) {
+      valor = valor.slice(1, -1);
     }
     if (!mapa.has(combinacao[1])) ordem.push(combinacao[1]);
     mapa.set(combinacao[1], valor);
+    literais.set(combinacao[1], combinacao[2]);
   }
-  return { mapa, ordem };
+  return { mapa, ordem, literais };
 }
 
 // Monta o texto estável de um arquivo de ambiente.
-export function montarEnv(mapa, ordem, cabecalho = "") {
+export function montarEnv(mapa, ordem, cabecalho = "", literais = new Map()) {
   const linhas = [];
   if (cabecalho) linhas.push(...cabecalho.split("\n"));
   for (const chave of ordem) {
@@ -75,7 +79,10 @@ export function montarEnv(mapa, ordem, cabecalho = "") {
     if (/[\r\n]/.test(valor)) {
       throw erroValidacao(`O valor da variável ${chave} não pode ter quebra de linha.`);
     }
-    linhas.push(`${chave}=${valor}`);
+    const literal =
+      literais.get(chave) ??
+      (/^[\p{L}\p{N}\p{M}_.:/@%+=,-]*$/u.test(valor) ? valor : JSON.stringify(valor));
+    linhas.push(`${chave}=${literal}`);
   }
   return `${linhas.join("\n")}\n`;
 }
@@ -89,6 +96,10 @@ export function atualizarEnv(existente, gerenciados, cabecalho = "") {
   }
   const mapa = new Map(lido.mapa);
   for (const [chave, valor] of gerenciados) mapa.set(chave, String(valor));
+  const literais = new Map();
+  for (const [chave, literal] of lido.literais) {
+    if (!gerenciados.has(chave)) literais.set(chave, literal);
+  }
   const igual =
     Boolean(existente) &&
     lido.ordem.every((chave) => mapa.has(chave)) &&
@@ -96,7 +107,7 @@ export function atualizarEnv(existente, gerenciados, cabecalho = "") {
     [...mapa].every(([chave, valor]) => lido.mapa.get(chave) === valor);
   return {
     alterou: !igual,
-    texto: igual ? existente : montarEnv(mapa, ordem, cabecalho),
+    texto: igual ? existente : montarEnv(mapa, ordem, cabecalho, literais),
     mapa,
   };
 }

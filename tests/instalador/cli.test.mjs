@@ -86,6 +86,15 @@ describe("ajuda e versão", () => {
     assert.match(resultado.stdout, /restaurar/);
     assert.match(resultado.stdout, /desinstalar/);
     assert.match(resultado.stdout, /--nao-interativo/);
+    for (const flag of [
+      "--agenda-habilitada",
+      "--agenda-notificacoes",
+      "--agenda-planilhas",
+      "--agenda-indicadores",
+      "--backup-planilhas-habilitado",
+    ]) {
+      assert.ok(resultado.stdout.includes(flag), `ajuda não documenta ${flag}`);
+    }
     assert.doesNotMatch(resultado.stdout, /[\u2026\u2014\u2013\u201C\u201D\u2192]/);
   });
 

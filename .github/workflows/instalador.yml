@@ -7,6 +7,9 @@ on:
       - "instalar.sh"
       - "scripts/instalador/**"
       - "tests/instalador/**"
+      - "scripts/servidor/**"
+      - "tests/servidor/controlador/**"
+      - "docker/app/migrar.mjs"
       - "package.json"
       - "docs/instalador.md"
       - ".github/workflows/instalador.yml"
@@ -80,6 +83,34 @@ jobs:
         env:
           INSTALADOR_MATRIZ: "0"
         run: npm run test:instalador:unit
+
+  controlador:
+    name: Controlador administrativo isolado
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Preparar imagem apenas com fontes públicas versionadas
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          contexto=$(mktemp -d "$RUNNER_TEMP/controlador.XXXXXXXX")
+          git archive --format=tar HEAD scripts/servidor scripts/instalador \
+            tests/servidor/controlador docker/app/migrar.mjs package.json | tar -x -C "$contexto"
+          docker build --network default \
+            -f "$contexto/tests/servidor/controlador/Dockerfile" \
+            -t "frequenciapp-controlador-teste:${{ github.run_id }}-${{ github.run_attempt }}" "$contexto"
+
+      - name: Testar com root interno sem rede ou socket Docker
+        run: >
+          docker run --rm --network none --read-only --cap-drop ALL
+          --security-opt no-new-privileges --user 0:0
+          --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777
+          "frequenciapp-controlador-teste:${{ github.run_id }}-${{ github.run_attempt }}"
 
   matriz:
     name: Matriz Docker de plano

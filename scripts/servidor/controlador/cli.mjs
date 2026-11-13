@@ -370,6 +370,22 @@ async function executar(arquivo, args, trancado) {
     env = lerAmbiente(p),
     acao = args[0],
     opcoes = args.slice(1);
+  // O wrapper público do checkout é só um despachante. Nunca executa código
+  // antigo do prefixo nem transfere sua autorização para uma geração obsoleta.
+  if (
+    !trancado &&
+    acao === "instalar-rotinas" &&
+    aqui !== `${p.snapshot}/scripts/servidor/controlador` &&
+    !aqui.startsWith(`${p.prefixo}/`)
+  ) {
+    const r = spawnSync(`${p.prefixo}/executar`, args, {
+      env: { PATH: pathSistema },
+      stdio: "inherit",
+    });
+    process.exitCode = r.status ?? 1;
+    return;
+  }
+  exigir(aqui === `${p.snapshot}/scripts/servidor/controlador`, "Geração obsoleta do controlador.");
   exigir(
     Object.hasOwn(acoes, acao) || ["estado", "instalar-rotinas"].includes(acao),
     "Operação não permitida; Compose arbitrário não é uma entrada do operador.",
@@ -511,6 +527,28 @@ async function executar(arquivo, args, trancado) {
 async function principal() {
   const [acao, arquivo, ...args] = process.argv.slice(2);
   if (acao === "instalar") return instalar(process.argv.slice(3));
+  if (acao === "consultar-compose") {
+    exigir(
+      ["config", "ps", "images", "version", "logs"].includes(args[0]),
+      "Consulta Compose não permitida.",
+    );
+    const p = perfil(arquivo);
+    const env = {
+      ...lerAmbiente(p),
+      COMPOSE_ARQUIVOS: p.compose.join(":"),
+      SERVIDOR_CONTROLADOR_LEITURA: "compose",
+    };
+    const r = spawnSync("/bin/bash", [`${p.snapshot}/scripts/servidor/compose.sh`, ...args], {
+      env,
+      stdio: "inherit",
+    });
+    process.exitCode = r.error ? 78 : (r.status ?? 1);
+    return;
+  }
+  if (acao === "reconfigurar-rotinas") {
+    const { reconfigurarRotinas } = await import("./reconfigurar.mjs");
+    return reconfigurarRotinas(arquivo, args);
+  }
   if (acao === "executar" || acao === "trancado")
     return executar(arquivo, args, acao === "trancado");
   const p = autorizar(arquivo, "atualizar"),

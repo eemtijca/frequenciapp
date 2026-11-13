@@ -3,7 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 export const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 export function exigir(ok, mensagem) {
@@ -278,13 +278,17 @@ export function verificarEstadoLegado(p) {
   }
 }
 export function perfil(arquivo, conferirSnapshot = true) {
+  return conferirPerfil(arquivo, json(arquivo), conferirSnapshot);
+}
+function conferirPerfil(arquivo, p, conferirSnapshot = true, ambientes = null) {
   exigir(
     process.getuid() === 0,
     "Controlador requer entrada administrativa autorizada; não é setuid.",
   );
-  const p = json(arquivo);
   exigir(
-    p.versao === 1 && p.tipo === "compose-host" && arquivo === `${p.prefixo}/perfil.json`,
+    [1, 2].includes(p.versao) &&
+      p.tipo === "compose-host" &&
+      arquivo === `${p.prefixo}/perfil.json`,
     "Perfil não adotado por este controlador.",
   );
   for (const nome of [
@@ -307,9 +311,15 @@ export function perfil(arquivo, conferirSnapshot = true) {
       hash(fs.readFileSync(p.identidade)) === p.identidadeSha256,
     "Identidade adotada mudou.",
   );
+  for (const n of [p.appEnv, p.opsEnv]) protegido(n, "arquivo", true);
   exigir(
-    hash(fs.readFileSync(p.appEnv)) === p.appEnvSha256 &&
-      hash(fs.readFileSync(p.opsEnv)) === p.opsEnvSha256,
+    p.versao !== 2 ||
+      (p.snapshot === `${p.prefixo}/geracoes/${p.geracao}` && /^[a-f0-9-]{36}$/.test(p.geracao)),
+    "Geração inválida no perfil.",
+  );
+  exigir(
+    hash(ambientes?.get(p.appEnv) ?? fs.readFileSync(p.appEnv)) === p.appEnvSha256 &&
+      hash(ambientes?.get(p.opsEnv) ?? fs.readFileSync(p.opsEnv)) === p.opsEnvSha256,
     "Configuração mudou; adoção explícita necessária.",
   );
   verificarEstadoLegado(p);
@@ -334,6 +344,178 @@ export function perfil(arquivo, conferirSnapshot = true) {
   }
   return p;
 }
+export const SELETORES_ROTINAS = [
+  "AGENDA_HABILITADA",
+  "AGENDA_NOTIFICACOES",
+  "AGENDA_PLANILHAS",
+  "AGENDA_INDICADORES",
+  "BACKUP_PLANILHAS_HABILITADO",
+];
+export function atualizarSeletores(bytes, seletores) {
+  exigir(
+    Object.keys(seletores).length === 5 &&
+      SELETORES_ROTINAS.every((n) => ["true", "false"].includes(seletores[n])),
+    "Informar somente os cinco seletores booleanos.",
+  );
+  const vistas = new Set();
+  let texto = bytes
+    .toString("utf8")
+    .split(/(?<=\n)/)
+    .map((linha) => {
+      const nome = /^[ \t]*(?:export[ \t]+)?([A-Z_]+)[ \t]*=/.exec(linha)?.[1];
+      if (!SELETORES_ROTINAS.includes(nome)) return linha;
+      exigir(!vistas.has(nome), `Seletor ${nome} duplicado.`);
+      vistas.add(nome);
+      const m =
+        /^([ \t]*(?:export[ \t]+)?[A-Z_]+[ \t]*=[ \t]*)("(?:true|false)"|'(?:true|false)'|true|false)([ \t]*(?:#[^\r\n]*)?)(\r?\n)?$/.exec(
+          linha,
+        );
+      exigir(m, `Seletor ${nome} não é uma atribuição literal booleana.`);
+      const aspas = ["'", '"'].includes(m[2][0]) ? m[2][0] : "";
+      return `${m[1]}${aspas}${seletores[nome]}${aspas}${m[3]}${m[4] ?? ""}`;
+    })
+    .join("");
+  for (const n of SELETORES_ROTINAS)
+    if (!vistas.has(n)) {
+      if (texto && !texto.endsWith("\n")) texto += "\n";
+      texto += `${n}=${seletores[n]}\n`;
+    }
+  return Buffer.from(texto);
+}
+
+export function configuracaoRotinas(bytes, seletores) {
+  const config = bytes === null ? {} : JSON.parse(bytes.toString("utf8"));
+  exigir(
+    config && typeof config === "object" && !Array.isArray(config),
+    "Configuração do instalador inválida.",
+  );
+  const campos = [
+    "agendaHabilitada",
+    "agendaNotificacoes",
+    "agendaPlanilhas",
+    "agendaIndicadores",
+    "backupPlanilhasHabilitado",
+  ];
+  for (const [indice, nome] of SELETORES_ROTINAS.entries())
+    config[campos[indice]] = seletores[nome];
+  return Buffer.from(JSON.stringify(config) + "\n");
+}
+
+// Somente esta leitura administrativa aceita uma publicação incompleta. Cada byte
+// precisa pertencer aos estados antigo/novo de uma intenção durável e restrita.
+export function retomadaRotinas(arquivo) {
+  const prefixo = path.dirname(arquivo),
+    atual = json(arquivo);
+  exigir(
+    atual.prefixo === prefixo && atual.dados === `${prefixo}/dados`,
+    "Prefixo de retomada inválido.",
+  );
+  const raiz = `${prefixo}/dados/journal`;
+  protegido(raiz, "diretorio", true);
+  const pendentes = fs
+    .readdirSync(raiz)
+    .filter((n) => !fs.existsSync(`${raiz}/${n}/concluida.json`));
+  if (!pendentes.length) return null;
+  exigir(
+    pendentes.length === 1 && /^[a-f0-9-]{36}$/.test(pendentes[0]),
+    "Journal anterior incerto; reconfiguração recusada.",
+  );
+  const operacao = pendentes[0],
+    pasta = `${raiz}/${operacao}`,
+    i = json(`${pasta}/intencao.json`);
+  exigir(
+    i.versao === 1 &&
+      i.operacao === operacao &&
+      i.alvo === atual.alvo &&
+      i.acao === "reconfigurar-rotinas" &&
+      Array.isArray(i.arquivos),
+    "Journal anterior incerto; reconfiguração recusada.",
+  );
+  exigir(!fs.existsSync(`${pasta}/incerta.json`), "Operação incerta bloqueia mutações.");
+  const reg = i.arquivos.find((a) => a.caminho === arquivo);
+  exigir(reg, "Transição sem perfil comprovado.");
+  const p = JSON.parse(Buffer.from(reg.antes, "base64")),
+    q = JSON.parse(Buffer.from(reg.depois, "base64"));
+  exigir(
+    p.prefixo === prefixo &&
+      p.dados === `${prefixo}/dados` &&
+      q.snapshot === `${prefixo}/geracoes/${operacao}` &&
+      q.versao === 2 &&
+      q.geracao === operacao,
+    "Geração da transição inválida.",
+  );
+  const equivalencia = {
+    ...q,
+    versao: p.versao,
+    snapshot: p.snapshot,
+    compose: p.compose,
+    manifestoSha256: p.manifestoSha256,
+    appEnvSha256: p.appEnvSha256,
+    opsEnvSha256: p.opsEnvSha256,
+  };
+  if (p.geracao === undefined) delete equivalencia.geracao;
+  else equivalencia.geracao = p.geracao;
+  exigir(
+    JSON.stringify(equivalencia) === JSON.stringify(p),
+    "Transição altera campos não autorizados do perfil.",
+  );
+  exigir(
+    JSON.stringify(q.compose) ===
+      JSON.stringify(p.compose.map((n) => q.snapshot + n.slice(p.snapshot.length))),
+    "Compose da geração diverge.",
+  );
+  protegido(i.destino, "diretorio");
+  const permitidos = new Map([
+    [p.appEnv, 0o600],
+    [p.opsEnv, 0o600],
+    [arquivo, 0o600],
+    [`${prefixo}/executar`, 0o700],
+    [`${i.destino}/cron.d/frequenciapp`, 0o644],
+    [`${i.destino}/logrotate.d/frequenciapp`, 0o644],
+    [`${p.dados}/rotinas.json`, 0o600],
+    [`${p.config}/instalador.json`, 0o600],
+  ]);
+  exigir(i.arquivos.length === permitidos.size, "Arquivos incompletos na transição.");
+  const antigos = new Map(),
+    novos = new Map();
+  for (const a of i.arquivos) {
+    exigir(
+      permitidos.get(a.caminho) === a.modo && !antigos.has(a.caminho),
+      "Destino não autorizado na transição.",
+    );
+    const antes = a.antes === null ? null : Buffer.from(a.antes, "base64"),
+      depois = Buffer.from(a.depois, "base64");
+    exigir(
+      (antes === null ? a.antesSha256 === null : hash(antes) === a.antesSha256) &&
+        hash(depois) === a.depoisSha256,
+      "Bytes da transição não conferem.",
+    );
+    const s = fs.lstatSync(a.caminho, { throwIfNoEntry: false });
+    if (s) protegido(a.caminho, "arquivo", a.modo === 0o600);
+    const visivel = s ? fs.readFileSync(a.caminho) : null;
+    exigir(
+      visivel ? visivel.equals(depois) || (antes && visivel.equals(antes)) : antes === null,
+      "Arquivo não corresponde ao estado antigo ou novo comprovado.",
+    );
+    antigos.set(a.caminho, antes);
+    novos.set(a.caminho, depois);
+  }
+  for (const n of [p.appEnv, p.opsEnv])
+    exigir(
+      antigos.get(n) && atualizarSeletores(antigos.get(n), i.seletores).equals(novos.get(n)),
+      "Transição modifica configuração além dos seletores.",
+    );
+  conferirPerfil(arquivo, p, true, antigos);
+  const config = `${p.config}/instalador.json`;
+  exigir(
+    configuracaoRotinas(antigos.get(config), i.seletores).equals(novos.get(config)),
+    "Transição altera configuração do instalador além dos seletores.",
+  );
+  conferirPerfil(arquivo, q, true, novos);
+  verificarJournal(p, operacao);
+  return { p, q, i, operacao, pasta };
+}
+
 export function verificarJournal(p, operacaoPermitida = "") {
   const raiz = `${p.dados}/journal`;
   protegido(raiz, "diretorio", true);
@@ -390,6 +572,10 @@ export function verificarPin(p, operacao) {
 export function autorizar(arquivo, acao) {
   acao = { atualizacao: "atualizar", restauracao: "restaurar" }[acao] ?? acao;
   const p = perfil(arquivo);
+  exigir(
+    fileURLToPath(import.meta.url) === `${p.snapshot}/scripts/servidor/controlador/contrato.mjs`,
+    "Geração obsoleta do controlador.",
+  );
   exigir(process.env.SERVIDOR_ALVO_CHAVE === p.alvo, "Alvo da trava diverge do perfil adotado.");
   const s = fs.fstatSync(9),
     lock = fs.statSync(`${p.locks}/operacoes-${p.alvo}.lock`);

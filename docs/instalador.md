@@ -127,7 +127,7 @@ O perfil `simples` executa 16 etapas, sem `dropbox` e sem `controlador`. O perfi
 
 O `aplicar` interrompe na etapa exata da falha, preserva estado e recursos e não faz limpeza destrutiva. Depois de uma migração aplicada, ele não inicia automaticamente a imagem anterior. A recuperação usa o backup e `restaurar.sh`.
 
-No perfil `dropbox`, a etapa `dropbox` exige `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino`, valida a adoção e o hash do `rclone.conf` e grava a configuração no `ops.env` antes do primeiro backup. O upload continua no rclone e a verificação nativa fica no `backup-banco.sh`. O perfil `controlador` exige `--operador-controlador`, adota o snapshot e instala o cron estável; a readoção após troca de canal arquiva o prefixo e o cron anteriores. O primeiro backup usa a cifra configurada e exige a chave pública em `BACKUP_GPG_CHAVE_PUBLICA` ou o arquivo de destinatários age. O fingerprint de `--destinatario-gpg` também é usado como pin; quando a chave de cifra for uma subchave, definir `BACKUP_GPG_FINGERPRINT` com o fingerprint da chave primária. Nesta versão, o `aplicar` dos perfis disponíveis aceita apenas `--modo-backup compose`; o modo URL fica para a evolução do instalador.
+No perfil `dropbox`, a etapa `dropbox` exige `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino`, valida a adoção e o hash do `rclone.conf` e grava a configuração no `ops.env` antes do primeiro backup. O upload continua no rclone e a verificação nativa fica no `backup-banco.sh`. O perfil `controlador` exige `--operador-controlador`, adota o snapshot e instala o cron estável; a readoção ampla após troca de canal exige revisão administrativa e não move automaticamente o prefixo nem a trava. O primeiro backup usa a cifra configurada e exige a chave pública em `BACKUP_GPG_CHAVE_PUBLICA` ou o arquivo de destinatários age. O fingerprint de `--destinatario-gpg` também é usado como pin; quando a chave de cifra for uma subchave, definir `BACKUP_GPG_FINGERPRINT` com o fingerprint da chave primária. Nesta versão, o `aplicar` dos perfis disponíveis aceita apenas `--modo-backup compose`; o modo URL fica para a evolução do instalador.
 
 Ações destrutivas exigem `--sim`. Com `--nao-interativo` e sem `--sim`, a execução falha com `E_USO` antes de qualquer alteração. O `--forcar` repete a etapa selecionada, mas não ignora estado incerto, política de canal, downgrade nem hash do controlador.
 
@@ -142,7 +142,7 @@ As flags de teste têm efeito restrito:
 
 A etapa `agendador` roda entre `backup-inicial` e `firewall`. Com `--agendador auto`, o padrão, ela usa systemd quando o host é systemd e cai para cron quando o iniciador não é systemd ou o `systemctl` não está disponível. `--agendador systemd` exige systemd em execução; `--agendador cron` usa `scripts/servidor/instalar-rotinas.sh`.
 
-Nos perfis com controlador, a etapa `agendador` é pulada. A etapa `controlador` instala as rotinas estáveis com `instalar-rotinas.sh --controlador --perfil /opt/frequenciapp-controlador/perfil.json`, sempre em cron. A readoção após troca de canal arquiva o prefixo e o cron anteriores antes de confirmar a nova adoção.
+Nos perfis com controlador, a etapa `agendador` é pulada. A etapa `controlador` instala as rotinas estáveis com `instalar-rotinas.sh --controlador --perfil /opt/frequenciapp-controlador/perfil.json`, sempre em cron. A readoção ampla após troca de canal é recusada até revisão administrativa; o prefixo e a trava não são movidos automaticamente.
 
 No systemd, o instalador grava units e timers em `/etc/systemd/system` para a agenda, o backup do banco, o backup das planilhas, a renovação do certificado e a atualização. Os timers usam `Persistent=true`, `RandomizedDelaySec`, `AccuracySec=1min` e um usuário de serviço; as units usam `OnFailure` para a unidade `frequenciapp-falha@.service`, `WorkingDirectory` e `ReadWritePaths`. A agenda, o backup do banco e o backup das planilhas respeitam `AGENDA_HABILITADA`, `BACKUP_HABILITADO` e `BACKUP_PLANILHAS_HABILITADO` em `ops.env`. A renovação do certificado só é agendada com Nginx e TLS `acme`; o Caddy renova os certificados sozinho. As expressões `OnCalendar` são validadas com `systemd-analyze calendar` quando a ferramenta existe.
 
@@ -151,6 +151,27 @@ O fuso do host é conferido com `timedatectl`. Uma divergência em relação a `
 A atualização automática fica desabilitada por padrão. O timer de atualização só é instalado com `--habilitar-atualizacoes`, e o canal `main` exige `--permitir-instavel`. O timer usa o canal definido em `--canal-atualizacao` e a referência de `--ref-atualizacao`. No fallback cron, a linha gerada por `instalar-rotinas.sh` recebe o mesmo modo de atualização e a referência vem de `ATUALIZAR_REF` em `ops.env`.
 
 A segunda execução não reescreve uma unit igual, não duplica a linha de cron e não reinicia um timer que já está ativo e sem mudanças. A falha de uma unidade é registrada no journal e, quando `NOTIFICAR_URL` existe em `ops.env`, enviada por HTTP sem expor a URL no journal ou nos argumentos do processo.
+
+#### Seleção das rotinas
+
+As flags `--agenda-habilitada`, `--agenda-notificacoes`, `--agenda-planilhas`, `--agenda-indicadores` e `--backup-planilhas-habilitado` exigem o valor literal `true` ou `false`. As chaves JSON correspondentes são `agendaHabilitada`, `agendaNotificacoes`, `agendaPlanilhas`, `agendaIndicadores` e `backupPlanilhasHabilitado`, e aceitam booleanos ou essas duas strings. As escolhas explícitas ficam em `instalador.json` e aparecem em `etapas[].detalhes.rotinas` no plano.
+
+A flag prevalece sobre o JSON. Sem escolha explícita, um `false` em qualquer um dos arquivos `app.env` e `ops.env` prevalece sobre um `true` no outro. O instalador reconcilia os seletores de notificações, planilhas e indicadores nos dois arquivos. A agenda geral e o backup das planilhas são controlados em `ops.env`. São aceitas atribuições literais com `export` opcional e aspas simples ou duplas; valor inválido ou seletor repetido no mesmo arquivo é recusado antes de adquirir a trava ou alterar arquivos. O arquivo indicado por `--arquivo-google` não pode sobrepor esses cinco controles.
+
+Na instalação nova, a agenda geral e seus três seletores mantêm o padrão `true`. O backup de planilhas tem padrão `false`, independentemente de `--destino`, que configura o backup do banco. Habilitar o backup de planilhas exige escolha separada e a configuração própria descrita em [backup-servidor.md](backup-servidor.md). Desligar a agenda geral impede seu agendamento, mas não revoga a autorização de chamadas manuais das rotas.
+
+Exemplo de instalação sem rotina automática de planilhas:
+
+```bash
+sudo ./instalar.sh aplicar --config /root/instalador.json \
+  --agenda-planilhas false \
+  --backup-planilhas-habilitado false \
+  --sim
+```
+
+No perfil simples, a retomada com escolhas explícitas precisa incluir a etapa `ambiente`. O `--desde-etapa` posterior ao ambiente não pode descartar silenciosamente essas escolhas. Uma retomada que pule a reconciliação de ambientes conflitantes é recusada.
+
+Em controlador já adotado, o `aplicar` usa a [reconfiguração restrita](controlador-manutencao.md#reconfiguração-dos-seletores), sem repetir o pipeline. O legado sem recibo de cron exige `--adotar-cron-sha256 <hash>` com o SHA-256 exato revisado pelo administrador; essa autorização não é gravada como padrão reutilizável. Configurações divergentes, journal incerto e readoção ampla pendente continuam bloqueados.
 
 ### situacao
 
@@ -507,7 +528,7 @@ O `--permitir-migracoes` confirma a aplicação de migrações novas em `atualiz
 
 O controlador é opt-in e não bloqueia o perfil simples. Quando adotado, o estado do instalador registra `controlador.adotado`, `controlador.migradorSha256` e `controlador.readocaoPendente`.
 
-Uma troca de canal que muda o `migradorSha256` invalida o marcador do controlador. O controlador fica parado, o journal e os pins são preservados e `situacao` e `diagnosticar` mostram `E_CONTROLADOR`. A readoção é feita com `aplicar --perfil controlador`, depois de:
+Uma troca de canal que muda o `migradorSha256` invalida o marcador do controlador. O controlador fica parado, o journal e os pins são preservados e `situacao` e `diagnosticar` mostram `E_CONTROLADOR`. A readoção ampla exige procedimento administrativo separado, preservando a trava, depois de:
 
 1. confirmar que o journal não tem operação incerta;
 2. confirmar o backup e o recibo;
@@ -750,7 +771,7 @@ sudo ./instalar.sh aplicar \
   --sim
 ```
 
-O perfil completo usa as duas configurações no mesmo comando. A etapa Dropbox roda antes do primeiro backup, e a etapa controlador roda depois do firewall. Em uma readoção, o prefixo e o cron anteriores são arquivados com o sufixo `.anterior-<data>` antes da nova confirmação.
+O perfil completo usa as duas configurações no mesmo comando. A etapa Dropbox roda antes do primeiro backup, e a etapa controlador roda depois do firewall. A reconfiguração dos seletores preserva o prefixo e a trava; uma readoção ampla exige revisão administrativa separada.
 
 ### Rocky Linux 9
 
@@ -792,7 +813,7 @@ sudo ./instalar.sh canal definir release --tag v1.0.0 --aplicar --sim
 sudo ./instalar.sh situacao --json
 ```
 
-Se o controlador estiver adotado e o `migradorSha256` mudar, a troca termina com o controlador parado e `readocaoPendente: true`. A readoção usa `sudo ./instalar.sh aplicar --perfil controlador --sim`, depois da revisão do journal e dos pins.
+Se o controlador estiver adotado e o `migradorSha256` mudar, a troca termina com o controlador parado e `readocaoPendente: true`. A readoção ampla permanece bloqueada no instalador até revisão administrativa separada do journal, dos pins e da trava.
 
 ## Para agentes de IA
 
@@ -955,7 +976,7 @@ Os testes ficam em `tests/instalador/` e cobrem:
 - perfis `simples`, `controlador`, `dropbox` e `completo`;
 - matriz de plano em todas as distros Tier 1; o subconjunto de aplicação entra com a implementação do `aplicar`.
 
-O workflow `instalador.yml` separa qualidade, unidade e matriz de plano. A matriz de aplicação entra com a implementação do `aplicar`. A suíte de qualidade do repositório continua rodando formatação, lint, tipos e unidade. O instalador não depende de `pnpm` no host de produção; a matriz usa Docker e Node 24 preparado fora do worktree.
+O workflow `instalador.yml` separa qualidade, unidade, controlador administrativo isolado e matriz de plano. As regressões de controlador adotado ficam em `tests/servidor/controlador/`, fora da suíte sem privilégio do instalador, e rodam no contêiner dedicado sem rede ou socket Docker. A matriz de aplicação entra com a implementação do `aplicar`. A suíte de qualidade do repositório continua rodando formatação, lint, tipos e unidade. O instalador não depende de `pnpm` no host de produção; a matriz usa Docker e Node 24 preparado fora do worktree.
 
 ## Referências
 

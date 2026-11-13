@@ -183,7 +183,7 @@ A convenção das suítes está em [docs/testes.md](docs/testes.md) e [tests/REA
 
 O VPS Linux é o destino de produção do FrequenciApp. A Vercel fica como ambiente de preview ou desligada, sem deploy automático da `main`. A escolha evita dois bancos, duas agendas e duas origens de dados para o mesmo domínio.
 
-O instalador `instalar.sh` é o caminho recomendado em VPS. Ele segue o contrato de [docs/instalador.md](docs/instalador.md), com comandos, flags, JSON e códigos de erro estáveis, e orquestra os scripts de servidor já existentes. O [roteiro do ensaio em VPS](docs/ensaio-implantacao-vps.md) descreve a validação em Ubuntu 26.04 descartável; o roteiro foi escrito e ainda não foi executado.
+O instalador `instalar.sh` é o caminho recomendado em VPS. Ele segue o contrato de [docs/instalador.md](docs/instalador.md), com comandos, flags, JSON e códigos de erro estáveis, e orquestra os scripts de servidor já existentes.
 
 No caminho de nuvem, o build da Vercel apenas gera o cliente Prisma; as migrações são aplicadas pelo workflow de implantação em cada push na `main` ou manualmente com `pnpm run db:deploy`. A agenda de notificações usa o `CRON_SECRET`. As demais formas de publicação estão em [docs/deploy.md](docs/deploy.md) e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
 
@@ -285,7 +285,7 @@ gh variable set AGENDA_EXTERNA --body servidor
 gh variable set BACKUP_EXTERNO --body servidor
 ```
 
-Com esses valores, os workflows de implantação, migração, agenda e backup da nuvem são pulados. O instalador não configura o GitHub nem a Vercel. O passo a passo, o checklist e a reversão estão no [roteiro do ensaio em VPS](docs/ensaio-implantacao-vps.md) e no guia de [auto-hospedagem](docs/auto-hospedagem.md).
+Com esses valores, os workflows de implantação, migração, agenda e backup da nuvem são pulados. O instalador não configura o GitHub nem a Vercel. O checklist e a reversão estão no guia de [auto-hospedagem](docs/auto-hospedagem.md).
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Feemtijca%2Ffrequenciapp&project-name=frequenciapp&repository-name=frequenciapp&env=DATABASE_URL,DIRECT_URL,AUTH_SECRET,TZ_APP,ADMIN_EMAIL,ADMIN_SENHA,ADMIN_NOME&envDescription=Vari%C3%A1veis%20do%20FrequenciApp%3A%20banco%2C%20segredo%20de%20sess%C3%A3o%2C%20fuso%20e%20administrador%20inicial&envLink=https%3A%2F%2Fgithub.com%2Feemtijca%2Ffrequenciapp%2Fblob%2Fmain%2Fdocs%2Fambiente.md)
 
@@ -421,7 +421,6 @@ Em uma issue no GitHub. Vulnerabilidades seguem o [SECURITY.md](SECURITY.md).
 | [docs/auto-hospedagem.md](docs/auto-hospedagem.md)                                         | Servidor próprio, proxy TLS, agenda e atualização.  |
 | [docs/controlador-manutencao.md](docs/controlador-manutencao.md)                           | Adoção do controlador, journal, pins e reversão.    |
 | [docs/dropbox-retencao.md](docs/dropbox-retencao.md)                                       | Token, pasta, retenção e restauração no Dropbox.    |
-| [docs/ensaio-implantacao-vps.md](docs/ensaio-implantacao-vps.md)                           | Roteiro do ensaio em VPS, sem execução.             |
 | [docs/kubernetes.md](docs/kubernetes.md)                                                   | Chart Helm, Ingress, migração, agenda e backup.     |
 | [docs/backup-servidor.md](docs/backup-servidor.md)                                         | Dump, cifra, rclone, retenção e restauração.        |
 | [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md)                                     | AWS, Azure e GCP com Terraform.                     |
