@@ -10,7 +10,7 @@ trap 'rm -rf "$TMP"' EXIT
 DOCKER_BIN="${DOCKER_BIN:-docker}"
 HELM_IMAGE="${HELM_IMAGE:-alpine/helm:latest@sha256:e3f8d5c462d75470fbb1fce79ad5c20063657096d1f98c0fcea869e2600e2e5e}"
 KUBECONFORM_IMAGE="${KUBECONFORM_IMAGE:-ghcr.io/yannh/kubeconform:latest@sha256:faffaf43f95aa6425306e1ab8d6fcad72acb9049158f38e574c085ea1ec0f64e}"
-NODE_IMAGE="${NODE_IMAGE:-node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9}"
+NODE_IMAGE="${NODE_IMAGE:-node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68}"
 REPO_HOST="${REPO_HOST:-$REPO}"
 
 converter=false

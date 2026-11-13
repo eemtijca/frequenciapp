@@ -1,7 +1,7 @@
 // Envio Web Push com VAPID, tempo máximo de conexão e tratamento
 // de assinaturas expiradas sem registrar endpoints nem chaves em logs.
 import { createECDH, timingSafeEqual } from "node:crypto";
-import webpush from "web-push";
+import * as webpush from "web-push";
 import { ambiente } from "@/infra/ambiente";
 import {
   endpointPushValido,

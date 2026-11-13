@@ -18,6 +18,7 @@ const { conferirFerramentas, lerAllowBuilds, montarArquivos } = moduloScanner as
 type Inventario = {
   ferramentas: {
     node: { versao: string; serie: string; imagem: string };
+    corepack: { versao: string };
     pnpm: { versao: string };
   };
   builds: Record<string, { permitido: boolean; motivo: string }>;
@@ -60,7 +61,7 @@ describe("inventário de ferramentas", () => {
     const arquivos = montarArquivos(inventario);
     arquivos.Dockerfile = exigirArquivo(arquivos, "Dockerfile").replace(
       inventario.ferramentas.node.imagem,
-      "node:24-bookworm-slim",
+      "node:26-bookworm-slim",
     );
     expect(() => conferirFerramentas(arquivos, inventario)).toThrow(
       "Imagem móvel ou fora do inventário no Dockerfile",
@@ -117,7 +118,7 @@ describe("inventário de ferramentas", () => {
 
   it("recusa imagem pinada no inventário sem digest", () => {
     const inventario = clonar(lerInventario());
-    inventario.ferramentas.node.imagem = "node:24.22.2-bookworm-slim";
+    inventario.ferramentas.node.imagem = "node:26.13.0-bookworm-slim";
     expect(() => conferirFerramentas(montarArquivos(lerInventario()), inventario)).toThrow(
       "Imagem do Node sem tag e digest",
     );
@@ -191,10 +192,40 @@ describe("pins do Node, pnpm e Dependabot", () => {
   it("mantém o Node do Dockerfile na versão e na série do CI", () => {
     const inventario = lerInventario();
     const dockerfile = readFileSync("Dockerfile", "utf8");
-    expect(inventario.ferramentas.node.serie).toBe("24");
+    expect(inventario.ferramentas.node.serie).toBe("26");
     expect(dockerfile).toContain(inventario.ferramentas.node.imagem);
-    expect(dockerfile).not.toContain("FROM node:24-bookworm-slim");
+    expect(dockerfile).not.toContain("FROM node:26-bookworm-slim");
   });
+
+  it("instala Corepack pinado antes de habilitar o pnpm no Node 26", () => {
+    const inventario = lerInventario();
+    const dockerfile = readFileSync("Dockerfile", "utf8");
+    expect(dockerfile).toContain("RUN npm install --global corepack@0.36.0 && corepack enable");
+    expect(inventario.ferramentas.corepack.versao).toBe("0.36.0");
+  });
+
+  it("recusa o Dockerfile sem o bootstrap do Corepack", () => {
+    const inventario = lerInventario();
+    const arquivos = montarArquivos(inventario);
+    arquivos.Dockerfile = exigirArquivo(arquivos, "Dockerfile").replace(
+      "RUN npm install --global corepack@0.36.0 && corepack enable",
+      "RUN corepack enable",
+    );
+    expect(() => conferirFerramentas(arquivos, inventario)).toThrow("Consumidor divergente");
+  });
+
+  it.each(["corepack@latest", "corepack@0.35.0"])(
+    "recusa bootstrap do Corepack fora do pin: %s",
+    (referencia) => {
+      const inventario = lerInventario();
+      const arquivos = montarArquivos(inventario);
+      arquivos.Dockerfile = exigirArquivo(arquivos, "Dockerfile").replace(
+        "corepack@0.36.0",
+        referencia,
+      );
+      expect(() => conferirFerramentas(arquivos, inventario)).toThrow("Consumidor divergente");
+    },
+  );
 
   it("alinha o pnpm com o packageManager", () => {
     const inventario = lerInventario();

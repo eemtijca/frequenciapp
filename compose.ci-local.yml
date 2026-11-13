@@ -24,7 +24,7 @@ services:
     ports: !reset []
 
   api:
-    image: node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
+    image: node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
     network_mode: "service:app"
     working_dir: /work
     entrypoint: ["/bin/bash", "-lc"]
@@ -41,7 +41,7 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
 
   e2e:
-    image: ${EXECUTOR_IMAGEM_PLAYWRIGHT:-mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f}
+    image: ${EXECUTOR_IMAGEM_PLAYWRIGHT:-mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe}
     network_mode: "service:app"
     ipc: host
     working_dir: /work
@@ -61,7 +61,7 @@ services:
       PLAYWRIGHT_SKIP_WEBSERVER: "1"
 
   pwa:
-    image: ${EXECUTOR_IMAGEM_PLAYWRIGHT:-mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f}
+    image: ${EXECUTOR_IMAGEM_PLAYWRIGHT:-mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe}
     network_mode: "service:app"
     ipc: host
     working_dir: /work

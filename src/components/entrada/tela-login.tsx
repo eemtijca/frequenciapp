@@ -184,7 +184,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
                   if (erro) setErro("");
                 }}
                 placeholder="ana@escola.br ou 3a-maria"
-                className="h-12"
+                className="h-12 placeholder:text-sm"
               />
             </div>
             <div className="flex flex-col gap-2">

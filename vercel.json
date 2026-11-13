@@ -4,7 +4,8 @@
   "git": {
     "deploymentEnabled": {
       "main": false,
-      "fix/instalador-preserva-rotinas": false
+      "fix/instalador-preserva-rotinas": false,
+      "chore/atualizacoes-consolidadas": false
     }
   },
   "buildCommand": "pnpm run vercel-build",

@@ -406,7 +406,7 @@ O comando executa `node --test tests/servidor/controlador/*.test.mjs` e `bash te
 bash tests/servidor/perfis.sh
 ```
 
-O job `controlador` de `instalador.yml` constrói `tests/servidor/controlador/Dockerfile` com uma cópia apenas das fontes públicas versionadas. A imagem contém Node 24, Git, Bash e `flock`; o runtime usa root interno sem capacidades adicionais, rede ou socket Docker, com raiz somente leitura e `/tmp` executável descartável. O comando abaixo testa a revisão já commitada, não as alterações locais pendentes:
+O job `controlador` de `instalador.yml` constrói `tests/servidor/controlador/Dockerfile` com uma cópia apenas das fontes públicas versionadas. A imagem contém Node 26, Git, Bash e `flock`; o runtime usa root interno sem capacidades adicionais, rede ou socket Docker, com raiz somente leitura e `/tmp` executável descartável. O comando abaixo testa a revisão já commitada, não as alterações locais pendentes:
 
 ```bash
 contexto=$(mktemp -d)

@@ -6,9 +6,9 @@ set -Eeuo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-IMAGEM_PLAYWRIGHT="mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f"
-IMAGEM_QUALIDADE="${EXECUTOR_IMAGEM_QUALIDADE:-frequenciapp-dev-qualidade:24.22.2-git-openssl}"
-IMAGEM_FERRAMENTAS="${EXECUTOR_IMAGEM_FERRAMENTAS:-frequenciapp-dev-ferramentas:24.22.2-docker27.5.1-compose2.32.4}"
+IMAGEM_PLAYWRIGHT="mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe"
+IMAGEM_QUALIDADE="${EXECUTOR_IMAGEM_QUALIDADE:-frequenciapp-dev-qualidade:26.13.0-git-openssl}"
+IMAGEM_FERRAMENTAS="${EXECUTOR_IMAGEM_FERRAMENTAS:-frequenciapp-dev-ferramentas:26.13.0-docker27.5.1-compose2.32.4}"
 
 TAREFA="${EXECUTOR_TAREFA:-local}"
 MANTER="${EXECUTOR_MANTER:-0}"
@@ -98,8 +98,8 @@ Ambiente:
                              Compose.
 
 Imagens fixas:
-  Node:       node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9
-  Playwright: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+  Node:       node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
+  Playwright: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe
 
 O executor não usa WSL e não executa pnpm, npx, vitest ou playwright no host.
 TEXTO
@@ -338,6 +338,7 @@ rodar_suite() {
 rodar_api() {
   # shellcheck disable=SC2016
   rodar_suite api 'set -Eeuo pipefail
+npm install --global corepack@0.36.0
 corepack enable
 pnpm install --frozen-lockfile --store-dir=/pnpm-store
 pnpm exec vitest run --config vitest.api.config.ts "$@"'

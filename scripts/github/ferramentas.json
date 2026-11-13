@@ -2,9 +2,9 @@
   "descricao": "Inventário dos pins de ferramentas, actions e scripts de instalação. O scanner confere os consumidores sem baixar imagens nem provisionar recursos.",
   "ferramentas": {
     "node": {
-      "versao": "24.22.2",
-      "serie": "24",
-      "imagem": "node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9",
+      "versao": "26.13.0",
+      "serie": "26",
+      "imagem": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
       "estado": "pinado",
       "fontes": ["https://hub.docker.com/_/node", "https://github.com/nodejs/docker-node"]
     },
@@ -12,6 +12,13 @@
       "versao": "12.11.2",
       "origem": "packageManager do package.json",
       "estado": "pinado"
+    },
+    "corepack": {
+      "versao": "0.36.0",
+      "origem": "https://registry.npmjs.org/corepack/-/corepack-0.36.0.tgz",
+      "integridade": "sha512-SiiJsBhZqdBiPHTEl6OT3sASrRrKIcYTQMsVGXx6EE/gM8WFMwYjeIX8Tt8RiU4Iv2J6LbT8KpGfCOsBpRWB/w==",
+      "estado": "pinado",
+      "fontes": ["https://github.com/nodejs/corepack", "https://registry.npmjs.org/corepack/0.36.0"]
     }
   },
   "builds": {
@@ -50,12 +57,8 @@
   },
   "actions": [
     {
-      "referencia": "actions/checkout@11d5960a326750d5838078e36cf38b85af677262",
-      "versao": "v4"
-    },
-    {
       "referencia": "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-      "versao": "v7"
+      "versao": "v7.0.1"
     },
     {
       "referencia": "actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3",
@@ -66,39 +69,39 @@
       "versao": "v7.0.0"
     },
     {
-      "referencia": "actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020",
-      "versao": "v4"
+      "referencia": "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1",
+      "versao": "v7.1.0"
     },
     {
-      "referencia": "actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02",
-      "versao": "v4"
+      "referencia": "actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9",
+      "versao": "v7.0.2"
     },
     {
-      "referencia": "docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8",
-      "versao": "v6"
+      "referencia": "docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc",
+      "versao": "v7.4.0"
     },
     {
-      "referencia": "docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9",
-      "versao": "v3"
+      "referencia": "docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550",
+      "versao": "v4.8.0"
     },
     {
       "referencia": "docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302",
       "versao": "v6"
     },
     {
-      "referencia": "docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f",
-      "versao": "v3"
+      "referencia": "docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069",
+      "versao": "v4.4.1"
     },
     {
-      "referencia": "docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130",
-      "versao": "v3"
+      "referencia": "docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1",
+      "versao": "v4.4.0"
     },
     {
-      "referencia": "github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26",
+      "referencia": "github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066",
       "versao": "v4"
     },
     {
-      "referencia": "github/codeql-action/init@1fc58d04a4d4374f921bdac573c3811c240f9c26",
+      "referencia": "github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066",
       "versao": "v4"
     },
     {
@@ -106,19 +109,24 @@
       "versao": "v6.1.1"
     },
     {
-      "referencia": "actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830",
-      "versao": "v4"
+      "referencia": "actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
+      "versao": "v6.1.0"
     },
     {
-      "referencia": "hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd",
-      "versao": "v3"
+      "referencia": "hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e",
+      "versao": "v4.0.1"
     }
   ],
   "pendencias": [],
   "usos": [
     {
       "arquivo": "Dockerfile",
-      "trecho": "FROM node:24.22.2-bookworm-slim@sha256:01d566e8d94d8c619591d78652babfccd3c6992a3dffa9ed5ab39e11cf6c70e9 AS base",
+      "trecho": "FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68 AS base",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "Dockerfile",
+      "trecho": "RUN npm install --global corepack@0.36.0 && corepack enable",
       "estado": "pinado"
     },
     {
@@ -143,7 +151,7 @@
     },
     {
       "arquivo": "infra/servidor/nginx/Dockerfile",
-      "trecho": "FROM nginx:1.30-alpine@sha256:583b7f2fce1cdb8da5ad5c39ebd3c33b98b87d493190e548bdee1fa8c619c311",
+      "trecho": "FROM nginx:1.31-alpine@sha256:713fc2ebfd92e8217db451477182ee91944b123d2b1ee9fd5a8c6e91ca6c3a11",
       "estado": "pinado"
     },
     {
@@ -163,7 +171,67 @@
     },
     {
       "arquivo": "tests/playwright-container.sh",
-      "trecho": "mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f",
+      "trecho": "mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/controlador/Dockerfile",
+      "trecho": "FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "compose.ci-local.yml",
+      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "scripts/dev/executar-container.sh",
+      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "scripts/dev/img/quality.Dockerfile",
+      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "scripts/dev/img/ferramentas.Dockerfile",
+      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/kubernetes/validar.sh",
+      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/contexto-docker.test.mjs",
+      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "compose.ci-local.yml",
+      "trecho": "mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "scripts/dev/executar-container.sh",
+      "trecho": "mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "scripts/dev/img/quality.Dockerfile",
+      "trecho": "npm install --global corepack@0.36.0",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "scripts/dev/img/ferramentas.Dockerfile",
+      "trecho": "npm install --global corepack@0.36.0",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "scripts/dev/executar-container.sh",
+      "trecho": "npm install --global corepack@0.36.0",
       "estado": "pinado"
     }
   ],

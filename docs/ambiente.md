@@ -96,6 +96,8 @@ O usuário PostgreSQL da URL precisa existir e ter permissões no schema escolhi
 
 Pré-requisitos: Node.js 20.19 ou superior e um PostgreSQL 17 acessível.
 
+O CI e a imagem da aplicação usam Node 26, com versão e digest registrados em `scripts/github/ferramentas.json`. A imagem instala Corepack em versão explícita antes de habilitar o pnpm fixado no `packageManager`; Node 26 não inclui esse executável. O bootstrap do instalador usa um runtime privado Node 24 independente e não exige trocar o Node do sistema.
+
 ```bash
 pnpm install --frozen-lockfile
 cp .env.example .env
