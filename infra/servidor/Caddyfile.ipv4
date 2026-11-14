@@ -1,0 +1,50 @@
+# Caddy público por IPv4: ACME de curta duração e HTTPS sem SNI.
+{
+	default_sni {$DOMINIO}
+	admin off
+	persist_config off
+	grace_period 10s
+	log {
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete code
+					delete state
+				}
+			}
+		}
+	}
+}
+
+{$DOMINIO} {
+	tls {
+		issuer acme {
+			dir {$ACME_CA}
+			email {$ACME_EMAIL}
+			profile shortlived
+		}
+	}
+	encode zstd gzip
+
+	reverse_proxy app:3000 {
+		health_uri /api/saude
+		health_interval 30s
+		health_timeout 5s
+	}
+
+	header -Server
+
+	log {
+		output stdout
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					delete code
+					delete state
+				}
+			}
+		}
+	}
+}

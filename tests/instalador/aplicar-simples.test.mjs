@@ -265,26 +265,60 @@ function simular(contexto, comando, argumentos, opcoes) {
   return ok("");
 }
 
+// Projeta apenas os campos do serviço Caddy afetados por esta seam; o hash é sintético.
+function proxyDesejado(raiz) {
+  const ops = fs.readFileSync(path.join(raiz, "etc/frequenciapp/ops.env"), "utf8");
+  return Object.fromEntries(
+    ["CADDYFILE", "DOMINIO", "ACME_EMAIL", "ACME_CA"].map((chave) => [chave, valorEnv(ops, chave)]),
+  );
+}
+
 function simularCompose(contexto, argumentos) {
-  const { cenario } = contexto;
-  if (argumentos[0] === "config") return ok("");
+  const { raiz, cenario } = contexto;
+  const desejado = proxyDesejado(raiz);
+  const hash = crypto.createHash("sha256").update(JSON.stringify(desejado)).digest("hex");
+  if (argumentos[0] === "config") {
+    if (argumentos[1] === "--hash") return ok(`caddy ${hash}\n`);
+    return ok("");
+  }
   if (argumentos[0] === "ps") {
     if (argumentos.includes("-q")) return ok("dbid\n");
     if (argumentos.includes("json")) {
       if (!cenario.pilhaSaudavel) return ok("[]");
+      // Compose 2.39.1 emite JSON por linha e Labels como texto separado por vírgulas.
       return ok(
-        JSON.stringify([
+        [
           { Service: "app", State: "running", Health: "healthy" },
           { Service: "db", State: "running", Health: "healthy" },
-          { Service: "caddy", State: "running", Health: "healthy" },
-        ]),
+          {
+            Service: "caddy",
+            Project: "frequenciapp-teste",
+            State: "running",
+            Health: "",
+            Labels: `com.docker.compose.service=caddy,com.docker.compose.config-hash=${cenario.proxyHash},com.docker.compose.project=frequenciapp-teste`,
+          },
+        ]
+          .map((servico) => JSON.stringify(servico))
+          .join("\n"),
       );
     }
     return ok("");
   }
   if (argumentos[0] === "up") {
-    cenario.pilhaSaudavel = true;
     cenario.up = (cenario.up ?? 0) + 1;
+    if (cenario.proxyUpFalha) return falha("falha antes da aplicação do proxy");
+    if (cenario.proxyUpIgnorado) return ok("");
+    cenario.recriacoes ??= { app: 0, db: 0, caddy: 0 };
+    if (!cenario.pilhaSaudavel) {
+      cenario.recriacoes.app += 1;
+      cenario.recriacoes.db += 1;
+    }
+    if (cenario.proxyHash !== hash || argumentos.includes("--force-recreate")) {
+      cenario.proxyEfetivo = { ...desejado };
+      cenario.proxyHash = hash;
+      cenario.recriacoes.caddy += 1;
+    }
+    cenario.pilhaSaudavel = true;
     return ok("");
   }
   if (argumentos[0] === "exec") {
@@ -430,6 +464,352 @@ after(() => {
 });
 
 describe("aplicar do perfil simples", () => {
+  it("reconcilia somente o Caddy legado saudável ao selecionar IPv4 público", (t) => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    const args = argumentos(raiz, senhaAdmin);
+    assert.equal(executar(args, criarDeps({ raiz, cenario, chamadas: [] })).codigo, 0);
+    assert.equal(cenario.proxyEfetivo.CADDYFILE, "infra/servidor/Caddyfile");
+    args[args.indexOf("--dominio") + 1] = "203.0.113.10";
+    const chamadas = [];
+    const resultado = executar(args, criarDeps({ raiz, cenario, chamadas }));
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    assert.equal(
+      valorEnv(fs.readFileSync(path.join(raiz, "etc/frequenciapp/ops.env"), "utf8"), "CADDYFILE"),
+      "infra/servidor/Caddyfile.ipv4",
+    );
+    t.diagnostic(
+      JSON.stringify({
+        proxyEfetivo: cenario.proxyEfetivo,
+        chamadasCompose: chamadas
+          .filter((item) => String(item.argumentos[0]).endsWith("compose.sh"))
+          .map((item) => item.argumentos.slice(1)),
+        recriacoes: cenario.recriacoes,
+      }),
+    );
+    assert.deepEqual(
+      cenario.proxyEfetivo,
+      {
+        CADDYFILE: "infra/servidor/Caddyfile.ipv4",
+        DOMINIO: "203.0.113.10",
+        ACME_EMAIL: "admin@escola.teste",
+        ACME_CA: "https://acme-v02.api.letsencrypt.org/directory",
+      },
+      `Proxy efetivo após a CLI; chamadas up: ${cenario.up}`,
+    );
+    assert.deepEqual(
+      chamadas
+        .filter(
+          (item) =>
+            String(item.argumentos[0]).endsWith("compose.sh") && item.argumentos[1] === "up",
+        )
+        .map((item) => item.argumentos.slice(1)),
+      [["up", "-d", "--no-deps", "caddy"]],
+    );
+    assert.deepEqual(cenario.recriacoes, { app: 1, db: 1, caddy: 2 });
+  });
+  it("converge de TLS interno para ACME e mantém a repetição saudável idempotente", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    const args = argumentos(raiz, senhaAdmin);
+    args[args.indexOf("--dominio") + 1] = "203.0.113.10";
+    args[args.indexOf("--tls") + 1] = "interno";
+    assert.equal(executar(args, criarDeps({ raiz, cenario, chamadas: [] })).codigo, 0);
+    assert.equal(cenario.proxyEfetivo.CADDYFILE, "infra/servidor/Caddyfile.interno");
+    args[args.indexOf("--tls") + 1] = "acme";
+    args[args.indexOf("--email-acme") + 1] = "tls@escola.teste";
+    args.push("--acme-staging");
+    const chamadas = [];
+    const resultado = executar(
+      [...args, "--desde-etapa", "ambiente"],
+      criarDeps({ raiz, cenario, chamadas }),
+    );
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    assert.deepEqual(cenario.proxyEfetivo, {
+      CADDYFILE: "infra/servidor/Caddyfile.ipv4",
+      DOMINIO: "203.0.113.10",
+      ACME_EMAIL: "tls@escola.teste",
+      ACME_CA: "https://acme-staging-v02.api.letsencrypt.org/directory",
+    });
+    assert.deepEqual(
+      chamadas
+        .filter(
+          (item) =>
+            String(item.argumentos[0]).endsWith("compose.sh") && item.argumentos[1] === "up",
+        )
+        .map((item) => item.argumentos.slice(1)),
+      [["up", "-d", "--no-deps", "caddy"]],
+    );
+    const ops = path.join(raiz, "etc/frequenciapp/ops.env");
+    const persistido = fs.readFileSync(ops, "utf8");
+    chamadas.length = 0;
+    const repetida = executar(args, criarDeps({ raiz, cenario, chamadas }));
+    assert.equal(repetida.codigo, 0, JSON.stringify(repetida.json?.erros));
+    assert.equal(
+      repetida.json.etapas.find((item) => item.id === "compose").detalhes.semMudancas,
+      true,
+    );
+    assert.equal(
+      chamadas.some(
+        (item) => String(item.argumentos[0]).endsWith("compose.sh") && item.argumentos[1] === "up",
+      ),
+      false,
+    );
+    assert.equal(fs.readFileSync(ops, "utf8"), persistido);
+    assert.equal(cenario.up, 2);
+    assert.deepEqual(cenario.recriacoes, { app: 1, db: 1, caddy: 2 });
+  });
+  for (const motivo of ["arquivo ausente", "up falhou", "up não aplicou"]) {
+    it(`retoma o proxy com ambiente já persistido após ${motivo}`, () => {
+      const { raiz, appDir, senhaAdmin } = prepararRaiz();
+      const cenario = cenarioPadrao();
+      const args = argumentos(raiz, senhaAdmin);
+      assert.equal(executar(args, criarDeps({ raiz, cenario, chamadas: [] })).codigo, 0);
+      const arquivo = path.join(appDir, "infra/servidor/Caddyfile.ipv4");
+      const conteudo = fs.readFileSync(arquivo);
+      if (motivo === "arquivo ausente") fs.unlinkSync(arquivo);
+      cenario.proxyUpFalha = motivo === "up falhou";
+      cenario.proxyUpIgnorado = motivo === "up não aplicou";
+      args[args.indexOf("--dominio") + 1] = "203.0.113.10";
+      const falhou = executar(
+        [...args, "--desde-etapa", "ambiente"],
+        criarDeps({ raiz, cenario, chamadas: [] }),
+      );
+      assert.equal(
+        falhou.codigo,
+        motivo === "arquivo ausente" ? 7 : 8,
+        JSON.stringify(falhou.json?.erros),
+      );
+      assert.equal(cenario.proxyEfetivo.CADDYFILE, "infra/servidor/Caddyfile");
+      const ops = path.join(raiz, "etc/frequenciapp/ops.env");
+      const persistido = fs.readFileSync(ops, "utf8");
+      assert.equal(valorEnv(persistido, "CADDYFILE"), "infra/servidor/Caddyfile.ipv4");
+      const estado = lerEstado({ caminho: estadoDaRaiz(raiz) }).estado;
+      assert.equal(estado.etapas.find((item) => item.id === "ambiente").estado, "concluida");
+      assert.equal(
+        estado.etapas.find(
+          (item) => item.id === (motivo === "arquivo ausente" ? "proxy" : "compose"),
+        ).estado,
+        "falhou",
+      );
+      if (motivo === "arquivo ausente") fs.writeFileSync(arquivo, conteudo);
+      cenario.proxyUpFalha = false;
+      cenario.proxyUpIgnorado = false;
+      const chamadas = [];
+      const retomada = executar([...args, "--retomar"], criarDeps({ raiz, cenario, chamadas }));
+      assert.equal(retomada.codigo, 0, JSON.stringify(retomada.json?.erros));
+      assert.deepEqual(cenario.proxyEfetivo, {
+        CADDYFILE: "infra/servidor/Caddyfile.ipv4",
+        DOMINIO: "203.0.113.10",
+        ACME_EMAIL: "admin@escola.teste",
+        ACME_CA: "https://acme-v02.api.letsencrypt.org/directory",
+      });
+      assert.deepEqual(
+        chamadas
+          .filter(
+            (item) =>
+              String(item.argumentos[0]).endsWith("compose.sh") && item.argumentos[1] === "up",
+          )
+          .map((item) => item.argumentos.slice(1)),
+        [["up", "-d", "--no-deps", "caddy"]],
+      );
+      assert.equal(fs.readFileSync(ops, "utf8"), persistido);
+      assert.deepEqual(cenario.recriacoes, { app: 1, db: 1, caddy: 2 });
+    });
+  }
+  it("não reconcilia o proxy saudável desatualizado com --nao-iniciar", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    const args = argumentos(raiz, senhaAdmin);
+    assert.equal(executar(args, criarDeps({ raiz, cenario, chamadas: [] })).codigo, 0);
+    const antes = { ...cenario.proxyEfetivo };
+    args[args.indexOf("--dominio") + 1] = "203.0.113.10";
+    const chamadas = [];
+    const resultado = executar(
+      [...args, "--desde-etapa", "ambiente", "--nao-iniciar"],
+      criarDeps({ raiz, cenario, chamadas }),
+    );
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    assert.deepEqual(
+      chamadas
+        .filter((item) => String(item.argumentos[0]).endsWith("compose.sh"))
+        .map((item) => item.argumentos.slice(1)),
+      [["config", "--quiet"]],
+    );
+    assert.deepEqual(cenario.proxyEfetivo, antes);
+    assert.deepEqual(cenario.recriacoes, { app: 1, db: 1, caddy: 1 });
+    assert.equal(cenario.up, 1);
+  });
+  it("não descarta uma troca de TLS quando a retomada pula o ambiente", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    cenario.migracaoFalha = true;
+    const args = argumentos(raiz, senhaAdmin);
+    args[args.indexOf("--dominio") + 1] = "203.0.113.10";
+    assert.equal(executar(args, criarDeps({ raiz, cenario, chamadas: [] })).codigo, 9);
+    const opsEnv = path.join(raiz, "etc/frequenciapp/ops.env");
+    const antes = fs.readFileSync(opsEnv, "utf8");
+    const estadoAntes = fs.readFileSync(estadoDaRaiz(raiz), "utf8");
+    args[args.indexOf("--tls") + 1] = "interno";
+    cenario.migracaoFalha = false;
+    const chamadas = [];
+    const deps = criarDeps({ raiz, cenario, chamadas });
+    let travou = false;
+    deps.adquirirTrava = () => {
+      travou = true;
+      return { liberar() {} };
+    };
+    const retomada = executar([...args, "--retomar"], deps);
+    assert.equal(retomada.codigo, 7, retomada.stdout);
+    assert.equal(retomada.json.codigo, "E_VALIDACAO");
+    assert.match(JSON.stringify(retomada.json.erros), /ambiente/);
+    assert.equal(travou, false);
+    assert.equal(chamadas.length, 0);
+    assert.equal(fs.readFileSync(opsEnv, "utf8"), antes);
+    assert.equal(fs.readFileSync(estadoDaRaiz(raiz), "utf8"), estadoAntes);
+    const reconciliada = executar([...args, "--desde-etapa", "ambiente"], deps);
+    assert.equal(reconciliada.codigo, 0, JSON.stringify(reconciliada.json?.erros));
+    assert.equal(
+      valorEnv(fs.readFileSync(opsEnv, "utf8"), "CADDYFILE"),
+      "infra/servidor/Caddyfile.interno",
+    );
+  });
+  it("preserva a seleção de proxy ao planejar, aplicar, retomar e repetir pela configuração gravada", () => {
+    for (const [dominio, tls, arquivo] of [
+      ["203.0.113.10", "acme", "infra/servidor/Caddyfile.ipv4"],
+      ["frequencia.teste", "acme", "infra/servidor/Caddyfile"],
+      ["192.168.1.10", "interno", "infra/servidor/Caddyfile.interno"],
+      ["frequencia.local", "interno", "infra/servidor/Caddyfile.interno"],
+    ]) {
+      const { raiz, senhaAdmin } = prepararRaiz();
+      const planejada = path.join(raiz, "planejada.json");
+      const args = argumentos(raiz, senhaAdmin, ["--acme-staging", "--salvar-config", planejada]);
+      args[0] = "planejar";
+      args[args.indexOf("--dominio") + 1] = dominio;
+      args[args.indexOf("--tls") + 1] = tls;
+      const cenario = cenarioPadrao();
+      const deps = criarDeps({ raiz, cenario, chamadas: [] });
+      deps.caminhoTrava = () => path.join(raiz, "plano.lock");
+      const plano = executar(args, deps);
+      assert.equal(plano.codigo, 0, JSON.stringify(plano.json?.erros));
+      assert.deepEqual(plano.json.etapas[0].detalhes.proxy?.arquivos, [arquivo]);
+      const humano = executar(
+        args.filter((item) => !["--json", "--salvar-config", planejada].includes(item)),
+        deps,
+      );
+      assert.equal(humano.codigo, 0);
+      assert.ok(humano.stdout.includes(arquivo), humano.stdout);
+      cenario.migracaoFalha = true;
+      const base = ["aplicar", "--json", "--sim", "--modo-teste", "--config", planejada];
+      const falhou = executar(base, deps);
+      assert.equal(falhou.codigo, 9);
+      const dir = path.join(raiz, "etc/frequenciapp");
+      const opsAntes = fs.readFileSync(path.join(dir, "ops.env"), "utf8");
+      assert.equal(valorEnv(opsAntes, "CADDYFILE"), arquivo);
+      assert.equal(valorEnv(opsAntes, "TLS_MODO"), tls);
+      assert.equal(valorEnv(opsAntes, "DOMINIO"), dominio);
+      assert.equal(
+        valorEnv(opsAntes, "ACME_CA"),
+        "https://acme-staging-v02.api.letsencrypt.org/directory",
+      );
+      const config = path.join(dir, "instalador.json");
+      const gravada = JSON.parse(fs.readFileSync(config, "utf8"));
+      assert.equal(gravada.dominio, dominio);
+      assert.equal(gravada.tls, tls);
+      assert.equal(gravada.proxy, "caddy");
+      assert.equal(gravada.acmeStaging, true);
+      base[base.indexOf("--config") + 1] = config;
+      cenario.migracaoFalha = false;
+      for (const extras of [["--retomar"], []]) {
+        const resultado = executar([...base, ...extras], deps);
+        assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+        assert.equal(fs.readFileSync(path.join(dir, "ops.env"), "utf8"), opsAntes);
+        assert.deepEqual(
+          resultado.json.etapas.find((etapa) => etapa.id === "proxy").detalhes.arquivos,
+          [arquivo],
+        );
+      }
+    }
+  });
+  it("recusa endereços inválidos ou não suportados antes dos efeitos", () => {
+    for (const dominio of [
+      "999.1.1.1",
+      "203.0.113.010",
+      "https://203.0.113.10",
+      "2001:db8::1",
+      "escola..teste",
+      "localhost",
+      "escola.local",
+    ]) {
+      const { raiz, senhaAdmin } = prepararRaiz();
+      const args = argumentos(raiz, senhaAdmin);
+      args[args.indexOf("--dominio") + 1] = dominio;
+      const chamadas = [];
+      const deps = criarDeps({ raiz, cenario: cenarioPadrao(), chamadas });
+      let travou = false;
+      deps.adquirirTrava = () => {
+        travou = true;
+        return { liberar() {} };
+      };
+      for (const comando of ["planejar", "aplicar"]) {
+        args[0] = comando;
+        const resultado = executar(args, deps);
+        assert.equal(resultado.codigo, 7, `${comando}: ${dominio}`);
+        assert.equal(resultado.json.codigo, "E_VALIDACAO");
+        assert.equal(travou, false);
+        assert.equal(chamadas.length, 0);
+        assert.equal(fs.existsSync(estadoDaRaiz(raiz)), false);
+        assert.equal(fs.existsSync(path.join(raiz, "etc/frequenciapp")), false);
+      }
+    }
+  });
+  it("recusa ACME por IPv4 com Nginx no plano e antes de qualquer efeito do aplicar", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const config = path.join(raiz, "nginx-ipv4.json");
+    fs.writeFileSync(
+      config,
+      JSON.stringify({ dominio: "203.0.113.10", proxy: "nginx", tls: "acme" }),
+    );
+    const args = argumentos(raiz, senhaAdmin).filter(
+      (item, indice, lista) =>
+        !["--dominio", "--proxy", "--tls"].includes(item) &&
+        !["--dominio", "--proxy", "--tls"].includes(lista[indice - 1]),
+    );
+    args.push("--config", config);
+    const chamadas = [];
+    const deps = criarDeps({ raiz, cenario: cenarioPadrao(), chamadas });
+    let travou = false;
+    deps.adquirirTrava = () => {
+      travou = true;
+      return { liberar() {} };
+    };
+    for (const comando of ["planejar", "aplicar"]) {
+      args[0] = comando;
+      const resultado = executar(args, deps);
+      assert.equal(resultado.codigo, 7, resultado.stdout);
+      assert.equal(resultado.json.codigo, "E_VALIDACAO");
+      assert.match(JSON.stringify(resultado.json.erros), /IPv4.*Caddy|Caddy.*IPv4/);
+      assert.equal(travou, false);
+      assert.equal(chamadas.length, 0);
+      assert.equal(fs.existsSync(estadoDaRaiz(raiz)), false);
+      assert.equal(fs.existsSync(path.join(raiz, "etc/frequenciapp")), false);
+    }
+  });
+  it("seleciona o Caddyfile versionado de IPv4 público ao aplicar", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const args = argumentos(raiz, senhaAdmin);
+    args[args.indexOf("--dominio") + 1] = "203.0.113.10";
+    const resultado = executar(args, criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }));
+    assert.equal(resultado.codigo, 0, JSON.stringify(resultado.json?.erros));
+    const ops = fs.readFileSync(path.join(raiz, "etc/frequenciapp/ops.env"), "utf8");
+    assert.equal(valorEnv(ops, "CADDYFILE"), "infra/servidor/Caddyfile.ipv4");
+    assert.equal(valorEnv(ops, "TLS_MODO"), "acme");
+    assert.equal(valorEnv(ops, "DOMINIO"), "203.0.113.10");
+    assert.equal(valorEnv(ops, "ACME_EMAIL"), "admin@escola.teste");
+    assert.equal(valorEnv(ops, "ACME_CA"), "https://acme-v02.api.letsencrypt.org/directory");
+    const proxy = resultado.json.etapas.find((etapa) => etapa.id === "proxy");
+    assert.deepEqual(proxy.detalhes.arquivos, ["infra/servidor/Caddyfile.ipv4"]);
+  });
   it("propaga os seletores gerados ao Compose real sem iniciar serviços", (t) => {
     const env = { PATH: process.env.PATH, HOME: os.tmpdir() };
     const versao = spawnSync("docker", ["compose", "version"], { env, encoding: "utf8" });

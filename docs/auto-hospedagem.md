@@ -29,7 +29,7 @@ Caddy, Nginx, cron, rclone, GPG e age são escolhas de referência. Outra infrae
 - `git`, `flock`, `curl`, `openssl`, `gnupg`, `age`, `rclone`, `sha256sum`, `node` e `jq` no host para as rotinas de operação.
 - `pg_restore` 17 e `psql` no host apenas para o modo de backup e restauração por URL. No modo Compose, o cliente roda dentro do contêiner do banco.
 - Cron compatível com o fuso do daemon. O cronie do RHEL e derivados aceita `CRON_TZ`; o cron do Debian e do Ubuntu não aceita. O instalador confere essa condição.
-- Domínio público com registros A e AAAA, portas 80 e 443 liberadas, para TLS público.
+- Domínio público com registros DNS adequados, ou IPv4 público roteável com Caddy, e portas 80 e 443 liberadas, para TLS público.
 - Ou nome interno e certificado de uma CA da escola, para TLS interno.
 - Conta de implantação dedicada, com acesso ao Docker e ao checkout.
 - Diretório de backup fora do volume do banco, de preferência em disco separado.
@@ -45,7 +45,7 @@ O `instalar.sh` é o caminho recomendado para preparar o host. Ele segue o contr
 
 | Perfil        | Requisitos                                                                | Rotinas                                               |
 | ------------- | ------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `simples`     | Docker, domínio e contas iniciais                                         | systemd timers ou cron                                |
+| `simples`     | Docker, nome DNS ou IPv4 público e contas iniciais                        | systemd timers ou cron                                |
 | `controlador` | `--operador-controlador` com conta sem privilégio e identidade já adotada | cron estável em `/etc/cron.d/frequenciapp`            |
 | `dropbox`     | Adoção, token, `rclone.conf` e destino Dropbox iguais à pasta adotada     | systemd timers ou cron; backup com verificação nativa |
 | `completo`    | Requisitos do controlador e do Dropbox                                    | cron estável e backup Dropbox                         |
@@ -60,6 +60,7 @@ compose.servidor-caddy.yml
 compose.servidor-nginx.yml
 infra/servidor/
   Caddyfile
+  Caddyfile.ipv4
   Caddyfile.interno
   nginx/
     Dockerfile
@@ -130,12 +131,12 @@ Os arquivos de ambiente não entram no Git. O `app.env` contém `AUTH_SECRET`, c
 | ------------------- | ------------------------------------- | ----------------------------------- |
 | `PROXY_TIPO`        | `caddy`                               | `caddy` ou `nginx`                  |
 | `TLS_MODO`          | `acme`                                | `acme` ou `interno`                 |
-| `DOMINIO`           | vazio                                 | Nome público ou interno             |
+| `DOMINIO`           | vazio                                 | Nome público, interno ou IPv4       |
 | `ACME_EMAIL`        | vazio                                 | Contato da autoridade certificadora |
 | `ACME_CA`           | Let's Encrypt                         | Diretório ACME                      |
 | `PROXY_HTTP_PORTA`  | `80`                                  | Porta HTTP no host                  |
 | `PROXY_HTTPS_PORTA` | `443`                                 | Porta HTTPS no host                 |
-| `CADDYFILE`         | `infra/servidor/Caddyfile`            | Caddyfile público ou interno        |
+| `CADDYFILE`         | `infra/servidor/Caddyfile`            | Caddyfile para DNS, IPv4 ou interno |
 | `CERTBOT_CERTS_DIR` | `./infra/servidor/nginx/certificados` | Certificados do Nginx               |
 
 ### Instalação Compose e serviços
@@ -157,7 +158,7 @@ A lista completa está em [backup-servidor.md](backup-servidor.md) e em `infra/s
 
 ## Subir com Caddy
 
-Para TLS público:
+Para TLS público com domínio DNS:
 
 ```text
 PROXY_TIPO=caddy
@@ -167,6 +168,23 @@ DOMINIO=frequencia.exemplo.br
 ACME_EMAIL=administracao@escola.exemplo.br
 ACME_CA=https://acme-v02.api.letsencrypt.org/directory
 ```
+
+Para HTTPS público por IPv4, o instalador usa `--dominio` com o endereço público e seleciona o arquivo específico automaticamente. Na preparação manual, usar o fragmento abaixo no `ops.env`, substituindo `IPV4_PUBLICO` pelo endereço real do servidor:
+
+```text
+PROXY_TIPO=caddy
+TLS_MODO=acme
+CADDYFILE=infra/servidor/Caddyfile.ipv4
+DOMINIO=IPV4_PUBLICO
+ACME_EMAIL=administracao@escola.exemplo.br
+ACME_CA=https://acme-v02.api.letsencrypt.org/directory
+```
+
+O arquivo para IPv4 declara o emissor ACME com perfil `shortlived` e `default_sni`, sem depender apenas das opções ACME globais. A autoridade precisa suportar esse perfil para IP, e o servidor precisa estar acessível nas portas 80 e 443. A opção de staging serve para ensaio e não produz uma cadeia publicamente confiável. O caminho IPv4 com Nginx e TLS ACME é recusado pelo instalador; não substituir por TLS interno para contornar essa recusa.
+
+Os arquivos versionados e o `CADDYFILE` persistido são usados nas operações seguintes. Não depender de um override de teste não registrado. Depois da implantação autorizada, conferir o certificado e o acesso por um cliente externo, sem desativar a validação TLS, incluindo um cliente que não envie SNI. A configuração da renovação automática não comprova que uma renovação já ocorreu.
+
+Ao reaplicar pelo instalador, o estado saudável da pilha não substitui a comparação entre o serviço Compose desejado e o proxy existente. Uma divergência de configuração reconcilia somente o proxy com `up -d --no-deps`, inclusive na retomada depois de persistir o ambiente. Essa comparação não detecta conteúdo editado manualmente em um arquivo cujo caminho de montagem permaneceu igual.
 
 Para TLS interno:
 

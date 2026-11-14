@@ -1,0 +1,9 @@
+# Fixture do Caddyfile público para IPv4.
+{$DOMINIO} {
+	tls {
+		issuer acme {
+			profile shortlived
+		}
+	}
+	reverse_proxy app:3000
+}

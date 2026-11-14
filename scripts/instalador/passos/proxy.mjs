@@ -1,39 +1,18 @@
 // Etapa de proxy: valida Caddy ou Nginx, TLS público ou interno e as portas públicas.
 import fs from "node:fs";
 import path from "node:path";
+import { resolverProxy } from "../configuracao-proxy.mjs";
 import { acao, avisoEtapa, falha, garantirDiretorio } from "./contexto.mjs";
 
 export const id = "proxy";
 export const titulo = "Configura Caddy ou Nginx, TLS e portas públicas";
 export const limiteSegundos = 900;
 
-const DOMINIO_SEGURO = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/i;
-
-function arquivosProxy(configuracao) {
-  if (configuracao.proxy === "nginx") {
-    return [
-      "infra/servidor/nginx/frequenciapp-http.conf",
-      "infra/servidor/nginx/frequenciapp-https.conf",
-    ];
-  }
-  return [
-    configuracao.tls === "interno"
-      ? "infra/servidor/Caddyfile.interno"
-      : "infra/servidor/Caddyfile",
-  ];
-}
-
 export function executar(ctx) {
   const configuracao = ctx.configuracao;
   const acoes = [];
   const avisos = [];
-  if (!DOMINIO_SEGURO.test(configuracao.dominio)) {
-    throw falha("E_VALIDACAO", "O domínio informado não tem formato válido.", {
-      dica: "Use um nome como frequencia.exemplo.br, sem esquema nem caminho.",
-      documentacao: "docs/instalador.md#flags",
-    });
-  }
-  const relativos = arquivosProxy(configuracao);
+  const { arquivos: relativos } = resolverProxy(configuracao);
   const ausentes = relativos.filter(
     (relativo) => !fs.existsSync(path.join(ctx.caminhos.appDir, relativo)),
   );
