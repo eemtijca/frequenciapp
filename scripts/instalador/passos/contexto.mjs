@@ -229,6 +229,7 @@ export function executarEtapa(ctx, comando, argumentos = [], opcoes = {}) {
     timeout: opcoes.timeout ?? 120000,
     maxBuffer: 4 * 1024 * 1024,
     env: ambiente,
+    ...(opcoes.uid !== undefined ? { uid: opcoes.uid, gid: opcoes.gid } : {}),
   });
   const normalizado = {
     status: typeof resultado.status === "number" ? resultado.status : 1,

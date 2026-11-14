@@ -84,7 +84,7 @@ export function executar(ctx) {
           }
           const commit = String(corpo.commit ?? "");
           const esperado = String(ctx.configuracao.commit || ctx.commitDetectado || "");
-          if (esperado && commit && commit !== esperado && commit !== "local") {
+          if (esperado && commit !== esperado) {
             throw falha("E_SAUDE", "A versão implantada diverge do commit do plano.", {
               dica: "Confira a imagem e o COMMIT_SHA do container.",
               documentacao: "docs/instalador.md#aplicar",

@@ -35,6 +35,10 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 - Exige cliente PostgreSQL 17 no ambiente.
 - A imagem de backup já inclui o cliente.
 - Usar uma role somente leitura com `pg_read_all_data` quando possível.
+- A produção e a conferência do backup exigem acesso de leitura a `pg_control_system().system_identifier`. Se a função estiver indisponível ou sem permissão, a operação é recusada; o script não concede privilégios nem altera o banco.
+- O recibo vincula banco e schema ao identificador nativo do cluster, consultado pela conexão configurada, e não aceita automaticamente recibos antigos com alvo `url-conservador`. Clusters inicializados separadamente são distintos; réplicas e cópias físicas podem compartilhar o identificador. Essa conferência não atesta restauração nem impede troca do endpoint entre consulta e dump.
+- A conexão é passada ao cliente por arquivo `pgservice` privado e ambiente restrito, sem URI ou senha nos argumentos. O adaptador preserva `+` literal nos parâmetros e a equivalência de `ssl=true` com `sslmode=require` da URI libpq.
+- A retenção URL continua conservadora: não realiza expurgo local ou remoto, mesmo após identificar o cluster.
 - A Transaction pooler do Supabase não é adequada para `pg_dump`.
 - A restauração URL exige `BACKUP_RESTAURACAO_URL_VALIDACAO` para o ensaio em banco descartável. O script confere a identidade do servidor e do banco nas duas URLs e recusa quando ambas apontam para a mesma base, mesmo com grafias diferentes. A opção `--sem-validacao` é uma decisão explícita de risco.
 

@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O executor dos testes administrativos fixa a execução sem shell, mesmo quando o chamador solicita essa opção. Uma regressão com processos reais confere nomes de arquivo com espaços e metacaracteres, sem executar comandos embutidos nem remover arquivos vizinhos.
+
 - A inicialização auto-hospedada valida `app.env` e `ops.env` antes de qualquer `source`, recusando substituição de comando, crase, ponto e vírgula, CR, NUL, continuação de linha e valor sem aspas com espaços. A mensagem aponta arquivo e linha sem repetir o valor. A inicialização recusa registros de migração não revertidos com `finished_at` nulo e tem roteiro para migração incompleta e checksum divergente, sem apagar dados. Os horários do exemplo são normalizados em LF e passam a ser valores válidos em um arquivo carregado pelo shell. Os contextos de build excluem certificados, chaves SSH, keystores e arquivos sensíveis comuns. O migrador é exercitado contra PostgreSQL 17 real, inclusive nos bloqueios de migração incompleta e checksum divergente.
 
 - A simulação da atualização deixa de buscar referências e não altera refs ou tags; usa as refs locais e orienta a buscar manualmente para considerar o remoto.
@@ -98,6 +100,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 - A Chamada mostra somente o nome da justificativa, sem sigla ou repetição. Após salvar, a linha exibe o nome; ao desbloquear, o seletor e a observação voltam a ficar disponíveis.
 
 ### Corrigido
+
+- O primeiro backup do instalador passa a conferir o escopo a partir da identidade operacional e do banco efetivo, reutilizando a verificação oficial e preservando as recusas de artefatos, ponteiro, schema ou destino divergentes. A repetição confere novamente os arquivos e o remoto configurado sem gerar outro dump nem declarar a restauração exercitada.
+- O backup em modo URL consulta a identidade nativa do cluster antes de produzir ou conferir o recibo e recusa identidade indisponível e recibos legados sem esse vínculo. O adaptador privado preserva `+` literal e a equivalência de `ssl=true` da URI libpq. A retenção URL continua sem expurgo.
+- O instalador preserva a revisão comprovada pelo Git em execução administrativa, distingue erro de acesso de distribuição sem Git e consulta o checkout da conta de serviço sob sua identidade. A seleção por branch, tag ou SHA e a retomada mantêm a rastreabilidade, sem exceção global de propriedade nem execução de hooks. A saúde exige o SHA esperado, e o CI confere a revisão da imagem construída e da resposta da aplicação.
 
 - O instalador distingue IPv4 público de nome DNS e seleciona uma configuração Caddy com emissor ACME explícito, perfil `shortlived` e atendimento sem SNI, preservando os caminhos de domínio DNS e TLS interno. A escolha fica registrada no ambiente operacional e as combinações não suportadas são recusadas antes das etapas com efeitos, sem troca implícita para CA interna. Uma pilha já saudável também tem a configuração efetiva do proxy conferida e reconciliada quando diverge, sem recriar a aplicação ou o banco, inclusive na retomada com ambiente persistido.
 - A integração de notificações usa os exports ESM do web-push 4, preserva a derivação das chaves VAPID e mantém a criptografia real nos testes. O exemplo do campo de entrada usa tamanho próprio no placeholder, preservando a fonte de 16 px do texto digitado e a área de toque de 48 px. A alteração acomoda a medição de largura do Chromium novo sem reduzir os requisitos da regressão.

@@ -138,6 +138,22 @@ As flags de teste têm efeito restrito:
 - `--modo-teste` usa caminhos e nomes de projeto de teste, exige `INSTALADOR_RAIZ` apontando para um diretório sintético e é recusado em instalação real;
 - `--autoteste` valida CLI, detecção, schema e estado sem alterar o host.
 
+#### Fonte e revisão verificável
+
+Uma origem com metadados Git precisa ser consultada com sucesso. Git ausente, acesso recusado ou propriedade incompatível produzem erro; não autorizam a cópia silenciosa como distribuição sem Git. A consulta administrativa preserva a verificação nativa de proprietário, limita a identidade `SUDO_UID` validada às chamadas Git e consulta um checkout da conta de serviço sob a identidade dessa conta. Configurações globais e de sistema não entram nessas chamadas, e o clone não executa hooks.
+
+No canal `main`, `--ref` aceita branch ou SHA de um objeto de commit existente na origem. O SHA comprovado é propagado ao ambiente e ao estado; divergência em relação ao plano ou ao estado é recusada sem promover a revisão divergente. Uma distribuição legítima sem metadados Git continua permitida sem inventar um SHA. Informar um commit não substitui a comprovação pelo Git.
+
+A retomada que começa depois de `fonte` também consulta o `HEAD` operacional antes de executar etapas posteriores ou retornar sem pendências. A revisão precisa corresponder ao estado e ao SHA explícito do plano, quando presente. Essa conferência não clona, não faz checkout e não ajusta permissões; uma divergência interrompe a retomada sem alterar a origem nem promover o novo SHA.
+
+Quando existe um SHA esperado, a saúde precisa devolver esse mesmo valor: `local`, campo ausente, vazio ou outra revisão produzem `E_SAUDE`. Sem revisão esperada, o caminho de distribuição sem Git mantém seu comportamento. A conferência da saúde não substitui a verificação do rótulo OCI da imagem construída.
+
+#### Primeiro backup e conferência
+
+A etapa `backup-inicial` usa o produtor oficial e sua opção `--verificar`. A conferência precisa resolver novamente a identidade operacional e o banco efetivo antes de chamar o consumidor de recibos. Alvo, banco, schema e destino esperados vêm da operação, não do recibo apresentado. O ponteiro, os artefatos e os sidecars precisam continuar íntegros, inclusive quando o estado já registra um backup confirmado.
+
+Um destino remoto configurado é conferido novamente; uma confirmação antiga no ponteiro não comprova que os bytes ainda estejam disponíveis. Falhas preservam os artefatos e impedem o avanço ao agendador. Repetir a conferência não gera outro dump nem comprova que a restauração foi exercitada.
+
 ### Agendador
 
 A etapa `agendador` roda entre `backup-inicial` e `firewall`. Com `--agendador auto`, o padrão, ela usa systemd quando o host é systemd e cai para cron quando o iniciador não é systemd ou o `systemctl` não está disponível. `--agendador systemd` exige systemd em execução; `--agendador cron` usa `scripts/servidor/instalar-rotinas.sh`.
@@ -988,7 +1004,11 @@ Os testes ficam em `tests/instalador/` e cobrem:
 - perfis `simples`, `controlador`, `dropbox` e `completo`;
 - matriz de plano em todas as distros Tier 1; o subconjunto de aplicação entra com a implementação do `aplicar`.
 
-O workflow `instalador.yml` separa qualidade, unidade, controlador administrativo isolado e matriz de plano. As regressões de controlador adotado ficam em `tests/servidor/controlador/`, fora da suíte sem privilégio do instalador, e rodam no contêiner dedicado sem rede ou socket Docker. A matriz de aplicação entra com a implementação do `aplicar`. A suíte de qualidade do repositório continua rodando formatação, lint, tipos e unidade. O instalador não depende de `pnpm` no host de produção; a matriz usa Docker e Node 24 preparado fora do worktree.
+O workflow `instalador.yml` separa qualidade, unidade, controlador administrativo isolado e matriz de plano. As regressões de controlador adotado ficam em `tests/servidor/controlador/`, fora da suíte sem privilégio do instalador, e rodam no contêiner dedicado sem rede ou socket Docker. As regressões Git em `tests/instalador/administrativo/` usam a mesma imagem e uma etapa própria com root apenas dentro do contêiner e capacidades limitadas para criar proprietários distintos e consultar o checkout como serviço. Esses testes usam Git real, cobrem a origem do operador, a seleção de referência e a retomada, e não executam uma implantação real.
+
+O teste de escopo do primeiro backup fica na suíte sem privilégio e executa os scripts Bash e o consumidor Node reais com transportes externos sintéticos. O workflow `testes.yml` confere separadamente o SHA do rótulo OCI da imagem e da resposta de saúde da aplicação, usando a revisão construída e um banco descartável. Essas provas não autorizam acesso a dados de produção nem substituem o ensaio de restauração.
+
+A matriz de aplicação entra com a implementação do `aplicar`. A suíte de qualidade do repositório continua rodando formatação, lint, tipos e unidade. O instalador não depende de `pnpm` no host de produção; a matriz usa Docker e Node 24 preparado fora do worktree.
 
 ## Referências
 

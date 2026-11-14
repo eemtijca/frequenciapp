@@ -80,7 +80,7 @@ esac
 if [ "$BACKUP_MODO" = compose ]; then
   verificar_instalacao
 else
-  # Conservador: aliases de URL nÃ£o fornecem identidade de banco verificÃ¡vel.
+  # Conservador: aliases de URL não comprovam identidade física do servidor.
   SERVIDOR_ALVO_CHAVE=url-conservador
 fi
 export SERVIDOR_ALVO_CHAVE
@@ -209,22 +209,87 @@ verificar_ultimo_backup() {
 
   if [ -n "${BACKUP_REMOTO:-}" ]; then
     preparar_rclone
-    verificar_item_remoto "$arquivo" "$sha"
-    if [ -n "$ambiente" ]; then
-      verificar_item_remoto "$ambiente" "$ambiente_sha"
-    fi
+    # O escopo já foi conferido contra o alvo; todos os membros precisam conferir hoje.
+    node --input-type=module - "$BACKUP_BANCO_DIR/$recibo" <<'NODE' >"$tmp/artefatos-remotos"
+import fs from 'node:fs';
+const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+for (const a of r.artefatos) process.stdout.write(`${a.nome}\t${a.sha256}\n`);
+NODE
+    local nome hash_remoto
+    while IFS=$'\t' read -r nome hash_remoto; do
+      verificar_item_remoto "$nome" "$hash_remoto"
+    done <"$tmp/artefatos-remotos"
+    verificar_item_remoto "$recibo" "$(sha256sum "$BACKUP_BANCO_DIR/$recibo" | cut -d' ' -f1)"
     log "A cÃ³pia remota confere com o hash local original."
   fi
   log "Backup confirmado: $arquivo."
 }
 
-if [ "$verificar_somente" = true ]; then
-  verificar_ultimo_backup
-  exit 0
-fi
+executar_postgres_url() {
+  # A conexão privada é comum à consulta e ao dump; nenhuma URL vai para argv.
+  node --input-type=module - "$tmp/conexao.pgservice" "$@" <<'NODE'
+import fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
+try {
+  const [arquivo, comando, ...args] = process.argv.slice(2);
+  if (!['psql', 'pg_dump'].includes(comando)) throw new Error();
+  const u = new URL(process.env.BACKUP_DATABASE_URL || process.env.DIRECT_URL || '');
+  const campos = new Map([
+    ['host', decodeURIComponent(u.hostname.replace(/^\[|\]$/g, ''))],
+    ['port', u.port || '5432'], ['dbname', decodeURIComponent(u.pathname.slice(1))],
+  ]);
+  if (u.username) campos.set('user', decodeURIComponent(u.username));
+  if (u.password) campos.set('password', decodeURIComponent(u.password));
+  // libpq trata + literalmente; URLSearchParams segue form-urlencoded.
+  u.search = u.search.replaceAll('+', '%2B');
+  for (const [chave, valor] of u.searchParams) {
+    if (chave === 'schema') continue;
+    // Compatibilidade JDBC da URI libpq, não aceita como chave pgservice.
+    if (chave === 'ssl' && valor === 'true') campos.set('sslmode', 'require');
+    else campos.set(chave, valor);
+  }
+  const senha = campos.get('password');
+  campos.delete('password');
+  for (const [chave, valor] of campos) {
+    if (!/^[a-z_]+$/.test(chave) || /[\r\n\0]/.test(valor) || valor !== valor.trimEnd()) throw new Error();
+  }
+  // password fica no ambiente para preservar inclusive espaços nas extremidades.
+  const texto = '[backup]\n' + [...campos].map(([k, v]) => `${k}=${v}\n`).join('');
+  fs.writeFileSync(arquivo, texto, { mode: 0o600 });
+  const env = { PATH: process.env.PATH, HOME: process.env.HOME, PGSERVICEFILE: arquivo, PGSERVICE: 'backup' };
+  if (senha !== undefined) env.PGPASSWORD = senha;
+  const r = spawnSync(comando, args, { env, stdio: ['ignore', 'inherit', 'pipe'] });
+  if (r.error || r.signal || r.status !== 0) throw new Error();
+} catch {
+  console.error('[banco] Não foi possível executar o cliente PostgreSQL com a conexão configurada.');
+  process.exitCode = 1;
+}
+NODE
+}
 
 if [ "$BACKUP_MODO" = "compose" ]; then
   conferir_banco_compose
+else
+  banco_esperado=$(node --input-type=module - "$APP_DIR/scripts/servidor/validar-banco.mjs" <<'NODE'
+const { validarIdentidadeBanco } = await import(process.argv[2]);
+process.stdout.write(validarIdentidadeBanco().database);
+NODE
+  ) || erro "Não foi possível resolver o banco solicitado."
+  banco_observado=$(executar_postgres_url psql -X -v ON_ERROR_STOP=1 -tAc 'SELECT current_database();') ||
+    erro "Não foi possível comprovar o banco selecionado."
+  [ "$banco_observado" = "$banco_esperado" ] || erro "Banco efetivo diverge do banco solicitado."
+  cluster_observado=$(executar_postgres_url psql -X -v ON_ERROR_STOP=1 -tAc 'SELECT system_identifier::text FROM pg_control_system();') ||
+    erro "Não foi possível comprovar a identidade do cluster PostgreSQL; conferir acesso de leitura e conexão."
+  [[ "$cluster_observado" =~ ^[1-9][0-9]{0,19}$ ]] ||
+    erro "Não foi possível comprovar a identidade do cluster PostgreSQL."
+  # A trava URL continua global/conservadora; o recibo distingue clusters nativos.
+  export SERVIDOR_ALVO_CHAVE="url-cluster-$cluster_observado"
+  export BACKUP_BANCO_VERIFICADO="$banco_observado"
+fi
+
+if [ "$verificar_somente" = true ]; then
+  verificar_ultimo_backup
+  exit 0
 fi
 
 if [ "$verificar_somente" = false ] && [ -n "${BACKUP_DROPBOX_CONFIG:-}" ]; then
@@ -289,10 +354,7 @@ gerar_dump_cifrado() {
       status_pipeline=$?
     fi
   else
-    url_dump="${BACKUP_DATABASE_URL:-${DIRECT_URL:-}}"
-    [ -n "$url_dump" ] || erro "Defina BACKUP_DATABASE_URL ou DIRECT_URL."
-    log "Destino do dump: $(mascarar_url "$url_dump")"
-    if pg_dump "$url_dump" "${argumentos_dump[@]}" | tee "$fifo" | cifrar_fluxo "$destino"; then
+    if executar_postgres_url pg_dump "${argumentos_dump[@]}" | tee "$fifo" | cifrar_fluxo "$destino"; then
       status_pipeline=0
     else
       status_pipeline=$?

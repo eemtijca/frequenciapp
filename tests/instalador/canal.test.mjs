@@ -61,6 +61,10 @@ function prepararRepositorio() {
   const raiz = temporario();
   const appDir = path.join(raiz, "opt", "frequenciapp");
   fs.cpSync(FIXTURE, appDir, { recursive: true });
+  // A fonte pode ser somente leitura; somente as cópias sintéticas serão alteradas.
+  for (const relativo of ["docker/app/migrar.mjs", "LEIA.md"]) {
+    fs.chmodSync(path.join(appDir, relativo), 0o600);
+  }
   for (const script of ["atualizar.sh", "backup-banco.sh"]) {
     fs.chmodSync(path.join(appDir, "scripts", "servidor", script), 0o755);
   }

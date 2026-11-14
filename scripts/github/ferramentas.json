@@ -190,6 +190,11 @@
       "estado": "pinado"
     },
     {
+      "arquivo": ".github/workflows/instalador.yml",
+      "trecho": "mcr.microsoft.com/playwright:v1.65.0-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f",
+      "estado": "pinado"
+    },
+    {
       "arquivo": "tests/servidor/controlador/Dockerfile",
       "trecho": "FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
       "estado": "pinado"
