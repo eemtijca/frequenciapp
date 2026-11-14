@@ -26,6 +26,7 @@ function real(comando, argumentos, opcoes = {}) {
     env: ENV,
     timeout: 30000,
     ...opcoes,
+    shell: false,
   });
   return { ...resultado, erro: resultado.error ?? null };
 }
@@ -257,6 +258,40 @@ function commitAmbiente(caso) {
   const texto = fs.readFileSync(arquivo, "utf8");
   return /^COMMIT_SHA=(.*)$/m.exec(texto)?.[1];
 }
+
+it("mantém nomes literais mesmo quando o chamador solicita shell", () => {
+  const caso = preparar();
+  const vizinho = path.join(caso.raiz, "preservado");
+  fs.writeFileSync(vizinho, "preservar\n");
+  const nomes = [
+    "obj;touch marcador;#",
+    "nome com espaços",
+    'nome"com"aspas',
+    "nome'com'aspas",
+    "obj$(touch marcador)",
+    "obj`touch marcador`",
+    "--preserve-root",
+  ];
+  for (const [indice, nome] of nomes.entries()) {
+    const diretorio = path.join(caso.raiz, `argumentos-${indice}`);
+    const marcador = path.join(diretorio, "marcador");
+    const arquivo = path.join(diretorio, nome);
+    fs.mkdirSync(diretorio, { mode: 0o755 });
+    fs.writeFileSync(arquivo, "arquivo sintético\n");
+    fs.chownSync(arquivo, SERVICO.uid, SERVICO.gid);
+    fs.chownSync(diretorio, SERVICO.uid, SERVICO.gid);
+    for (const entrada of fs.readdirSync(diretorio)) {
+      exigir("rm", ["-r", path.join(diretorio, entrada)], {
+        ...SERVICO,
+        cwd: diretorio,
+        shell: true,
+      });
+    }
+    assert.equal(fs.existsSync(marcador), false, "O nome não pode executar comandos.");
+    assert.deepEqual(fs.readdirSync(diretorio), []);
+    assert.equal(fs.readFileSync(vizinho, "utf8"), "preservar\n");
+  }
+});
 
 it("recusa SHA de referência sem objeto de commit no checkout", () => {
   const caso = preparar();
