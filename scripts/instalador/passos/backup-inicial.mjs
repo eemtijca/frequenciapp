@@ -1,13 +1,31 @@
 // Etapa de backup inicial: executa, verifica o recibo e grava o ponteiro do último backup.
 import fs from "node:fs";
 import path from "node:path";
-import { acao, avisoEtapa, executarEtapa, falha, sha256Arquivo } from "./contexto.mjs";
+import { acao, avisoEtapa, executarEtapa, falha, lerEnv, sha256Arquivo } from "./contexto.mjs";
 
 export const id = "backup-inicial";
 export const titulo = "Executa e confere o primeiro backup";
 export const limiteSegundos = 3600;
 
 const PADRAO_RECIBO = /^frequenciapp-\d{8}T\d{6}Z-[a-f0-9]{8}\.confirmado\.json$/;
+
+// A retomada pode pular ambiente; os arquivos validados continuam sendo a autoridade.
+function ambienteBackup(ctx) {
+  return {
+    APP_DIR: ctx.caminhos.appDir,
+    APP_ENV_FILE: ctx.caminhos.appEnv,
+    OPS_ENV_FILE: ctx.caminhos.opsEnv,
+    SERVIDOR_CONFIG_DIR: ctx.caminhos.configDir,
+    ESTADO_DIR: ctx.caminhos.estadoDir,
+    LOG_DIR: ctx.caminhos.logDir,
+    BACKUP_DIR: ctx.caminhos.backupDir,
+    BACKUP_BANCO_DIR: ctx.caminhos.backupBancoDir,
+    SERVIDOR_LOCK_DIR: ctx.caminhos.lockDir,
+    SERVIDOR_USUARIO: ctx.usuarioServico,
+    COMPOSE_PROJECT_NAME: ctx.caminhos.projetoCompose,
+    SERVIDOR_IDENTIDADE_ARQUIVO: ctx.caminhos.identidade,
+  };
+}
 
 function lerPonteiro(caminho) {
   try {
@@ -19,12 +37,6 @@ function lerPonteiro(caminho) {
   } catch {
     return null;
   }
-}
-
-function backupValido(ctx) {
-  if (!ctx.estado?.backup?.verificadoEm) return false;
-  const ponteiro = lerPonteiro(path.join(ctx.caminhos.estadoDir, "ultimo-backup.json"));
-  return Boolean(ponteiro?.recibo && PADRAO_RECIBO.test(String(ponteiro.recibo)));
 }
 
 function verificarRecibo(ctx) {
@@ -77,14 +89,9 @@ function verificarRecibo(ctx) {
   }
   const conferencia = executarEtapa(
     ctx,
-    "node",
-    [
-      path.join(ctx.caminhos.appDir, "scripts", "servidor", "recibos.mjs"),
-      "conferir-estado",
-      ctx.caminhos.backupBancoDir,
-      caminhoEstado,
-    ],
-    { timeout: 120000 },
+    "bash",
+    [path.join(ctx.caminhos.appDir, "scripts", "servidor", "backup-banco.sh"), "--verificar"],
+    { timeout: 120000, env: ambienteBackup(ctx) },
   );
   if (conferencia.status !== 0) {
     throw falha("E_BACKUP", "O recibo do backup não passou na conferência de integridade.", {
@@ -92,19 +99,26 @@ function verificarRecibo(ctx) {
       documentacao: "docs/instalador.md#backup",
     });
   }
-  const remoto = String(ctx.ambiente?.get("BACKUP_REMOTO") ?? "");
-  if (remoto && dados.verificadoRemoto !== true) {
-    throw falha("E_BACKUP", "O backup remoto não foi confirmado.", {
-      dica: "Confira o rclone, o destino e o checksum remoto.",
-      documentacao: "docs/instalador.md#backup",
-    });
-  }
+  // A conferência oficial acabou de baixar o remoto; a flag histórica não prova disponibilidade.
+  const remoto = lerEnv(fs.readFileSync(ctx.caminhos.opsEnv, "utf8")).mapa.get("BACKUP_REMOTO");
   return {
     recibo,
     arquivo,
     sha256,
     verificadoEm: ctx.agora(),
     remoto: Boolean(remoto),
+  };
+}
+
+// Confere o conjunto atual sem produzir outro dump, inclusive nas retomadas posteriores.
+export function revalidar(ctx) {
+  const conferido = verificarRecibo(ctx);
+  ctx.backupInfo = conferido;
+  return {
+    estado: "concluida",
+    acoes: [acao("Revalida o primeiro backup já confirmado", null, false)],
+    avisos: [],
+    detalhes: { semMudancas: true, backup: true, ...conferido },
   };
 }
 
@@ -123,24 +137,14 @@ export function executar(ctx) {
       detalhes: { semMudancas: true, backup: false },
     };
   }
-  if (backupValido(ctx) && !ctx.forcar) {
-    return {
-      estado: "concluida",
-      acoes: [acao("O primeiro backup já está confirmado", null, false)],
-      avisos: [],
-      detalhes: {
-        semMudancas: true,
-        backup: true,
-        recibo: ctx.estado.backup.ultimoRecibo,
-        verificadoEm: ctx.estado.backup.verificadoEm,
-      },
-    };
+  if (ctx.estado?.backup?.verificadoEm && !ctx.forcar) {
+    return revalidar(ctx);
   }
   const resultado = executarEtapa(
     ctx,
     "bash",
     [path.join(ctx.caminhos.appDir, "scripts", "servidor", "backup-banco.sh")],
-    { timeout: 3600000 },
+    { timeout: 3600000, env: ambienteBackup(ctx) },
   );
   if (resultado.status !== 0) {
     throw falha("E_BACKUP", "O primeiro backup falhou.", {

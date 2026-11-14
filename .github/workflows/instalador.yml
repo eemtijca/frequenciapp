@@ -79,13 +79,27 @@ jobs:
         with:
           node-version: 26.13.0
 
-      - name: Testes unitários
-        env:
-          INSTALADOR_MATRIZ: "0"
-        run: npm run test:instalador:unit
+      - name: Testes unitários em contêiner sem privilégios
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          contexto=$(mktemp -d "$RUNNER_TEMP/instalador-unit.XXXXXXXX")
+          git archive --format=tar HEAD | tar -x -C "$contexto"
+          chmod -R a+rX "$contexto"
+          docker run --rm --network none --read-only --cap-drop ALL \
+            --security-opt no-new-privileges --user 1000:1000 \
+            --pids-limit 512 --memory 2g --cpus 2 \
+            --tmpfs /scratch:rw,nosuid,nodev,exec,size=4g,mode=1777 \
+            --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777 \
+            --mount "type=bind,src=$contexto,dst=/repo,readonly" --workdir /repo \
+            --env HOME=/scratch --env TMPDIR=/scratch \
+            --env INSTALADOR_LOCK_DIR=/scratch/instalador-lock --env INSTALADOR_MATRIZ=0 \
+            --entrypoint /bin/bash \
+            mcr.microsoft.com/playwright:v1.65.0-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f \
+            -c 'exec /usr/bin/node --test --test-reporter=tap --test-concurrency=1 tests/instalador/*.test.mjs'
 
   controlador:
-    name: Controlador administrativo isolado
+    name: Controlador e Git administrativo isolados
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -100,7 +114,10 @@ jobs:
           set -Eeuo pipefail
           contexto=$(mktemp -d "$RUNNER_TEMP/controlador.XXXXXXXX")
           git archive --format=tar HEAD scripts/servidor scripts/instalador \
-            tests/servidor/controlador docker/app/migrar.mjs package.json | tar -x -C "$contexto"
+            tests/servidor/controlador tests/instalador infra/servidor \
+            docker/app/migrar.mjs package.json instalar.sh .env.example \
+            compose.yml compose.servidor.yml compose.servidor-caddy.yml \
+            compose.servidor-nginx.yml | tar -x -C "$contexto"
           docker build --network default \
             -f "$contexto/tests/servidor/controlador/Dockerfile" \
             -t "frequenciapp-controlador-teste:${{ github.run_id }}-${{ github.run_attempt }}" "$contexto"
@@ -111,6 +128,16 @@ jobs:
           --security-opt no-new-privileges --user 0:0
           --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777
           "frequenciapp-controlador-teste:${{ github.run_id }}-${{ github.run_attempt }}"
+
+      - name: Testar Git real com proprietários distintos sem rede ou socket Docker
+        run: >
+          docker run --rm --network none --read-only --cap-drop ALL
+          --cap-add CHOWN --cap-add FOWNER --cap-add SETUID --cap-add SETGID
+          --security-opt no-new-privileges --user 0:0
+          --env INSTALADOR_LOCK_DIR=/tmp/instalador-lock
+          --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777
+          "frequenciapp-controlador-teste:${{ github.run_id }}-${{ github.run_attempt }}"
+          bash -c 'umask 022; exec node --test --test-reporter=tap --test-concurrency=1 tests/instalador/administrativo/*.test.mjs'
 
   matriz:
     name: Matriz Docker de plano

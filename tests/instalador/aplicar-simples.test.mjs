@@ -242,7 +242,15 @@ function simular(contexto, comando, argumentos, opcoes) {
       return ok("");
     }
     if (script.endsWith("instalar-rotinas.sh")) return ok("");
-    if (script.endsWith("backup-banco.sh")) return simularBackup(contexto, opcoes);
+    if (script.endsWith("backup-banco.sh")) {
+      if (argumentos.includes("--verificar")) {
+        cenario.verificacoesBackup = (cenario.verificacoesBackup ?? 0) + 1;
+        return cenario.verificacaoBackupFalha
+          ? falha("falha simulada na conferência do backup")
+          : ok("Backup confirmado.\n");
+      }
+      return simularBackup(contexto, opcoes);
+    }
     return ok("");
   }
   if (nome === "node" && argumentos.some((item) => String(item).endsWith("recibos.mjs"))) {
@@ -1401,7 +1409,8 @@ describe("aplicar do perfil simples", () => {
     assert.equal(estadoLido.estado.perfil, "simples");
     assert.equal(estadoLido.estado.canal, "release");
     assert.equal(estadoLido.estado.tag, "v1.0.0");
-    assert.equal(estadoLido.estado.commit, COMMIT);
+    // A fixture é uma distribuição sem Git; a suíte administrativa comprova revisões reais.
+    assert.equal(estadoLido.estado.commit, "");
     assert.equal(estadoLido.estado.migradorSha256.length, 64);
     assert.ok(estadoLido.estado.backup.ultimoRecibo);
     assert.equal(fs.statSync(estadoCaminho).mode & 0o777, 0o600);
@@ -1435,6 +1444,7 @@ describe("aplicar do perfil simples", () => {
     }
     assert.equal(cenario.up, 1);
     assert.equal(cenario.backups, 1);
+    assert.equal(cenario.verificacoesBackup, 1);
   });
 
   it("aplica o perfil completo com Dropbox e controlador", () => {
@@ -1513,9 +1523,17 @@ describe("aplicar do perfil simples", () => {
     );
     assert.equal(
       chamadas.filter(
-        (item) => item.comando === "bash" && String(item.argumentos[0]).endsWith("backup-banco.sh"),
+        (item) =>
+          item.comando === "bash" &&
+          String(item.argumentos[0]).endsWith("backup-banco.sh") &&
+          !item.argumentos.includes("--verificar"),
       ).length,
       0,
+    );
+    assert.equal(cenario.backups, 1);
+    assert.equal(cenario.verificacoesBackup, 2);
+    assert.ok(
+      chamadas.some((item) => item.comando === "bash" && item.argumentos.includes("--verificar")),
     );
     const etapaCompose = segunda.json.etapas.find((item) => item.id === "compose");
     assert.equal(etapaCompose.detalhes.semMudancas, true);

@@ -19,6 +19,8 @@ env:
   DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
   DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
   TZ_APP: America/Fortaleza
+  # A mesma revisão precisa chegar ao rótulo da imagem e à saúde da aplicação.
+  COMMIT_SHA: ${{ github.sha }}
   APP_URL: http://127.0.0.1:3000
 
 jobs:
@@ -60,8 +62,15 @@ jobs:
           push: false
           load: true
           tags: frequenciapp:ci
+          build-args: |
+            COMMIT_SHA=${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Conferir a revisão na imagem construída
+        run: |
+          revisao=$(docker image inspect frequenciapp:ci --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')
+          test "$revisao" = "$COMMIT_SHA"
 
       - name: Gerar cliente Prisma
         run: pnpm run db:generate
@@ -72,7 +81,14 @@ jobs:
       - name: Aguardar a aplicação
         run: |
           for tentativa in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:3000/api/saude > /dev/null; then
+            if curl -fsS http://127.0.0.1:3000/api/saude > "$RUNNER_TEMP/saude.json"; then
+              node --input-type=module -e '
+                import assert from "node:assert/strict";
+                import fs from "node:fs";
+                const saude = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+                assert.equal(saude.ok, true);
+                assert.equal(saude.commit, process.env.COMMIT_SHA);
+              ' "$RUNNER_TEMP/saude.json"
               echo "Aplicação disponível após ${tentativa} tentativa(s)."
               exit 0
             fi

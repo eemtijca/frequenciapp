@@ -515,13 +515,15 @@ function prepararContexto(deps, configuracao, deteccao, auditoria, estadoResulta
 }
 
 function estadoParaGravar(ctx) {
-  const atual = ctx.estado ?? estadoInicial({ configuracao: ctx.configuracao, agora: ctx.agora });
+  const atual =
+    ctx.estado ??
+    estadoInicial({ configuracao: { ...ctx.configuracao, commit: "" }, agora: ctx.agora });
   atual.instaladoEm = atual.instaladoEm || ctx.agora();
   atual.atualizadoEm = ctx.agora();
   atual.perfil = ctx.configuracao.perfil;
   atual.canal = ctx.configuracao.canal;
   atual.tag = ctx.configuracao.tag ?? "";
-  atual.commit = ctx.commitDetectado || ctx.configuracao.commit || atual.commit || "";
+  atual.commit = ctx.commitDetectado || atual.commit || "";
   atual.imagem = ctx.configuracao.imagem ?? atual.imagem;
   atual.digest = ctx.configuracao.digest || ctx.configuracao.imagemDigest || atual.digest || "";
   atual.migradorSha256 = ctx.migradorSha256 ?? atual.migradorSha256 ?? null;
@@ -624,12 +626,14 @@ function selecionarInicio(ctx) {
 }
 
 function estadoInicialAplicacao(ctx) {
-  const estado = ctx.estado ?? estadoInicial({ configuracao: ctx.configuracao, agora: ctx.agora });
+  const estado =
+    ctx.estado ??
+    estadoInicial({ configuracao: { ...ctx.configuracao, commit: "" }, agora: ctx.agora });
   estado.instaladoEm = estado.instaladoEm || ctx.agora();
   estado.perfil = ctx.configuracao.perfil;
   estado.canal = ctx.configuracao.canal;
   estado.tag = ctx.configuracao.tag ?? "";
-  estado.commit = ctx.configuracao.commit || estado.commit || "";
+  estado.commit = estado.commit || "";
   estado.imagem = ctx.configuracao.imagem || estado.imagem || "";
   estado.digest = ctx.configuracao.digest || ctx.configuracao.imagemDigest || estado.digest || "";
   estado.origem = {
@@ -753,6 +757,7 @@ export function executarAplicacao(opcoes, deps, dados) {
     etapaPreflight.inicio = ctx.agora();
     ctx.etapaSelecionada = "preflight";
     try {
+      fonte.resolverCommitAbreviado(ctx);
       const resultado = preflight.executar(ctx);
       etapaPreflight.estado = resultado.estado ?? "concluida";
       etapaPreflight.fim = ctx.agora();
@@ -780,6 +785,44 @@ export function executarAplicacao(opcoes, deps, dados) {
       gravarEstadoAtual(ctx, deps);
       ctx.registrarLog(`etapa=preflight estado=${etapaPreflight.estado}`);
       inicio = 1;
+    }
+    const indiceFonte = ctx.ordemEtapas.indexOf(fonte.id);
+    if (indiceFonte >= 0 && inicio > indiceFonte && etapaAnteriorValida(ctx.estado, fonte.id)) {
+      const resultado = executarEtapaSelecionada(ctx, deps, {
+        ...fonte,
+        executar: fonte.revalidar,
+      });
+      if (resultado.erro) {
+        return documentoAplicacao(
+          ctx,
+          ctx.estado,
+          ctx.estado.etapas,
+          [erroObjeto(resultado.erro)],
+          [],
+        );
+      }
+    }
+    const indiceBackup = ctx.ordemEtapas.indexOf(backupInicial.id);
+    const backupAnterior = ctx.estado.etapas.find((etapa) => etapa.id === backupInicial.id);
+    if (
+      indiceBackup >= 0 &&
+      inicio > indiceBackup &&
+      backupAnterior?.estado === "concluida" &&
+      (ctx.estado.backup?.verificadoEm || backupAnterior.detalhes?.backup === true)
+    ) {
+      const resultado = executarEtapaSelecionada(ctx, deps, {
+        ...backupInicial,
+        executar: backupInicial.revalidar,
+      });
+      if (resultado.erro) {
+        return documentoAplicacao(
+          ctx,
+          ctx.estado,
+          ctx.estado.etapas,
+          [erroObjeto(resultado.erro)],
+          [],
+        );
+      }
     }
     if (inicio >= ctx.ordemEtapas.length) {
       const documento = documentoAplicacao(
