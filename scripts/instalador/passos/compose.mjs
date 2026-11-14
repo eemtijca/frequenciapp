@@ -58,6 +58,33 @@ function pilhaSaudavel(ctx) {
   return { saudavel, servicos };
 }
 
+function hashProxy(ctx) {
+  const servico = ctx.configuracao.proxy;
+  const resultado = compose(ctx, ["config", "--hash", servico], { timeout: 120000 });
+  const combinacao = new RegExp(`^${servico} ([a-f0-9]{64})$`).exec(resultado.stdout.trim());
+  if (resultado.status !== 0 || !combinacao) {
+    throw falha("E_COMPOSE", "Não foi possível conferir a configuração efetiva do proxy.", {
+      dica: "Confira o Compose e os arquivos de ambiente antes de retomar.",
+      documentacao: "docs/instalador.md#retomada",
+    });
+  }
+  return combinacao[1];
+}
+
+function proxyConferido(ctx, servicos, hash) {
+  const proxies = servicos.filter((item) => item.Service === ctx.configuracao.proxy);
+  return (
+    proxies.length === 1 &&
+    proxies.every(
+      (item) =>
+        item.Project === ctx.caminhos.projetoCompose &&
+        String(item.Labels ?? "")
+          .split(",")
+          .includes(`com.docker.compose.config-hash=${hash}`),
+    )
+  );
+}
+
 function conferirIdentidade(ctx, adotar) {
   const argumentos = adotar ? ["--adotar", "--confirmar"] : ["--conferir"];
   const resultado = executarEtapa(ctx, "bash", [script(ctx, "identidade.sh"), ...argumentos], {
@@ -132,7 +159,28 @@ export function executar(ctx) {
     iniciou = true;
     acoes.push(acao("Sobe a pilha com o Compose", "docker compose up -d --remove-orphans", true));
   } else {
-    acoes.push(acao("A pilha já está em execução e saudável", null, false));
+    // A saúde e o ops.env não comprovam o mount nem o ambiente do container existente.
+    const hash = hashProxy(ctx);
+    if (!proxyConferido(ctx, antes.servicos, hash)) {
+      const argumentos = ["up", "-d", "--no-deps", ctx.configuracao.proxy];
+      const resultado = compose(ctx, argumentos);
+      if (resultado.status !== 0 || !proxyConferido(ctx, pilhaSaudavel(ctx).servicos, hash)) {
+        throw falha("E_COMPOSE", "Não foi possível reconciliar a configuração do proxy.", {
+          dica: "Confira o container do proxy e retome a etapa compose.",
+          documentacao: "docs/instalador.md#retomada",
+        });
+      }
+      iniciou = true;
+      acoes.push(
+        acao(
+          "Reconcilia somente o proxy com o Compose",
+          `docker compose ${argumentos.join(" ")}`,
+          true,
+        ),
+      );
+    } else {
+      acoes.push(acao("A pilha está saudável e o proxy já está atualizado", null, false));
+    }
   }
   const identidadeExiste = fs.existsSync(ctx.caminhos.identidade);
   let identidadeAdotada = false;

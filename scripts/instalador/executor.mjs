@@ -50,6 +50,7 @@ import * as firewall from "./passos/firewall.mjs";
 import * as dropbox from "./passos/dropbox.mjs";
 import * as controlador from "./passos/controlador.mjs";
 import { reconfigurarControlador } from "./rotinas-controlador.mjs";
+import { resolverProxy } from "./configuracao-proxy.mjs";
 
 const RAIZ_INSTALADOR = path.resolve(fileURLToPath(new URL("../..", import.meta.url)));
 
@@ -643,6 +644,7 @@ export function executarAplicacao(opcoes, deps, dados) {
   validarFlagsAplicacao(opcoes);
   const raiz = dados.raiz ?? "/";
   const configuracao = dados.configuracao;
+  resolverProxy(configuracao);
   const deteccao = dados.deteccao;
   const auditoria = dados.auditoria;
   const estadoResultado = dados.estadoResultado ?? { presente: false, estado: null, avisos: [] };
@@ -700,6 +702,9 @@ export function executarAplicacao(opcoes, deps, dados) {
     });
   }
   const inicioPlanejado = selecionarInicio(ctx);
+  if (inicioPlanejado > ctx.ordemEtapas.indexOf("ambiente")) {
+    ambiente.validarProxySemAmbiente(ctx);
+  }
   if (
     inicioPlanejado > ctx.ordemEtapas.indexOf("ambiente") &&
     inicioPlanejado <= ctx.ordemEtapas.indexOf("agendador")

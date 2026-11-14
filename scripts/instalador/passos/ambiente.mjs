@@ -15,6 +15,7 @@ import {
   sha256Arquivo,
 } from "./contexto.mjs";
 import { contemSegredo } from "../redigir.mjs";
+import { resolverProxy } from "../configuracao-proxy.mjs";
 
 export const id = "ambiente";
 export const titulo = "Gera app.env e ops.env com segredos e permissões corretas";
@@ -96,6 +97,20 @@ export function rotinasPrevistas(ctx) {
   };
 }
 
+// Impede que a retomada descarte uma seleção de proxy ainda não persistida.
+export function validarProxySemAmbiente(ctx) {
+  const ops = lerEnv(textoExistente(ctx.caminhos.opsEnv, "ops.env")).mapa;
+  const { ambiente } = resolverProxy(ctx.configuracao);
+  for (const [chave, desejado] of Object.entries(ambiente)) {
+    if (ops.get(chave) !== desejado) {
+      throw falha("E_VALIDACAO", "A seleção do proxy exige reconciliar o ambiente.", {
+        dica: "Retome com --desde-etapa ambiente para persistir a configuração de TLS.",
+        documentacao: "docs/instalador.md#retomada",
+      });
+    }
+  }
+}
+
 export function validarRotinasSemAmbiente(ctx) {
   const app = lerEnv(textoExistente(ctx.caminhos.appEnv, "app.env")).mapa;
   const ops = lerEnv(textoExistente(ctx.caminhos.opsEnv, "ops.env")).mapa;
@@ -163,12 +178,6 @@ function imagemAplicacao(configuracao) {
   if (configuracao.tag) return `${base}:${configuracao.tag}`;
   if (base.includes(":")) return base;
   return "frequenciapp:local";
-}
-
-function acmeCa(configuracao) {
-  return configuracao.acmeStaging
-    ? "https://acme-staging-v02.api.letsencrypt.org/directory"
-    : "https://acme-v02.api.letsencrypt.org/directory";
 }
 
 function lerArquivoGoogle(caminho) {
@@ -265,8 +274,6 @@ export function executar(ctx) {
   }
 
   const dominio = configuracao.dominio;
-  const tls = configuracao.tls;
-  const proxy = configuracao.proxy;
   const fingerprintGpg = (
     process.env.BACKUP_GPG_FINGERPRINT ||
     configuracao.destinatarioGpg ||
@@ -274,17 +281,11 @@ export function executar(ctx) {
   ).toUpperCase();
   const portaHttp = String(configuracao.portaHttp);
   const portaHttps = String(configuracao.portaHttps);
-  const caddyfile =
-    tls === "interno" ? "infra/servidor/Caddyfile.interno" : "infra/servidor/Caddyfile";
+  const proxy = resolverProxy(configuracao);
   const opsDesejado = new Map([
-    ["PROXY_TIPO", proxy],
-    ["TLS_MODO", tls],
-    ["DOMINIO", dominio],
-    ["ACME_EMAIL", configuracao.emailAcme || ""],
-    ["ACME_CA", acmeCa(configuracao)],
+    ...Object.entries(proxy.ambiente),
     ["PROXY_HTTP_PORTA", portaHttp],
     ["PROXY_HTTPS_PORTA", portaHttps],
-    ["CADDYFILE", caddyfile],
     ["CERTBOT_CERTS_DIR", `${ctx.caminhos.appDir}/infra/servidor/nginx/certificados`],
     ["APP_DIR", ctx.caminhos.appDir],
     ["APP_ENV_FILE", ctx.caminhos.appEnv],

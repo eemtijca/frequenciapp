@@ -49,16 +49,8 @@ docker compose \
   -f "$REPO/compose.servidor-nginx.yml" \
   config --quiet
 
-for caddyfile in Caddyfile Caddyfile.interno; do
-  docker run --rm \
-    --env-file "$APP_ENV_FILE" \
-    -e "DOMINIO=$DOMINIO" \
-    -e "ACME_EMAIL=$ACME_EMAIL" \
-    -e "ACME_CA=$ACME_CA" \
-    -v "$REPO/infra/servidor/$caddyfile:/etc/caddy/Caddyfile:ro" \
-    caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9 \
-    caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-done
+# A integração adapta os três modos e prova TLS sem SNI com CA sintética, sem rede externa.
+setpriv --no-new-privs node "$REPO/tests/servidor/caddy-integracao.mjs"
 
 docker build -t frequenciapp-nginx:validar "$REPO/infra/servidor/nginx"
 

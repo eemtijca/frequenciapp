@@ -1,5 +1,6 @@
 // Valida a configuração estática do instalador antes do plano e do preflight.
 import { aviso, criarErro, erroUso } from "./json.mjs";
+import { resolverProxy } from "./configuracao-proxy.mjs";
 
 const PERFIS = new Set(["simples", "controlador", "dropbox", "completo"]);
 const DOCUMENTACAO = "docs/instalador.md";
@@ -17,6 +18,11 @@ export function validarConfiguracaoEstatica(configuracao, opcoes = {}) {
   const criptografia = configuracao.criptografia ?? "gpg";
   const comControlador = ["controlador", "completo"].includes(perfil);
   const comDropbox = ["dropbox", "completo"].includes(perfil);
+  try {
+    resolverProxy(configuracao);
+  } catch (erro) {
+    bloqueios.push(bloqueio("A_PROXY_INVALIDO", erro, true));
+  }
 
   if (!PERFIS.has(perfil)) {
     bloqueios.push(

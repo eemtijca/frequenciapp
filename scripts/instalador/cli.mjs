@@ -25,6 +25,7 @@ import {
 import { executarAplicacao, ORDEM_ETAPAS } from "./executor.mjs";
 import { caminhosOperacao } from "./passos/contexto.mjs";
 import { rotinasPrevistas } from "./passos/ambiente.mjs";
+import { resolverProxy } from "./configuracao-proxy.mjs";
 import { executarCanal } from "./canal.mjs";
 import { COMANDOS_OPERACAO, executarOperacao } from "./operacao.mjs";
 import {
@@ -773,6 +774,9 @@ function processarPlanejar(opcoes, io, deps) {
     exigirConfiguracao: opcoes.valores.has("--salvar-config"),
   });
   documento.etapas[0].detalhes.rotinas = rotinas;
+  if (documento.ok && valores.dominio) {
+    documento.etapas[0].detalhes.proxy = resolverProxy(valores);
+  }
   if (opcoes.valores.has("--salvar-config")) {
     if (!documento.ok) {
       documento.avisos = deduplicarAvisos([
@@ -1049,6 +1053,7 @@ function formatarPlanoHumano(documentoFinal) {
   const preflight = documentoFinal.etapas.find((etapa) => etapa.id === "preflight");
   const pacotes = documentoFinal.etapas.find((etapa) => etapa.id === "pacotes");
   const detalhes = preflight?.detalhes ?? {};
+  const arquivosProxy = detalhes.proxy?.arquivos ?? [];
   linhas.push("FrequenciApp - instalador");
   linhas.push("");
   linhas.push(`Comando: ${documentoFinal.comando}`);
@@ -1066,6 +1071,7 @@ function formatarPlanoHumano(documentoFinal) {
   linhas.push(`Perfil: ${documentoFinal.perfil}  Canal: ${documentoFinal.canal}`);
   if (documentoFinal.tag) linhas.push(`Tag: ${documentoFinal.tag}`);
   linhas.push(...formatarRotinasHumanas(documentoFinal));
+  if (arquivosProxy.length) linhas.push(`Configuração do proxy: ${arquivosProxy.join(", ")}`);
   linhas.push("");
   linhas.push("Pacotes:");
   if (pacotes?.detalhes?.pacotes?.length) {

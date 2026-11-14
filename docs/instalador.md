@@ -266,6 +266,18 @@ Valores aceitos: `--perfil` aceita `simples`, `controlador`, `dropbox` ou `compl
 
 Padrões: perfil `simples`, canal `release`, canal de atualização `release`, proxy `caddy`, TLS `acme`, agendador `auto`, atualização agendada desabilitada, modo de backup `compose`, criptografia `gpg`, retenção de 30 dias com mínimo de 5 cópias confirmadas, firewall `nao`, fuso `America/Fortaleza`, porta SSH 22, portas HTTP e HTTPS 80 e 443. O `--canal-atualizacao main` exige `--permitir-instavel`.
 
+### HTTPS público por IPv4
+
+O `--dominio` também aceita o IPv4 público do servidor com `--proxy caddy --tls acme`. Não é necessário criar um domínio DNS para esse caminho. Os demais requisitos de conta, backup e canal continuam obrigatórios; substituir apenas o endereço nos exemplos completos de instalação.
+
+Para IPv4, o instalador seleciona `infra/servidor/Caddyfile.ipv4` e grava essa escolha em `CADDYFILE` no `ops.env`. O arquivo configura um emissor ACME explícito com o perfil `shortlived` e `default_sni` para clientes que se conectam sem enviar SNI. A seleção é refeita a partir da configuração do instalador nas repetições e retomadas, sem editar o checkout manualmente. Domínios DNS continuam usando `infra/servidor/Caddyfile`; TLS interno continua usando `infra/servidor/Caddyfile.interno`.
+
+Uma pilha saudável não dispensa a conferência da configuração em uso. O instalador compara o hash do serviço Compose desejado com o label do proxy existente. Se houver divergência, reconcilia somente o proxy, sem recriar a aplicação ou o banco, e confere o resultado. A retomada também faz essa comparação quando o ambiente já foi persistido e a etapa Compose ficou pendente. Com `--nao-iniciar`, a configuração é validada sem reconciliar os contêineres. O hash cobre os campos do serviço, não o conteúdo de um arquivo editado manualmente no mesmo caminho.
+
+O IPv4 precisa ser público e acessível nas portas 80 e 443, e a autoridade ACME precisa oferecer certificados para IP com o perfil escolhido. O `--acme-staging` mantém o perfil, mas usa a autoridade de teste, cuja cadeia não tem confiança pública. O fluxo IPv4 com Nginx e TLS ACME não é oferecido pelo instalador e é recusado antes das etapas com efeitos, sem trocar silenciosamente para TLS interno.
+
+O Caddy mantém os certificados em seu volume persistente e gerencia a renovação. Conferir o HTTPS pelo endereço público, sem `-k`, e também o atendimento sem SNI. A saúde HTTP interna da aplicação e os testes isolados de configuração não comprovam emissão, confiança externa ou renovação de certificado público. A preparação manual equivalente está em [Auto-hospedagem](auto-hospedagem.md#subir-com-caddy).
+
 ### Aliases
 
 | Português          | Inglês              | Observação                                       |
