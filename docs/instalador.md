@@ -48,7 +48,7 @@ O `app.env` desses dois perfis mantém `DATABASE_URL` e `DIRECT_URL` vazias no h
 
 A configuração privada `instalador.json` persiste `operadorControlador`, `configDropbox` e `arquivoTokenDropbox`, além das demais opções do perfil. São nomes e caminhos, não o conteúdo do token. A retomada usa `aplicar --config <arquivo> --retomar`; as confirmações operacionais, como `--sim` e `--permitir-instavel` no canal `main`, continuam explícitas.
 
-A adoção ainda cria estado e armazenamento próprios para o controlador e não importa automaticamente o conjunto inicial de backup, o catálogo e o ponteiro legados. A existência de uma cópia antes da adoção não comprova sua disponibilidade no controlador. Essa transição exige validação adicional antes de considerar o perfil completo operacional.
+A adoção conserva as raízes administrativas existentes de estado, backups e travas. O primeiro conjunto, o recibo, o catálogo e o ponteiro permanecem acessíveis no armazenamento ativo, sem migração ou limpeza automática. Raízes sem proteção administrativa são recusadas. A prova isolada usa GPG e jq reais, com I/O Docker e Dropbox sintético; não comprova restauração PostgreSQL nem provisionamento integral do perfil.
 
 O transporte rclone precisa oferecer `root_namespace` no provedor Dropbox consultado por `rclone config providers`; apenas escrever essa chave no arquivo não comprova suporte. Binário ausente ou opção indisponível é uma pré-condição não satisfeita. A conferência não autoriza atualizar o host, criar credenciais, alterar o namespace ou mudar o destino adotado.
 
