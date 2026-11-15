@@ -287,6 +287,14 @@ NODE
   export BACKUP_BANCO_VERIFICADO="$banco_observado"
 fi
 
+if [ -n "${BACKUP_DROPBOX_CONFIG:-}" ]; then
+  node --input-type=module - "$DIR/dropbox-estado.mjs" <<'NODE' || exit 1
+const { verificarCapacidadeRclone } = await import(process.argv[2]);
+try { verificarCapacidadeRclone(); }
+catch (erro) { console.error(`[dropbox] ${erro.message}`); process.exitCode = 1; }
+NODE
+fi
+
 if [ "$verificar_somente" = true ]; then
   verificar_ultimo_backup
   exit 0

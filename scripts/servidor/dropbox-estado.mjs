@@ -8,6 +8,35 @@ const exigir = (ok) => {
   if (!ok) throw new Error("Dropbox: adoção, autoridade ou journal não comprovado.");
 };
 const sha = (b) => createHash("sha256").update(b).digest("hex");
+export function verificarCapacidadeRclone(e = process.env) {
+  let compativel = false;
+  try {
+    const r = spawnSync("rclone", ["config", "providers"], {
+      env: { PATH: e.PATH, HOME: e.HOME || "/tmp", RCLONE_CONFIG: "/dev/null" },
+      encoding: "utf8",
+      timeout: 15000,
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    if (!r.error && !r.signal && r.status === 0) {
+      const provedores = JSON.parse(r.stdout);
+      const dropbox = Array.isArray(provedores)
+        ? provedores.filter((p) => p.Name === "dropbox")
+        : [];
+      compativel =
+        dropbox.length === 1 &&
+        Array.isArray(dropbox[0].Options) &&
+        dropbox[0].Options.some((o) => o.Name === "root_namespace");
+    }
+  } catch {}
+  if (!compativel) {
+    const erro = new Error(
+      "rclone incompatível ou indisponível: o provedor Dropbox precisa anunciar root_namespace em config providers. Revisar o binário selecionado antes de repetir; nenhum fallback é permitido.",
+    );
+    erro.code = "E_RCLONE_DROPBOX";
+    throw erro;
+  }
+}
+
 function privado(p, diretorio = false) {
   exigir(typeof p === "string" && path.isAbsolute(p) && fs.realpathSync(p) === path.resolve(p));
   const s = fs.lstatSync(p);
@@ -67,6 +96,7 @@ export function persistirDropbox(p, dados) {
   }
 }
 export function carregarAdocaoDropbox(arquivo, e) {
+  verificarCapacidadeRclone(e);
   const c = JSON.parse(lerPrivado(arquivo, 64 * 1024));
   exigir(
     c.versao === 1 &&

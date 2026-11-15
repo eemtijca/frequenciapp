@@ -10,6 +10,11 @@ on:
       - "scripts/servidor/**"
       - "tests/servidor/controlador/**"
       - "docker/app/migrar.mjs"
+      - "src/infra/schema-postgres.mjs"
+      - "scripts/github/ferramentas.json"
+      - "infra/servidor/**"
+      - "compose*.yml"
+      - ".env.example"
       - "package.json"
       - "docs/instalador.md"
       - ".github/workflows/instalador.yml"
@@ -74,29 +79,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Setup Node
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26.13.0
+          persist-credentials: false
+
+      - name: Preparar imagem apenas com fontes públicas versionadas
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          contexto=$(mktemp -d "$RUNNER_TEMP/instalador-unit.XXXXXXXX")
+          git archive --format=tar HEAD scripts/servidor scripts/instalador \
+            tests/servidor/controlador tests/instalador infra/servidor \
+            docker/app/migrar.mjs src/infra/schema-postgres.mjs package.json instalar.sh .env.example \
+            compose.yml compose.servidor.yml compose.servidor-caddy.yml \
+            compose.servidor-nginx.yml | tar -x -C "$contexto"
+          docker build --network default \
+            -f "$contexto/tests/servidor/controlador/Dockerfile" \
+            -t "frequenciapp-instalador-unit-teste:${{ github.run_id }}-${{ github.run_attempt }}" "$contexto"
 
       - name: Testes unitários em contêiner sem privilégios
         shell: bash
         run: |
           set -Eeuo pipefail
-          contexto=$(mktemp -d "$RUNNER_TEMP/instalador-unit.XXXXXXXX")
-          git archive --format=tar HEAD | tar -x -C "$contexto"
-          chmod -R a+rX "$contexto"
-          docker run --rm --network none --read-only --cap-drop ALL \
+          docker run --rm --network none --ipc private --read-only --cap-drop ALL \
             --security-opt no-new-privileges --user 1000:1000 \
             --pids-limit 512 --memory 2g --cpus 2 \
             --tmpfs /scratch:rw,nosuid,nodev,exec,size=4g,mode=1777 \
             --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777 \
-            --mount "type=bind,src=$contexto,dst=/repo,readonly" --workdir /repo \
+            --workdir /repo \
             --env HOME=/scratch --env TMPDIR=/scratch \
             --env INSTALADOR_LOCK_DIR=/scratch/instalador-lock --env INSTALADOR_MATRIZ=0 \
             --entrypoint /bin/bash \
-            mcr.microsoft.com/playwright:v1.65.0-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f \
-            -c 'exec /usr/bin/node --test --test-reporter=tap --test-concurrency=1 tests/instalador/*.test.mjs'
+            "frequenciapp-instalador-unit-teste:${{ github.run_id }}-${{ github.run_attempt }}" \
+            -c 'umask 077; exec node --test --test-reporter=tap --test-concurrency=1 tests/instalador/*.test.mjs'
 
   controlador:
     name: Controlador e Git administrativo isolados
@@ -115,7 +129,7 @@ jobs:
           contexto=$(mktemp -d "$RUNNER_TEMP/controlador.XXXXXXXX")
           git archive --format=tar HEAD scripts/servidor scripts/instalador \
             tests/servidor/controlador tests/instalador infra/servidor \
-            docker/app/migrar.mjs package.json instalar.sh .env.example \
+            docker/app/migrar.mjs src/infra/schema-postgres.mjs package.json instalar.sh .env.example \
             compose.yml compose.servidor.yml compose.servidor-caddy.yml \
             compose.servidor-nginx.yml | tar -x -C "$contexto"
           docker build --network default \
@@ -124,17 +138,25 @@ jobs:
 
       - name: Testar com root interno sem rede ou socket Docker
         run: >
-          docker run --rm --network none --read-only --cap-drop ALL
+          docker run --rm --network none --ipc private --read-only --cap-drop ALL
+          --cap-add CHOWN --cap-add FOWNER --cap-add SETUID --cap-add SETGID
           --security-opt no-new-privileges --user 0:0
+          --pids-limit 512 --memory 2g --cpus 2
+          --env HOME=/scratch --env TMPDIR=/scratch
+          --env INSTALADOR_LOCK_DIR=/scratch/instalador-lock --env INSTALADOR_MATRIZ=0
+          --tmpfs /scratch:rw,nosuid,nodev,exec,size=4g,mode=1777
           --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777
           "frequenciapp-controlador-teste:${{ github.run_id }}-${{ github.run_attempt }}"
 
       - name: Testar Git real com proprietários distintos sem rede ou socket Docker
         run: >
-          docker run --rm --network none --read-only --cap-drop ALL
+          docker run --rm --network none --ipc private --read-only --cap-drop ALL
           --cap-add CHOWN --cap-add FOWNER --cap-add SETUID --cap-add SETGID
           --security-opt no-new-privileges --user 0:0
-          --env INSTALADOR_LOCK_DIR=/tmp/instalador-lock
+          --env HOME=/scratch --env TMPDIR=/scratch
+          --env INSTALADOR_LOCK_DIR=/scratch/instalador-lock --env INSTALADOR_MATRIZ=0
+          --pids-limit 512 --memory 2g --cpus 2
+          --tmpfs /scratch:rw,nosuid,nodev,exec,size=4g,mode=1777
           --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777
           "frequenciapp-controlador-teste:${{ github.run_id }}-${{ github.run_attempt }}"
           bash -c 'umask 022; exec node --test --test-reporter=tap --test-concurrency=1 tests/instalador/administrativo/*.test.mjs'
@@ -153,4 +175,4 @@ jobs:
           node-version: 26.13.0
 
       - name: Matriz de planejar
-        run: npm run test:instalador:matriz
+        run: node --test --test-reporter=tap tests/instalador/matriz.test.mjs

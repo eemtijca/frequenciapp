@@ -6,6 +6,7 @@ import {
   abrirDiaSeResumo,
   aguardarHidratacao,
   escolherHorario,
+  prepararChamadaParaSaida,
   registrarSaida,
   trocarVisao,
 } from "../helpers/pagina";
@@ -93,6 +94,7 @@ test("seletor de horário: teclado, foco e fechamento", async ({ page }) => {
 });
 
 test("registra a saída com o horário escolhido e mostra na lista", async ({ page }) => {
+  await prepararChamadaParaSaida(page, "E2E Ano A");
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
   await abrirDiaSeResumo(page);

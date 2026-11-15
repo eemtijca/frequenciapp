@@ -108,40 +108,42 @@ function normalizarChamada(dados: ChamadaDaApi): ChamadaDaApi {
 
 test.beforeAll(async () => {
   await limparMassa();
+  const criadoEm = `${diaDeChamada()}T12:00:00Z`;
   await comBanco(async (cliente) => {
     const serie = await cliente.query<{ id: string }>(
       "insert into series (nome, ordem) values ('E2E Parcial', 97) returning id",
     );
     const turma = await cliente.query<{ id: string }>(
-      "insert into turmas (serie_id, nome) values ($1, 'A') returning id",
-      [serie.rows[0]?.id],
+      "insert into turmas (serie_id, nome, criado_em) values ($1, 'A', $2) returning id",
+      [serie.rows[0]?.id, criadoEm],
     );
     turmaId = turma.rows[0]?.id ?? "";
     expect(turmaId).not.toBe("");
     const aluno = await cliente.query<{ id: string }>(
-      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Parcial Um', $1, $1, 1, true) returning id",
-      [turmaId],
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, criado_em) values ('E2E Parcial Um', $1, $1, 1, true, $2) returning id",
+      [turmaId, criadoEm],
     );
     alunoId = aluno.rows[0]?.id ?? "";
     expect(alunoId).not.toBe("");
     const outraTurma = await cliente.query<{ id: string }>(
-      "insert into turmas (serie_id, nome) values ($1, 'B') returning id",
-      [serie.rows[0]?.id],
+      "insert into turmas (serie_id, nome, criado_em) values ($1, 'B', $2) returning id",
+      [serie.rows[0]?.id, criadoEm],
     );
     outraTurmaId = outraTurma.rows[0]?.id ?? "";
     const segundo = await cliente.query<{ id: string }>(
-      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Parcial Dois', $1, $1, 2, true) returning id",
-      [turmaId],
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, criado_em) values ('E2E Parcial Dois', $1, $1, 2, true, $2) returning id",
+      [turmaId, criadoEm],
     );
     segundoAlunoId = segundo.rows[0]?.id ?? "";
     const desistente = await cliente.query<{ id: string }>(
-      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em) values ('E2E Parcial Desistente', $1, $1, 3, true, '2020-01-01') returning id",
-      [turmaId],
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em, criado_em) values ('E2E Parcial Desistente', $1, $1, 3, true, $2, $3) returning id",
+      [turmaId, diaDeChamada(), criadoEm],
     );
     desistenteId = desistente.rows[0]?.id ?? "";
+    // O inativo continua na massa, com desistência conhecida, sem vínculo histórico inventado.
     await cliente.query(
-      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Parcial Inativo', $1, $1, 4, false), ('E2E Parcial Outra Turma', $2, $2, 1, true)",
-      [turmaId, outraTurmaId],
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, criado_em, desistente_em) values ('E2E Parcial Inativo', $1, $1, 4, false, $3, $4), ('E2E Parcial Outra Turma', $2, $2, 1, true, $3, null)",
+      [turmaId, outraTurmaId, criadoEm, diaDeChamada()],
     );
     await cliente.query(
       "insert into horarios (turma_id, ordem, inicio, fim, dias_semana, ativo) values ($1, 1, '07:00', '07:50', $2, true), ($1, 2, '07:50', '08:40', $2, true), ($1, 3, '08:40', '09:30', $2, true)",

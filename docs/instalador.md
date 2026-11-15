@@ -40,7 +40,19 @@ O instalador orquestra os scripts existentes do servidor: `compose.sh`, `identid
 
 O perfil `simples` não pode ser bloqueado por artefato do controlador. Os perfis `controlador`, `dropbox` e `completo` são opt-in e exigem configuração explícita.
 
-O perfil `controlador` exige `--operador-controlador` com uma conta sem privilégio administrativo e instala as rotinas estáveis em cron. O perfil `dropbox` exige `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino`; o upload continua no rclone e a verificação nativa fica no backup. O perfil `completo` executa os dois. A adoção do Dropbox e o perfil do controlador são validados antes de qualquer mutação.
+O perfil `controlador` exige `--operador-controlador` com uma conta existente sem privilégio administrativo e instala as rotinas estáveis em cron. O perfil `dropbox` exige `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino`; o upload continua no rclone e a verificação nativa fica no backup. O perfil `completo` executa os dois. Os campos obrigatórios são conferidos no preflight; a validação dos arquivos Dropbox e a adoção do controlador ocorrem nas respectivas etapas, depois da configuração da pilha.
+
+Nos perfis `controlador` e `completo`, código, configuração, estado, backups e travas pertencem a root. A variável `SERVIDOR_USUARIO` não transfere essa propriedade para uma conta de serviço. O operador indicado por `--operador-controlador` permanece separado e não recebe o grupo Docker. Os perfis sem controlador mantêm a conta de serviço configurada.
+
+O `app.env` desses dois perfis mantém `DATABASE_URL` e `DIRECT_URL` vazias no host. O Compose constrói as conexões internas a partir de `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB`. A adoção continua recusando conexões explícitas, inclusive `BACKUP_DATABASE_URL`, para impedir uma autoridade de banco paralela.
+
+A configuração privada `instalador.json` persiste `operadorControlador`, `configDropbox` e `arquivoTokenDropbox`, além das demais opções do perfil. São nomes e caminhos, não o conteúdo do token. A retomada usa `aplicar --config <arquivo> --retomar`; as confirmações operacionais, como `--sim` e `--permitir-instavel` no canal `main`, continuam explícitas.
+
+A adoção conserva as raízes administrativas existentes de estado, backups e travas. O primeiro conjunto, o recibo, o catálogo e o ponteiro permanecem acessíveis no armazenamento ativo, sem migração ou limpeza automática. Raízes sem proteção administrativa são recusadas. A prova isolada usa GPG e jq reais, com I/O Docker e Dropbox sintético; não comprova restauração PostgreSQL nem provisionamento integral do perfil.
+
+O transporte rclone precisa oferecer `root_namespace` no provedor Dropbox consultado por `rclone config providers`; apenas escrever essa chave no arquivo não comprova suporte. A etapa Dropbox consulta o binário selecionado antes de ativar sua configuração. Retomadas posteriores à etapa repetem a consulta; a entrada estável repete a guarda antes de criar intenção operacional. O produtor e o consumidor nativo também recusam o transporte incompatível, inclusive em `--verificar`, sem fallback ou redução de perfil.
+
+O pacote rclone da distribuição pode satisfazer a versão mínima geral e ainda não anunciar essa capacidade. Nesse caso, a instalação completa é recusada com diagnóstico de `root_namespace`; o fluxo não instala outra versão automaticamente. O binário compatível precisa ser preparado e conferido administrativamente antes da repetição. Isso não autoriza upgrade do host, criação de credenciais, troca de namespace ou alteração do destino adotado.
 
 ### Escopo
 
@@ -163,6 +175,8 @@ Nos perfis com controlador, a etapa `agendador` é pulada. A etapa `controlador`
 No systemd, o instalador grava units e timers em `/etc/systemd/system` para a agenda, o backup do banco, o backup das planilhas, a renovação do certificado e a atualização. Os timers usam `Persistent=true`, `RandomizedDelaySec`, `AccuracySec=1min` e um usuário de serviço; as units usam `OnFailure` para a unidade `frequenciapp-falha@.service`, `WorkingDirectory` e `ReadWritePaths`. A agenda, o backup do banco e o backup das planilhas respeitam `AGENDA_HABILITADA`, `BACKUP_HABILITADO` e `BACKUP_PLANILHAS_HABILITADO` em `ops.env`. A renovação do certificado só é agendada com Nginx e TLS `acme`; o Caddy renova os certificados sozinho. As expressões `OnCalendar` são validadas com `systemd-analyze calendar` quando a ferramenta existe.
 
 O fuso do host é conferido com `timedatectl`. Uma divergência em relação a `--fuso` é recusada, salvo confirmação explícita com `INSTALADOR_PERMITIR_FUSO_DIVERGENTE=1` ou, no cron, com `CRON_TZ`.
+
+Nos perfis `controlador` e `completo`, a etapa `ambiente` grava em `CRON_FUSO_SISTEMA` a observação de `timedatectl show --property=Timezone`, sem substituir o valor pelo `--fuso`. Campo vazio ou divergente bloqueia o cron do controlador. O uso de `CRON_TZ` exige também `CRON_SUPORTA_TZ=true` na configuração protegida; a presença da variável ou a confirmação genérica de divergência não comprovam suporte. Antes da adoção, repetir a etapa `ambiente` permite obter a prova ausente. Depois da adoção, a reconfiguração restrita não altera silenciosamente esses campos nem os hashes do perfil.
 
 A atualização automática fica desabilitada por padrão. O timer de atualização só é instalado com `--habilitar-atualizacoes`, e o canal `main` exige `--permitir-instavel`. O timer usa o canal definido em `--canal-atualizacao` e a referência de `--ref-atualizacao`. No fallback cron, a linha gerada por `instalar-rotinas.sh` recebe o mesmo modo de atualização e a referência vem de `ATUALIZAR_REF` em `ops.env`.
 
@@ -655,6 +669,8 @@ Estado corrompido, etapa desconhecida ou estado de instalação divergente produ
 
 A trava fica em `/var/lock/frequenciapp/instalador.lock`, modo 600, e usa `flock` exclusivo. O instalador espera até 30 segundos; se a trava continuar ocupada, retorna `E_VALIDACAO` com a etapa e o processo que detém o arquivo.
 
+Na instalação nova, quando `/var/lock` é o alias simbólico usual para `/run/lock`, a derivação inicial usa `/run/lock/frequenciapp` também em `SERVIDOR_LOCK_DIR`, antes dos produtores e da adoção. Sem esse alias, conserva o padrão literal. Um caminho já configurado em `ops.env` permanece literal; não há migração automática de travas ou de autoridades. Links arbitrários e caminhos legados não canônicos continuam recusados na adoção.
+
 A trava é local ao host, não distribuída. Ela serializa `aplicar`, `atualizar`, `backup`, `restaurar`, `desinstalar` e `canal definir --aplicar`. Projetos Compose independentes usam travas próprias quando a identidade operacional estiver configurada. Um processo filho legítimo pode herdar o descritor, e a revalidação confere se ele aponta para a trava do mesmo projeto.
 
 ### Retentativas e tempo limite
@@ -1005,6 +1021,14 @@ Os testes ficam em `tests/instalador/` e cobrem:
 - matriz de plano em todas as distros Tier 1; o subconjunto de aplicação entra com a implementação do `aplicar`.
 
 O workflow `instalador.yml` separa qualidade, unidade, controlador administrativo isolado e matriz de plano. As regressões de controlador adotado ficam em `tests/servidor/controlador/`, fora da suíte sem privilégio do instalador, e rodam no contêiner dedicado sem rede ou socket Docker. As regressões Git em `tests/instalador/administrativo/` usam a mesma imagem e uma etapa própria com root apenas dentro do contêiner e capacidades limitadas para criar proprietários distintos e consultar o checkout como serviço. Esses testes usam Git real, cobrem a origem do operador, a seleção de referência e a retomada, e não executam uma implantação real.
+
+Os jobs de unidade e controlador constroem a receita `tests/servidor/controlador/Dockerfile` sobre o mesmo Node pinado, a partir de uma allowlist de fontes públicas versionadas. O contexto e a imagem incluem explicitamente `src/infra/schema-postgres.mjs`, usado pelo validador real do banco. O migrador é copiado como dado para hashes e recibos nestes perfis; isso não comprova sua execução nem migrações PostgreSQL.
+
+A preparação da imagem Linux amd64 usa rede apenas no build para instalar Git, OpenSSL, util-linux, passwd e GnuPG do Debian e obter artefatos com SHA-256 fixado no inventário `scripts/github/ferramentas.json`: jq 1.8.1, rclone 1.67.0 e o pacote Debian rclone 1.60.1+dfsg-2+b5. O compatível fica em `/usr/local/bin/rclone`, junto do Node efetivamente selecionado; `/usr/bin/node` aponta para esse Node para atender aos clientes de teste com shebang absoluto. O legado fica apenas em `/opt/frequenciapp-test-tools/rclone-legado`, fora do PATH. O build confere as versões e a presença de `root_namespace` no compatível e sua ausência no legado, sem autenticação. Os demais pacotes do Debian não têm versão individual congelada.
+
+Os runtimes não usam rede, socket Docker, bind de credenciais ou portas publicadas. A unidade usa UID 1000, nenhuma capacidade e umask 077. As duas etapas administrativas usam root somente interno, `cap-drop ALL` e apenas CHOWN, FOWNER, SETUID e SETGID, sem DAC_OVERRIDE ou modo privilegiado. Todos usam rootfs somente leitura, IPC privado, NoNewPrivs, 2 CPUs, 2 GiB de memória, 512 PIDs e tmpfs executáveis `/scratch` de 4 GiB e `/tmp` de 256 MiB. HOME, TMPDIR e a trava do instalador ficam em `/scratch`. O controlador usa umask 077; a etapa Git usa 022 para permitir leitura das origens sintéticas depois da troca de UID, sem ampliar capacidades.
+
+As novas regressões administrativas exercitam GPG e jq reais e a capacidade dos dois rclones reais. Somente o I/O Docker e Dropbox é sintético. Testes verdes em outra imagem preparada não aprovam automaticamente esta receita de build; a construção exata e os dois jobs precisam ser conferidos no CI. Essas provas não atestam autenticação Dropbox, transporte remoto, daemon Docker ou restauração PostgreSQL reais.
 
 O teste de escopo do primeiro backup fica na suíte sem privilégio e executa os scripts Bash e o consumidor Node reais com transportes externos sintéticos. O workflow `testes.yml` confere separadamente o SHA do rótulo OCI da imagem e da resposta de saúde da aplicação, usando a revisão construída e um banco descartável. Essas provas não autorizam acesso a dados de produção nem substituem o ensaio de restauração.
 

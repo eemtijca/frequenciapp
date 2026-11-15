@@ -15,6 +15,10 @@ const sha = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const RCLONE_FALSO = `#!/usr/bin/env node
 const fs = require('node:fs');
 const path = require('node:path');
+if (process.argv.slice(2).join(' ') === 'config providers') {
+  require('node:child_process').execFileSync(RCLONE_REAL, ['config','providers'], {stdio:'inherit'});
+  process.exit(0);
+}
 const config = JSON.parse(fs.readFileSync(process.env.FALSO_RCLONE_CONFIG, 'utf8'));
 const [comando, origem, destino] = process.argv.slice(2);
 fs.appendFileSync(config.log, comando + ' ' + origem + ' ' + destino + '\\n');
@@ -319,7 +323,14 @@ async function fixture() {
   gravar(path.join(scripts, "backup-banco.sh"), BACKUP_SHELL, 0o700);
   gravar(path.join(scripts, "backup-falso.mjs"), BACKUP_FALSO, 0o600);
   gravar(path.join(scripts, "ajudante-autoridade.mjs"), AJUDANTE_AUTORIDADE, 0o600);
-  gravar(path.join(bin, "rclone"), RCLONE_FALSO, 0o700);
+  const rcloneReal = execFileSync("/bin/sh", ["-c", "command -v rclone"], {
+    encoding: "utf8",
+  }).trim();
+  gravar(
+    path.join(bin, "rclone"),
+    RCLONE_FALSO.replace("RCLONE_REAL", JSON.stringify(rcloneReal)),
+    0o700,
+  );
   gravar(path.join(tmp, "rclone.json"), JSON.stringify({ remoto, log: eventos }));
 
   const objetos = new Map(),
@@ -658,7 +669,9 @@ test("o ciclo publica o recibo, remove o marcador e a retenção usa o token e o
     assert.equal(fs.statSync(path.join(f.catalogo, publicado.recibo)).mode & 0o077, 0);
     assert.equal(fs.statSync(path.join(f.estado, "ultimo-backup.json")).mode & 0o077, 0);
 
-    const retencao = await f.retention();
+    // O positivo verifica TLS e CLI completos, não um SLO de resposta em 50 ms.
+    // Os controles de autoridade ocupada conservam os orçamentos próprios de 50 e 5000 ms.
+    const retencao = await f.retention({ BACKUP_DROPBOX_CONFIG: f.configLongo });
     assert.equal(retencao.signal, null);
     assert.equal(retencao.status, 0, retencao.stderr);
     assert.equal(fs.existsSync(path.join(f.remoto, "arquivo-alheio.txt")), true);

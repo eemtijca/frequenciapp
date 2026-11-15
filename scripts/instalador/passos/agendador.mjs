@@ -109,7 +109,7 @@ function validarAtualizacoes(ctx) {
   });
 }
 
-function lerFusoHost(ctx) {
+export function lerFusoHost(ctx) {
   if (typeof ctx.comandoExiste !== "function" || !ctx.comandoExiste("timedatectl")) {
     return { host: "", verificado: false };
   }

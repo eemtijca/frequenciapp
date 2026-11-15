@@ -203,7 +203,32 @@ export function lerAmbiente(p, capturarLegado = false) {
         return [s.slice(0, n), s.slice(n + 1)];
       }),
   );
-  if (capturarLegado) p.estadoLegado = env.ESTADO_DIR || "/var/lib/frequenciapp";
+  if (capturarLegado) {
+    p.estadoLegado = env.ESTADO_DIR || "/var/lib/frequenciapp";
+    // O primeiro conjunto e seu catálogo não mudam de autoridade na adoção.
+    for (const [campo, raiz] of [
+      ["estado", p.estadoLegado],
+      ["backups", env.BACKUP_DIR || "/var/backups/frequenciapp"],
+    ]) {
+      if (fs.lstatSync(raiz, { throwIfNoEntry: false })) {
+        protegido(raiz, "diretorio", true);
+        p[campo] = raiz;
+      }
+    }
+    exigir(
+      !env.BACKUP_BANCO_DIR ||
+        env.BACKUP_BANCO_DIR === `${p.backups}/banco` ||
+        (!fs.lstatSync(env.BACKUP_DIR || "/var/backups/frequenciapp", { throwIfNoEntry: false }) &&
+          env.BACKUP_BANCO_DIR === `${env.BACKUP_DIR || "/var/backups/frequenciapp"}/banco`),
+      "BACKUP_BANCO_DIR precisa corresponder ao armazenamento adotado; revisão administrativa necessária.",
+    );
+    // A adoção não pode criar uma segunda exclusão para um produtor já existente.
+    const locks = env.SERVIDOR_LOCK_DIR || "/var/lock/frequenciapp";
+    if (fs.lstatSync(locks, { throwIfNoEntry: false })) {
+      protegido(locks, "diretorio", true);
+      p.locks = locks;
+    }
+  }
   for (const n of Object.keys(env))
     if (
       /^(?:NODE_|BASH_|BASH_FUNC_|LD_|DYLD_|GIT_|SERVIDOR_CONTROLADOR|SERVIDOR_LOCK_HERDADO)/.test(

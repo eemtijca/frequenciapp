@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ErroInstalador } from "../json.mjs";
+import { verificarCapacidadeRclone } from "../../servidor/dropbox-estado.mjs";
 import {
   acao,
   atualizarEnv,
@@ -327,6 +328,7 @@ function executarPasso(ctx) {
   const adocao = lerAdocao(ctx);
   const validada = validarAdocao(adocao, ctx);
   validarRclone(validada.rcloneTexto, validada.remoto, adocao);
+  revalidar(ctx);
   const { alterou } = atualizarOps(ctx, adocao);
   if (typeof ctx.registrarLog === "function") {
     ctx.registrarLog(
@@ -360,6 +362,23 @@ function executarPasso(ctx) {
         conferidaPor: "scripts/servidor/backup-banco.sh",
       },
     },
+  };
+}
+
+export function revalidar(ctx) {
+  try {
+    verificarCapacidadeRclone(ctx.ambienteBase ?? process.env);
+  } catch (erro) {
+    throw erroDropbox(
+      erro.message,
+      "Revise a capacidade do rclone selecionado; preserve namespace e destino adotados.",
+    );
+  }
+  return {
+    estado: "concluida",
+    acoes: [acao("Revalida root_namespace no transporte rclone selecionado", null, false)],
+    avisos: [],
+    detalhes: { semMudancas: true },
   };
 }
 

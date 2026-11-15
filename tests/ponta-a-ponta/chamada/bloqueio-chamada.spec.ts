@@ -2,6 +2,7 @@
 // sem editar nem reenviar uma frequência por toque acidental.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
+import { diaDeChamada } from "../helpers/dia";
 import {
   aguardarHidratacao,
   desbloquearChamada,
@@ -25,6 +26,7 @@ async function limparMassa(): Promise<void> {
 }
 
 test.beforeAll(async () => {
+  const criadoEm = `${diaDeChamada()}T12:00:00Z`;
   await limparMassa();
   await comBanco(async (cliente) => {
     const serie = await cliente.query<{ id: string }>(
@@ -32,12 +34,12 @@ test.beforeAll(async () => {
     );
     const serieId = serie.rows[0]?.id;
     const turmaA = await cliente.query<{ id: string }>(
-      "insert into turmas (serie_id, nome) values ($1, 'A') returning id",
-      [serieId],
+      "insert into turmas (serie_id, nome, criado_em) values ($1, 'A', $2) returning id",
+      [serieId, criadoEm],
     );
     const turmaB = await cliente.query<{ id: string }>(
-      "insert into turmas (serie_id, nome) values ($1, 'B') returning id",
-      [serieId],
+      "insert into turmas (serie_id, nome, criado_em) values ($1, 'B', $2) returning id",
+      [serieId, criadoEm],
     );
     const aId = turmaA.rows[0]?.id;
     const bId = turmaB.rows[0]?.id;
@@ -46,8 +48,8 @@ test.beforeAll(async () => {
       [aId, bId, [1, 2, 3, 4, 5, 6, 7]],
     );
     await cliente.query(
-      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Bloqueio Um', $1, $1, 1, true), ('E2E Bloqueio Dois', $2, $2, 1, true)",
-      [aId, bId],
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, criado_em) values ('E2E Bloqueio Um', $1, $1, 1, true, $3), ('E2E Bloqueio Dois', $2, $2, 1, true, $3)",
+      [aId, bId, criadoEm],
     );
   });
 });

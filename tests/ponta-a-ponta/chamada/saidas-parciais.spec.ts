@@ -1,8 +1,13 @@
 // Saída aparece na Chamada Parcial, com conferência manual e personalização preservada.
 import { expect, test } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
-import { diaDeChamada } from "../helpers/dia";
-import { aguardarHidratacao, salvarFrequenciaParcial, trocarVisao } from "../helpers/pagina";
+import { diaCorrente, diaDeChamada } from "../helpers/dia";
+import {
+  aguardarHidratacao,
+  prepararChamadaParaSaida,
+  salvarFrequenciaParcial,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 const prefixo = "E2E Saída Parcial";
@@ -12,6 +17,10 @@ let alunoId = "";
 
 async function limpar() {
   await comBanco(async (banco) => {
+    await banco.query(
+      "delete from frequencias where turma_id in (select t.id from turmas t join series s on s.id=t.serie_id where s.nome=$1)",
+      [prefixo],
+    );
     await banco.query("delete from alunos where nome=$1", [`${prefixo} Um`]);
     await banco.query(
       "delete from turmas where serie_id in (select id from series where nome=$1)",
@@ -24,6 +33,7 @@ async function limpar() {
 
 test.beforeAll(async () => {
   await limpar();
+  const criadoEm = `${dia}T12:00:00Z`;
   await comBanco(async (banco) => {
     const serie = (
       await banco.query<{ id: string }>(
@@ -34,15 +44,15 @@ test.beforeAll(async () => {
     turmaId =
       (
         await banco.query<{ id: string }>(
-          "insert into turmas (nome,serie_id) values ('A',$1) returning id",
-          [serie],
+          "insert into turmas (nome,serie_id,criado_em) values ('A',$1,$2) returning id",
+          [serie, criadoEm],
         )
       ).rows[0]?.id ?? "";
     alunoId =
       (
         await banco.query<{ id: string }>(
-          "insert into alunos (nome,turma_id,turma_original_id,ordem) values ($1,$2,$2,1) returning id",
-          [`${prefixo} Um`, turmaId],
+          "insert into alunos (nome,turma_id,turma_original_id,ordem,criado_em) values ($1,$2,$2,1,$3) returning id",
+          [`${prefixo} Um`, turmaId, criadoEm],
         )
       ).rows[0]?.id ?? "";
     await banco.query(
@@ -64,6 +74,7 @@ test("migra a saída, confirma na Seduc e preserva a edição após remover a or
   await comBanco((banco) =>
     banco.query("delete from frequencias_parciais where aluno_id=$1", [alunoId]),
   );
+  await prepararChamadaParaSaida(page, `${prefixo} A`, dia);
   const criada = await page.request.post("/api/saidas", {
     data: {
       alunoId,
@@ -75,7 +86,13 @@ test("migra a saída, confirma na Seduc e preserva a edição após remover a or
     },
   });
   expect(criada.status()).toBe(201);
-  const { saida } = (await criada.json()) as { saida: { id: string } };
+  const { saida } = (await criada.json()) as {
+    saida: { id: string; origemReferencia: string; turmaHistoricaId: string };
+  };
+  expect(saida).toMatchObject({
+    turmaHistoricaId: turmaId,
+    origemReferencia: dia === diaCorrente() ? "MATRICULA_VIGENTE" : "CHAMADA_HISTORICA",
+  });
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Chamada Parcial", "chamada-parcial");

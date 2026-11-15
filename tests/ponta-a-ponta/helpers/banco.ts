@@ -4,6 +4,7 @@ import pg from "pg";
 import { hashearSenha } from "../../../src/infra/auth/hash";
 import { selecionarSchema } from "../../../src/infra/schema-postgres.mjs";
 import { exigirAmbienteE2E } from "./isolamento";
+import { diaDeChamada } from "./dia";
 
 /** Papel de quem faz a frequência; acompanha o enum do schema. */
 const PAPEL_COORDENACAO = "COORDENACAO";
@@ -109,9 +110,10 @@ export async function massaDeDemonstracaoPresente(): Promise<boolean> {
 
 /**
  * Cria a massa da suíte de frequência: série E2E Ano, turma A, três aulas
- * de segunda a sábado e dois alunos. Chamada no beforeAll do spec.
+ * de segunda a sábado e dois alunos existentes no dia da chamada.
  */
 export async function criarMassaE2E(): Promise<void> {
+  const criadoEm = `${diaDeChamada()}T12:00:00Z`;
   await comBanco(async (cliente) => {
     await cliente.query(
       "delete from frequencias where turma_id in (select id from turmas where serie_id in (select id from series where nome = 'E2E Ano'))",
@@ -129,8 +131,8 @@ export async function criarMassaE2E(): Promise<void> {
     );
     const serieId = serie.rows[0]?.id as string;
     const turma = await cliente.query(
-      "insert into turmas (serie_id, nome) values ($1, 'A') returning id",
-      [serieId],
+      "insert into turmas (serie_id, nome, criado_em) values ($1, 'A', $2) returning id",
+      [serieId, criadoEm],
     );
     const turmaId = turma.rows[0]?.id as string;
     const aulas: [number, string, string][] = [
@@ -145,8 +147,8 @@ export async function criarMassaE2E(): Promise<void> {
       );
     }
     await cliente.query(
-      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('E2E Aluno Um', $1, $1, 1, true), ('E2E Aluno Dois', $1, $1, 2, true)",
-      [turmaId],
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, criado_em) values ('E2E Aluno Um', $1, $1, 1, true, $2), ('E2E Aluno Dois', $1, $1, 2, true, $2)",
+      [turmaId, criadoEm],
     );
   });
 }

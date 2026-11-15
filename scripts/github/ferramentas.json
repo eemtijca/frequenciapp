@@ -19,6 +19,33 @@
       "integridade": "sha512-SiiJsBhZqdBiPHTEl6OT3sASrRrKIcYTQMsVGXx6EE/gM8WFMwYjeIX8Tt8RiU4Iv2J6LbT8KpGfCOsBpRWB/w==",
       "estado": "pinado",
       "fontes": ["https://github.com/nodejs/corepack", "https://registry.npmjs.org/corepack/0.36.0"]
+    },
+    "rclone-teste": {
+      "versao": "1.67.0",
+      "plataforma": "linux-amd64",
+      "origem": "https://downloads.rclone.org/v1.67.0/rclone-v1.67.0-linux-amd64.zip",
+      "checksumFonte": "https://downloads.rclone.org/v1.67.0/SHA256SUMS",
+      "sha256": "07c23d21a94d70113d949253478e13261c54d14d72023bb14d96a8da5f3e7722",
+      "destino": "/usr/local/bin/rclone",
+      "estado": "pinado"
+    },
+    "rclone-legado-teste": {
+      "versao": "1.60.1+dfsg-2+b5",
+      "plataforma": "linux-amd64",
+      "origem": "https://deb.debian.org/debian/pool/main/r/rclone/rclone_1.60.1+dfsg-2+b5_amd64.deb",
+      "checksumFonte": "https://packages.debian.org/bookworm/amd64/rclone/download",
+      "sha256": "703722dcab0c487322690fe68c7f8d6787e54e1ecd1297800d1382687ddbd81a",
+      "destino": "/opt/frequenciapp-test-tools/rclone-legado",
+      "estado": "pinado"
+    },
+    "jq-teste": {
+      "versao": "1.8.1",
+      "plataforma": "linux-amd64",
+      "origem": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64",
+      "checksumFonte": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/sha256sum.txt",
+      "sha256": "020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d",
+      "destino": "/usr/local/bin/jq",
+      "estado": "pinado"
     }
   },
   "builds": {
@@ -190,11 +217,6 @@
       "estado": "pinado"
     },
     {
-      "arquivo": ".github/workflows/instalador.yml",
-      "trecho": "mcr.microsoft.com/playwright:v1.65.0-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f",
-      "estado": "pinado"
-    },
-    {
       "arquivo": "tests/servidor/controlador/Dockerfile",
       "trecho": "FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
       "estado": "pinado"
@@ -252,6 +274,36 @@
     {
       "arquivo": "scripts/dev/executar-container.sh",
       "trecho": "npm install --global corepack@0.36.0",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/controlador/Dockerfile",
+      "trecho": "https://downloads.rclone.org/v1.67.0/rclone-v1.67.0-linux-amd64.zip",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/controlador/Dockerfile",
+      "trecho": "07c23d21a94d70113d949253478e13261c54d14d72023bb14d96a8da5f3e7722",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/controlador/Dockerfile",
+      "trecho": "https://deb.debian.org/debian/pool/main/r/rclone/rclone_1.60.1+dfsg-2+b5_amd64.deb",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/controlador/Dockerfile",
+      "trecho": "703722dcab0c487322690fe68c7f8d6787e54e1ecd1297800d1382687ddbd81a",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/controlador/Dockerfile",
+      "trecho": "https://github.com/jqlang/jq/releases/download/jq-1.8.1/jq-linux-amd64",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/controlador/Dockerfile",
+      "trecho": "020468de7539ce70ef1bceaf7cde2e8c4f2ca6c3afb84642aabc5c97d9fc2a0d",
       "estado": "pinado"
     }
   ],

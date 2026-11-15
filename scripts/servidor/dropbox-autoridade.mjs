@@ -148,9 +148,11 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
         authority.close();
       }
     }
-  } catch {
+  } catch (erro) {
     console.error(
-      "[dropbox] Autoridade ou publicação incerta; preservar intenção e suspender exclusões.",
+      erro.code === "E_RCLONE_DROPBOX"
+        ? `[dropbox] ${erro.message}`
+        : "[dropbox] Autoridade ou publicação incerta; preservar intenção e suspender exclusões.",
     );
     process.exitCode = 1;
   }

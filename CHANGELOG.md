@@ -10,6 +10,22 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- As massas dos testes de chamada alinham o cadastro das turmas e dos alunos ao dia de referência, evitando conflitos históricos artificiais no domingo. Uma regressão usa domingo fixo na geração da massa e salva o sábado pela API real, sem alterar o relógio do aplicativo nem dispensar a confirmação histórica quando necessária.
+
+- As massas próprias de Chamada Parcial e Seduc seguem o dia de referência e preservam os alunos inativos e desistentes com situação temporal explícita. Os cenários de saída preparam chamada com participantes e retrato de aulas pela API, sem substituir referência comprovada por confirmação de histórico desconhecido. Os testes de remoção de saídas passam a criar os próprios registros e independem da ordem de execução.
+
+- O instalador transmite ao cron do controlador o fuso realmente observado, sem fabricar confirmação a partir da escolha. A derivação inicial reconhece o alias usual de `/var/lock` para `/run/lock`, antes do produtor, sem remapear autoridades já configuradas. A ajuda local de `backup-banco` dispensa transporte e intenção, mantendo as guardas de perfil e das operações normais.
+
+- O CI do instalador prepara uma única receita de ferramentas para unidade e regressões administrativas, com jq e rclones compatível e legado fixados por SHA-256, GnuPG real e o validador compartilhado do banco. Os runtimes permanecem sem rede ou socket, com capacidades administrativas fechadas e temporários dimensionados para o perfil completo.
+
+- A adoção do controlador conserva também as raízes administrativas existentes de estado e backups, mantendo acessíveis o primeiro conjunto, o catálogo, o recibo e o ponteiro sem copiar ou apagar artefatos. Testes isolados usam produtor e consumidor reais com GPG e jq, mas I/O Docker e Dropbox sintético; não atestam restauração PostgreSQL.
+
+- O perfil Dropbox consulta a capacidade `root_namespace` no rclone efetivamente selecionado antes da ativação, nas retomadas e antes de criar intenção operacional no controlador. Transporte incompatível é recusado com diagnóstico, sem upload, novo dump ou fallback de perfil.
+
+- A adoção inicial do controlador conserva a raiz protegida de travas já existente. Processos anteriores e a entrada estável continuam disputando o mesmo caminho e inode, sem recriar o arquivo da trava. Raiz com proprietário não administrativo ou com link é recusada.
+
+- Os perfis do instalador com controlador mantêm propriedade administrativa em root, sem conceder grupo Docker ao operador separado. O ambiente do host deixa as conexões Compose vazias e o JSON efetivo conserva os campos obrigatórios para retomada. As guardas de adoção contra conexões paralelas permanecem ativas.
+
 - O executor dos testes administrativos fixa a execução sem shell, mesmo quando o chamador solicita essa opção. Uma regressão com processos reais confere nomes de arquivo com espaços e metacaracteres, sem executar comandos embutidos nem remover arquivos vizinhos.
 
 - A inicialização auto-hospedada valida `app.env` e `ops.env` antes de qualquer `source`, recusando substituição de comando, crase, ponto e vírgula, CR, NUL, continuação de linha e valor sem aspas com espaços. A mensagem aponta arquivo e linha sem repetir o valor. A inicialização recusa registros de migração não revertidos com `finished_at` nulo e tem roteiro para migração incompleta e checksum divergente, sem apagar dados. Os horários do exemplo são normalizados em LF e passam a ser valores válidos em um arquivo carregado pelo shell. Os contextos de build excluem certificados, chaves SSH, keystores e arquivos sensíveis comuns. O migrador é exercitado contra PostgreSQL 17 real, inclusive nos bloqueios de migração incompleta e checksum divergente.

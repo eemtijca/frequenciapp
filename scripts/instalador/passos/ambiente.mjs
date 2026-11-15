@@ -16,6 +16,7 @@ import {
 } from "./contexto.mjs";
 import { contemSegredo } from "../redigir.mjs";
 import { resolverProxy } from "../configuracao-proxy.mjs";
+import { lerFusoHost } from "./agendador.mjs";
 
 export const id = "ambiente";
 export const titulo = "Gera app.env e ops.env com segredos e permissões corretas";
@@ -245,8 +246,9 @@ export function executar(ctx) {
     ["POSTGRES_USER", postgresUsuario],
     ["POSTGRES_PASSWORD", senhaBanco],
     ["POSTGRES_DB", postgresBanco],
-    ["DATABASE_URL", bancoUrl],
-    ["DIRECT_URL", bancoUrl],
+    // O Compose resolve as conexões internas; o host não recebe uma conexão paralela.
+    ["DATABASE_URL", ["controlador", "completo"].includes(configuracao.perfil) ? "" : bancoUrl],
+    ["DIRECT_URL", ["controlador", "completo"].includes(configuracao.perfil) ? "" : bancoUrl],
     ["AUTH_SECRET", authSecret],
     ["CRON_SECRET", cronSecret],
     ["COMMIT_SHA", commit],
@@ -351,6 +353,14 @@ export function executar(ctx) {
     ["CERTBOT_RENOVAR_HORARIO", "15 2 * * *"],
     ["TZ_APP", configuracao.fuso],
   ]);
+  if (["controlador", "completo"].includes(configuracao.perfil)) {
+    // O cron consome a observação, nunca o fuso desejado como se fosse prova.
+    const fuso = lerFusoHost(ctx);
+    opsDesejado.set(
+      "CRON_FUSO_SISTEMA",
+      fuso.verificado && /^[a-zA-Z0-9_+/-]+$/.test(fuso.host) ? fuso.host : "",
+    );
+  }
   if (configuracao.criptografia === "age" && configuracao.destinatariosAge) {
     const arquivo = configuracao.destinatariosAge;
     if (!fs.existsSync(arquivo)) {
@@ -432,6 +442,9 @@ export function executar(ctx) {
     "destinatarioGpg",
     "destinatariosAge",
     "configRclone",
+    "configDropbox",
+    "arquivoTokenDropbox",
+    "operadorControlador",
     "destino",
     "retencaoDias",
     "retencaoMinimo",
