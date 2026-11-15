@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A adoção inicial do controlador conserva a raiz protegida de travas já existente. Processos anteriores e a entrada estável continuam disputando o mesmo caminho e inode, sem recriar o arquivo da trava. Raiz com proprietário não administrativo ou com link é recusada.
+
 - Os perfis do instalador com controlador mantêm propriedade administrativa em root, sem conceder grupo Docker ao operador separado. O ambiente do host deixa as conexões Compose vazias e o JSON efetivo conserva os campos obrigatórios para retomada. As guardas de adoção contra conexões paralelas permanecem ativas.
 
 - O executor dos testes administrativos fixa a execução sem shell, mesmo quando o chamador solicita essa opção. Uma regressão com processos reais confere nomes de arquivo com espaços e metacaracteres, sem executar comandos embutidos nem remover arquivos vizinhos.

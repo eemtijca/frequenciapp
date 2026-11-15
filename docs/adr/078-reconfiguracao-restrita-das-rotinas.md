@@ -18,7 +18,7 @@ Cron e logrotate são vinculados a um recibo protegido. O legado sem recibo exig
 
 Uma intenção durável versão 1 guarda os estados anterior e desejado antes das publicações ativas. Cada arquivo é publicado atomicamente e sincronizado. A retomada admite apenas os bytes comprovados e as mesmas escolhas. A intenção permanece privada porque contém ambientes sensíveis. O conjunto não promete atomicidade de múltiplos arquivos nem resistência a um administrador malicioso.
 
-A transição cria uma geração física e perfil versão 2, preservando o prefixo, os snapshots anteriores e os dados. Uma chamada carregada da geração anterior revalida sua autorização depois da trava e é recusada. A versão 1 continua aceita como origem de migração. A readoção ampla que move o prefixo deixa de ser automática e exige revisão administrativa separada.
+A transição cria uma geração física e perfil versão 2, preservando o prefixo, os snapshots anteriores e os dados. Uma chamada carregada da geração anterior revalida sua autorização depois da trava e é recusada. Na adoção inicial, uma raiz legada de travas já existente também permanece no mesmo caminho e com o mesmo inode do arquivo de operação. A raiz precisa ser privada de root e sem links; a adoção não corrige permissões nem muda a autoridade de um produtor ativo. A versão 1 continua aceita como origem de migração. A readoção ampla que move o prefixo deixa de ser automática e exige revisão administrativa separada.
 
 ## Alternativas
 

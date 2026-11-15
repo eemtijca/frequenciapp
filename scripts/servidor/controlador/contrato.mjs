@@ -203,7 +203,15 @@ export function lerAmbiente(p, capturarLegado = false) {
         return [s.slice(0, n), s.slice(n + 1)];
       }),
   );
-  if (capturarLegado) p.estadoLegado = env.ESTADO_DIR || "/var/lib/frequenciapp";
+  if (capturarLegado) {
+    p.estadoLegado = env.ESTADO_DIR || "/var/lib/frequenciapp";
+    // A adoção não pode criar uma segunda exclusão para um produtor já existente.
+    const locks = env.SERVIDOR_LOCK_DIR || "/var/lock/frequenciapp";
+    if (fs.lstatSync(locks, { throwIfNoEntry: false })) {
+      protegido(locks, "diretorio", true);
+      p.locks = locks;
+    }
+  }
   for (const n of Object.keys(env))
     if (
       /^(?:NODE_|BASH_|BASH_FUNC_|LD_|DYLD_|GIT_|SERVIDOR_CONTROLADOR|SERVIDOR_LOCK_HERDADO)/.test(

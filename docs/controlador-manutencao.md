@@ -71,9 +71,13 @@ O instalador grava:
 | `/opt/frequenciapp-controlador/dados/pins/`             | Cópias físicas de backup, recibo, ponteiro e checksums.                                         |
 | `/opt/frequenciapp-controlador/dados/backups/`          | Backups produzidos pelo perfil.                                                                 |
 | `/opt/frequenciapp-controlador/dados/logs/`             | Logs das rotinas estáveis.                                                                      |
-| `/opt/frequenciapp-controlador/dados/locks/`            | Trava derivada da identidade do alvo.                                                           |
+| `/opt/frequenciapp-controlador/dados/locks/`            | Raiz própria de travas quando não existe raiz anterior.                                                           |
 
 Com o perfil ativo, `ESTADO_DIR`, `BACKUP_DIR` e `LOG_DIR` são fixados sob o prefixo; a instalação simples continua usando `/var/lib/frequenciapp`, `/var/backups/frequenciapp` e `/var/log/frequenciapp`. O estado legado é apenas conferido na adoção e nas leituras do perfil.
+
+Quando a raiz de travas anterior já existe, a adoção conserva o caminho informado em `SERVIDOR_LOCK_DIR`, cujo padrão é `/var/lock/frequenciapp`. Essa raiz precisa ser privada de root, canônica e sem links; propriedade de outra conta é recusada antes da criação do prefixo. O perfil passa a referenciá-la sem copiar, remover, renomear ou recriar o arquivo `operacoes-<alvo>.lock`. O inode em uso pelo produtor anterior continua sendo disputado pela entrada estável. Sem raiz anterior, permanece a raiz própria `dados/locks`.
+
+Essa continuidade da trava não transfere backups, recibos, catálogo ou ponteiro para o armazenamento novo. A disponibilidade do primeiro conjunto após a adoção precisa ser demonstrada separadamente; um caminho de trava preservado não comprova recuperação de banco.
 
 O perfil guarda `versao`, `tipo` `compose-host`, caminhos absolutos, o caminho absoluto do Node usado na entrada, a lista de arquivos Compose, o `migradorSha256`, o SHA-256 do manifesto, o SHA-256 de `app.env`, de `ops.env` e de `identidade.json`, e o estado legado conferido. O `migradorSha256` é o hash de `docker/app/migrar.mjs` no momento da adoção.
 
