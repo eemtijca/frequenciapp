@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- As massas dos testes de chamada alinham o cadastro das turmas e dos alunos ao dia de referência, evitando conflitos históricos artificiais no domingo. Uma regressão usa domingo fixo na geração da massa e salva o sábado pela API real, sem alterar o relógio do aplicativo nem dispensar a confirmação histórica quando necessária.
+
 - O instalador transmite ao cron do controlador o fuso realmente observado, sem fabricar confirmação a partir da escolha. A derivação inicial reconhece o alias usual de `/var/lock` para `/run/lock`, antes do produtor, sem remapear autoridades já configuradas. A ajuda local de `backup-banco` dispensa transporte e intenção, mantendo as guardas de perfil e das operações normais.
 
 - O CI do instalador prepara uma única receita de ferramentas para unidade e regressões administrativas, com jq e rclones compatível e legado fixados por SHA-256, GnuPG real e o validador compartilhado do banco. Os runtimes permanecem sem rede ou socket, com capacidades administrativas fechadas e temporários dimensionados para o perfil completo.

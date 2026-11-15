@@ -72,6 +72,7 @@ async function limpar(): Promise<void> {
 }
 
 test.beforeAll(async () => {
+  const criadoEm = `${diaDeChamada()}T12:00:00Z`;
   inicial = await lerOrigem();
   await limpar();
   await comBanco(async (cliente) => {
@@ -82,12 +83,12 @@ test.beforeAll(async () => {
       );
       for (const turma of ["A", "B"]) {
         const criada = await cliente.query<{ id: string }>(
-          "insert into turmas (serie_id, nome) values ($1, $2) returning id",
-          [serie.rows[0]?.id, turma],
+          "insert into turmas (serie_id, nome, criado_em) values ($1, $2, $3) returning id",
+          [serie.rows[0]?.id, turma, criadoEm],
         );
         await cliente.query(
-          "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ($1, $2, $2, 1, true)",
-          [`E2E Serie ${indice + 1}${turma}`, criada.rows[0]?.id],
+          "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, criado_em) values ($1, $2, $2, 1, true, $3)",
+          [`E2E Serie ${indice + 1}${turma}`, criada.rows[0]?.id, criadoEm],
         );
         await cliente.query(
           "insert into horarios (turma_id, ordem, inicio, fim, dias_semana) values ($1, 1, '07:00', '07:50', $2)",
@@ -97,17 +98,17 @@ test.beforeAll(async () => {
       }
     }
     await cliente.query(
-      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em) values ('E2E Serie 1B Extra Um', $1, $1, 2, true, null), ('E2E Serie 1B Extra Dois', $1, $1, 3, true, null), ('E2E Serie 1B Desistente', $1, $1, 4, true, '2020-01-01')",
-      [turmasDoProgresso.get("B")],
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em, criado_em) values ('E2E Serie 1B Extra Um', $1, $1, 2, true, null, $2), ('E2E Serie 1B Extra Dois', $1, $1, 3, true, null, $2), ('E2E Serie 1B Desistente', $1, $1, 4, true, '2020-01-01', $2)",
+      [turmasDoProgresso.get("B"), criadoEm],
     );
     const neutras = await cliente.query<{ id: string; nome: string }>(
-      "insert into turmas (serie_id, nome) select id, unnest(array['C', 'D']) from series where nome = $1 returning id, nome",
-      [series[0]],
+      "insert into turmas (serie_id, nome, criado_em) select id, unnest(array['C', 'D']), $2::timestamptz from series where nome = $1 returning id, nome",
+      [series[0], criadoEm],
     );
     for (const turma of neutras.rows) turmasDoProgresso.set(turma.nome, turma.id);
     await cliente.query(
-      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em) values ('E2E Serie 1D Desistente', $1, $1, 1, true, '2020-01-01')",
-      [turmasDoProgresso.get("D")],
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em, criado_em) values ('E2E Serie 1D Desistente', $1, $1, 1, true, '2020-01-01', $2)",
+      [turmasDoProgresso.get("D"), criadoEm],
     );
   });
 });
