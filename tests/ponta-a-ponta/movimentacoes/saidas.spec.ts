@@ -1,13 +1,45 @@
 // Saída antecipada: registro durante a aula com texto opcional, justificativa
 // escrita no intervalo e o nome de quem liberou vindo do catálogo da Gestão.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { criarLiberadoresE2E, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, registrarSaida, trocarVisao } from "../helpers/pagina";
+import { diaDeChamada } from "../helpers/dia";
+import {
+  aguardarHidratacao,
+  prepararChamadaParaSaida,
+  registrarSaida,
+  trocarVisao,
+} from "../helpers/pagina";
+
+/** Cada cenário de remoção recebe as duas saídas, sem depender dos testes de registro. */
+async function prepararSaidasParaRemocao(page: Page) {
+  const resposta = await page.request.get("/api/alunos");
+  expect(resposta.status()).toBe(200);
+  const { alunos } = (await resposta.json()) as { alunos: { id: string; nome: string }[] };
+  for (const [nome, texto, momento, liberadoPorCodigo] of [
+    ["E2E Aluno Um", "Saiu para a coordenação", "aula_1", "E2EDIRETOR"],
+    ["E2E Aluno Dois", "Foi buscar o irmão", "intervalo_1", "E2ECOORD"],
+  ]) {
+    const aluno = alunos.find((item) => item.nome === nome);
+    if (!aluno) throw new Error(`Aluno da massa não encontrado: ${nome}.`);
+    const criada = await page.request.post("/api/saidas", {
+      data: {
+        alunoId: aluno.id,
+        dia: diaDeChamada(),
+        momento,
+        horario: "08:10",
+        texto,
+        liberadoPorCodigo,
+      },
+    });
+    expect(criada.status(), await criada.text()).toBe(201);
+  }
+}
 
 test.describe("saída durante a aula", () => {
-  test.beforeAll(async () => {
+  test.beforeEach(async ({ page }) => {
     await criarMassaE2E();
     await criarLiberadoresE2E();
+    await prepararChamadaParaSaida(page, "E2E Ano A");
   });
 
   test.afterAll(async () => {
@@ -69,6 +101,7 @@ test.describe("saída durante a aula", () => {
   });
 
   test("bloqueia de novo a remoção das saídas ao tocar em Bloquear", async ({ page }) => {
+    await prepararSaidasParaRemocao(page);
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Saídas e Entradas", "saidas");
@@ -80,6 +113,7 @@ test.describe("saída durante a aula", () => {
   });
 
   test("remove uma saída pela lista do dia para corrigir o registro", async ({ page }) => {
+    await prepararSaidasParaRemocao(page);
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Saídas e Entradas", "saidas");

@@ -2,7 +2,12 @@
 // antecipado, com o nome novo aparecendo na lista do dia.
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, registrarSaida, trocarVisao } from "../helpers/pagina";
+import {
+  aguardarHidratacao,
+  prepararChamadaParaSaida,
+  registrarSaida,
+  trocarVisao,
+} from "../helpers/pagina";
 import {
   selecionarAcaoConfiguracoes,
   descartarConfiguracoes,
@@ -32,6 +37,7 @@ test.describe("quem libera as saídas", () => {
 
   test("administração mantém o catálogo e o formulário usa o nome novo", async ({ page }) => {
     test.setTimeout(90_000);
+    await prepararChamadaParaSaida(page, "E2E Ano A");
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");

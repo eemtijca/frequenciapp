@@ -40,6 +40,7 @@ async function limpar() {
 }
 test.beforeAll(async () => {
   await limpar();
+  const criadoEm = `${diaDeChamada()}T12:00:00Z`;
   await comBanco(async (cliente) => {
     const serie = await cliente.query<{ id: string }>(
       "insert into series (nome, ordem) values ($1, 98) returning id",
@@ -48,13 +49,13 @@ test.beforeAll(async () => {
     turmaId =
       (
         await cliente.query<{ id: string }>(
-          "insert into turmas (serie_id, nome) values ($1, 'A') returning id",
-          [serie.rows[0]?.id],
+          "insert into turmas (serie_id, nome, criado_em) values ($1, 'A', $2) returning id",
+          [serie.rows[0]?.id, criadoEm],
         )
       ).rows[0]?.id ?? "";
     const alunos = await cliente.query<{ id: string; nome: string }>(
-      "insert into alunos (nome, turma_id, turma_original_id, ordem) values ($1, $3, $3, 1), ($2, $3, $3, 2) returning id, nome",
-      [`${prefixo} Um`, `${prefixo} Dois`, turmaId],
+      "insert into alunos (nome, turma_id, turma_original_id, ordem, criado_em) values ($1, $3, $3, 1, $4), ($2, $3, $3, 2, $4) returning id, nome",
+      [`${prefixo} Um`, `${prefixo} Dois`, turmaId, criadoEm],
     );
     alunoId = alunos.rows.find((aluno) => aluno.nome === `${prefixo} Um`)?.id ?? "";
     segundoAlunoId = alunos.rows.find((aluno) => aluno.nome === `${prefixo} Dois`)?.id ?? "";

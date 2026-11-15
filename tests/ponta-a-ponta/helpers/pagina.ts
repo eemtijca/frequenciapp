@@ -3,7 +3,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { nomeDoMes } from "@/domain/frequencia";
 import { navegarCalendario } from "./calendario-historico";
 import { validarDiaCivil } from "./navegacao-periodo";
-import { hojeEDomingo } from "./dia";
+import { diaDeChamada, hojeEDomingo } from "./dia";
 
 /**
  * Aguarda a hidratação do React. O HTML do servidor pode estar visível antes
@@ -140,6 +140,40 @@ export async function salvarChamada(secao: Locator): Promise<void> {
   await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible({
     timeout: 15_000,
   });
+}
+
+/** Prepara pela API a chamada com participantes e aulas exigida pelas saídas retroativas. */
+export async function prepararChamadaParaSaida(
+  page: Page,
+  rotuloTurma: string,
+  dia = diaDeChamada(),
+): Promise<string> {
+  const respostaTurmas = await page.request.get("/api/turmas");
+  expect(respostaTurmas.status()).toBe(200);
+  const { turmas } = (await respostaTurmas.json()) as {
+    turmas: { id: string; rotulo: string }[];
+  };
+  const turma = turmas.find((item) => item.rotulo === rotuloTurma);
+  if (!turma) throw new Error(`Turma da massa não encontrada: ${rotuloTurma}.`);
+  const url = `/api/frequencias?dia=${dia}&turmaId=${turma.id}`;
+  const anterior = await page.request.get(url);
+  expect(anterior.status()).toBe(200);
+  if ((await anterior.json()).frequencia === null) {
+    const salva = await page.request.post("/api/frequencias", {
+      data: { dia, turmaId: turma.id, faltas: [], revisao: 0 },
+    });
+    expect(salva.status(), await salva.text()).toBe(200);
+  }
+  // Não confirma histórico incerto nem completa silenciosamente um retrato incompleto.
+  const leitura = await page.request.get(url);
+  expect(leitura.status()).toBe(200);
+  const { frequencia } = (await leitura.json()) as {
+    frequencia: { turmaId: string; dia: string; alunos: string[]; aulas: string[] };
+  };
+  expect(frequencia).toMatchObject({ turmaId: turma.id, dia });
+  expect(frequencia.alunos.length).toBeGreaterThan(0);
+  expect(frequencia.aulas.length).toBeGreaterThan(0);
+  return turma.id;
 }
 
 /** Clica em Registrar saída, confirma o resumo e aguarda o formulário limpar. */
