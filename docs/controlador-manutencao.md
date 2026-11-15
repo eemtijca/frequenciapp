@@ -21,16 +21,16 @@ O único caso de recusa deliberada é `SERVIDOR_CONTROLADOR_PERFIL` definido com
 
 ### Pré-requisitos
 
-| Requisito     | Detalhe                                                                                                                                                                                                    |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Execução      | A instalação e a entrada estável exigem root. O controlador não é setuid.                                                                                                                                  |
-| Checkout      | Caminho absoluto e canônico, sem espaços ou metacaracteres, pertencente a root e sem escrita de grupo ou de outras contas. O mesmo vale para os metadados Git.                                             |
-| Configuração  | `/etc/frequenciapp` precisa ser privado de root. `app.env`, `ops.env` e `identidade.json` precisam de modo 600. Permissão 640 de grupo é recusada.                                                         |
-| Identidade    | A identidade Compose precisa estar adotada com `identidade.sh --adotar --confirmar` e corresponder aos recursos atuais.                                                                                    |
-| Operador      | A conta indicada em `--operador` precisa existir, não pode ser root e não pode pertencer a `root`, `docker`, `sudo`, `wheel`, `lxd`, `disk` ou `containerd`. Também não pode ter escrita no socket Docker. |
-| Banco         | O primeiro perfil aceita apenas banco interno do Compose. `DATABASE_URL`, `DIRECT_URL` e `BACKUP_DATABASE_URL` precisam estar ausentes ou vazias, e o modo de backup precisa ser `compose` ou estar ausente.         |
-| Estado legado | O `ESTADO_DIR` da configuração, por padrão `/var/lib/frequenciapp`, não pode conter marcador de atualização, falha com migrações possivelmente aplicadas ou journal não vazio.                             |
-| Host          | Node.js acessível no momento da instalação, Docker e Docker Compose funcionais, Git, `flock`, `jq` e espaço para snapshot, worktree e pins.                                                                |
+| Requisito     | Detalhe                                                                                                                                                                                                      |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Execução      | A instalação e a entrada estável exigem root. O controlador não é setuid.                                                                                                                                    |
+| Checkout      | Caminho absoluto e canônico, sem espaços ou metacaracteres, pertencente a root e sem escrita de grupo ou de outras contas. O mesmo vale para os metadados Git.                                               |
+| Configuração  | `/etc/frequenciapp` precisa ser privado de root. `app.env`, `ops.env` e `identidade.json` precisam de modo 600. Permissão 640 de grupo é recusada.                                                           |
+| Identidade    | A identidade Compose precisa estar adotada com `identidade.sh --adotar --confirmar` e corresponder aos recursos atuais.                                                                                      |
+| Operador      | A conta indicada em `--operador` precisa existir, não pode ser root e não pode pertencer a `root`, `docker`, `sudo`, `wheel`, `lxd`, `disk` ou `containerd`. Também não pode ter escrita no socket Docker.   |
+| Banco         | O primeiro perfil aceita apenas banco interno do Compose. `DATABASE_URL`, `DIRECT_URL` e `BACKUP_DATABASE_URL` precisam estar ausentes ou vazias, e o modo de backup precisa ser `compose` ou estar ausente. |
+| Estado legado | O `ESTADO_DIR` da configuração, por padrão `/var/lib/frequenciapp`, não pode conter marcador de atualização, falha com migrações possivelmente aplicadas ou journal não vazio.                               |
+| Host          | Node.js acessível no momento da instalação, Docker e Docker Compose funcionais, Git, `flock`, `jq` e espaço para snapshot, worktree e pins.                                                                  |
 
 A conta de implantação que usa o grupo `docker` não serve como `--operador` do controlador. O perfil exige uma conta sem privilégio administrativo e sem acesso direto ao daemon. A execução das rotinas continua sendo feita pela entrada administrativa e pelo cron de root. O instalador não cria regra de `sudo`, unidade systemd ou usuário.
 
@@ -71,7 +71,7 @@ O instalador grava:
 | `/opt/frequenciapp-controlador/dados/pins/`             | Cópias físicas de backup, recibo, ponteiro e checksums.                                         |
 | `/opt/frequenciapp-controlador/dados/backups/`          | Backups produzidos pelo perfil.                                                                 |
 | `/opt/frequenciapp-controlador/dados/logs/`             | Logs das rotinas estáveis.                                                                      |
-| `/opt/frequenciapp-controlador/dados/locks/`            | Raiz própria de travas quando não existe raiz anterior.                                                           |
+| `/opt/frequenciapp-controlador/dados/locks/`            | Raiz própria de travas quando não existe raiz anterior.                                         |
 
 Com o perfil ativo, as raízes `ESTADO_DIR` e `BACKUP_DIR` já existentes são conservadas no perfil, desde que canônicas, privadas de root e sem links. `ultimo-backup.json`, os recibos no catálogo e os artefatos continuam nos mesmos caminhos e com os mesmos bytes; a adoção não copia, apaga nem recria o primeiro conjunto. Sem raiz anterior, o controlador usa o diretório correspondente sob `dados`. `LOG_DIR` continua sob o prefixo. Um `BACKUP_BANCO_DIR` independente da raiz de backups exige revisão administrativa, em vez de ocultar conjuntos em outro armazenamento.
 
@@ -157,6 +157,8 @@ As gravações usam criação exclusiva, `fsync` do arquivo e do diretório. O `
 
 A leitura de `--simular` e `--ajuda` também passa pela autorização, mas não cria intenção, observação, conclusão ou pin. `estado` imprime o alvo e as operações do journal sem gravar. `instalar-rotinas` é autorizado sob a trava, mas não cria entrada de journal. `--registrar` cria uma intenção da ação `registrar-atualizacao` e uma conclusão, sem pin.
 
+Em `backup-banco`, `--ajuda` e `-h` alcançados pelo parser são leituras locais, sem consultar rclone, executar dump ou criar intenção. A opção `--verificar` anterior à ajuda é aceita; uma opção desconhecida anterior não se transforma em ajuda. Perfil, geração e autorização continuam obrigatórios. Backup normal e `--verificar` sem ajuda conservam a guarda de transporte.
+
 Uma atualização só conclui com pin verificado e com o serviço da aplicação executando e saudável. As demais ações concluem depois que o filho termina com status 0 e a observação posterior é gravada. A conclusão prova que o filho terminou e que o estado observável foi registrado, não que o banco ou as migrações estejam semanticamente corretos.
 
 ## Pins
@@ -171,7 +173,7 @@ A retenção local do backup não remove pins. A ação `retencao` executa apena
 
 A identidade do alvo é a chave `trava` de 64 caracteres hexadecimais gravada em `identidade.json` na adoção. O perfil guarda essa chave e o hash do arquivo de identidade. A leitura do perfil compara o hash; a autorização exige que `SERVIDOR_ALVO_CHAVE` seja igual ao alvo, e a entrada que monta o Compose recalcula a identidade efetiva antes de usar a trava.
 
-A trava fica em `dados/locks/operacoes-<alvo>.lock`, com modo 600 e proprietário root. O `trancar.sh` monta o Compose, confere a identidade e chama `travar`. A função abre o descritor 9, aplica `flock` sem espera e exporta `SERVIDOR_LOCK_HERDADO`. O controlador passa o descritor 9 para o processo filho.
+A trava usa a raiz registrada em `perfil.json`, conservando a raiz anterior quando existente, ou `dados/locks/operacoes-<alvo>.lock` na ausência dela, com modo 600 e proprietário root. O `trancar.sh` monta o Compose, confere a identidade e chama `travar`. A função abre o descritor 9, aplica `flock` sem espera e exporta `SERVIDOR_LOCK_HERDADO`. O controlador passa o descritor 9 para o processo filho.
 
 O `autorizar` compara o inode e o dispositivo do descritor 9 com o arquivo de trava do perfil. O filho que chama `travar` com `SERVIDOR_LOCK_HERDADO` confere o mesmo descritor e não reabre o arquivo. Descritor ausente, trava de outro alvo ou identidade divergente encerram a operação. Não há fallback para uma trava global nem para o caminho simples quando o perfil está ativo.
 

@@ -176,6 +176,10 @@ Para preencher `alvo` e `banco`, usar os valores que a rotina exporta depois de 
 
 ### Seção do rclone
 
+Antes de ativar Dropbox ou iniciar uma operação protegida, o código consulta `rclone config providers` no mesmo PATH usado pelo transporte. O provedor `dropbox` precisa anunciar a opção `root_namespace`. A consulta não lê credenciais nem faz autenticação. Binário ausente, falha da consulta, resposta inválida ou opção ausente suspendem a operação com diagnóstico, sem aceitar a mera presença da chave no INI.
+
+A instalação e as retomadas reavaliam a capacidade, e a entrada estável a confere antes de criar intenção no journal. O ensaio isolado diferencia rclone 1.60.1-DEV, que não anuncia a opção, de 1.67.0, que a anuncia; o I/O Dropbox permanece sintético. A versão, isoladamente, não substitui a consulta. Não há atualização automática de binário, mudança de namespace nem fallback para outro perfil.
+
 O remote indicado em `destino` precisa existir no `rclone.conf` com tipo `dropbox` e o mesmo namespace da adoção. A seção aceita apenas estas chaves:
 
 ```ini

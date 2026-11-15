@@ -804,6 +804,21 @@ export function executarAplicacao(opcoes, deps, dados) {
         );
       }
     }
+    const indiceDropbox = ctx.ordemEtapas.indexOf(dropbox.id);
+    if (indiceDropbox >= 0 && inicio > indiceDropbox && !ctx.naoIniciar) {
+      const resultado = executarEtapaSelecionada(ctx, deps, {
+        ...dropbox,
+        executar: dropbox.revalidar,
+      });
+      if (resultado.erro)
+        return documentoAplicacao(
+          ctx,
+          ctx.estado,
+          ctx.estado.etapas,
+          [erroObjeto(resultado.erro)],
+          [],
+        );
+    }
     const indiceBackup = ctx.ordemEtapas.indexOf(backupInicial.id);
     const backupAnterior = ctx.estado.etapas.find((etapa) => etapa.id === backupInicial.id);
     if (

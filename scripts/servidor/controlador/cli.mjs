@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
+import { verificarCapacidadeRclone } from "../dropbox-estado.mjs";
 import {
   exigir,
   protegido,
@@ -352,6 +353,14 @@ function classificarAtualizacao(opcoes) {
   exigir(!(simular && registrar), "--simular e --registrar são incompatíveis.");
   return ajuda ? "ajuda" : simular ? "simular" : registrar ? "registrar-atualizacao" : "preparar";
 }
+function classificarBackupBanco(opcoes) {
+  // O parser Bash encerra na primeira ajuda; opção desconhecida anterior recusa.
+  for (const opcao of opcoes) {
+    if (opcao === "--ajuda" || opcao === "-h") return "ajuda";
+    if (opcao !== "--verificar") break;
+  }
+  return "backup-banco";
+}
 function iniciarIntencao(p, env, operacao, acao) {
   const pasta = `${p.dados}/journal/${operacao}`;
   mkdir(pasta);
@@ -390,7 +399,12 @@ async function executar(arquivo, args, trancado) {
     Object.hasOwn(acoes, acao) || ["estado", "instalar-rotinas"].includes(acao),
     "Operação não permitida; Compose arbitrário não é uma entrada do operador.",
   );
-  const classe = acao === "atualizar" ? classificarAtualizacao(opcoes) : acao;
+  const classe =
+    acao === "atualizar"
+      ? classificarAtualizacao(opcoes)
+      : acao === "backup-banco"
+        ? classificarBackupBanco(opcoes)
+        : acao;
   env.COMPOSE_ARQUIVOS = p.compose.join(":");
   if (!trancado) {
     const r = spawnSync("/bin/bash", [`${aqui}/trancar.sh`, arquivo, ...args], {
@@ -401,6 +415,11 @@ async function executar(arquivo, args, trancado) {
     return;
   }
   autorizar(arquivo, acao);
+  if (
+    env.BACKUP_DROPBOX_CONFIG &&
+    (classe === "backup-banco" || (acao === "atualizar" && classe === "preparar"))
+  )
+    verificarCapacidadeRclone(env);
   if (acao === "instalar-rotinas") {
     const { instalarRotinas } = await import("./cron.mjs");
     return instalarRotinas(p, opcoes);

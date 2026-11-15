@@ -12,6 +12,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A adoção do controlador conserva também as raízes administrativas existentes de estado e backups, mantendo acessíveis o primeiro conjunto, o catálogo, o recibo e o ponteiro sem copiar ou apagar artefatos. Testes isolados usam produtor e consumidor reais com GPG e jq, mas I/O Docker e Dropbox sintético; não atestam restauração PostgreSQL.
 
+- O perfil Dropbox consulta a capacidade `root_namespace` no rclone efetivamente selecionado antes da ativação, nas retomadas e antes de criar intenção operacional no controlador. Transporte incompatível é recusado com diagnóstico, sem upload, novo dump ou fallback de perfil.
+
 - A adoção inicial do controlador conserva a raiz protegida de travas já existente. Processos anteriores e a entrada estável continuam disputando o mesmo caminho e inode, sem recriar o arquivo da trava. Raiz com proprietário não administrativo ou com link é recusada.
 
 - Os perfis do instalador com controlador mantêm propriedade administrativa em root, sem conceder grupo Docker ao operador separado. O ambiente do host deixa as conexões Compose vazias e o JSON efetivo conserva os campos obrigatórios para retomada. As guardas de adoção contra conexões paralelas permanecem ativas.

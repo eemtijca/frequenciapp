@@ -50,7 +50,9 @@ A configuração privada `instalador.json` persiste `operadorControlador`, `conf
 
 A adoção conserva as raízes administrativas existentes de estado, backups e travas. O primeiro conjunto, o recibo, o catálogo e o ponteiro permanecem acessíveis no armazenamento ativo, sem migração ou limpeza automática. Raízes sem proteção administrativa são recusadas. A prova isolada usa GPG e jq reais, com I/O Docker e Dropbox sintético; não comprova restauração PostgreSQL nem provisionamento integral do perfil.
 
-O transporte rclone precisa oferecer `root_namespace` no provedor Dropbox consultado por `rclone config providers`; apenas escrever essa chave no arquivo não comprova suporte. Binário ausente ou opção indisponível é uma pré-condição não satisfeita. A conferência não autoriza atualizar o host, criar credenciais, alterar o namespace ou mudar o destino adotado.
+O transporte rclone precisa oferecer `root_namespace` no provedor Dropbox consultado por `rclone config providers`; apenas escrever essa chave no arquivo não comprova suporte. A etapa Dropbox consulta o binário selecionado antes de ativar sua configuração. Retomadas posteriores à etapa repetem a consulta; a entrada estável repete a guarda antes de criar intenção operacional. O produtor e o consumidor nativo também recusam o transporte incompatível, inclusive em `--verificar`, sem fallback ou redução de perfil.
+
+O pacote rclone da distribuição pode satisfazer a versão mínima geral e ainda não anunciar essa capacidade. Nesse caso, a instalação completa é recusada com diagnóstico de `root_namespace`; o fluxo não instala outra versão automaticamente. O binário compatível precisa ser preparado e conferido administrativamente antes da repetição. Isso não autoriza upgrade do host, criação de credenciais, troca de namespace ou alteração do destino adotado.
 
 ### Escopo
 
