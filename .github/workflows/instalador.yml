@@ -134,7 +134,9 @@ jobs:
           docker run --rm --network none --read-only --cap-drop ALL
           --cap-add CHOWN --cap-add FOWNER --cap-add SETUID --cap-add SETGID
           --security-opt no-new-privileges --user 0:0
-          --env INSTALADOR_LOCK_DIR=/tmp/instalador-lock
+          --env HOME=/scratch --env TMPDIR=/scratch
+          --env INSTALADOR_LOCK_DIR=/scratch/instalador-lock
+          --tmpfs /scratch:rw,nosuid,nodev,exec,size=4g,mode=1777
           --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777
           "frequenciapp-controlador-teste:${{ github.run_id }}-${{ github.run_attempt }}"
           bash -c 'umask 022; exec node --test --test-reporter=tap --test-concurrency=1 tests/instalador/administrativo/*.test.mjs'

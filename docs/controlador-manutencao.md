@@ -28,7 +28,7 @@ O único caso de recusa deliberada é `SERVIDOR_CONTROLADOR_PERFIL` definido com
 | Configuração  | `/etc/frequenciapp` precisa ser privado de root. `app.env`, `ops.env` e `identidade.json` precisam de modo 600. Permissão 640 de grupo é recusada.                                                         |
 | Identidade    | A identidade Compose precisa estar adotada com `identidade.sh --adotar --confirmar` e corresponder aos recursos atuais.                                                                                    |
 | Operador      | A conta indicada em `--operador` precisa existir, não pode ser root e não pode pertencer a `root`, `docker`, `sudo`, `wheel`, `lxd`, `disk` ou `containerd`. Também não pode ter escrita no socket Docker. |
-| Banco         | O primeiro perfil aceita apenas banco interno do Compose. `DATABASE_URL`, `DIRECT_URL` e `BACKUP_DATABASE_URL` precisam estar ausentes, e o modo de backup precisa ser `compose` ou estar ausente.         |
+| Banco         | O primeiro perfil aceita apenas banco interno do Compose. `DATABASE_URL`, `DIRECT_URL` e `BACKUP_DATABASE_URL` precisam estar ausentes ou vazias, e o modo de backup precisa ser `compose` ou estar ausente.         |
 | Estado legado | O `ESTADO_DIR` da configuração, por padrão `/var/lib/frequenciapp`, não pode conter marcador de atualização, falha com migrações possivelmente aplicadas ou journal não vazio.                             |
 | Host          | Node.js acessível no momento da instalação, Docker e Docker Compose funcionais, Git, `flock`, `jq` e espaço para snapshot, worktree e pins.                                                                |
 

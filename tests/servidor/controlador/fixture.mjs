@@ -4,10 +4,10 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
 
-export function fixture({ instalador = false } = {}) {
+export function fixture({ instalador = false, adotar = true } = {}) {
   assert.equal(process.getuid?.(), 0, "Executar a suíte administrativa com root interno isolado.");
   assert.equal(fs.existsSync("/var/run/docker.sock"), false);
-  const raiz = fs.mkdtempSync("/tmp/rotinas-controlador-");
+  const raiz = fs.mkdtempSync(`${process.env.TMPDIR ?? "/tmp"}/rotinas-controlador-`);
   const app = instalador ? `${raiz}/opt/frequenciapp` : `${raiz}/app`,
     config = instalador ? `${raiz}/etc/frequenciapp` : `${raiz}/config`,
     prefixo = instalador ? `${raiz}/opt/frequenciapp-controlador` : `${raiz}/controlador`,
@@ -91,7 +91,7 @@ esac
     }),
   );
   const cli = `${repo}/scripts/servidor/controlador/cli.mjs`;
-  ok(
+  const adocao = (extras = [], fase = "--confirmar") =>
     executar(process.execPath, [
       cli,
       "instalar",
@@ -107,12 +107,16 @@ esac
       "nobody",
       "--bin-dir",
       bin,
-      "--confirmar",
-    ]),
-  );
+      fase,
+      ...extras,
+    ]);
   const perfil = `${prefixo}/perfil.json`;
-  ok(executar(`${prefixo}/executar`, ["instalar-rotinas", "--confirmar", "--destino", destino]));
+  if (adotar) {
+    ok(adocao());
+    ok(executar(`${prefixo}/executar`, ["instalar-rotinas", "--confirmar", "--destino", destino]));
+  }
   return {
+    adocao,
     raiz,
     app,
     config,

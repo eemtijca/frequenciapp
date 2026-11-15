@@ -40,7 +40,17 @@ O instalador orquestra os scripts existentes do servidor: `compose.sh`, `identid
 
 O perfil `simples` não pode ser bloqueado por artefato do controlador. Os perfis `controlador`, `dropbox` e `completo` são opt-in e exigem configuração explícita.
 
-O perfil `controlador` exige `--operador-controlador` com uma conta sem privilégio administrativo e instala as rotinas estáveis em cron. O perfil `dropbox` exige `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino`; o upload continua no rclone e a verificação nativa fica no backup. O perfil `completo` executa os dois. A adoção do Dropbox e o perfil do controlador são validados antes de qualquer mutação.
+O perfil `controlador` exige `--operador-controlador` com uma conta existente sem privilégio administrativo e instala as rotinas estáveis em cron. O perfil `dropbox` exige `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino`; o upload continua no rclone e a verificação nativa fica no backup. O perfil `completo` executa os dois. Os campos obrigatórios são conferidos no preflight; a validação dos arquivos Dropbox e a adoção do controlador ocorrem nas respectivas etapas, depois da configuração da pilha.
+
+Nos perfis `controlador` e `completo`, código, configuração, estado, backups e travas pertencem a root. A variável `SERVIDOR_USUARIO` não transfere essa propriedade para uma conta de serviço. O operador indicado por `--operador-controlador` permanece separado e não recebe o grupo Docker. Os perfis sem controlador mantêm a conta de serviço configurada.
+
+O `app.env` desses dois perfis mantém `DATABASE_URL` e `DIRECT_URL` vazias no host. O Compose constrói as conexões internas a partir de `POSTGRES_USER`, `POSTGRES_PASSWORD` e `POSTGRES_DB`. A adoção continua recusando conexões explícitas, inclusive `BACKUP_DATABASE_URL`, para impedir uma autoridade de banco paralela.
+
+A configuração privada `instalador.json` persiste `operadorControlador`, `configDropbox` e `arquivoTokenDropbox`, além das demais opções do perfil. São nomes e caminhos, não o conteúdo do token. A retomada usa `aplicar --config <arquivo> --retomar`; as confirmações operacionais, como `--sim` e `--permitir-instavel` no canal `main`, continuam explícitas.
+
+A adoção ainda cria estado e armazenamento próprios para o controlador e não importa automaticamente o conjunto inicial de backup, o catálogo e o ponteiro legados. A existência de uma cópia antes da adoção não comprova sua disponibilidade no controlador. Essa transição exige validação adicional antes de considerar o perfil completo operacional.
+
+O transporte rclone precisa oferecer `root_namespace` no provedor Dropbox consultado por `rclone config providers`; apenas escrever essa chave no arquivo não comprova suporte. Binário ausente ou opção indisponível é uma pré-condição não satisfeita. A conferência não autoriza atualizar o host, criar credenciais, alterar o namespace ou mudar o destino adotado.
 
 ### Escopo
 

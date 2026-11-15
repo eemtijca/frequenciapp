@@ -74,7 +74,7 @@ export function executar(ctx) {
     }
     existe = true;
   }
-  const noGrupo = grupoDocker(ctx, usuario);
+  const noGrupo = usuario === "root" || grupoDocker(ctx, usuario);
   if (!noGrupo) {
     avisos.push(
       avisoEtapa(

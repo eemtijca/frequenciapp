@@ -477,7 +477,9 @@ function prepararContexto(deps, configuracao, deteccao, auditoria, estadoResulta
       deps.permitirFusoDivergente ?? process.env.INSTALADOR_PERMITIR_FUSO_DIVERGENTE === "1",
     ),
     uid: (deps.uid ?? (() => (typeof process.getuid === "function" ? process.getuid() : 0)))(),
-    usuarioServico: deps.usuarioServico ?? USUARIO_PADRAO,
+    usuarioServico: PERFIS_CONTROLADOR.has(configuracao.perfil)
+      ? "root"
+      : (deps.usuarioServico ?? USUARIO_PADRAO),
     etapasConhecidas: ETAPAS_CONHECIDAS,
     ordemEtapas: ordemEtapasPara(configuracao.perfil),
     etapaSelecionada: null,
