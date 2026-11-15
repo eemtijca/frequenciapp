@@ -175,4 +175,4 @@ jobs:
           node-version: 26.13.0
 
       - name: Matriz de planejar
-        run: npm run test:instalador:matriz
+        run: node --test --test-reporter=tap tests/instalador/matriz.test.mjs

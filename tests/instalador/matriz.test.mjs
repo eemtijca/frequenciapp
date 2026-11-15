@@ -182,13 +182,34 @@ const ESTADOS_ETAPA = new Set([
 const VOLUMES = [];
 const VOLUME_FONTE = process.env.INSTALADOR_MATRIZ_VOLUME?.trim() ?? "";
 
+function contextoDocker(argumentos) {
+  if (argumentos[0] === "info") return { etapa: "sonda-docker" };
+  if (argumentos[0] === "volume") {
+    return { etapa: argumentos[1] === "create" ? "criar-volume" : "remover-volume" };
+  }
+  if (argumentos.includes(NODE_GLIBC)) return { etapa: "preparar-node", imagem: "glibc" };
+  if (argumentos.includes(NODE_MUSL)) return { etapa: "preparar-node", imagem: "musl" };
+  const imagem = IMAGENS.find((item) => argumentos.includes(referencia(item)));
+  return { etapa: "planejar", imagem: imagem?.nome ?? "nao-identificada" };
+}
+
 function executar(programa, argumentos, opcoes = {}) {
+  const contexto = contextoDocker(argumentos);
+  const timeout = opcoes.timeout ?? 300_000;
+  const inicio = performance.now();
+  // Somente enums e imagens públicas; nunca argumentos, ambiente ou saída do cliente.
+  process.stderr.write(
+    `${JSON.stringify({ matrizDiagnostico: 1, evento: "inicio", ...contexto, timeout })}\n`,
+  );
   const resultado = spawnSync(programa, argumentos, {
     encoding: "utf8",
     maxBuffer: 32 * 1024 * 1024,
     windowsHide: true,
-    timeout: opcoes.timeout ?? 300_000,
+    timeout,
   });
+  process.stderr.write(
+    `${JSON.stringify({ matrizDiagnostico: 1, evento: "fim", ...contexto, duracaoMs: Math.round(performance.now() - inicio), status: resultado.status, sinal: resultado.signal, erro: resultado.error?.code ?? null })}\n`,
+  );
   return {
     status: typeof resultado.status === "number" ? resultado.status : 1,
     stdout: String(resultado.stdout ?? ""),
