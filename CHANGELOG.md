@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O instalador transmite ao cron do controlador o fuso realmente observado, sem fabricar confirmação a partir da escolha. A derivação inicial reconhece o alias usual de `/var/lock` para `/run/lock`, antes do produtor, sem remapear autoridades já configuradas. A ajuda local de `backup-banco` dispensa transporte e intenção, mantendo as guardas de perfil e das operações normais.
+
 - O CI do instalador prepara uma única receita de ferramentas para unidade e regressões administrativas, com jq e rclones compatível e legado fixados por SHA-256, GnuPG real e o validador compartilhado do banco. Os runtimes permanecem sem rede ou socket, com capacidades administrativas fechadas e temporários dimensionados para o perfil completo.
 
 - A adoção do controlador conserva também as raízes administrativas existentes de estado e backups, mantendo acessíveis o primeiro conjunto, o catálogo, o recibo e o ponteiro sem copiar ou apagar artefatos. Testes isolados usam produtor e consumidor reais com GPG e jq, mas I/O Docker e Dropbox sintético; não atestam restauração PostgreSQL.

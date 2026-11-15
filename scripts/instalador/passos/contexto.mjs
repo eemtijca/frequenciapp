@@ -21,6 +21,25 @@ export function sobRaiz(raiz, absoluto) {
 export function caminhosOperacao(raiz = "/", configuracao = {}, modoTeste = false) {
   const diretorioFonte = configuracao.diretorioFonte || "/opt/frequenciapp";
   const travaDirInformada = process.env.INSTALADOR_LOCK_DIR || "";
+  const opsEnv = sobRaiz(raiz, "/etc/frequenciapp/ops.env");
+  const travaAnterior = fs.lstatSync(opsEnv, { throwIfNoEntry: false })?.isFile()
+    ? lerEnv(fs.readFileSync(opsEnv, "utf8")).mapa.get("SERVIDOR_LOCK_DIR")
+    : "";
+  let lockDir = travaDirInformada
+    ? path.resolve(travaDirInformada)
+    : travaAnterior || sobRaiz(raiz, "/var/lock/frequenciapp");
+  if (!travaDirInformada && !travaAnterior) {
+    // Só a derivação inicial reconhece o alias usual; autoridades existentes não migram.
+    const varLock = sobRaiz(raiz, "/var/lock");
+    const runLock = sobRaiz(raiz, "/run/lock");
+    try {
+      if (fs.lstatSync(varLock).isSymbolicLink() && fs.realpathSync(varLock) === runLock) {
+        lockDir = path.join(runLock, "frequenciapp");
+      }
+    } catch {
+      // Sem prova do alias, conserva o literal; as guardas continuam recusando links.
+    }
+  }
   return {
     raiz,
     appDir: sobRaiz(raiz, diretorioFonte),
@@ -39,9 +58,7 @@ export function caminhosOperacao(raiz = "/", configuracao = {}, modoTeste = fals
     backupPlanilhasDir: sobRaiz(raiz, "/var/backups/frequenciapp/planilhas"),
     logDir: sobRaiz(raiz, "/var/log/frequenciapp"),
     log: sobRaiz(raiz, "/var/log/frequenciapp/instalador.log"),
-    lockDir: travaDirInformada
-      ? path.resolve(travaDirInformada)
-      : sobRaiz(raiz, "/var/lock/frequenciapp"),
+    lockDir,
     projetoCompose: modoTeste
       ? process.env.COMPOSE_PROJECT_NAME || PROJETO_TESTE
       : process.env.COMPOSE_PROJECT_NAME || PROJETO_PADRAO,

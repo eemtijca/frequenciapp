@@ -79,6 +79,8 @@ Quando a raiz de travas anterior já existe, a adoção conserva o caminho infor
 
 A continuidade do armazenamento e da trava é exercitada com produtor Bash, GPG, jq e consumidor de recibos reais, antes e depois da adoção e pela entrada estável. O I/O Docker e Dropbox desses testes é sintético: a prova não demonstra dump PostgreSQL válido, recuperação de banco, autenticação ou transporte remoto reais. A autoridade nativa continua recusando caminho, inode e pasta divergentes e impede nova escrita quando sua trava está ocupada.
 
+Na derivação inicial pelo instalador, o alias usual `/var/lock` para `/run/lock` produz o caminho canônico `/run/lock/frequenciapp` antes do primeiro produtor. O literal já configurado em `ops.env` não é remapeado. Adoção legada por caminho simbólico continua recusada e exige revisão administrativa; a mudança não migra autoridades nem permite links arbitrários.
+
 O perfil guarda `versao`, `tipo` `compose-host`, caminhos absolutos, o caminho absoluto do Node usado na entrada, a lista de arquivos Compose, o `migradorSha256`, o SHA-256 do manifesto, o SHA-256 de `app.env`, de `ops.env` e de `identidade.json`, e o estado legado conferido. O `migradorSha256` é o hash de `docker/app/migrar.mjs` no momento da adoção.
 
 A entrada estável é fixa e não carrega o ambiente do chamador:
@@ -115,6 +117,8 @@ O cron do controlador usa a entrada `executar` e as ações estáveis `agenda`, 
 | Certificado          | `renovar-certificado` | Nginx com ACME, horário de `CERTBOT_RENOVAR_HORARIO`.           |
 
 O instalador exige confirmação do fuso. `CRON_FUSO_SISTEMA` precisa ser igual a `TZ_APP`, ou `CRON_TZ` precisa ser aceito com `CRON_SUPORTA_TZ=true`. O cron do controlador não recarrega serviço nenhum; o daemon lê `/etc/cron.d`. O logrotate também não é recarregado.
+
+Nos perfis com controlador, a etapa `ambiente` do instalador persiste em `CRON_FUSO_SISTEMA` somente o fuso observado por `timedatectl show --property=Timezone`. Ausência de prova deixa o campo vazio; divergência não é substituída pelo fuso escolhido. O cron recusa ambos, salvo a confirmação explícita de suporte a `CRON_TZ`. A retomada anterior à adoção pode repetir a etapa `ambiente`; um perfil já adotado não recebe alteração silenciosa dos ambientes hasheados. Essa observação não é uma atestação contínua do relógio do host.
 
 ### Reconfiguração dos seletores
 

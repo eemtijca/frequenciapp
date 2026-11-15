@@ -50,7 +50,7 @@ function preparar(t) {
   };
   f.aplicar = (extras = [], env = {}) =>
     f.executar(
-      process.execPath,
+      f.nodeCli ?? process.execPath,
       [
         path.resolve(import.meta.dirname, "../../../scripts/instalador/cli.mjs"),
         "aplicar",
@@ -129,6 +129,153 @@ test("B: ambiente Compose gerado permite adoção real sem conexão paralela", (
   f.ok(f.executar(`${f.prefixo}/executar`, ["estado"]));
 });
 
+test("E: CLI transmite o fuso observado ao cron sem confirmação antecipada", (t) => {
+  const f = preparar(t);
+  f.nodeCli = `${f.bin}/node-cli`;
+  fs.copyFileSync(process.execPath, f.nodeCli);
+  fs.chmodSync(f.nodeCli, 0o700);
+  f.gravar(
+    `${f.config}/ops.env`,
+    fs.readFileSync(`${f.config}/ops.env`, "utf8").replace(/^CRON_FUSO_SISTEMA=.*\n/m, ""),
+  );
+  f.gravar(
+    `${f.bin}/timedatectl`,
+    '#!/bin/sh\n[ "$*" = "show --property=Timezone" ] || exit 91\nprintf "Timezone=UTC\\n"\n',
+    0o700,
+  );
+  f.inicio("ambiente");
+  f.ok(f.aplicar(["--desde-etapa", "ambiente", "--fuso", "UTC"]));
+  assert.match(fs.readFileSync(`${f.config}/ops.env`, "utf8"), /^CRON_FUSO_SISTEMA=UTC$/m);
+  f.ok(f.adocao());
+  const cron = f.ok(
+    f.executar(`${f.prefixo}/executar`, ["instalar-rotinas", "--plano", "--destino", f.destino]),
+  );
+  assert.match(cron.stdout, /30 2 \* \* \* root .*\/executar backup-banco/);
+  assert.deepEqual(fs.readdirSync(`${f.prefixo}/dados/journal`), []);
+});
+
+for (const caso of [
+  { nome: "ausente", saida: "exit 1", observado: "", fuso: "UTC", extra: "", aceita: false },
+  {
+    nome: "divergente",
+    saida: "printf 'Timezone=UTC\\n'",
+    observado: "UTC",
+    fuso: "America/Fortaleza",
+    extra: "",
+    aceita: false,
+  },
+  {
+    nome: "CRON_TZ sem suporte comprovado",
+    saida: "printf 'Timezone=UTC\\n'",
+    observado: "UTC",
+    fuso: "America/Fortaleza",
+    extra: "CRON_TZ=America/Fortaleza\n",
+    aceita: false,
+  },
+  {
+    nome: "CRON_TZ com confirmação explícita",
+    saida: "printf 'Timezone=UTC\\n'",
+    observado: "UTC",
+    fuso: "America/Fortaleza",
+    extra: "CRON_TZ=America/Fortaleza\nCRON_SUPORTA_TZ=true\n",
+    aceita: true,
+  },
+])
+  test(`E: cron trata prova de fuso ${caso.nome} sem confundir observação e escolha`, (t) => {
+    const f = preparar(t);
+    f.nodeCli = `${f.bin}/node-cli`;
+    fs.copyFileSync(process.execPath, f.nodeCli);
+    fs.chmodSync(f.nodeCli, 0o700);
+    f.gravar(
+      `${f.config}/ops.env`,
+      fs.readFileSync(`${f.config}/ops.env`, "utf8").replace(/^CRON_FUSO_SISTEMA=.*\n/m, "") +
+        caso.extra,
+    );
+    f.gravar(
+      `${f.bin}/timedatectl`,
+      `#!/bin/sh\n[ "$*" = "show --property=Timezone" ] || exit 91\n${caso.saida}\n`,
+      0o700,
+    );
+    f.inicio("ambiente");
+    f.ok(f.aplicar(["--desde-etapa", "ambiente", "--fuso", caso.fuso]));
+    const ops = fs.readFileSync(`${f.config}/ops.env`);
+    assert.ok(ops.toString().split("\n").includes(`CRON_FUSO_SISTEMA=${caso.observado}`));
+    f.ok(f.adocao());
+    const r = f.executar(`${f.prefixo}/executar`, [
+      "instalar-rotinas",
+      "--confirmar",
+      "--destino",
+      f.destino,
+    ]);
+    assert.equal(r.error, undefined);
+    assert.equal(r.signal, null);
+    if (caso.aceita) {
+      f.ok(r);
+      assert.match(
+        fs.readFileSync(`${f.destino}/cron.d/frequenciapp`, "utf8"),
+        /^CRON_TZ=America\/Fortaleza$/m,
+      );
+    } else {
+      assert.equal(r.status, 78);
+      assert.match(r.stderr, /Confirmar CRON_FUSO_SISTEMA/);
+      assert.equal(fs.existsSync(`${f.destino}/cron.d/frequenciapp`), false);
+    }
+    assert.deepEqual(fs.readFileSync(`${f.config}/ops.env`), ops);
+    assert.deepEqual(fs.readdirSync(`${f.prefixo}/dados/journal`), []);
+  });
+
+test("E: retomada mantém a prova persistida e não reescreve ambiente já adotado", (t) => {
+  const f = preparar(t);
+  f.nodeCli = `${f.bin}/node-cli`;
+  fs.copyFileSync(process.execPath, f.nodeCli);
+  fs.chmodSync(f.nodeCli, 0o700);
+  f.gravar(
+    `${f.config}/ops.env`,
+    fs.readFileSync(`${f.config}/ops.env`, "utf8").replace(/^CRON_FUSO_SISTEMA=.*\n/m, ""),
+  );
+  f.gravar(`${f.bin}/timedatectl`, "#!/bin/sh\nprintf 'Timezone=UTC\\n'\n", 0o700);
+  f.inicio("ambiente");
+  f.ok(f.aplicar(["--desde-etapa", "ambiente", "--fuso", "UTC"]));
+  const ops = fs.readFileSync(`${f.config}/ops.env`);
+  f.inicio("ambiente");
+  f.ok(f.aplicar(["--retomar", "--fuso", "UTC"]));
+  assert.deepEqual(fs.readFileSync(`${f.config}/ops.env`), ops);
+  f.ok(f.adocao());
+  f.ok(
+    f.executar(`${f.prefixo}/executar`, [
+      "instalar-rotinas",
+      "--confirmar",
+      "--destino",
+      f.destino,
+    ]),
+  );
+  f.gravar(`${f.bin}/timedatectl`, "#!/bin/sh\nprintf 'Timezone=America/Fortaleza\\n'\n", 0o700);
+  f.ok(
+    f.executar(
+      f.nodeCli,
+      [
+        path.resolve(import.meta.dirname, "../../../scripts/instalador/cli.mjs"),
+        "aplicar",
+        "--config",
+        `${f.config}/instalador.json`,
+        "--retomar",
+        "--sim",
+        "--json",
+      ],
+      {
+        env: {
+          PATH: `${f.bin}:/usr/local/bin:/usr/bin:/bin`,
+          HOME: f.raiz,
+          TMPDIR: f.raiz,
+          INSTALADOR_RAIZ: f.raiz,
+        },
+      },
+    ),
+  );
+  assert.deepEqual(fs.readFileSync(`${f.config}/ops.env`), ops);
+  f.ok(f.executar(`${f.prefixo}/executar`, ["estado"]));
+});
+
 test("B: adoção recusa cada conexão explícita divergente sem criar prefixo", (t) => {
   for (const chave of ["DATABASE_URL", "DIRECT_URL", "BACKUP_DATABASE_URL"]) {
     const f = preparar(t);
@@ -141,6 +288,72 @@ test("B: adoção recusa cada conexão explícita divergente sem criar prefixo",
     assert.match(r.stderr, /conexões URL paralelas/);
     assert.equal(fs.existsSync(f.prefixo), false);
     assert.deepEqual(fs.readFileSync(`${f.config}/ops.env`), antes);
+  }
+});
+
+test("C: default sob var/lock simbólico preserva a trava do produtor na adoção", (t) => {
+  const f = preparar(t);
+  f.gravar(`${f.raiz}/run/lock/.fixture`, "");
+  fs.mkdirSync(`${f.raiz}/var`, { recursive: true });
+  fs.symlinkSync("../run/lock", `${f.raiz}/var/lock`);
+  f.inicio("ambiente");
+  f.ok(f.aplicar(["--desde-etapa", "ambiente"], { INSTALADOR_LOCK_DIR: "" }));
+  const env = {
+    PATH: `${f.bin}:/usr/local/bin:/usr/bin:/bin`,
+    HOME: f.raiz,
+    TMPDIR: f.raiz,
+    APP_DIR: f.app,
+    APP_ENV_FILE: `${f.config}/app.env`,
+    OPS_ENV_FILE: `${f.config}/ops.env`,
+    SERVIDOR_CONFIG_DIR: f.config,
+  };
+  // O produtor público disputa a mesma trava operacional, com Docker sintético.
+  f.gravar(
+    `${f.bin}/docker`,
+    fs.readFileSync(`${f.bin}/docker`, "utf8").replace("exec) exit 0;;", "exec|run) exit 0;;"),
+    0o700,
+  );
+  f.ok(f.executar("/bin/bash", [`${f.app}/scripts/servidor/backup-planilhas.sh`], { env }));
+  const alvo = JSON.parse(fs.readFileSync(`${f.config}/identidade.json`)).trava;
+  const trava = `${f.raiz}/run/lock/frequenciapp/operacoes-${alvo}.lock`;
+  const antes = fs.statSync(trava);
+  f.ok(f.adocao());
+  const p = JSON.parse(fs.readFileSync(f.perfil));
+  assert.equal(p.locks, `${f.raiz}/run/lock/frequenciapp`);
+  assert.equal(fs.statSync(trava).ino, antes.ino);
+  assert.equal(fs.statSync(trava).dev, antes.dev);
+  const ocupado = f.executar("flock", ["-x", trava, `${f.prefixo}/executar`, "agenda"]);
+  assert.equal(ocupado.error, undefined);
+  assert.equal(ocupado.signal, null);
+  assert.equal(ocupado.status, 1);
+  assert.match(ocupado.stderr, /Outra operação incompatível com agenda está em andamento/);
+  assert.deepEqual(fs.readdirSync(`${f.prefixo}/dados/journal`), []);
+  f.ok(f.executar(`${f.prefixo}/executar`, ["agenda"]));
+  assert.equal(fs.statSync(trava).ino, antes.ino);
+});
+
+test("C: derivação inicial não aceita alias arbitrário nem migra literal legado", (t) => {
+  for (const legado of [false, true]) {
+    const f = preparar(t);
+    f.gravar(`${f.raiz}/${legado ? "run/lock" : "outro"}/.fixture`, "");
+    fs.mkdirSync(`${f.raiz}/var`, { recursive: true });
+    fs.symlinkSync(legado ? "../run/lock" : "../outro", `${f.raiz}/var/lock`);
+    if (legado)
+      fs.appendFileSync(
+        `${f.config}/ops.env`,
+        `SERVIDOR_LOCK_DIR=${f.raiz}/var/lock/frequenciapp\n`,
+      );
+    f.inicio("ambiente");
+    f.ok(f.aplicar(["--desde-etapa", "ambiente"], { INSTALADOR_LOCK_DIR: "" }));
+    const ops = fs.readFileSync(`${f.config}/ops.env`);
+    assert.ok(ops.toString().includes(`SERVIDOR_LOCK_DIR=${f.raiz}/var/lock/frequenciapp\n`));
+    const r = f.adocao();
+    assert.equal(r.error, undefined);
+    assert.equal(r.signal, null);
+    assert.equal(r.status, 78);
+    assert.match(r.stderr, /root e não conter links/);
+    assert.equal(fs.existsSync(f.prefixo), false);
+    assert.deepEqual(fs.readFileSync(`${f.config}/ops.env`), ops);
   }
 });
 

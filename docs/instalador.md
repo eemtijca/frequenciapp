@@ -176,6 +176,8 @@ No systemd, o instalador grava units e timers em `/etc/systemd/system` para a ag
 
 O fuso do host é conferido com `timedatectl`. Uma divergência em relação a `--fuso` é recusada, salvo confirmação explícita com `INSTALADOR_PERMITIR_FUSO_DIVERGENTE=1` ou, no cron, com `CRON_TZ`.
 
+Nos perfis `controlador` e `completo`, a etapa `ambiente` grava em `CRON_FUSO_SISTEMA` a observação de `timedatectl show --property=Timezone`, sem substituir o valor pelo `--fuso`. Campo vazio ou divergente bloqueia o cron do controlador. O uso de `CRON_TZ` exige também `CRON_SUPORTA_TZ=true` na configuração protegida; a presença da variável ou a confirmação genérica de divergência não comprovam suporte. Antes da adoção, repetir a etapa `ambiente` permite obter a prova ausente. Depois da adoção, a reconfiguração restrita não altera silenciosamente esses campos nem os hashes do perfil.
+
 A atualização automática fica desabilitada por padrão. O timer de atualização só é instalado com `--habilitar-atualizacoes`, e o canal `main` exige `--permitir-instavel`. O timer usa o canal definido em `--canal-atualizacao` e a referência de `--ref-atualizacao`. No fallback cron, a linha gerada por `instalar-rotinas.sh` recebe o mesmo modo de atualização e a referência vem de `ATUALIZAR_REF` em `ops.env`.
 
 A segunda execução não reescreve uma unit igual, não duplica a linha de cron e não reinicia um timer que já está ativo e sem mudanças. A falha de uma unidade é registrada no journal e, quando `NOTIFICAR_URL` existe em `ops.env`, enviada por HTTP sem expor a URL no journal ou nos argumentos do processo.
@@ -666,6 +668,8 @@ Estado corrompido, etapa desconhecida ou estado de instalação divergente produ
 ### Trava
 
 A trava fica em `/var/lock/frequenciapp/instalador.lock`, modo 600, e usa `flock` exclusivo. O instalador espera até 30 segundos; se a trava continuar ocupada, retorna `E_VALIDACAO` com a etapa e o processo que detém o arquivo.
+
+Na instalação nova, quando `/var/lock` é o alias simbólico usual para `/run/lock`, a derivação inicial usa `/run/lock/frequenciapp` também em `SERVIDOR_LOCK_DIR`, antes dos produtores e da adoção. Sem esse alias, conserva o padrão literal. Um caminho já configurado em `ops.env` permanece literal; não há migração automática de travas ou de autoridades. Links arbitrários e caminhos legados não canônicos continuam recusados na adoção.
 
 A trava é local ao host, não distribuída. Ela serializa `aplicar`, `atualizar`, `backup`, `restaurar`, `desinstalar` e `canal definir --aplicar`. Projetos Compose independentes usam travas próprias quando a identidade operacional estiver configurada. Um processo filho legítimo pode herdar o descritor, e a revalidação confere se ele aponta para a trava do mesmo projeto.
 
