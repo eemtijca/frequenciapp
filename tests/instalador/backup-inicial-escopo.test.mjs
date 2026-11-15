@@ -81,6 +81,7 @@ if(nome==='docker') {
 
 function preparar(t, ajustes = {}) {
   assert.equal(process.getuid(), 1000);
+  const usuarioServico = os.userInfo().username;
   const raiz = fs.mkdtempSync(path.join(os.tmpdir(), "backup-inicial-escopo-"));
   t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
   const appDir = path.join(raiz, "opt/frequenciapp");
@@ -174,7 +175,7 @@ function preparar(t, ajustes = {}) {
   const deps = {
     raiz,
     uid: () => 1000,
-    usuarioServico: "ubuntu",
+    usuarioServico,
     raizRepositorio: appDir,
     agora: () => "2026-11-11T12:00:00Z",
     esperar() {},
@@ -194,7 +195,7 @@ function preparar(t, ajustes = {}) {
     executar(comando, args = [], opcoes = {}) {
       chamadas.push({ comando, args, env: opcoes.env });
       if (comando === "git" || comando === "node") return real(comando, args, opcoes);
-      if (comando === "id") return ok(args[0] === "-nG" ? "ubuntu docker" : "1000");
+      if (comando === "id") return ok(args[0] === "-nG" ? `${usuarioServico} docker` : "1000");
       if (comando === "timedatectl") return ok("Timezone=America/Fortaleza");
       if (comando === "systemctl") return ok("active");
       if (comando === "docker") {
@@ -381,6 +382,7 @@ function deteccao() {
 test("primeiro aplicar aceita recibo íntegro do alvo efetivo e alcança o agendador", (t) => {
   const f = preparar(t);
   const resultado = f.aplicar();
+  assert.equal(resultado.codigo, 0, JSON.stringify(resultado.dados.erros));
   const estadoDir = path.join(f.raiz, "var/lib/frequenciapp");
   const ponteiro = ler(path.join(estadoDir, "ultimo-backup.json"));
   const recibo = ler(path.join(estadoDir, "recibos", ponteiro.recibo));
@@ -394,7 +396,6 @@ test("primeiro aplicar aceita recibo íntegro do alvo efetivo e alcança o agend
       recuperacaoExercitada: recibo.etapas.recuperacaoExercitada,
     }),
   );
-  assert.equal(resultado.codigo, 0, JSON.stringify(resultado.dados.erros));
   assert.equal(resultado.dados.etapas.find((e) => e.id === "agendador").estado, "concluida");
   assert.ok(fs.existsSync(path.join(f.raiz, "etc/systemd/system/frequenciapp-backup-banco.timer")));
 });

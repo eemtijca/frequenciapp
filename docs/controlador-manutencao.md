@@ -412,21 +412,11 @@ O comando executa `node --test tests/servidor/controlador/*.test.mjs` e `bash te
 bash tests/servidor/perfis.sh
 ```
 
-O job `controlador` de `instalador.yml` constrói `tests/servidor/controlador/Dockerfile` com uma cópia apenas das fontes públicas versionadas. A imagem contém Node 26, Git, Bash e `flock`; o runtime usa root interno sem capacidades adicionais, rede ou socket Docker, com raiz somente leitura e `/tmp` executável descartável. O comando abaixo testa a revisão já commitada, não as alterações locais pendentes:
+As receitas canônicas de contexto, build e execução ficam nos jobs `unidade` e `controlador` de [instalador.yml](../.github/workflows/instalador.yml) e em [Dockerfile](../tests/servidor/controlador/Dockerfile). O `git archive` seleciona somente fontes públicas versionadas, incluindo `src/infra/schema-postgres.mjs`, exigido pelo `COPY` e pelo validador do banco. A receita testa a revisão commitada, não alterações locais pendentes; não copiar indiscriminadamente o checkout, `.git`, ambientes ou autenticação.
 
-```bash
-contexto=$(mktemp -d)
-git archive --format=tar HEAD scripts/servidor scripts/instalador \
-  tests/servidor/controlador docker/app/migrar.mjs package.json | tar -x -C "$contexto"
-docker build --network default -f "$contexto/tests/servidor/controlador/Dockerfile" \
-  -t frequenciapp-controlador-teste:local "$contexto"
-docker run --rm --network none --read-only --cap-drop ALL \
-  --security-opt no-new-privileges --user 0:0 \
-  --tmpfs /tmp:rw,nosuid,nodev,exec,size=256m,mode=1777 \
-  frequenciapp-controlador-teste:local
-```
+A imagem prepara Node 26, Git, Bash, `flock`, OpenSSL, GnuPG, jq e os rclones compatível e legado. A preparação pode baixar pacotes e artefatos conferidos por hash; o runtime não tem rede, socket Docker, binds ou portas publicadas. As etapas administrativas usam root apenas interno, `cap-drop ALL` e somente CHOWN, FOWNER, SETUID e SETGID, sem DAC_OVERRIDE ou modo privilegiado. A unidade usa UID 1000 sem capacidades. Todos usam rootfs somente leitura, IPC privado, NoNewPrivs, 2 CPUs, 2 GiB de memória, 512 PIDs e tmpfs executáveis `/scratch` de 4 GiB e `/tmp` de 256 MiB. A umask é 077 no controlador e 022 no Git administrativo.
 
-A preparação da imagem pode baixar pacotes; a execução dos testes não tem rede. O contexto não inclui `.git`, ambientes reais ou autenticação. Os clientes Docker são falsos e o resultado não comprova serviços, DNS, TLS ou recuperação real.
+Os testes usam ferramentas e guardas reais, mas I/O Docker e Dropbox sintético. O resultado não comprova serviços, DNS, OAuth, transporte remoto ou recuperação PostgreSQL reais. Uma imagem de ferramentas preparada separadamente não comprova o build exato da receita Debian com apt e downloads; esse gate precisa de evidência própria.
 
 A validação de servidor cobre sintaxe, ShellCheck dos scripts e do controlador, configuração Compose, Caddy e Nginx:
 
