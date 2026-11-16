@@ -1,31 +1,21 @@
 // Etapa de backup inicial: executa, verifica o recibo e grava o ponteiro do último backup.
 import fs from "node:fs";
 import path from "node:path";
-import { acao, avisoEtapa, executarEtapa, falha, lerEnv, sha256Arquivo } from "./contexto.mjs";
+import {
+  acao,
+  ambienteBackup,
+  avisoEtapa,
+  executarEtapa,
+  falha,
+  lerEnv,
+  sha256Arquivo,
+} from "./contexto.mjs";
 
 export const id = "backup-inicial";
 export const titulo = "Executa e confere o primeiro backup";
 export const limiteSegundos = 3600;
 
 const PADRAO_RECIBO = /^frequenciapp-\d{8}T\d{6}Z-[a-f0-9]{8}\.confirmado\.json$/;
-
-// A retomada pode pular ambiente; os arquivos validados continuam sendo a autoridade.
-function ambienteBackup(ctx) {
-  return {
-    APP_DIR: ctx.caminhos.appDir,
-    APP_ENV_FILE: ctx.caminhos.appEnv,
-    OPS_ENV_FILE: ctx.caminhos.opsEnv,
-    SERVIDOR_CONFIG_DIR: ctx.caminhos.configDir,
-    ESTADO_DIR: ctx.caminhos.estadoDir,
-    LOG_DIR: ctx.caminhos.logDir,
-    BACKUP_DIR: ctx.caminhos.backupDir,
-    BACKUP_BANCO_DIR: ctx.caminhos.backupBancoDir,
-    SERVIDOR_LOCK_DIR: ctx.caminhos.lockDir,
-    SERVIDOR_USUARIO: ctx.usuarioServico,
-    COMPOSE_PROJECT_NAME: ctx.caminhos.projetoCompose,
-    SERVIDOR_IDENTIDADE_ARQUIVO: ctx.caminhos.identidade,
-  };
-}
 
 function lerPonteiro(caminho) {
   try {

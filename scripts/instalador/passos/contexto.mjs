@@ -65,6 +65,24 @@ export function caminhosOperacao(raiz = "/", configuracao = {}, modoTeste = fals
   };
 }
 
+// Monta o ambiente mínimo das rotinas de backup, sem autoridade de escopo herdada.
+export function ambienteBackup(ctx) {
+  return {
+    APP_DIR: ctx.caminhos.appDir,
+    APP_ENV_FILE: ctx.caminhos.appEnv,
+    OPS_ENV_FILE: ctx.caminhos.opsEnv,
+    SERVIDOR_CONFIG_DIR: ctx.caminhos.configDir,
+    ESTADO_DIR: ctx.caminhos.estadoDir,
+    LOG_DIR: ctx.caminhos.logDir,
+    BACKUP_DIR: ctx.caminhos.backupDir,
+    BACKUP_BANCO_DIR: ctx.caminhos.backupBancoDir,
+    SERVIDOR_LOCK_DIR: ctx.caminhos.lockDir,
+    SERVIDOR_USUARIO: ctx.usuarioServico,
+    COMPOSE_PROJECT_NAME: ctx.caminhos.projetoCompose,
+    SERVIDOR_IDENTIDADE_ARQUIVO: ctx.caminhos.identidade,
+  };
+}
+
 // Lê atribuições literais de ambiente, com export opcional e sem executar shell.
 export function lerEnv(texto) {
   const mapa = new Map();
