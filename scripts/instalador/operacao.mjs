@@ -3,7 +3,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { ErroInstalador, aviso, erroObjeto, erroUso, erroValidacao } from "./json.mjs";
 import { DOCUMENTACAO, agoraPadrao, deduplicarAvisos, montarDocumento } from "./plano.mjs";
-import { acao, caminhosOperacao, executarEtapa, falha, sobRaiz } from "./passos/contexto.mjs";
+import {
+  acao,
+  ambienteBackup,
+  caminhosOperacao,
+  executarEtapa,
+  falha,
+  sobRaiz,
+} from "./passos/contexto.mjs";
 
 export const COMANDOS_OPERACAO = new Set(["atualizar", "backup", "restaurar", "desinstalar"]);
 
@@ -290,6 +297,16 @@ function executarBackup(ctx, avisosBase) {
       documentacao: `${DOCUMENTACAO}#backup`,
     });
   }
+  const verificacao = executarComando(ctx, "bash", [script, "--verificar"], {
+    timeout: limiteMilissegundos(ctx.configuracao.tempoLimite, 120000),
+    env: ambienteBackup(ctx),
+  });
+  if (verificacao.status !== 0) {
+    throw falha("E_BACKUP", "O recibo do backup não passou na conferência de integridade.", {
+      dica: "Preserve os artefatos e revise o catálogo de recibos.",
+      documentacao: `${DOCUMENTACAO}#backup`,
+    });
+  }
   const conferido = conferirReciboBackup(ctx);
   const fim = ctx.agora();
   return documentoOperacao(
@@ -305,7 +322,7 @@ function executarBackup(ctx, avisosBase) {
         null,
         [
           acao("Executa e confere um backup do banco", "scripts/servidor/backup-banco.sh", true),
-          acao("Lê o ponteiro e valida o recibo confirmado", null, false),
+          acao("Confere o recibo, o escopo e o remoto pelo verificador oficial", null, false),
         ],
         [],
         {
