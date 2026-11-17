@@ -171,8 +171,42 @@ verificar_instalacao() {
       erro "O serviço $SERVIDOR_SERVICO_BACKUP_PLANILHAS não existe na instalação Compose."
   fi
 
-  conferir_identidade auto
+  if [ "${SERVIDOR_IDENTIDADE_SEM_ARQUIVOS:-false}" = true ]; then
+    conferir_identidade_sem_arquivos auto
+  else
+    conferir_identidade auto
+  fi
   log "Instalação Compose conferida: projeto $COMPOSE_PROJECT_NAME, app $SERVIDOR_SERVICO_APP, banco $SERVIDOR_SERVICO_DB."
+}
+
+conferir_identidade_sem_arquivos() {
+  local acao="${1:-auto}"
+  local registro="${SERVIDOR_IDENTIDADE_ARQUIVO:-$SERVIDOR_CONFIG_DIR/identidade.json}"
+  local config daemon containers ids_texto captura
+  local -a ids
+  command -v node >/dev/null || erro "Instale Node.js para conferir a identidade operacional."
+  # A captura usa memória e pipes, sem arquivos temporários na instalação.
+  config=$(compose config --format json) || erro "Não foi possível ler a configuração Compose."
+  daemon=$(docker info --format '{{json .}}') || erro "Não foi possível ler a identidade do daemon."
+  ids_texto=$(compose ps -aq) || erro "Não foi possível listar os containers do projeto."
+  if [ -n "$ids_texto" ]; then
+    mapfile -t ids <<<"$ids_texto"
+    containers=$(docker inspect "${ids[@]}") || erro "Não foi possível inspecionar os containers."
+  else
+    containers='[]'
+  fi
+  captura=$(printf '%s\0%s\0%s' "$config" "$daemon" "$containers" |
+    node --input-type=module -e '
+      import fs from "node:fs";
+      const [projeto, app, db] = process.argv.slice(1);
+      const [config, daemon, containers] = fs.readFileSync(0, "utf8").split("\0").map(JSON.parse);
+      process.stdout.write(JSON.stringify({config,daemon,containers,parametros:{projeto,app,db}}));
+    ' "$COMPOSE_PROJECT_NAME" "$SERVIDOR_SERVICO_APP" "$SERVIDOR_SERVICO_DB") ||
+    erro "Não foi possível montar a identidade a partir da configuração."
+  SERVIDOR_ALVO_CHAVE=$(printf '%s' "$captura" |
+    node "$SERVIDOR_SCRIPTS_DIR/identidade.mjs" "$acao" "$registro") ||
+    erro "Identidade não conferida; use a adoção explícita após revisar os recursos."
+  export SERVIDOR_ALVO_CHAVE
 }
 
 conferir_identidade() {

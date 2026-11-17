@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { lerEstadoAtualizador } from "../estado.mjs";
 import {
+  ambienteBackup,
   atualizarEnv,
   executarEtapa,
   falha,
@@ -175,7 +176,7 @@ function lerPonteiroBackup(ctx, estadoDir) {
   }
 }
 
-function conferirReciboBackup(ctx) {
+function conferirReciboBackup(ctx, somenteLeitura = false) {
   const ops = lerOps(ctx);
   const estadoDir = String(ops.get("ESTADO_DIR") ?? "") || ctx.caminhos.estadoDir;
   const backupDir = String(ops.get("BACKUP_BANCO_DIR") ?? "") || ctx.caminhos.backupBancoDir;
@@ -222,28 +223,22 @@ function conferirReciboBackup(ctx) {
       documentacao: "docs/instalador.md#backup",
     });
   }
-  const conferencista = path.join(ctx.caminhos.appDir, "scripts", "servidor", "recibos.mjs");
-  if (fs.existsSync(conferencista)) {
-    const conferencia = executarEtapa(
-      ctx,
-      "node",
-      [conferencista, "conferir-estado", backupDir, path.join(estadoDir, "ultimo-backup.json")],
-      { timeout: 120000 },
-    );
-    if (conferencia.status !== 0) {
-      throw falha("E_BACKUP", "O recibo do backup não passou na conferência de integridade.", {
-        dica: "Preserve os artefatos e revise o catálogo de recibos.",
-        documentacao: "docs/instalador.md#backup",
-      });
-    }
-  }
-  const remoto = String(ops.get("BACKUP_REMOTO") ?? "");
-  if (remoto && dados.verificadoRemoto !== true) {
-    throw falha("E_BACKUP", "O backup remoto não foi confirmado.", {
-      dica: "Confira o rclone, o destino e o checksum remoto.",
+  // A verificação oficial resolve alvo e banco antes do consumidor e confere o remoto atual.
+  const argumentos = ["--verificar"];
+  if (somenteLeitura) argumentos.push("--sem-escrita");
+  const conferencia = executarEtapa(
+    ctx,
+    "bash",
+    [path.join(ctx.caminhos.appDir, "scripts", "servidor", "backup-banco.sh"), ...argumentos],
+    { timeout: 120000, env: ambienteBackup(ctx), ambienteExclusivo: true },
+  );
+  if (conferencia.status !== 0) {
+    throw falha("E_BACKUP", "O recibo do backup não passou na conferência de integridade.", {
+      dica: "Preserve os artefatos e revise o catálogo de recibos.",
       documentacao: "docs/instalador.md#backup",
     });
   }
+  const remoto = String(ops.get("BACKUP_REMOTO") ?? "");
   return {
     recibo,
     arquivo,
@@ -255,7 +250,7 @@ function conferirReciboBackup(ctx) {
 
 // Confere o último backup confirmado sem executar uma cópia nova.
 export function conferirBackupExistente(ctx) {
-  return conferirReciboBackup(ctx);
+  return conferirReciboBackup(ctx, true);
 }
 
 // Executa um backup novo e confirma o recibo antes da troca de canal.

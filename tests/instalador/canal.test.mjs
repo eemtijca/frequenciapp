@@ -61,6 +61,10 @@ function prepararRepositorio() {
   const raiz = temporario();
   const appDir = path.join(raiz, "opt", "frequenciapp");
   fs.cpSync(FIXTURE, appDir, { recursive: true });
+  fs.copyFileSync(
+    path.join(RAIZ, "scripts", "servidor", "recibos.mjs"),
+    path.join(appDir, "scripts", "servidor", "recibos.mjs"),
+  );
   // A fonte pode ser somente leitura; somente as cópias sintéticas serão alteradas.
   for (const relativo of ["docker/app/migrar.mjs", "LEIA.md"]) {
     fs.chmodSync(path.join(appDir, relativo), 0o600);
@@ -182,6 +186,26 @@ function prepararInstalacao({
   fs.chmodSync(path.join(configuracao, "app.env"), 0o600);
   fs.chmodSync(path.join(configuracao, "ops.env"), 0o600);
   return { caminho };
+}
+
+function prepararBackup(raiz) {
+  const appDir = path.join(raiz, "opt", "frequenciapp");
+  const resultado = spawnSync(
+    "bash",
+    [path.join(appDir, "scripts", "servidor", "backup-banco.sh")],
+    {
+      encoding: "utf8",
+      env: {
+        PATH: process.env.PATH,
+        HOME: raiz,
+        TMPDIR: raiz,
+        APP_DIR: appDir,
+        ESTADO_DIR: path.join(raiz, "var", "lib", "frequenciapp"),
+        BACKUP_BANCO_DIR: path.join(raiz, "var", "backups", "frequenciapp", "banco"),
+      },
+    },
+  );
+  assert.equal(resultado.status, 0, resultado.stderr);
 }
 
 function escreverEstadoAtualizador(raiz, dados) {
@@ -401,6 +425,14 @@ describe("canal definir release com aplicação", () => {
     const atualizar = indiceChamada(chamadas, "atualizar.sh");
     assert.ok(backup >= 0, "backup não executado");
     assert.ok(atualizar > backup, "ordem backup e atualização inválida");
+    const conferencias = chamadasDeScript(chamadas, "backup-banco.sh").filter((chamada) =>
+      chamada.argumentos.includes("--verificar"),
+    );
+    assert.equal(conferencias.length, 1, "a conferência oficial não foi executada");
+    assert.equal(conferencias[0].argumentos.includes("--sem-escrita"), false);
+    for (const chave of ["SERVIDOR_ALVO_CHAVE", "BACKUP_BANCO_VERIFICADO"]) {
+      assert.equal(Object.hasOwn(conferencias[0].opcoes.env, chave), false, chave);
+    }
     const chamadaAtualizar = chamadasDeScript(chamadas, "atualizar.sh")[0];
     assert.deepEqual(chamadaAtualizar.argumentos.slice(1, 3), ["--modo", "release"]);
 
@@ -579,6 +611,35 @@ describe("canal definir com downgrade", () => {
     assert.equal(estado.commit, commits.B);
   });
 
+  it("planeja downgrade autorizado com backup existente íntegro", () => {
+    const { raiz, commits } = prepararRepositorio();
+    prepararInstalacao({ raiz, commit: commits.D, tag: "v1.2.0" });
+    prepararBackup(raiz);
+    const chamadas = [];
+    const resultado = executar(
+      [
+        "canal",
+        "definir",
+        "release",
+        "--tag",
+        "v1.1.0",
+        "--permitir-downgrade",
+        "--sim",
+        "--planejar",
+        "--json",
+      ],
+      criarDeps({ raiz, chamadas }),
+    );
+    assert.equal(resultado.codigo, 0, resultado.stderr);
+    assert.equal(resultado.json.ok, true);
+    assert.equal(resultado.json.dry_run, true);
+    assert.equal(lerEstado({ caminho: caminhoEstado(raiz) }).estado.commit, commits.D);
+    const conferencias = chamadasDeScript(chamadas, "backup-banco.sh");
+    assert.equal(conferencias.length, 1);
+    assert.equal(conferencias[0].argumentos.includes("--sem-escrita"), true);
+    assert.equal(chamadasDeScript(chamadas, "atualizar.sh").length, 0);
+  });
+
   it("recusa downgrade autorizado com estado incerto", () => {
     const { raiz, commits } = prepararRepositorio();
     prepararInstalacao({ raiz, commit: commits.D, tag: "v1.2.0" });
@@ -697,6 +758,43 @@ describe("canal definir com falhas", () => {
     assert.equal(resultado.codigo, 10);
     assert.equal(resultado.json.codigo, "E_BACKUP");
     assert.equal(lerEstado({ caminho: caminhoEstado(raiz) }).estado.commit, commits.A);
+  });
+
+  it("propaga E_BACKUP e mantém o commit, preservando apenas a preferência já registrada", () => {
+    const { raiz, commits } = prepararRepositorio();
+    prepararInstalacao({ raiz, commit: commits.A, tag: "v1.0.0" });
+    const estadoAntes = lerEstado({ caminho: caminhoEstado(raiz) }).estado;
+    const deps = criarDeps({ raiz });
+    const original = deps.executar;
+    deps.executar = (comando, argumentos = [], opcoes = {}) => {
+      if (
+        comando === "bash" &&
+        String(argumentos[0]).endsWith("backup-banco.sh") &&
+        argumentos.includes("--verificar")
+      ) {
+        return original(comando, argumentos, {
+          ...opcoes,
+          env: { ...(opcoes.env ?? {}), CANAL_TESTE_VERIFICACAO_FALHA: "1" },
+        });
+      }
+      return original(comando, argumentos, opcoes);
+    };
+    const resultado = executar(
+      ["canal", "definir", "release", "--tag", "v1.1.0", "--aplicar", "--sim", "--json"],
+      deps,
+    );
+    assert.equal(resultado.codigo, 10);
+    assert.equal(resultado.json.codigo, "E_BACKUP");
+    const estadoDepois = lerEstado({ caminho: caminhoEstado(raiz) }).estado;
+    assert.equal(estadoDepois.commit, commits.A);
+    assert.equal(estadoDepois.canal, "release");
+    assert.equal(estadoDepois.tag, "v1.1.0");
+    assert.deepEqual(
+      { ...estadoDepois, canal: estadoAntes.canal, tag: estadoAntes.tag },
+      estadoAntes,
+      "a falha só pode preservar a preferência já registrada antes do backup",
+    );
+    assert.equal(fs.existsSync(path.join(raiz, "var/backups/frequenciapp/banco")), true);
   });
 
   it("exige --sim quando a troca é aplicada", () => {

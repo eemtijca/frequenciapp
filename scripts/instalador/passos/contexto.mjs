@@ -65,6 +65,27 @@ export function caminhosOperacao(raiz = "/", configuracao = {}, modoTeste = fals
   };
 }
 
+// Monta o ambiente mínimo das rotinas de backup, sem autoridade de escopo herdada.
+export function ambienteBackup(ctx) {
+  return {
+    PATH: ctx.ambienteBase?.PATH ?? process.env.PATH ?? "",
+    HOME: ctx.ambienteBase?.HOME ?? process.env.HOME ?? "/tmp",
+    TMPDIR: ctx.ambienteBase?.TMPDIR ?? process.env.TMPDIR ?? "/tmp",
+    APP_DIR: ctx.caminhos.appDir,
+    APP_ENV_FILE: ctx.caminhos.appEnv,
+    OPS_ENV_FILE: ctx.caminhos.opsEnv,
+    SERVIDOR_CONFIG_DIR: ctx.caminhos.configDir,
+    ESTADO_DIR: ctx.caminhos.estadoDir,
+    LOG_DIR: ctx.caminhos.logDir,
+    BACKUP_DIR: ctx.caminhos.backupDir,
+    BACKUP_BANCO_DIR: ctx.caminhos.backupBancoDir,
+    SERVIDOR_LOCK_DIR: ctx.caminhos.lockDir,
+    SERVIDOR_USUARIO: ctx.usuarioServico,
+    COMPOSE_PROJECT_NAME: ctx.caminhos.projetoCompose,
+    SERVIDOR_IDENTIDADE_ARQUIVO: ctx.caminhos.identidade,
+  };
+}
+
 // Lê atribuições literais de ambiente, com export opcional e sem executar shell.
 export function lerEnv(texto) {
   const mapa = new Map();
@@ -240,7 +261,9 @@ export function lerSegredo(caminho, rotulo) {
 
 // Executa um comando com ambiente explícito e devolve a saída normalizada.
 export function executarEtapa(ctx, comando, argumentos = [], opcoes = {}) {
-  const ambiente = { ...(ctx.ambienteBase ?? {}), ...(opcoes.env ?? {}) };
+  const ambiente = opcoes.ambienteExclusivo
+    ? { ...(opcoes.env ?? {}) }
+    : { ...(ctx.ambienteBase ?? {}), ...(opcoes.env ?? {}) };
   const resultado = ctx.executar(comando, argumentos, {
     input: opcoes.input,
     timeout: opcoes.timeout ?? 120000,

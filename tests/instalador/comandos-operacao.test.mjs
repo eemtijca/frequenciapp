@@ -115,6 +115,7 @@ function deteccaoFalsa() {
 function cenarioPadrao() {
   return {
     backupFalha: false,
+    verificacaoFalha: false,
     atualizarFalha: "",
     restaurarFalha: false,
     dockerStatus: 0,
@@ -135,7 +136,10 @@ function responder(cenario, comando, argumentos) {
   if (nome === "bash") {
     const script = path.basename(String(argumentos[0] ?? ""));
     if (script === "backup-banco.sh") {
-      return cenario.backupFalha ? falha("falha simulada no backup") : ok("backup concluido\n");
+      if (cenario.backupFalha) return falha("falha simulada no backup");
+      if (argumentos.includes("--verificar") && cenario.verificacaoFalha)
+        return falha("falha simulada na conferência");
+      return ok("backup concluido\n");
     }
     if (script === "atualizar.sh") {
       if (cenario.atualizarFalha === "saude") return falha("health check falhou");
@@ -244,6 +248,54 @@ describe("backup", () => {
       path.join(raiz, "var", "backups", "frequenciapp", "banco"),
     );
     assert.equal(chamada.opcoes.env.SERVIDOR_CONFIG_DIR, path.join(raiz, "etc", "frequenciapp"));
+    const conferencias = chamadas.filter(
+      (item) =>
+        item.comando === "bash" &&
+        path.basename(String(item.argumentos[0] ?? "")) === "backup-banco.sh" &&
+        item.argumentos.includes("--verificar"),
+    );
+    assert.equal(conferencias.length, 1, "a conferência oficial não foi executada");
+    for (const chave of ["SERVIDOR_ALVO_CHAVE", "BACKUP_BANCO_VERIFICADO"]) {
+      assert.equal(Object.hasOwn(conferencias[0].opcoes.env, chave), false, chave);
+    }
+  });
+
+  it("não herda escopo nem segredos do processo pai na conferência adicional", () => {
+    const raiz = prepararRaiz();
+    prepararRecibo(raiz);
+    const sentinela = "sentinela-fora-do-contrato";
+    const { deps, chamadas } = criarDeps({
+      raiz,
+      uid: 1000,
+      ambiente: {
+        SERVIDOR_ALVO_CHAVE: "alvo-forjado",
+        BACKUP_BANCO_VERIFICADO: "banco-forjado",
+        DATABASE_SCHEMA: "schema-forjado",
+        BACKUP_REMOTO: "remoto-forjado",
+        SEGREDO_FORA_DO_CONTRATO: sentinela,
+      },
+    });
+    const resultado = executar(["backup", "--json", "--modo-teste", "--sim"], deps);
+    assert.equal(resultado.codigo, 0, resultado.stderr);
+    const conferencias = chamadas.filter(
+      (item) =>
+        item.comando === "bash" &&
+        path.basename(String(item.argumentos[0] ?? "")) === "backup-banco.sh" &&
+        item.argumentos.includes("--verificar"),
+    );
+    assert.equal(conferencias.length, 1);
+    for (const chave of [
+      "SERVIDOR_ALVO_CHAVE",
+      "BACKUP_BANCO_VERIFICADO",
+      "DATABASE_SCHEMA",
+      "BACKUP_REMOTO",
+      "SEGREDO_FORA_DO_CONTRATO",
+    ]) {
+      assert.equal(Object.hasOwn(conferencias[0].opcoes.env, chave), false, chave);
+    }
+    assert.equal(typeof conferencias[0].opcoes.env.PATH, "string");
+    assert.equal(typeof conferencias[0].opcoes.env.HOME, "string");
+    assert.equal(typeof conferencias[0].opcoes.env.TMPDIR, "string");
   });
 
   it("devolve E_BACKUP quando a rotina falha", () => {
@@ -252,6 +304,21 @@ describe("backup", () => {
     cenario.backupFalha = true;
     const { deps } = criarDeps({ raiz, cenario });
     const resultado = executar(["backup", "--json", "--modo-teste"], deps);
+    assert.equal(resultado.codigo, 10);
+    assert.equal(resultado.json.comando, "backup");
+    assert.equal(resultado.json.codigo, "E_BACKUP");
+    assert.equal(resultado.json.ok, false);
+    assert.equal(resultado.json.etapas[0].estado, "falhou");
+    assert.doesNotMatch(resultado.stdout, /Error|at .*\.mjs/);
+  });
+
+  it("devolve E_BACKUP quando a conferência oficial falha", () => {
+    const raiz = prepararRaiz();
+    prepararRecibo(raiz);
+    const cenario = cenarioPadrao();
+    cenario.verificacaoFalha = true;
+    const { deps } = criarDeps({ raiz, cenario });
+    const resultado = executar(["backup", "--json", "--modo-teste", "--sim"], deps);
     assert.equal(resultado.codigo, 10);
     assert.equal(resultado.json.comando, "backup");
     assert.equal(resultado.json.codigo, "E_BACKUP");

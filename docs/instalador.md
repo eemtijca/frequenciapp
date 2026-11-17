@@ -231,7 +231,7 @@ O backup é obrigatório no caminho simples e no controlador. A atualização au
 
 ### backup
 
-O `backup` chama a rotina existente, espera o recibo confirmado e atualiza o ponteiro do último backup. Ele aceita os modos `compose` e `url`, as cifras GPG e age, o destino rclone e a retenção configurada em [backup-servidor.md](backup-servidor.md).
+O `backup` chama a rotina existente, espera o recibo confirmado e atualiza o ponteiro do último backup. Ele aceita os modos `compose` e `url`, as cifras GPG e age, o destino rclone e a retenção configurada em [backup-servidor.md](backup-servidor.md). A conferência final usa `backup-banco.sh --verificar`, resolve o escopo pela operação e confere novamente o remoto configurado.
 
 O comando não publica recibo quando a geração, a cifra, o upload ou a verificação falham. A retenção preserva o mínimo de cópias confirmadas. Na cifra GPG, `--destinatario-gpg` é obrigatório; na cifra age, `--destinatarios-age` é obrigatório. O backup das planilhas continua no caminho rclone atual e não é movido para o Dropbox. Em instalação real, o comando exige `--sim`; `--simular` mostra a ação sem executar.
 
@@ -258,7 +258,7 @@ instalar.sh canal definir release --tag vX.Y.Z --aplicar --sim
 instalar.sh canal definir main --permitir-instavel --planejar
 ```
 
-Sem `--aplicar`, o comando grava apenas a preferência de canal no estado, sem alterar containers, imagem, ambiente ou dados. Com `--aplicar`, o instalador faz backup, valida a compatibilidade, executa `atualizar.sh` e atualiza o estado. Em modo não interativo, `--aplicar` exige `--sim`. O `--planejar` no `canal definir` produz o plano da troca e mantém a gravação da preferência, que é a única escrita permitida nesse modo.
+Sem `--aplicar`, o comando grava apenas a preferência de canal no estado, sem alterar containers, imagem, ambiente ou dados. Com `--aplicar`, o instalador faz backup, confere o conjunto pelo verificador oficial, valida a compatibilidade, executa `atualizar.sh` e atualiza o estado. Em modo não interativo, `--aplicar` exige `--sim`. O `--planejar` no `canal definir` produz o plano da troca e mantém a gravação da preferência, que é a única escrita durável permitida nesse modo. O planejamento de downgrade confere o backup existente pelo modo somente leitura do verificador, sem adquirir trava, criar diretórios ou temporários na instalação e sem gerar outro dump. Uma falha na conferência preserva o conjunto e não avança para a atualização; a preferência de canal e tag pode já ter sido registrada antes do backup no caminho de aplicação, como no comportamento anterior.
 
 O detalhamento de downgrade, compatibilidade e readoção do controlador está na seção [Canal release e main](#canal-release-e-main).
 

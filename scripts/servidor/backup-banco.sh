@@ -7,26 +7,37 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$DIR/comum.sh"
 
 verificar_somente=false
+sem_escrita=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --verificar)
       verificar_somente=true
       shift
       ;;
+    --sem-escrita)
+      sem_escrita=true
+      shift
+      ;;
     --ajuda | -h)
       cat <<'TEXTO'
-Uso: backup-banco.sh [--verificar]
+Uso: backup-banco.sh [--verificar [--sem-escrita]]
 
-Sem opÃ§Ãµes, gera um novo backup. Com --verificar, confere o Ãºltimo backup
-local e, quando configurado, a cÃ³pia remota.
+Sem opções, gera um novo backup. Com --verificar, confere o último backup
+local e, quando configurado, a cópia remota. --sem-escrita exige --verificar
+e faz a conferência sem adquirir trava nem criar diretórios ou temporários
+na instalação.
 TEXTO
       exit 0
       ;;
     *)
-      erro "OpÃ§Ã£o desconhecida: $1"
+      erro "Opção desconhecida: $1"
       ;;
   esac
 done
+
+if [ "$sem_escrita" = true ] && [ "$verificar_somente" != true ]; then
+  erro "--sem-escrita exige --verificar."
+fi
 
 carregar_ambiente
 
@@ -78,23 +89,39 @@ case "$BACKUP_RETER_REMOTO" in
 esac
 
 if [ "$BACKUP_MODO" = compose ]; then
+  if [ "$sem_escrita" = true ]; then
+    export SERVIDOR_IDENTIDADE_SEM_ARQUIVOS=true
+  else
+    unset SERVIDOR_IDENTIDADE_SEM_ARQUIVOS
+  fi
   verificar_instalacao
 else
+  unset SERVIDOR_IDENTIDADE_SEM_ARQUIVOS
   # Conservador: aliases de URL não comprovam identidade física do servidor.
   SERVIDOR_ALVO_CHAVE=url-conservador
 fi
 export SERVIDOR_ALVO_CHAVE
-travar backup-banco 0
 unset BACKUP_BANCO_VERIFICADO
 estado="$ESTADO_DIR/ultimo-backup.json"
 
-mkdir -p "$BACKUP_BANCO_DIR"
-chmod 700 "$BACKUP_BANCO_DIR" 2>/dev/null || true
-mkdir -p "$ESTADO_DIR"
-chmod 700 "$ESTADO_DIR" 2>/dev/null || true
+if [ "$sem_escrita" = false ]; then
+  travar backup-banco 0
+  mkdir -p "$BACKUP_BANCO_DIR"
+  chmod 700 "$BACKUP_BANCO_DIR" 2>/dev/null || true
+  mkdir -p "$ESTADO_DIR"
+  chmod 700 "$ESTADO_DIR" 2>/dev/null || true
+  tmp=$(mktemp -d "$BACKUP_BANCO_DIR/.tmp.XXXXXX")
+else
+  tmp=""
+fi
 
-tmp=$(mktemp -d "$BACKUP_BANCO_DIR/.tmp.XXXXXX")
-trap 'status=$?; limpar_home_gpg; if [ "$status" -ne 0 ]; then notificar falha "Backup do banco falhou."; fi; rm -rf "$tmp"' EXIT
+if [ "$sem_escrita" = true ]; then
+  export BACKUP_POSTGRES_SEM_ARQUIVO=true
+else
+  unset BACKUP_POSTGRES_SEM_ARQUIVO
+fi
+
+trap 'status=$?; limpar_home_gpg; if [ "$status" -ne 0 ] && [ "$sem_escrita" = false ]; then notificar falha "Backup do banco falhou."; fi; [ -z "$tmp" ] || rm -rf "$tmp"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 umask 077
@@ -177,11 +204,21 @@ verificar_item_remoto() {
   local destino="$tmp/verificacao/$nome"
   mkdir -p "$(dirname "$destino")"
   rclone_limpo copyto "${BACKUP_REMOTO%/}/$nome" "$destino" ||
-    erro "NÃ£o foi possÃ­vel baixar $nome do destino remoto."
+    erro "Não foi possível baixar $nome do destino remoto."
   local calculado
   calculado=$(sha256sum "$destino" | cut -d' ' -f1)
   [ "$calculado" = "$esperado" ] ||
-    erro "A cÃ³pia remota de $nome diverge do hash local."
+    erro "A cópia remota de $nome diverge do hash local."
+}
+
+verificar_item_remoto_leitura() {
+  local nome="$1"
+  local esperado="$2"
+  local calculado
+  calculado=$(rclone_limpo cat "${BACKUP_REMOTO%/}/$nome" | sha256sum | cut -d' ' -f1) ||
+    erro "Não foi possível ler $nome do destino remoto."
+  [ "$calculado" = "$esperado" ] ||
+    erro "A cópia remota de $nome diverge do hash local."
 }
 
 verificar_ultimo_backup() {
@@ -208,26 +245,46 @@ verificar_ultimo_backup() {
   fi
 
   if [ -n "${BACKUP_REMOTO:-}" ]; then
-    preparar_rclone
+    if [ "$sem_escrita" = true ]; then
+      [ -n "${BACKUP_RCLONE_CONFIG:-}" ] || erro "Defina BACKUP_RCLONE_CONFIG."
+      verificar_permissao_arquivo "$BACKUP_RCLONE_CONFIG"
+    else
+      preparar_rclone
+    fi
     # O escopo já foi conferido contra o alvo; todos os membros precisam conferir hoje.
-    node --input-type=module - "$BACKUP_BANCO_DIR/$recibo" <<'NODE' >"$tmp/artefatos-remotos"
+    local lista_remota
+    lista_remota=$(node --input-type=module - "$BACKUP_BANCO_DIR/$recibo" <<'NODE'
 import fs from 'node:fs';
 const r = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
 for (const a of r.artefatos) process.stdout.write(`${a.nome}\t${a.sha256}\n`);
 NODE
+    ) || erro "Não foi possível ler os artefatos do recibo remoto."
     local nome hash_remoto
     while IFS=$'\t' read -r nome hash_remoto; do
-      verificar_item_remoto "$nome" "$hash_remoto"
-    done <"$tmp/artefatos-remotos"
-    verificar_item_remoto "$recibo" "$(sha256sum "$BACKUP_BANCO_DIR/$recibo" | cut -d' ' -f1)"
-    log "A cÃ³pia remota confere com o hash local original."
+      [ -n "$nome" ] || continue
+      if [ "$sem_escrita" = true ]; then
+        verificar_item_remoto_leitura "$nome" "$hash_remoto"
+      else
+        verificar_item_remoto "$nome" "$hash_remoto"
+      fi
+    done <<<"$lista_remota"
+    if [ "$sem_escrita" = true ]; then
+      verificar_item_remoto_leitura "$recibo" "$(sha256sum "$BACKUP_BANCO_DIR/$recibo" | cut -d' ' -f1)"
+    else
+      verificar_item_remoto "$recibo" "$(sha256sum "$BACKUP_BANCO_DIR/$recibo" | cut -d' ' -f1)"
+    fi
+    log "A cópia remota confere com o hash local original."
   fi
   log "Backup confirmado: $arquivo."
 }
 
 executar_postgres_url() {
   # A conexão privada é comum à consulta e ao dump; nenhuma URL vai para argv.
-  node --input-type=module - "$tmp/conexao.pgservice" "$@" <<'NODE'
+  local arquivo_pgservice="$tmp/conexao.pgservice"
+  if [ "$sem_escrita" = true ]; then
+    arquivo_pgservice=""
+  fi
+  node --input-type=module - "$arquivo_pgservice" "$@" <<'NODE'
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 try {
@@ -253,11 +310,29 @@ try {
   for (const [chave, valor] of campos) {
     if (!/^[a-z_]+$/.test(chave) || /[\r\n\0]/.test(valor) || valor !== valor.trimEnd()) throw new Error();
   }
-  // password fica no ambiente para preservar inclusive espaços nas extremidades.
-  const texto = '[backup]\n' + [...campos].map(([k, v]) => `${k}=${v}\n`).join('');
-  fs.writeFileSync(arquivo, texto, { mode: 0o600 });
-  const env = { PATH: process.env.PATH, HOME: process.env.HOME, PGSERVICEFILE: arquivo, PGSERVICE: 'backup' };
-  if (senha !== undefined) env.PGPASSWORD = senha;
+  let env;
+  if (process.env.BACKUP_POSTGRES_SEM_ARQUIVO === 'true') {
+    // Leitura sem arquivo: parâmetros conhecidos passam pelo ambiente do libpq.
+    const mapa = new Map([
+      ['host', 'PGHOST'], ['port', 'PGPORT'], ['dbname', 'PGDATABASE'], ['user', 'PGUSER'],
+      ['sslmode', 'PGSSLMODE'], ['application_name', 'PGAPPNAME'],
+      ['connect_timeout', 'PGCONNECT_TIMEOUT'], ['options', 'PGOPTIONS'],
+      ['target_session_attrs', 'PGTARGETSESSIONATTRS'],
+    ]);
+    env = { PATH: process.env.PATH, HOME: process.env.HOME };
+    for (const [chave, valor] of campos) {
+      const destino = mapa.get(chave);
+      if (!destino) throw new Error();
+      env[destino] = valor;
+    }
+    if (senha !== undefined) env.PGPASSWORD = senha;
+  } else {
+    // password fica no ambiente para preservar inclusive espaços nas extremidades.
+    const texto = '[backup]\n' + [...campos].map(([k, v]) => `${k}=${v}\n`).join('');
+    fs.writeFileSync(arquivo, texto, { mode: 0o600 });
+    env = { PATH: process.env.PATH, HOME: process.env.HOME, PGSERVICEFILE: arquivo, PGSERVICE: 'backup' };
+    if (senha !== undefined) env.PGPASSWORD = senha;
+  }
   const r = spawnSync(comando, args, { env, stdio: ['ignore', 'inherit', 'pipe'] });
   if (r.error || r.signal || r.status !== 0) throw new Error();
 } catch {
