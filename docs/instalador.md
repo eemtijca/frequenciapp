@@ -258,7 +258,7 @@ instalar.sh canal definir release --tag vX.Y.Z --aplicar --sim
 instalar.sh canal definir main --permitir-instavel --planejar
 ```
 
-Sem `--aplicar`, o comando grava apenas a preferência de canal no estado, sem alterar containers, imagem, ambiente ou dados. Com `--aplicar`, o instalador faz backup, confere o conjunto pelo verificador oficial, valida a compatibilidade, executa `atualizar.sh` e atualiza o estado. Em modo não interativo, `--aplicar` exige `--sim`. O `--planejar` no `canal definir` produz o plano da troca e mantém a gravação da preferência, que é a única escrita permitida nesse modo. O planejamento de downgrade também confere o backup existente sem gerar outro dump, e uma falha preserva os artefatos e o estado.
+Sem `--aplicar`, o comando grava apenas a preferência de canal no estado, sem alterar containers, imagem, ambiente ou dados. Com `--aplicar`, o instalador faz backup, confere o conjunto pelo verificador oficial, valida a compatibilidade, executa `atualizar.sh` e atualiza o estado. Em modo não interativo, `--aplicar` exige `--sim`. O `--planejar` no `canal definir` produz o plano da troca e mantém a gravação da preferência, que é a única escrita durável permitida nesse modo. O planejamento de downgrade confere o backup existente pelo modo somente leitura do verificador, sem adquirir trava, criar diretórios ou temporários na instalação e sem gerar outro dump. Uma falha na conferência preserva o conjunto e não avança para a atualização; a preferência de canal e tag pode já ter sido registrada antes do backup no caminho de aplicação, como no comportamento anterior.
 
 O detalhamento de downgrade, compatibilidade e readoção do controlador está na seção [Canal release e main](#canal-release-e-main).
 

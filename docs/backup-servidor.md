@@ -207,6 +207,8 @@ O contrato completo do token, do arquivo de adoção, da autoridade e da retenç
 11. Atualizar atomicamente `ultimo-backup.json`, que é ponteiro e não catálogo histórico.
 12. Planejar expurgo por recibos válidos do mesmo alvo; verificar novamente o remoto contra o catálogo local independente antes de excluir seus membros exatos.
 
+A conferência de planejamento do instalador usa `backup-banco.sh --verificar --sem-escrita`. Esse modo resolve a identidade e o banco, confere os artefatos locais e o remoto em leitura e não adquire trava, não cria diretórios nem temporários na instalação.
+
 Execução manual no Compose:
 
 ```bash
