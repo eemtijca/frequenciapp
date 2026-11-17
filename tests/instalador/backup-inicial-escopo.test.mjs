@@ -1,5 +1,6 @@
 // Exercita aplicar com Git, Bash e recibos reais; serviços, banco e cifra usam transportes fechados.
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
@@ -16,6 +17,31 @@ const gravar = (arquivo, texto) => {
 };
 const json = (arquivo, dados) => gravar(arquivo, JSON.stringify(dados) + "\n");
 const ok = (stdout = "") => ({ status: 0, stdout, stderr: "" });
+
+function fotografar(diretorios) {
+  const mapa = new Map();
+  const visitar = (caminho) => {
+    let info;
+    try {
+      info = fs.lstatSync(caminho);
+    } catch {
+      return;
+    }
+    if (info.isSymbolicLink()) {
+      mapa.set(caminho, `link:${fs.readlinkSync(caminho)}`);
+      return;
+    }
+    if (!info.isDirectory()) {
+      const hash = createHash("sha256").update(fs.readFileSync(caminho)).digest("hex");
+      mapa.set(caminho, `arquivo:${info.mode & 0o777}:${hash}:${info.mtimeMs}`);
+      return;
+    }
+    mapa.set(caminho, `diretorio:${info.mode & 0o777}:${info.mtimeMs}`);
+    for (const nome of fs.readdirSync(caminho).sort()) visitar(path.join(caminho, nome));
+  };
+  for (const diretorio of diretorios) visitar(diretorio);
+  return mapa;
+}
 
 // Os binários falsos recusam operações desconhecidas e nunca alcançam daemon ou rede.
 const CLIENTE = `#!/usr/bin/node
@@ -42,11 +68,20 @@ if(nome==='docker') {
   } else negar();
 } else if(nome==='psql' || nome==='pg_dump' || nome==='pg_restore') {
   if(nome!=='pg_restore') {
-    const permitidas=['PATH','HOME','PGSERVICEFILE','PGSERVICE','PGPASSWORD'];
-    if(Object.keys(process.env).some(n=>!permitidas.includes(n)) || process.env.PGSERVICE!=='backup' || process.env.PGPASSWORD!==(d.senhaUrl??'senha-url-sintetica')) negar();
-    const s=fs.statSync(process.env.PGSERVICEFILE), texto=fs.readFileSync(process.env.PGSERVICEFILE,'utf8');
-    if((s.mode&0o777)!==0o600 || !texto.includes('host=banco.invalid\\n') || !texto.includes('dbname=frequencia\\n') || texto.includes('schema=') || texto.includes('password=')) negar();
-    if(d.parametrosUrl && (Object.entries(d.parametrosUrl).some(([k,v])=>!texto.split('\\n').includes(k+'='+v)) || texto.includes('\\nssl='))) negar();
+    const semArquivo=process.env.PGSERVICEFILE===undefined;
+    const permitidas=semArquivo
+      ? ['PATH','HOME','PGPASSWORD','PGHOST','PGPORT','PGDATABASE','PGUSER','PGSSLMODE','PGAPPNAME','PGCONNECT_TIMEOUT','PGOPTIONS','PGTARGETSESSIONATTRS']
+      : ['PATH','HOME','PGSERVICEFILE','PGSERVICE','PGPASSWORD'];
+    if(Object.keys(process.env).some(n=>!permitidas.includes(n)) || process.env.PGPASSWORD!==(d.senhaUrl??'senha-url-sintetica')) negar();
+    if(semArquivo) {
+      if(process.env.PGSERVICEFILE!==undefined || process.env.PGSERVICE!==undefined ||
+        process.env.PGHOST!=='banco.invalid' || process.env.PGDATABASE!=='frequencia' || process.env.PGUSER!=='operador') negar();
+    } else {
+      if(process.env.PGSERVICE!=='backup') negar();
+      const s=fs.statSync(process.env.PGSERVICEFILE), texto=fs.readFileSync(process.env.PGSERVICEFILE,'utf8');
+      if((s.mode&0o777)!==0o600 || !texto.includes('host=banco.invalid\\n') || !texto.includes('dbname=frequencia\\n') || texto.includes('schema=') || texto.includes('password=')) negar();
+      if(d.parametrosUrl && (Object.entries(d.parametrosUrl).some(([k,v])=>!texto.split('\\n').includes(k+'='+v)) || texto.includes('\\nssl='))) negar();
+    }
     if(a.some(v=>v.includes('postgresql://') || v.includes('postgres://') || v.includes(d.senhaUrl??'senha-url-sintetica'))) negar();
     if(d.falharBancoUrl) {process.stderr.write('senha-url-sintetica: conexão recusada\\n');process.exit(45);}
   }
@@ -75,6 +110,8 @@ if(nome==='docker') {
   } else if(a[0]==='copyto' && a.length===3) {
     if(a[1].startsWith('falso:')) fs.copyFileSync(remoto(a[1]),a[2]);
     else fs.copyFileSync(a[1],remoto(a[2]));
+  } else if(a[0]==='cat' && a.length===2) {
+    process.stdout.write(fs.readFileSync(remoto(a[1])));
   } else negar();
 } else negar();
 `;
@@ -165,6 +202,17 @@ function preparar(t, ajustes = {}) {
   ])
     assert.equal(real("git", args).status, 0);
   const commit = real("git", ["-C", appDir, "rev-parse", "HEAD"]).stdout.trim();
+  let commitAlvo = commit;
+  if (ajustes.segundaRevisao) {
+    fs.appendFileSync(path.join(appDir, "LEIA.md"), "\nSegunda revisão sintética.\n");
+    for (const args of [
+      ["-C", appDir, "add", "."],
+      ["-C", appDir, "-c", "commit.gpgsign=false", "commit", "-m", "test: prepara alvo seguinte"],
+      ["-C", appDir, "tag", "v1.1.0"],
+    ])
+      assert.equal(real("git", args).status, 0);
+    commitAlvo = real("git", ["-C", appDir, "rev-parse", "HEAD"]).stdout.trim();
+  }
   const destinatarios = path.join(raiz, "destinatarios.age");
   gravar(destinatarios, "DESTINATARIO FALSO, sem chave privada\n");
   const senha = path.join(raiz, "senha-admin");
@@ -191,6 +239,7 @@ function preparar(t, ajustes = {}) {
       avisos: [],
     }),
     comandoExiste: (nome) => ["systemctl", "timedatectl"].includes(nome),
+    consultarDigest: () => `sha256:${"c".repeat(64)}`,
     adquirirTrava: () => ({ liberar() {} }),
     executar(comando, args = [], opcoes = {}) {
       chamadas.push({ comando, args, env: opcoes.env });
@@ -278,11 +327,35 @@ function preparar(t, ajustes = {}) {
     "--diretorio-fonte",
     "/opt/frequenciapp",
   ];
-  const aplicar = (extras = []) => {
+  const executarAplicar = (argumentos) => {
     let stdout = "",
       stderr = "";
     const codigo = principal(
-      [...args, ...extras],
+      argumentos,
+      {
+        stdout: {
+          write: (s) => {
+            stdout += s;
+          },
+        },
+        stderr: {
+          write: (s) => {
+            stderr += s;
+          },
+        },
+      },
+      deps,
+    );
+    return { codigo, stdout, stderr, dados: JSON.parse(stdout) };
+  };
+  const aplicar = (extras = []) => executarAplicar([...args, ...extras]);
+  const aplicarTag = (tag, extras = []) =>
+    executarAplicar([...args.map((valor) => (valor === "v1.0.0" ? tag : valor)), ...extras]);
+  const canal = (extras = []) => {
+    let stdout = "",
+      stderr = "";
+    const codigo = principal(
+      ["canal", "definir", "release", ...extras, "--json"],
       {
         stdout: {
           write: (s) => {
@@ -333,6 +406,10 @@ function preparar(t, ajustes = {}) {
     raiz,
     appDir,
     aplicar,
+    aplicarTag,
+    canal,
+    commits: { atual: commit, alvo: commitAlvo },
+    deps,
     chamadas,
     eventos,
     real,
@@ -398,6 +475,64 @@ test("primeiro aplicar aceita recibo íntegro do alvo efetivo e alcança o agend
   );
   assert.equal(resultado.dados.etapas.find((e) => e.id === "agendador").estado, "concluida");
   assert.ok(fs.existsSync(path.join(f.raiz, "etc/systemd/system/frequenciapp-backup-banco.timer")));
+});
+
+test("conferência somente leitura não altera estado, backup, trava nem cria temporários", (t) => {
+  const f = preparar(t);
+  assert.equal(f.aplicar().codigo, 0);
+  const diretorios = [f.estadoDir, f.backupDir, path.join(f.raiz, "var/lock/frequenciapp")];
+  const antes = fotografar(diretorios);
+  const resultado = f.backup(["--verificar", "--sem-escrita"]);
+  assert.equal(resultado.status, 0, resultado.stderr);
+  assert.deepEqual([...fotografar(diretorios)], [...antes]);
+});
+
+test("conferência somente leitura com remoto não altera diretórios nem baixa arquivos", (t) => {
+  const f = preparar(t);
+  assert.equal(f.aplicar(f.remotoArgs).codigo, 0);
+  const diretorios = [
+    f.estadoDir,
+    f.backupDir,
+    path.join(f.raiz, "var/lock/frequenciapp"),
+    f.remoto,
+  ];
+  const antes = fotografar(diretorios);
+  const resultado = f.backup(["--verificar", "--sem-escrita"]);
+  assert.equal(resultado.status, 0, resultado.stderr);
+  assert.deepEqual([...fotografar(diretorios)], [...antes]);
+});
+
+test("conferência somente leitura recusa adulteração sem alterar o estado", (t) => {
+  const f = preparar(t);
+  assert.equal(f.aplicar().codigo, 0);
+  const ponteiro = ler(f.ponteiro);
+  fs.appendFileSync(path.join(f.backupDir, ponteiro.arquivo), "ADULTERADO\n");
+  const diretorios = [f.estadoDir, f.backupDir, path.join(f.raiz, "var/lock/frequenciapp")];
+  const antes = fotografar(diretorios);
+  const resultado = f.backup(["--verificar", "--sem-escrita"]);
+  assert.equal(resultado.status, 1);
+  assert.match(resultado.stderr, /Recibo, escopo ou artefatos/);
+  assert.deepEqual([...fotografar(diretorios)], [...antes]);
+});
+
+test("planejamento de canal usa autoridade real e não altera backup, trava ou remoto", (t) => {
+  const f = preparar(t, { segundaRevisao: true });
+  const aplicado = f.aplicarTag("v1.1.0", [...f.remotoArgs, "--pular-saude"]);
+  assert.equal(aplicado.codigo, 0, JSON.stringify(aplicado.dados.erros));
+  const diretorios = [
+    f.backupDir,
+    path.join(f.raiz, "var/lock/frequenciapp"),
+    path.join(f.raiz, "etc/frequenciapp"),
+    f.remoto,
+  ];
+  const antes = fotografar(diretorios);
+  const resultado = f.canal(["--tag", "v1.0.0", "--permitir-downgrade", "--sim", "--planejar"]);
+  assert.equal(resultado.codigo, 0, resultado.stderr);
+  assert.equal(resultado.dados.dry_run, true);
+  const estado = ler(path.join(f.raiz, "var/lib/frequenciapp/instalacao.json"));
+  assert.equal(estado.commit, f.commits.alvo);
+  assert.equal(estado.tag, "v1.0.0");
+  assert.deepEqual([...fotografar(diretorios)], [...antes]);
 });
 
 test("repetição íntegra verifica sem novo dump e mantém ambiente do filho em allowlist", (t) => {
@@ -509,6 +644,18 @@ test("URL produz escopo de banco comprovado e verifica sem credenciais no argv",
     eventos.split("\n").filter((l) => l && JSON.parse(l).tipo === "banco-url").length,
     2,
   );
+});
+
+test("URL confere em modo somente leitura sem alterar o estado nem criar temporários", (t) => {
+  const f = preparar(t);
+  assert.equal(f.aplicar().codigo, 0);
+  f.configurarUrl();
+  assert.equal(f.backup().status, 0);
+  const diretorios = [f.estadoDir, f.backupDir, path.join(f.raiz, "var/lock/frequenciapp")];
+  const antes = fotografar(diretorios);
+  const resultado = f.backup(["--verificar", "--sem-escrita"]);
+  assert.equal(resultado.status, 0, resultado.stderr);
+  assert.deepEqual([...fotografar(diretorios)], [...antes]);
 });
 
 test("URL preserva ssl=true e + literal da URI libpq sem segredo no argv", (t) => {

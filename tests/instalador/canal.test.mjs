@@ -429,6 +429,7 @@ describe("canal definir release com aplicação", () => {
       chamada.argumentos.includes("--verificar"),
     );
     assert.equal(conferencias.length, 1, "a conferência oficial não foi executada");
+    assert.equal(conferencias[0].argumentos.includes("--sem-escrita"), false);
     for (const chave of ["SERVIDOR_ALVO_CHAVE", "BACKUP_BANCO_VERIFICADO"]) {
       assert.equal(Object.hasOwn(conferencias[0].opcoes.env, chave), false, chave);
     }
@@ -633,7 +634,9 @@ describe("canal definir com downgrade", () => {
     assert.equal(resultado.json.ok, true);
     assert.equal(resultado.json.dry_run, true);
     assert.equal(lerEstado({ caminho: caminhoEstado(raiz) }).estado.commit, commits.D);
-    assert.equal(chamadasDeScript(chamadas, "backup-banco.sh").length, 1);
+    const conferencias = chamadasDeScript(chamadas, "backup-banco.sh");
+    assert.equal(conferencias.length, 1);
+    assert.equal(conferencias[0].argumentos.includes("--sem-escrita"), true);
     assert.equal(chamadasDeScript(chamadas, "atualizar.sh").length, 0);
   });
 
@@ -757,9 +760,10 @@ describe("canal definir com falhas", () => {
     assert.equal(lerEstado({ caminho: caminhoEstado(raiz) }).estado.commit, commits.A);
   });
 
-  it("propaga E_BACKUP e preserva o estado quando a conferência oficial falha", () => {
+  it("propaga E_BACKUP e mantém o commit, preservando apenas a preferência já registrada", () => {
     const { raiz, commits } = prepararRepositorio();
     prepararInstalacao({ raiz, commit: commits.A, tag: "v1.0.0" });
+    const estadoAntes = lerEstado({ caminho: caminhoEstado(raiz) }).estado;
     const deps = criarDeps({ raiz });
     const original = deps.executar;
     deps.executar = (comando, argumentos = [], opcoes = {}) => {
@@ -781,7 +785,15 @@ describe("canal definir com falhas", () => {
     );
     assert.equal(resultado.codigo, 10);
     assert.equal(resultado.json.codigo, "E_BACKUP");
-    assert.equal(lerEstado({ caminho: caminhoEstado(raiz) }).estado.commit, commits.A);
+    const estadoDepois = lerEstado({ caminho: caminhoEstado(raiz) }).estado;
+    assert.equal(estadoDepois.commit, commits.A);
+    assert.equal(estadoDepois.canal, "release");
+    assert.equal(estadoDepois.tag, "v1.1.0");
+    assert.deepEqual(
+      { ...estadoDepois, canal: estadoAntes.canal, tag: estadoAntes.tag },
+      estadoAntes,
+      "a falha só pode preservar a preferência já registrada antes do backup",
+    );
     assert.equal(fs.existsSync(path.join(raiz, "var/backups/frequenciapp/banco")), true);
   });
 

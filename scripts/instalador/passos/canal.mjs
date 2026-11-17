@@ -176,7 +176,7 @@ function lerPonteiroBackup(ctx, estadoDir) {
   }
 }
 
-function conferirReciboBackup(ctx) {
+function conferirReciboBackup(ctx, somenteLeitura = false) {
   const ops = lerOps(ctx);
   const estadoDir = String(ops.get("ESTADO_DIR") ?? "") || ctx.caminhos.estadoDir;
   const backupDir = String(ops.get("BACKUP_BANCO_DIR") ?? "") || ctx.caminhos.backupBancoDir;
@@ -224,11 +224,13 @@ function conferirReciboBackup(ctx) {
     });
   }
   // A verificação oficial resolve alvo e banco antes do consumidor e confere o remoto atual.
+  const argumentos = ["--verificar"];
+  if (somenteLeitura) argumentos.push("--sem-escrita");
   const conferencia = executarEtapa(
     ctx,
     "bash",
-    [path.join(ctx.caminhos.appDir, "scripts", "servidor", "backup-banco.sh"), "--verificar"],
-    { timeout: 120000, env: ambienteBackup(ctx) },
+    [path.join(ctx.caminhos.appDir, "scripts", "servidor", "backup-banco.sh"), ...argumentos],
+    { timeout: 120000, env: ambienteBackup(ctx), ambienteExclusivo: true },
   );
   if (conferencia.status !== 0) {
     throw falha("E_BACKUP", "O recibo do backup não passou na conferência de integridade.", {
@@ -248,7 +250,7 @@ function conferirReciboBackup(ctx) {
 
 // Confere o último backup confirmado sem executar uma cópia nova.
 export function conferirBackupExistente(ctx) {
-  return conferirReciboBackup(ctx);
+  return conferirReciboBackup(ctx, true);
 }
 
 // Executa um backup novo e confirma o recibo antes da troca de canal.
