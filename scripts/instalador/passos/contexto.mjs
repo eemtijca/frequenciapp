@@ -68,6 +68,9 @@ export function caminhosOperacao(raiz = "/", configuracao = {}, modoTeste = fals
 // Monta o ambiente mínimo das rotinas de backup, sem autoridade de escopo herdada.
 export function ambienteBackup(ctx) {
   return {
+    PATH: ctx.ambienteBase?.PATH ?? process.env.PATH ?? "",
+    HOME: ctx.ambienteBase?.HOME ?? process.env.HOME ?? "/tmp",
+    TMPDIR: ctx.ambienteBase?.TMPDIR ?? process.env.TMPDIR ?? "/tmp",
     APP_DIR: ctx.caminhos.appDir,
     APP_ENV_FILE: ctx.caminhos.appEnv,
     OPS_ENV_FILE: ctx.caminhos.opsEnv,
@@ -258,7 +261,9 @@ export function lerSegredo(caminho, rotulo) {
 
 // Executa um comando com ambiente explícito e devolve a saída normalizada.
 export function executarEtapa(ctx, comando, argumentos = [], opcoes = {}) {
-  const ambiente = { ...(ctx.ambienteBase ?? {}), ...(opcoes.env ?? {}) };
+  const ambiente = opcoes.ambienteExclusivo
+    ? { ...(opcoes.env ?? {}) }
+    : { ...(ctx.ambienteBase ?? {}), ...(opcoes.env ?? {}) };
   const resultado = ctx.executar(comando, argumentos, {
     input: opcoes.input,
     timeout: opcoes.timeout ?? 120000,

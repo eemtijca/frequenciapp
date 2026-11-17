@@ -260,6 +260,44 @@ describe("backup", () => {
     }
   });
 
+  it("não herda escopo nem segredos do processo pai na conferência adicional", () => {
+    const raiz = prepararRaiz();
+    prepararRecibo(raiz);
+    const sentinela = "sentinela-fora-do-contrato";
+    const { deps, chamadas } = criarDeps({
+      raiz,
+      uid: 1000,
+      ambiente: {
+        SERVIDOR_ALVO_CHAVE: "alvo-forjado",
+        BACKUP_BANCO_VERIFICADO: "banco-forjado",
+        DATABASE_SCHEMA: "schema-forjado",
+        BACKUP_REMOTO: "remoto-forjado",
+        SEGREDO_FORA_DO_CONTRATO: sentinela,
+      },
+    });
+    const resultado = executar(["backup", "--json", "--modo-teste", "--sim"], deps);
+    assert.equal(resultado.codigo, 0, resultado.stderr);
+    const conferencias = chamadas.filter(
+      (item) =>
+        item.comando === "bash" &&
+        path.basename(String(item.argumentos[0] ?? "")) === "backup-banco.sh" &&
+        item.argumentos.includes("--verificar"),
+    );
+    assert.equal(conferencias.length, 1);
+    for (const chave of [
+      "SERVIDOR_ALVO_CHAVE",
+      "BACKUP_BANCO_VERIFICADO",
+      "DATABASE_SCHEMA",
+      "BACKUP_REMOTO",
+      "SEGREDO_FORA_DO_CONTRATO",
+    ]) {
+      assert.equal(Object.hasOwn(conferencias[0].opcoes.env, chave), false, chave);
+    }
+    assert.equal(typeof conferencias[0].opcoes.env.PATH, "string");
+    assert.equal(typeof conferencias[0].opcoes.env.HOME, "string");
+    assert.equal(typeof conferencias[0].opcoes.env.TMPDIR, "string");
+  });
+
   it("devolve E_BACKUP quando a rotina falha", () => {
     const raiz = prepararRaiz();
     const cenario = cenarioPadrao();

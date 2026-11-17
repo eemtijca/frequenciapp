@@ -300,6 +300,7 @@ function executarBackup(ctx, avisosBase) {
   const verificacao = executarComando(ctx, "bash", [script, "--verificar"], {
     timeout: limiteMilissegundos(ctx.configuracao.tempoLimite, 120000),
     env: ambienteBackup(ctx),
+    ambienteExclusivo: true,
   });
   if (verificacao.status !== 0) {
     throw falha("E_BACKUP", "O recibo do backup não passou na conferência de integridade.", {
