@@ -487,6 +487,46 @@ test("conferência somente leitura não altera estado, backup, trava nem cria te
   assert.deepEqual([...fotografar(diretorios)], [...antes]);
 });
 
+test("comando backup usa verificador real e não herda escopo do processo pai", (t) => {
+  const f = preparar(t);
+  assert.equal(f.aplicar().codigo, 0);
+  f.chamadas.length = 0;
+  const deps = {
+    ...f.deps,
+    ambienteBase: {
+      ...(f.deps.ambienteBase ?? {}),
+      SERVIDOR_ALVO_CHAVE: "alvo-forjado",
+      BACKUP_BANCO_VERIFICADO: "banco-forjado",
+      SEGREDO_FORA_DO_CONTRATO: "sentinela-fora-do-contrato",
+    },
+  };
+  let stdout = "",
+    stderr = "";
+  const codigo = principal(
+    ["backup", "--modo-teste", "--sim", "--json"],
+    {
+      stdout: { write: (texto) => (stdout += texto) },
+      stderr: { write: (texto) => (stderr += texto) },
+    },
+    deps,
+  );
+  assert.equal(codigo, 0, stderr);
+  const conferencias = f.chamadas.filter(
+    (chamada) =>
+      chamada.comando === "bash" &&
+      String(chamada.args[0]).endsWith("backup-banco.sh") &&
+      chamada.args.includes("--verificar"),
+  );
+  assert.equal(conferencias.length, 1);
+  for (const chave of [
+    "SERVIDOR_ALVO_CHAVE",
+    "BACKUP_BANCO_VERIFICADO",
+    "SEGREDO_FORA_DO_CONTRATO",
+  ]) {
+    assert.equal(Object.hasOwn(conferencias[0].env, chave), false, chave);
+  }
+});
+
 test("conferência somente leitura com remoto não altera diretórios nem baixa arquivos", (t) => {
   const f = preparar(t);
   assert.equal(f.aplicar(f.remotoArgs).codigo, 0);
