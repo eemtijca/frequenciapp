@@ -121,7 +121,7 @@ else
   unset BACKUP_POSTGRES_SEM_ARQUIVO
 fi
 
-trap 'status=$?; limpar_home_gpg; if [ "$status" -ne 0 ]; then notificar falha "Backup do banco falhou."; fi; [ -z "$tmp" ] || rm -rf "$tmp"' EXIT
+trap 'status=$?; limpar_home_gpg; if [ "$status" -ne 0 ] && [ "$sem_escrita" = false ]; then notificar falha "Backup do banco falhou."; fi; [ -z "$tmp" ] || rm -rf "$tmp"' EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 umask 077
