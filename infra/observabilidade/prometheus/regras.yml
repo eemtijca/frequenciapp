@@ -1,4 +1,4 @@
-# Regras de alerta da fase 1: indisponibilidade, erros, latência, pool e fila.
+# Regras de alerta das fases 1 e 2: aplicação, host, HTTPS e certificado.
 
 groups:
   - name: frequenciapp
@@ -61,3 +61,67 @@ groups:
         annotations:
           summary: "Fila de envio à planilha parada."
           description: "O item aberto mais antigo da fila passou de 1 hora."
+
+      - alert: FrequenciappDiscoBaixo
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs|overlay|squashfs",mountpoint!~"/var/lib/docker/.+"}
+            /
+            node_filesystem_size_bytes{fstype!~"tmpfs|ramfs|overlay|squashfs",mountpoint!~"/var/lib/docker/.+"}
+          ) < 0.15
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Espaço em disco abaixo de 15%."
+          description: "O sistema de arquivos {{ $labels.mountpoint }} está com menos de 15% livre há mais de 15 minutos."
+
+      - alert: FrequenciappMemoriaBaixa
+        expr: |
+          (
+            node_memory_MemAvailable_bytes
+            /
+            node_memory_MemTotal_bytes
+          ) < 0.10
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Memória disponível abaixo de 10%."
+          description: "O host está com menos de 10% de memória disponível há mais de 10 minutos."
+
+      - alert: FrequenciappSondaHttps
+        expr: probe_success{job="blackbox"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A sonda HTTPS do FrequenciApp falhou."
+          description: "O alvo https://proxy:443/api/saude não respondeu 200 há mais de 5 minutos."
+
+      - alert: FrequenciappCertificadoExpirando
+        expr: (probe_ssl_earliest_cert_expiry{job="blackbox"} - time()) < 14 * 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "Certificado TLS expira em menos de 14 dias."
+          description: "O certificado do alvo {{ $labels.instance }} expira em menos de 14 dias."
+
+      - alert: FrequenciappAlertmanagerFalhaNotificacao
+        expr: rate(alertmanager_notifications_failed_total{job="alertmanager"}[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "O Alertmanager falha ao entregar notificações."
+          description: "Há notificações com falha no receptor há mais de 10 minutos."
+
+      - alert: FrequenciappBackupAtrasado
+        expr: (time() - frequenciapp_backup_ultimo_sucesso_timestamp_seconds) > 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "O último backup verificado tem mais de 24 horas."
+          description: "O backup do banco não é verificado com sucesso há mais de 24 horas."

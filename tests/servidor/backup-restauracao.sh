@@ -33,6 +33,41 @@ fi
 ls -1 "$BACKUP_BANCO_DIR"/*-ambiente.env.gpg >/dev/null 2>&1 ||
   falhar "o arquivo de ambiente não foi cifrado."
 
+metrica="$ESTADO_DIR/metricas/ultimo-backup.prom"
+[ -f "$metrica" ] || falhar "a métrica do último backup não foi criada."
+[ "$(stat -c '%a' "$metrica")" = "644" ] ||
+  falhar "a métrica do último backup não tem modo 644."
+[ "$(stat -c '%a' "$ESTADO_DIR/metricas")" = "755" ] ||
+  falhar "o diretório de métricas não tem modo 755."
+grep -q '^# HELP frequenciapp_backup_ultimo_sucesso_timestamp_seconds ' "$metrica" ||
+  falhar "a métrica do último backup não tem o cabeçalho HELP."
+grep -q '^# TYPE frequenciapp_backup_ultimo_sucesso_timestamp_seconds gauge$' "$metrica" ||
+  falhar "a métrica do último backup não tem o cabeçalho TYPE."
+em_backup=$(grep -o '"em":"[^"]*"' "$ESTADO_DIR/ultimo-backup.json" | cut -d'"' -f4 | head -n 1)
+epoch_backup=$(date -u -d "$em_backup" +%s)
+[ "$(tail -n 1 "$metrica")" = "frequenciapp_backup_ultimo_sucesso_timestamp_seconds $epoch_backup" ] ||
+  falhar "a época da métrica não corresponde ao instante do backup."
+[ -z "$(find "$ESTADO_DIR/metricas" -maxdepth 1 -name '.ultimo-backup.*' -print -quit)" ] ||
+  falhar "sobrou temporário da métrica do último backup."
+
+# A verificação sem --sem-escrita republica a métrica; com --sem-escrita não altera.
+rm -f "$metrica"
+"$RAIZ/scripts/servidor/backup-banco.sh" --verificar >/dev/null
+[ -f "$metrica" ] || falhar "a verificação não republicou a métrica do último backup."
+antes_metrica=$(stat -c '%Y %s' "$metrica")
+sleep 1
+"$RAIZ/scripts/servidor/backup-banco.sh" --verificar --sem-escrita >/dev/null
+[ "$(stat -c '%Y %s' "$metrica")" = "$antes_metrica" ] ||
+  falhar "a verificação --sem-escrita alterou a métrica do último backup."
+
+# Falha de backup preserva a métrica do último sucesso.
+sleep 1
+if BACKUP_ESPACO_MINIMO_MB=999999999 "$RAIZ/scripts/servidor/backup-banco.sh" >/dev/null 2>&1; then
+  falhar "o backup com espaço insuficiente não falhou."
+fi
+[ "$(stat -c '%Y %s' "$metrica")" = "$antes_metrica" ] ||
+  falhar "a falha de backup alterou a métrica do último backup."
+
 # A remoção do registro prova que a restauração recupera os dados.
 executar_sql "$POSTGRES_DB" 'delete from alunos' >/dev/null
 "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$dump" --confirmar --sem-copia

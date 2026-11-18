@@ -1,5 +1,5 @@
-# Observabilidade auto-hospedada: o Prometheus fica na rede interna, sem portas
-# publicadas nem saída, e apenas a ponte socat expõe o painel no loopback.
+# Observabilidade auto-hospedada: Prometheus, node exporter, blackbox e
+# Alertmanager ficam na rede interna; apenas a ponte socat expõe o painel no loopback.
 
 services:
   prometheus:
@@ -57,5 +57,96 @@ services:
         max-file: "5"
     stop_grace_period: 10s
 
+  node-exporter:
+    image: prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0
+    restart: unless-stopped
+    pid: host
+    command:
+      - --path.rootfs=/host
+      - --collector.textfile.directory=/var/lib/node_exporter/textfile
+    volumes:
+      - /:/host:ro,rslave
+      - ${ESTADO_DIR:-/var/lib/frequenciapp}/metricas:/var/lib/node_exporter/textfile:ro
+    networks:
+      - interna
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    stop_grace_period: 10s
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/etc/blackbox_exporter/entrypoint.sh"]
+    command: ["--config.file=/tmp/blackbox.yml"]
+    environment:
+      DOMINIO: ${DOMINIO:?Defina DOMINIO no arquivo de ambiente}
+    volumes:
+      - ./infra/observabilidade/blackbox/blackbox.yml:/etc/blackbox_exporter/blackbox.yml:ro
+      - ./infra/observabilidade/blackbox/entrypoint.sh:/etc/blackbox_exporter/entrypoint.sh:ro
+    networks:
+      - interna
+      - publica
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    stop_grace_period: 10s
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:9115/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  alertmanager:
+    image: prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c
+    profiles: ["alertas"]
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/etc/alertmanager/entrypoint.sh"]
+    command: ["--storage.path=/alertmanager"]
+    environment:
+      ALERTA_WEBHOOK_URL: ${ALERTA_WEBHOOK_URL:-}
+      ALERTA_EMAIL_PARA: ${ALERTA_EMAIL_PARA:-}
+      ALERTA_EMAIL_DE: ${ALERTA_EMAIL_DE:-}
+      ALERTA_SMTP_SMARTHOST: ${ALERTA_SMTP_SMARTHOST:-}
+      ALERTA_SMTP_USUARIO: ${ALERTA_SMTP_USUARIO:-}
+      ALERTA_SMTP_SENHA: ${ALERTA_SMTP_SENHA:-}
+    volumes:
+      - ./infra/observabilidade/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./infra/observabilidade/alertmanager/entrypoint.sh:/etc/alertmanager/entrypoint.sh:ro
+      - alertmanager_data:/alertmanager
+    networks:
+      - interna
+      - publica
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "/bin/wget", "-q", "--spider", "http://127.0.0.1:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
 volumes:
   prometheus_data:
+  alertmanager_data:

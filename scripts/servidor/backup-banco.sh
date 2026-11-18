@@ -275,7 +275,54 @@ NODE
     fi
     log "A cópia remota confere com o hash local original."
   fi
+  if [ "$sem_escrita" = false ]; then
+    publicar_metrica_ultimo_backup "$(ler_instante_backup)"
+  fi
   log "Backup confirmado: $arquivo."
+}
+
+ler_instante_backup() {
+  node --input-type=module - "$estado" 2>/dev/null <<'NODE' || true
+import fs from 'node:fs';
+try {
+  const estado = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+  process.stdout.write(typeof estado.em === 'string' ? estado.em : '');
+} catch {}
+NODE
+}
+
+publicar_metrica_ultimo_backup() {
+  local instante="${1:-}"
+  if [ -z "$instante" ]; then
+    log "AVISO: o último backup não informa o instante; idade do backup não publicada."
+    return 0
+  fi
+  local epoch
+  if ! epoch=$(date -u -d "$instante" +%s 2>/dev/null) || ! [[ "$epoch" =~ ^[0-9]+$ ]]; then
+    log "AVISO: o instante do último backup é inválido; idade do backup não publicada."
+    return 0
+  fi
+  local diretorio="$ESTADO_DIR/metricas"
+  local destino="$diretorio/ultimo-backup.prom"
+  local temporario
+  if ! mkdir -p "$diretorio" 2>/dev/null || ! chmod 755 "$diretorio" 2>/dev/null; then
+    log "AVISO: não foi possível preparar o diretório de métricas; idade do backup não publicada."
+    return 0
+  fi
+  if ! temporario=$(mktemp "$diretorio/.ultimo-backup.XXXXXX" 2>/dev/null); then
+    log "AVISO: não foi possível criar o temporário da métrica de idade do backup."
+    return 0
+  fi
+  if ! printf '%s\n' \
+    '# HELP frequenciapp_backup_ultimo_sucesso_timestamp_seconds Momento do último backup verificado.' \
+    '# TYPE frequenciapp_backup_ultimo_sucesso_timestamp_seconds gauge' \
+    "frequenciapp_backup_ultimo_sucesso_timestamp_seconds $epoch" >"$temporario" 2>/dev/null ||
+    ! chmod 644 "$temporario" 2>/dev/null ||
+    ! mv -f "$temporario" "$destino" 2>/dev/null; then
+    rm -f -- "$temporario" 2>/dev/null || true
+    log "AVISO: não foi possível publicar a métrica de idade do backup."
+    return 0
+  fi
 }
 
 executar_postgres_url() {
@@ -569,6 +616,8 @@ fi
 
 aplicar_retencao_remota
 aplicar_retencao_local
+
+publicar_metrica_ultimo_backup "$(ler_instante_backup)"
 
 notificar sucesso "Backup do banco concluÃ­do."
 log "Backup concluÃ­do: $nome_arquivo (${tamanho} bytes)."

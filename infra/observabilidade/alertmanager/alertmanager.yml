@@ -1,0 +1,14 @@
+# Modelo do Alertmanager: o entrypoint substitui a URL de exemplo pelo webhook
+# configurado e valida o resultado antes de iniciar o serviço.
+route:
+  receiver: frequenciapp
+  group_by: ["alertname"]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: frequenciapp
+    webhook_configs:
+      - url: http://127.0.0.1:9099/alerta
+        send_resolved: true

@@ -16,7 +16,9 @@ services:
       - ${CERTBOT_CERTS_DIR:-./infra/servidor/nginx/certificados}:/etc/letsencrypt:ro
       - certbot_www:/var/www/certbot:ro
     networks:
-      - publica
+      publica:
+        aliases:
+          - proxy
     security_opt:
       - no-new-privileges:true
     logging:
