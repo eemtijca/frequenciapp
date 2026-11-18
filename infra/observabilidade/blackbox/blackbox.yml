@@ -1,0 +1,15 @@
+# Módulos do blackbox exporter: sonda HTTPS pública, saúde e certificado.
+
+modules:
+  https_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      valid_status_codes: [200]
+      preferred_ip_protocol: ip4
+      headers:
+        Host: __DOMINIO__
+      tls_config:
+        server_name: __DOMINIO__
+        # Para TLS interno, monte a CA da escola e configure ca_file aqui.
+        # ca_file: /etc/blackbox_exporter/ca-interna.pem

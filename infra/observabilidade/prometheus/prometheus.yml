@@ -1,5 +1,5 @@
-# Coleta do Prometheus na auto-hospedagem: o aplicativo é lido pela rede
-# interna, o próprio Prometheus é autocoletado e o volume guarda 15 dias.
+# Coleta do Prometheus na auto-hospedagem: aplicativo, host, sonda HTTPS e o
+# próprio Prometheus, com 15 dias de retenção no volume.
 
 global:
   scrape_interval: 30s
@@ -33,3 +33,23 @@ scrape_configs:
     static_configs:
       - targets:
           - localhost:9090
+
+  - job_name: node-exporter
+    static_configs:
+      - targets:
+          - node-exporter:9100
+
+  - job_name: blackbox
+    metrics_path: /probe
+    params:
+      module: [https_2xx]
+    static_configs:
+      - targets:
+          - https://proxy:443/api/saude
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

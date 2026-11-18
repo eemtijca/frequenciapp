@@ -259,6 +259,110 @@ describe("servidor auto-hospedado", () => {
     expect(prometheus).toContain("- /etc/prometheus/regras.yml");
   });
 
+  it("coleta o host com node exporter na rede interna", async () => {
+    const observabilidade = await ler("compose.observabilidade.yml");
+    const prometheus = await ler("infra/observabilidade/prometheus/prometheus.yml");
+    const regras = await ler("infra/observabilidade/prometheus/regras.yml");
+    const blocoNode = observabilidade.slice(
+      observabilidade.indexOf("  node-exporter:"),
+      observabilidade.indexOf("  blackbox-exporter:"),
+    );
+
+    expect(observabilidade).toContain(
+      "prom/node-exporter:v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0",
+    );
+    expect(blocoNode).toContain("pid: host");
+    expect(blocoNode).toContain("--path.rootfs=/host");
+    expect(blocoNode).toContain("--collector.textfile.directory=/var/lib/node_exporter/textfile");
+    expect(blocoNode).toContain("/:/host:ro,rslave");
+    expect(blocoNode).toContain(
+      "${ESTADO_DIR:-/var/lib/frequenciapp}/metricas:/var/lib/node_exporter/textfile:ro",
+    );
+    expect(blocoNode).toContain("      - interna");
+    expect(blocoNode).toContain("cap_drop:\n      - ALL");
+    expect(blocoNode).toContain("no-new-privileges:true");
+    expect(blocoNode).not.toContain("ports:");
+    expect(blocoNode).not.toContain("privileged:");
+
+    expect(prometheus).toContain("job_name: node-exporter");
+    expect(prometheus).toContain("- node-exporter:9100");
+    expect(regras).toContain("alert: FrequenciappDiscoBaixo");
+    expect(regras).toContain("alert: FrequenciappMemoriaBaixa");
+    expect(regras).toContain("node_filesystem_avail_bytes");
+    expect(regras).toContain("node_memory_MemAvailable_bytes");
+  });
+
+  it("sonda HTTPS e certificado com blackbox exporter nos dois proxies", async () => {
+    const observabilidade = await ler("compose.observabilidade.yml");
+    const caddy = await ler("compose.servidor-caddy.yml");
+    const nginx = await ler("compose.servidor-nginx.yml");
+    const prometheus = await ler("infra/observabilidade/prometheus/prometheus.yml");
+    const regras = await ler("infra/observabilidade/prometheus/regras.yml");
+    const blackbox = await ler("infra/observabilidade/blackbox/blackbox.yml");
+    const entrypoint = await ler("infra/observabilidade/blackbox/entrypoint.sh");
+    const blocoBlackbox = observabilidade.slice(
+      observabilidade.indexOf("  blackbox-exporter:"),
+      observabilidade.indexOf("\nvolumes:"),
+    );
+
+    expect(observabilidade).toContain(
+      "prom/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13",
+    );
+    expect(blocoBlackbox).toContain("      - interna\n      - publica");
+    expect(blocoBlackbox).not.toContain("ports:");
+    expect(blocoBlackbox).toContain("cap_drop:\n      - ALL");
+    expect(blocoBlackbox).toContain("no-new-privileges:true");
+    expect(blocoBlackbox).toContain("DOMINIO: ${DOMINIO:?");
+
+    expect(blackbox).toContain("https_2xx:");
+    expect(blackbox).toContain("prober: http");
+    expect(blackbox).toContain("timeout: 5s");
+    expect(blackbox).toContain("valid_status_codes: [200]");
+    expect(blackbox).toContain("preferred_ip_protocol: ip4");
+    expect(blackbox).toContain("Host: __DOMINIO__");
+    expect(blackbox).toContain("server_name: __DOMINIO__");
+    expect(blackbox).toContain("# ca_file:");
+    expect(entrypoint).toContain("__DOMINIO__");
+    expect(entrypoint).toContain("$DOMINIO");
+    expect(entrypoint).toContain("/tmp/blackbox.yml");
+    expect(entrypoint).toContain('exec /bin/blackbox_exporter "$@"');
+
+    for (const [arquivo, conteudo] of [
+      ["compose.servidor-caddy.yml", caddy],
+      ["compose.servidor-nginx.yml", nginx],
+    ] as const) {
+      expect(conteudo, arquivo).toMatch(/publica:\s*\n\s+aliases:\s*\n\s+- proxy/);
+    }
+
+    expect(prometheus).toContain("job_name: blackbox");
+    expect(prometheus).toContain("metrics_path: /probe");
+    expect(prometheus).toContain("module: [https_2xx]");
+    expect(prometheus).toContain("- https://proxy:443/api/saude");
+    expect(prometheus).toContain("target_label: __param_target");
+    expect(prometheus).toContain("replacement: blackbox-exporter:9115");
+
+    expect(regras).toContain("alert: FrequenciappSondaHttps");
+    expect(regras).toContain("alert: FrequenciappCertificadoExpirando");
+    expect(regras).toContain('probe_success{job="blackbox"} == 0');
+    expect(regras).toContain("probe_ssl_earliest_cert_expiry");
+    expect(regras).toContain("14 * 24 * 3600");
+  });
+
+  it("registra node e blackbox no inventário de ferramentas", async () => {
+    const inventario = JSON.parse(await ler("scripts/github/ferramentas.json")) as {
+      usos: Array<{ arquivo: string; trecho: string }>;
+    };
+
+    for (const nome of ["prom/node-exporter", "prom/blackbox-exporter"]) {
+      expect(
+        inventario.usos.some(
+          (uso) => uso.arquivo === "compose.observabilidade.yml" && uso.trecho.includes(nome),
+        ),
+        nome,
+      ).toBe(true);
+    }
+  });
+
   it("publica imagens AMD64 e ARM64 e desativa workflows por variável", async () => {
     const publicacao = await ler(".github/workflows/publicacao.yml");
     const agenda = await ler(".github/workflows/notificacoes.yml");
