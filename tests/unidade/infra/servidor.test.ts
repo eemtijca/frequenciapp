@@ -353,13 +353,109 @@ describe("servidor auto-hospedado", () => {
       usos: Array<{ arquivo: string; trecho: string }>;
     };
 
-    for (const nome of ["prom/node-exporter", "prom/blackbox-exporter"]) {
+    for (const nome of ["prom/node-exporter", "prom/blackbox-exporter", "prom/alertmanager"]) {
       expect(
         inventario.usos.some(
           (uso) => uso.arquivo === "compose.observabilidade.yml" && uso.trecho.includes(nome),
         ),
         nome,
       ).toBe(true);
+    }
+  });
+
+  it("mantém o Alertmanager opt-in, isolado e com receptor por arquivo", async () => {
+    const observabilidade = await ler("compose.observabilidade.yml");
+    const bloco = observabilidade.slice(
+      observabilidade.indexOf("  alertmanager:"),
+      observabilidade.indexOf("\nvolumes:"),
+    );
+    const entrypoint = await ler("infra/observabilidade/alertmanager/entrypoint.sh");
+    const modelo = await ler("infra/observabilidade/alertmanager/alertmanager.yml");
+
+    expect(bloco).toContain('profiles: ["alertas"]');
+    expect(bloco).toContain(
+      "prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c",
+    );
+    expect(bloco).not.toContain("ports:");
+    expect(bloco).toContain("      - interna\n      - publica");
+    expect(bloco).toContain("alertmanager_data:/alertmanager");
+    expect(bloco).toContain('entrypoint: ["/bin/sh", "/etc/alertmanager/entrypoint.sh"]');
+    expect(bloco).toContain('command: ["--storage.path=/alertmanager"]');
+    expect(bloco).toContain("restart: unless-stopped");
+    expect(bloco).toContain("cap_drop:\n      - ALL");
+    expect(bloco).toContain("no-new-privileges:true");
+    expect(bloco).toContain("stop_grace_period: 30s");
+    expect(bloco).toContain('max-size: "10m"');
+    expect(bloco).toContain('max-file: "5"');
+    expect(bloco).toContain("/bin/wget");
+    expect(bloco).toContain("--spider");
+    expect(bloco).toContain("/-/healthy");
+    expect(observabilidade).toContain("alertmanager_data:");
+
+    for (const variavel of [
+      "ALERTA_WEBHOOK_URL",
+      "ALERTA_EMAIL_PARA",
+      "ALERTA_EMAIL_DE",
+      "ALERTA_SMTP_SMARTHOST",
+      "ALERTA_SMTP_USUARIO",
+      "ALERTA_SMTP_SENHA",
+    ]) {
+      expect(entrypoint, variavel).toContain(variavel);
+      expect(observabilidade, variavel).toContain(`${variavel}: \${${variavel}:-}`);
+    }
+    expect(entrypoint).toContain("http://127.0.0.1:9099/alerta");
+    expect(entrypoint).toContain("/etc/alertmanager/alertmanager.yml");
+    expect(entrypoint).toContain("/tmp/alertmanager.yml");
+    expect(entrypoint).toContain("umask 077");
+    expect(entrypoint).toContain("escapar_sed");
+    expect(entrypoint).toContain("escapar_yaml");
+    expect(entrypoint).toContain("tr -d '\\r\\n'");
+    expect(entrypoint).toContain("Configure apenas um receptor: webhook ou e-mail.");
+    expect(entrypoint).toContain("ALERTA_WEBHOOK_URL não pode conter espaços.");
+    expect(entrypoint).toContain("não podem conter quebra de linha");
+    expect(entrypoint).toContain("require_tls: true");
+    expect(entrypoint).toContain("send_resolved: true");
+    expect(entrypoint).toContain("/bin/amtool check-config /tmp/alertmanager.yml");
+    expect(entrypoint).toContain('exec /bin/alertmanager --config.file=/tmp/alertmanager.yml "$@"');
+    expect(entrypoint).not.toContain("NOTIFICAR_URL");
+    expect(modelo).toContain("webhook_configs:");
+    expect(modelo).toContain("http://127.0.0.1:9099/alerta");
+    expect(modelo).toContain("send_resolved: true");
+    expect(modelo).not.toContain("ALERTA_");
+  });
+
+  it("envia alertas ao Alertmanager e monitora a entrega", async () => {
+    const prometheus = await ler("infra/observabilidade/prometheus/prometheus.yml");
+    const regras = await ler("infra/observabilidade/prometheus/regras.yml");
+    const alerta = regras.slice(
+      regras.indexOf("alert: FrequenciappAlertmanagerFalhaNotificacao"),
+      regras.indexOf("alert: FrequenciappBackupAtrasado"),
+    );
+
+    expect(prometheus).toContain("alerting:");
+    expect(prometheus).toContain("alertmanagers:");
+    expect(prometheus).toContain("- alertmanager:9093");
+    expect(prometheus).toContain("job_name: alertmanager");
+    expect(alerta).toContain(
+      'rate(alertmanager_notifications_failed_total{job="alertmanager"}[10m]) > 0',
+    );
+    expect(alerta).toContain("for: 10m");
+    expect(alerta).toContain("severity: warning");
+    expect(regras).not.toContain('up{job="alertmanager"}');
+  });
+
+  it("documenta os receptores de alerta vazios no exemplo", async () => {
+    const exemplo = await ler("infra/servidor/servidor.env.example");
+
+    for (const variavel of [
+      "ALERTA_WEBHOOK_URL",
+      "ALERTA_EMAIL_PARA",
+      "ALERTA_EMAIL_DE",
+      "ALERTA_SMTP_SMARTHOST",
+      "ALERTA_SMTP_USUARIO",
+      "ALERTA_SMTP_SENHA",
+    ]) {
+      expect(exemplo, variavel).toContain(`# ${variavel}=\n`);
     }
   });
 

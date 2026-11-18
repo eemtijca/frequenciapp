@@ -107,3 +107,12 @@ groups:
         annotations:
           summary: "Certificado TLS expira em menos de 14 dias."
           description: "O certificado do alvo {{ $labels.instance }} expira em menos de 14 dias."
+
+      - alert: FrequenciappAlertmanagerFalhaNotificacao
+        expr: rate(alertmanager_notifications_failed_total{job="alertmanager"}[10m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "O Alertmanager falha ao entregar notificações."
+          description: "Há notificações com falha no receptor há mais de 10 minutos."
