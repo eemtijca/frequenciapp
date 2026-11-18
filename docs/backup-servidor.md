@@ -206,8 +206,29 @@ O contrato completo do token, do arquivo de adoção, da autoridade e da retenç
 10. Publicar recibo individual versionado após as etapas exigidas e manter cópia no catálogo persistente `ESTADO_DIR/recibos`.
 11. Atualizar atomicamente `ultimo-backup.json`, que é ponteiro e não catálogo histórico.
 12. Planejar expurgo por recibos válidos do mesmo alvo; verificar novamente o remoto contra o catálogo local independente antes de excluir seus membros exatos.
+13. Publicar `$ESTADO_DIR/metricas/ultimo-backup.prom` com o instante do último backup verificado.
 
 A conferência de planejamento do instalador usa `backup-banco.sh --verificar --sem-escrita`. Esse modo resolve a identidade e o banco, confere os artefatos locais e o remoto em leitura e não adquire trava, não cria diretórios nem temporários na instalação.
+
+### Métrica de idade do backup
+
+Depois de um backup verificado, a rotina publica `$ESTADO_DIR/metricas/ultimo-backup.prom`, com o instante do último sucesso em segundos Unix:
+
+```text
+# HELP frequenciapp_backup_ultimo_sucesso_timestamp_seconds Momento do último backup verificado.
+# TYPE frequenciapp_backup_ultimo_sucesso_timestamp_seconds gauge
+frequenciapp_backup_ultimo_sucesso_timestamp_seconds 1762486200
+```
+
+- O diretório `$ESTADO_DIR/metricas` usa modo 755 e o arquivo usa modo 644, para o node exporter ler o conteúdo sem privilégio extra.
+- A escrita é atômica: o conteúdo vai para um temporário no mesmo diretório e é renomeado para `ultimo-backup.prom`.
+- A publicação acontece no fim de um backup verificado e em uma verificação sem `--sem-escrita`, que reaproveita o instante de `ultimo-backup.json`.
+- Uma falha de backup não altera o arquivo. `--verificar --sem-escrita` também não altera, porque o modo de planejamento não escreve na instalação.
+- Se o diretório ou o arquivo não puderem ser escritos, a rotina registra um aviso e retorna sucesso. O backup continua válido e o recibo não muda.
+- O conteúdo não tem caminho, host, chave, nome de arquivo de dump ou dado escolar. Apenas o instante do último sucesso.
+- O node exporter lê o diretório pelo coletor de textfile. A regra `FrequenciappBackupAtrasado` dispara quando o instante tem mais de 24 horas.
+
+Antes do primeiro backup verificado, o arquivo não existe e a série não aparece no Prometheus. A regra não dispara por ausência; a ausência é conferida pelo `ultimo-backup.json`, pelo cron e pelo `MAILTO`.
 
 Execução manual no Compose:
 
@@ -401,9 +422,10 @@ Regras:
 ## Monitoramento
 
 - `ultimo-backup.json` em `/var/lib/frequenciapp`.
+- `ultimo-backup.prom` em `/var/lib/frequenciapp/metricas`, lido pelo node exporter.
 - `MAILTO` do cron.
 - `NOTIFICAR_URL` opcional, sem dados escolares.
-- Alerta quando o backup mais recente tiver mais de 24 horas.
+- Alerta quando o backup mais recente tiver mais de 24 horas, pela regra `FrequenciappBackupAtrasado`.
 - Alerta quando o disco de backup estiver acima do limite.
 - Alerta quando a renovação do certificado falhar.
 - Conferência mensal de restauração em ambiente isolado.

@@ -77,6 +77,12 @@ infra/observabilidade/
     prometheus.yml
     regras.yml
     entrypoint.sh
+  blackbox/
+    blackbox.yml
+    entrypoint.sh
+  alertmanager/
+    alertmanager.yml
+    entrypoint.sh
 scripts/servidor/
   comum.sh
   compose.sh
@@ -92,7 +98,7 @@ scripts/servidor/
   instalar-rotinas.sh
 ```
 
-A aplicação e o banco ficam sem portas publicadas. Apenas o proxy publica 80 e 443. Com a observabilidade ligada, a ponte do painel publica 9090 somente no loopback do host.
+A aplicação e o banco ficam sem portas publicadas. Apenas o proxy publica 80 e 443. Com a observabilidade ligada, a ponte do painel publica 9090 somente no loopback do host. O Prometheus, o node exporter, o blackbox exporter e o Alertmanager não publicam porta alguma.
 
 ## Preparar o servidor
 
@@ -140,6 +146,14 @@ A coleta e o painel são opcionais e não sobem em instalações existentes sem 
 | ---------------------------- | -------------------------------------------------- | -------------------------------------------------------- |
 | `OBSERVABILIDADE_HABILITADA` | `false` em instalações existentes, `true` em novas | Inclui `compose.observabilidade.yml` no projeto Compose. |
 | `PROMETHEUS_PORTA`           | `9090`                                             | Porta do painel no loopback do host.                     |
+| `ALERTA_WEBHOOK_URL`         | vazio                                              | Receptor webhook do Alertmanager. Segredo.               |
+| `ALERTA_EMAIL_PARA`          | vazio                                              | Destinatário do receptor de e-mail.                      |
+| `ALERTA_EMAIL_DE`            | vazio                                              | Remetente do receptor de e-mail.                         |
+| `ALERTA_SMTP_SMARTHOST`      | vazio                                              | Servidor SMTP no formato `host:porta`.                   |
+| `ALERTA_SMTP_USUARIO`        | vazio                                              | Usuário de autenticação do SMTP.                         |
+| `ALERTA_SMTP_SENHA`          | vazio                                              | Senha de autenticação do SMTP. Segredo.                  |
+
+O node exporter e o blackbox exporter sobem com a observabilidade. O Alertmanager é opt-in pelo perfil Compose `alertas` e aceita apenas um receptor por vez: o webhook ou o conjunto completo de e-mail. As variáveis `ALERTA_*` ficam no `ops.env`, e o webhook e a senha SMTP são segredos.
 
 ### Proxy e TLS
 
@@ -278,6 +292,16 @@ As duas pilhas:
 - usam logs com rotação do Docker.
 
 Não execute Caddy e Nginx ao mesmo tempo. `PROXY_TIPO` escolhe uma sobreposição.
+
+## Alertas externos
+
+O Alertmanager é opt-in e não publica portas. Para receber notificações por webhook ou e-mail, configurar apenas um receptor no `ops.env` e subir o serviço com o perfil `alertas`:
+
+```bash
+scripts/servidor/compose.sh --profile alertas up -d alertmanager
+```
+
+O Prometheus já envia alertas para `alertmanager:9093`. Sem o perfil, os alertas aparecem apenas no painel. O detalhamento dos receptores, do teste com `amtool` e do desligamento está em [observabilidade.md](observabilidade.md#alertas).
 
 ## Agenda
 
@@ -494,19 +518,27 @@ O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database
 - Monitorar `https://dominio/api/saude` de fora da máquina.
 - Acompanhar falhas do cron por `MAILTO` ou pelo webhook `NOTIFICAR_URL`.
 - Conferir `ultimo-backup.json` e `estado.json` em `/var/lib/frequenciapp`.
-- Alertar quando o backup mais recente tiver mais de 24 horas.
-- Alertar quando o certificado estiver próximo do vencimento.
-- Monitorar espaço em disco do banco, dos logs e do backup.
+- Alertar quando o backup mais recente tiver mais de 24 horas, pela regra `FrequenciappBackupAtrasado` ou pelo `MAILTO`.
+- Alertar quando o certificado estiver próximo do vencimento, pela regra `FrequenciappCertificadoExpirando`.
+- Monitorar espaço em disco do banco, dos logs e do backup, pela regra `FrequenciappDiscoBaixo`.
 - Revisar a agenda do GitHub quando ela for usada na nuvem.
-- Com a observabilidade ligada, seguir [observabilidade.md](observabilidade.md). O painel do Prometheus reúne `/targets` e `/alerts`, e as cinco regras da fase 1 cobrem indisponibilidade, erros 5xx, latência, pool e fila. Sem Alertmanager, o alerta aparece apenas no painel.
-- Conferir `up{job="frequenciapp"}` em `1` e a idade do item aberto mais antigo da fila.
+- Com a observabilidade ligada, seguir [observabilidade.md](observabilidade.md). O painel do Prometheus reúne `/targets`, `/alerts` e `/rules`.
+- Conferir `up{job="frequenciapp"}`, `up{job="node-exporter"}`, `up{job="blackbox"}` e, com o perfil `alertas`, `up{job="alertmanager"}` em `1`.
+- Conferir `probe_success{job="blackbox"}` em `1` e os dias restantes em `probe_ssl_earliest_cert_expiry`.
+- Conferir a idade do item aberto mais antigo da fila e a idade do último backup verificado.
+
+As onze regras cobrem indisponibilidade, erros 5xx, latência, pool, fila, disco, memória, sonda HTTPS, certificado, falha de notificação e atraso do backup. Sem o perfil `alertas`, o alerta aparece apenas no painel. A tabela completa está em [observabilidade.md](observabilidade.md#alertas).
 
 ### Validar a observabilidade
 
 1. `curl -s -o /dev/null -w '%{http_code}\n' https://dominio/api/metricas` deve devolver `404`.
-2. O túnel SSH de [observabilidade.md](observabilidade.md#painel-e-acesso) deve abrir `http://localhost:9090` e mostrar o alvo `frequenciapp` em `/targets`.
-3. `ss -lntp | grep 9090` deve mostrar `127.0.0.1:9090`, nunca `0.0.0.0:9090`.
-4. A coleta com o token do ambiente deve devolver `200` e linhas `frequenciapp_`, conforme o comando do guia.
+2. O túnel SSH de [observabilidade.md](observabilidade.md#painel-e-acesso) deve abrir `http://localhost:9090` e mostrar os alvos `frequenciapp`, `node-exporter` e `blackbox` em `/targets`.
+3. Com o perfil `alertas`, o alvo `alertmanager` também deve aparecer em `/targets`. Sem o perfil, ele aparece fora do ar e nenhuma regra dispara por isso.
+4. `ss -lntp | grep 9090` deve mostrar `127.0.0.1:9090`, nunca `0.0.0.0:9090`.
+5. A coleta com o token do ambiente deve devolver `200` e linhas `frequenciapp_`, conforme o comando do guia.
+6. A consulta `probe_success{job="blackbox"}` deve devolver `1`, e `probe_ssl_earliest_cert_expiry` deve estar presente.
+7. Depois do primeiro backup verificado, `frequenciapp_backup_ultimo_sucesso_timestamp_seconds` deve aparecer com o instante do backup.
+8. Com o perfil `alertas`, `alertmanager_notifications_failed_total` deve estar disponível e o teste com `amtool alert add` deve chegar ao receptor.
 
 ## Segurança
 
@@ -651,12 +683,52 @@ Não editar o checksum em `_prisma_migrations`, não remover linhas do históric
 
 ### Observabilidade sem coleta
 
-- Conferir `scripts/servidor/compose.sh ps` e os serviços `prometheus` e `prometheus-ui`.
+- Conferir `scripts/servidor/compose.sh ps` e os serviços `prometheus`, `prometheus-ui`, `node-exporter` e `blackbox-exporter`.
 - Conferir `up{job="frequenciapp"}` e o último erro em `/targets`.
 - Um 404 no alvo indica `METRICAS_TOKEN` ausente na aplicação. Um 401 indica token divergente entre a aplicação e o Prometheus.
 - Conferir a rede `interna` e o alvo `app:3000`.
 - Conferir os logs com `scripts/servidor/compose.sh logs --tail 200 prometheus`.
 - Validar configuração e regras com `promtool`, conforme [observabilidade.md](observabilidade.md#validar-configuração-e-regras).
+
+### Sonda HTTPS falhando
+
+- Conferir `probe_success{job="blackbox"}` e o último erro do alvo `blackbox` em `/targets`.
+- Conferir o `DOMINIO` em `/etc/frequenciapp/ops.env` e o alias `proxy` na rede `publica` do Caddy ou do Nginx.
+- Conferir `probe_http_status_code` para separar recusa, tempo limite e status inesperado.
+- Em TLS interno, conferir a CA da escola montada e o `ca_file` no `blackbox.yml`.
+- Conferir os logs com `scripts/servidor/compose.sh logs --tail 200 blackbox-exporter`.
+
+### Certificado TLS expirando
+
+- Conferir `probe_ssl_earliest_cert_expiry` e os dias restantes em `/graph`.
+- No Caddy, conferir a renovação automática e os logs do proxy.
+- No Nginx, executar `scripts/servidor/renovar-certificado.sh --dry-run` e conferir o cron da renovação.
+- Em TLS interno, renovar na CA da escola e substituir os arquivos do proxy.
+
+### Disco ou memória
+
+- Conferir `node_filesystem_avail_bytes` e `node_memory_MemAvailable_bytes` em `/graph`.
+- Conferir `df -h` e `free -m` no host.
+- Conferir o crescimento de `/var/lib/docker`, dos volumes, dos logs e do backup.
+- Revisar as exclusões da regra antes de concluir que o alerta é falso positivo.
+
+### Backup atrasado
+
+- Conferir a consulta de idade do backup em `/graph`.
+- Conferir `/var/lib/frequenciapp/ultimo-backup.json` e `/var/lib/frequenciapp/metricas/ultimo-backup.prom`.
+- Se a métrica não existir, nenhum backup verificado foi concluído. Conferir o cron, o `MAILTO` e os logs da rotina.
+- Conferir `BACKUP_*`, a chave de cifra e o destino remoto em [backup-servidor.md](backup-servidor.md).
+- A falha de escrita da métrica gera aviso e não falha o backup. O arquivo só muda depois de um backup verificado ou de uma verificação sem `--sem-escrita`.
+
+### Alertmanager sem entrega
+
+- Conferir se o perfil `alertas` está ativo e se `up{job="alertmanager"}` vale `1`.
+- Conferir `scripts/servidor/compose.sh --profile alertas exec alertmanager amtool alert query` e os silêncios.
+- Conferir `scripts/servidor/compose.sh --profile alertas exec alertmanager amtool check-config /tmp/alertmanager.yml`.
+- Conferir `rate(alertmanager_notifications_failed_total{job="alertmanager"}[10m])` e os rótulos `integration` e `reason`.
+- Conferir os logs com `scripts/servidor/compose.sh --profile alertas logs --tail 200 alertmanager`.
+- Conferir o webhook ou o SMTP, a autenticação, a porta e a saída pela rede `publica`.
+- Um alerta silenciado não é notificado. Conferir a lista de silêncios antes de concluir que a entrega falhou.
 
 ## Identidade operacional
 

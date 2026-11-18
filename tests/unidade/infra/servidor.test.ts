@@ -235,7 +235,8 @@ describe("servidor auto-hospedado", () => {
 
     expect(token).toMatch(/^[A-Za-z0-9_-]{32,200}$/);
     expect(validar).toContain("export PROMETHEUS_PORTA=9090");
-    expect(validar.match(/compose\.observabilidade\.yml/g)).toHaveLength(2);
+    expect(validar.match(/compose\.observabilidade\.yml/g)).toHaveLength(4);
+    expect(validar.match(/--profile alertas/g)).toHaveLength(2);
     expect(validar).toContain("infra/observabilidade/prometheus/entrypoint.sh");
     expect(validar).toContain(
       "prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06",
@@ -481,6 +482,100 @@ describe("servidor auto-hospedado", () => {
     ]) {
       expect(exemplo, variavel).toContain(`# ${variavel}=\n`);
     }
+  });
+
+  it("valida os exporters e o Alertmanager na configuração do servidor", async () => {
+    const validar = await ler("infra/servidor/validar.sh");
+
+    expect(validar).toContain("infra/observabilidade/blackbox/entrypoint.sh");
+    expect(validar).toContain("infra/observabilidade/alertmanager/entrypoint.sh");
+    expect(validar).toContain("--profile alertas");
+    expect(validar).toContain('sed "s|__DOMINIO__|$DOMINIO|g"');
+    expect(validar).toContain('chmod 644 "$tmp/blackbox.yml"');
+    expect(validar).toContain(
+      "prom/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13",
+    );
+    expect(validar).toContain("--config.check --config.file=/etc/blackbox_exporter/blackbox.yml");
+    expect(validar).toContain("--entrypoint /bin/amtool");
+    expect(validar).toContain("check-config /etc/alertmanager/alertmanager.yml");
+    expect(validar).toContain(
+      "prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c",
+    );
+    expect(validar).toContain('-e ALERTA_WEBHOOK_URL="https://monitor.exemplo.br/frequenciapp"');
+    expect(validar).toContain('-e ALERTA_EMAIL_PARA="coordenacao@escola.exemplo.br"');
+    expect(validar).toContain('-e ALERTA_SMTP_SENHA="senha-sintetica-de-validacao"');
+    expect(
+      validar.match(/\/etc\/alertmanager\/entrypoint\.sh --version >\/dev\/null/g),
+    ).toHaveLength(2);
+    expect(validar).not.toMatch(/echo[^\n]*(?:ALERTA_SMTP_SENHA|ALERTA_WEBHOOK_URL)/);
+  });
+
+  it("documenta host, TLS, alertas e idade do backup", async () => {
+    const observabilidade = await ler("docs/observabilidade.md");
+    const autoHospedagem = await ler("docs/auto-hospedagem.md");
+    const backup = await ler("docs/backup-servidor.md");
+    const changelog = await ler("CHANGELOG.md");
+
+    for (const texto of [
+      "node exporter",
+      "blackbox exporter",
+      "Alertmanager",
+      "alias `proxy`",
+      "--profile alertas",
+      "probe_success",
+      "probe_ssl_earliest_cert_expiry",
+      "alertmanager_notifications_failed_total",
+      "frequenciapp_backup_ultimo_sucesso_timestamp_seconds",
+      "alertmanager_data",
+      "amtool alert add",
+      "não publicam portas",
+    ]) {
+      expect(observabilidade, texto).toContain(texto);
+    }
+
+    for (const alerta of [
+      "FrequenciappIndisponivel",
+      "FrequenciappErros5xx",
+      "FrequenciappLatenciaP95",
+      "FrequenciappPoolAguardando",
+      "FrequenciappFilaPlanilhaParada",
+      "FrequenciappDiscoBaixo",
+      "FrequenciappMemoriaBaixa",
+      "FrequenciappSondaHttps",
+      "FrequenciappCertificadoExpirando",
+      "FrequenciappAlertmanagerFalhaNotificacao",
+      "FrequenciappBackupAtrasado",
+    ]) {
+      expect(observabilidade, alerta).toContain(alerta);
+    }
+
+    for (const texto of [
+      "infra/observabilidade/",
+      "blackbox.yml",
+      "alertmanager.yml",
+      "scripts/servidor/compose.sh --profile alertas up -d alertmanager",
+      "node-exporter",
+      "probe_success",
+      "probe_ssl_earliest_cert_expiry",
+      "frequenciapp_backup_ultimo_sucesso_timestamp_seconds",
+      "Alertmanager sem entrega",
+    ]) {
+      expect(autoHospedagem, texto).toContain(texto);
+    }
+
+    for (const texto of [
+      "$ESTADO_DIR/metricas/ultimo-backup.prom",
+      "modo 755",
+      "modo 644",
+      "--sem-escrita",
+      "24 horas",
+      "FrequenciappBackupAtrasado",
+    ]) {
+      expect(backup, texto).toContain(texto);
+    }
+
+    expect(changelog).toContain("frequenciapp_backup_ultimo_sucesso_timestamp_seconds");
+    expect(changelog).toContain("[observabilidade.md](docs/observabilidade.md)");
   });
 
   it("publica imagens AMD64 e ARM64 e desativa workflows por variável", async () => {
