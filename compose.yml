@@ -41,6 +41,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-frequencia}:${POSTGRES_PASSWORD:-frequencia}@db:5432/${POSTGRES_DB:-frequencia}
       DIRECT_URL: postgresql://${POSTGRES_USER:-frequencia}:${POSTGRES_PASSWORD:-frequencia}@db:5432/${POSTGRES_DB:-frequencia}
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
+      METRICAS_TOKEN: ${METRICAS_TOKEN:-}
       COMMIT_SHA: ${COMMIT_SHA:-}
       MIGRAR_NA_PARTIDA: ${MIGRAR_NA_PARTIDA:-true}
       PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}

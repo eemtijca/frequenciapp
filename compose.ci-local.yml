@@ -5,6 +5,7 @@ x-ambiente-testes: &ambiente-testes
   CI: "1"
   TZ_APP: America/Fortaleza
   AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
+  METRICAS_TOKEN: metricas-token-sintetico-ci-000000000000
   DATABASE_URL: postgresql://frequencia:frequencia@db:5432/frequencia
   DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
 
@@ -17,6 +18,7 @@ services:
       # O aplicativo é alcançado por http://localhost dentro da própria pilha
       # de rede; sem TLS, o cookie não usa Secure.
       PERMITIR_HTTP: "true"
+      METRICAS_TOKEN: metricas-token-sintetico-ci-000000000000
       DATABASE_URL: postgresql://frequencia:frequencia@db:5432/frequencia
       DIRECT_URL: postgresql://frequencia:frequencia@db:5432/frequencia
 

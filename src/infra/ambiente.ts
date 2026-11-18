@@ -69,6 +69,19 @@ const esquema = z.object({
       .optional(),
   ),
   CRON_SECRET: z.preprocess(ausenteSeVazio, z.string().min(32).optional()),
+  // Token da coleta Prometheus. Sem ele, /api/metricas responde 404.
+  METRICAS_TOKEN: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .min(32, "METRICAS_TOKEN deve ter pelo menos 32 caracteres.")
+      .max(200, "METRICAS_TOKEN deve ter no máximo 200 caracteres.")
+      .regex(
+        /^[A-Za-z0-9_-]+$/,
+        "METRICAS_TOKEN aceita apenas letras, números, hífen e sublinhado.",
+      )
+      .optional(),
+  ),
   GOOGLE_CLIENT_ID: z.preprocess(ausenteSeVazio, z.string().optional()),
   GOOGLE_CLIENT_SECRET: z.preprocess(ausenteSeVazio, z.string().optional()),
   GOOGLE_REDIRECT_URI: z.preprocess(ausenteSeVazio, z.url().optional()),
@@ -182,6 +195,7 @@ export const ambiente = {
   databaseUrl: resultado.data.DATABASE_URL,
   authSecret: resultado.data.AUTH_SECRET,
   poolMaxConexoes: resultado.data.POOL_MAX_CONEXOES,
+  metricasToken: resultado.data.METRICAS_TOKEN,
   push: {
     ...configuracaoPushDe({
       segredo: resultado.data.AUTH_SECRET,

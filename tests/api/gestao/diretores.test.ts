@@ -257,6 +257,8 @@ describe("palavra-chave e entrada do diretor", () => {
       "GET /api/docs",
       "GET /api/docs/api.md",
       "GET /api/docs/openapi.json",
+      // A coleta interna usa Bearer METRICAS_TOKEN, não cookie de sessão.
+      "GET /api/metricas",
       "POST /api/conta/senha",
       "GET /api/notificacoes/assinatura",
       "POST /api/notificacoes/assinatura",

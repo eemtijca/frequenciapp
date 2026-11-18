@@ -58,8 +58,8 @@ async function operacoesDeclaradas(diretorio: string, rota = ""): Promise<string
   for (const entrada of entradas) {
     const caminho = path.join(diretorio, entrada.name);
     if (entrada.isDirectory()) {
-      // As rotas internas da documentação não entram na especificação.
-      if (rota === "" && entrada.name === "docs") continue;
+      // As rotas internas da documentação e de métricas não entram na especificação.
+      if (rota === "" && (entrada.name === "docs" || entrada.name === "metricas")) continue;
       saida.push(...(await operacoesDeclaradas(caminho, `${rota}/${entrada.name}`)));
     } else if (entrada.name === "route.ts") {
       const conteudo = await readFile(caminho, "utf8");

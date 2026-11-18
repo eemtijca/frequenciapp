@@ -131,6 +131,8 @@ jobs:
         run: pnpm run criar-coordenacao
 
       - name: Testes de contratos da API
+        env:
+          METRICAS_TOKEN: metricas-token-sintetico-ci-000000000000
         run: pnpm run test:api
 
       - name: Instalar navegadores do Playwright
