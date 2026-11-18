@@ -444,6 +444,30 @@ describe("servidor auto-hospedado", () => {
     expect(regras).not.toContain('up{job="alertmanager"}');
   });
 
+  it("publica a idade do último backup verificado", async () => {
+    const backup = await ler("scripts/servidor/backup-banco.sh");
+    const regras = await ler("infra/observabilidade/prometheus/regras.yml");
+    const atraso = regras.slice(regras.indexOf("alert: FrequenciappBackupAtrasado"));
+
+    expect(backup).toContain("publicar_metrica_ultimo_backup");
+    expect(backup).toContain("ultimo-backup.prom");
+    expect(backup).toContain('date -u -d "$instante" +%s');
+    expect(backup).toContain('mkdir -p "$diretorio"');
+    expect(backup).toContain('chmod 755 "$diretorio"');
+    expect(backup).toContain('chmod 644 "$temporario"');
+    expect(backup).toContain('mv -f "$temporario" "$destino"');
+    expect(backup).toContain('rm -f -- "$temporario"');
+    expect(backup).toContain('[ "$sem_escrita" = false ]');
+    expect(backup).toContain(
+      "# HELP frequenciapp_backup_ultimo_sucesso_timestamp_seconds Momento do último backup verificado.",
+    );
+    expect(atraso).toContain(
+      "(time() - frequenciapp_backup_ultimo_sucesso_timestamp_seconds) > 24 * 3600",
+    );
+    expect(atraso).toContain("for: 1h");
+    expect(atraso).toContain("severity: warning");
+  });
+
   it("documenta os receptores de alerta vazios no exemplo", async () => {
     const exemplo = await ler("infra/servidor/servidor.env.example");
 

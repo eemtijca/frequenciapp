@@ -116,3 +116,12 @@ groups:
         annotations:
           summary: "O Alertmanager falha ao entregar notificações."
           description: "Há notificações com falha no receptor há mais de 10 minutos."
+
+      - alert: FrequenciappBackupAtrasado
+        expr: (time() - frequenciapp_backup_ultimo_sucesso_timestamp_seconds) > 24 * 3600
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "O último backup verificado tem mais de 24 horas."
+          description: "O backup do banco não é verificado com sucesso há mais de 24 horas."
