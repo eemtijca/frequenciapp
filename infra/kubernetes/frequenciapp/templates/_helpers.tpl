@@ -71,6 +71,18 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- required "Defina backup.filesSecret para habilitar o backup" .Values.backup.filesSecret -}}
 {{- end -}}
 
+{{/* Nome do Secret que guarda METRICAS_TOKEN para o ServiceMonitor. O valor
+explícito vence; vazio usa o existingSecret ou o Secret gerenciado. */}}
+{{- define "frequenciapp.metricsSecretName" -}}
+{{- if .Values.metrics.serviceMonitor.bearerTokenSecret.name -}}
+{{- .Values.metrics.serviceMonitor.bearerTokenSecret.name -}}
+{{- else if or .Values.existingSecret .Values.secrets.create -}}
+{{- include "frequenciapp.secretName" . -}}
+{{- else -}}
+{{- required "Defina metrics.serviceMonitor.bearerTokenSecret.name, existingSecret ou secrets.create para habilitar o ServiceMonitor" "" -}}
+{{- end -}}
+{{- end -}}
+
 {{/* Fuso IANA dos CronJobs, com America/Fortaleza como padrão. */}}
 {{- define "frequenciapp.timeZone" -}}
 {{- default "America/Fortaleza" . -}}
