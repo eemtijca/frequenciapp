@@ -22,6 +22,8 @@ export const id = "ambiente";
 export const titulo = "Gera app.env e ops.env com segredos e permissões corretas";
 export const limiteSegundos = 300;
 
+const FORMATO_METRICAS_TOKEN = /^[A-Za-z0-9_-]{32,200}$/;
+
 function textoExistente(caminho, rotulo) {
   try {
     const info = fs.lstatSync(caminho);
@@ -210,6 +212,7 @@ export function executar(ctx) {
   const appExistente = textoExistente(ctx.caminhos.appEnv, "app.env");
   const opsExistente = textoExistente(ctx.caminhos.opsEnv, "ops.env");
   const appAtual = lerEnv(appExistente).mapa;
+  const opsAtual = lerEnv(opsExistente).mapa;
   const rotinas = rotinasPrevistas(ctx);
   const acoes = [];
   const avisos = [];
@@ -219,6 +222,7 @@ export function executar(ctx) {
   let senhaBanco = valor(appAtual, "POSTGRES_PASSWORD", "");
   let authSecret = valor(appAtual, "AUTH_SECRET", "");
   let cronSecret = valor(appAtual, "CRON_SECRET", "");
+  let metricasToken = valor(appAtual, "METRICAS_TOKEN", "");
   const gerados = [];
   if (!senhaBanco) {
     senhaBanco = segredoAleatorio(24)
@@ -234,7 +238,12 @@ export function executar(ctx) {
     cronSecret = segredoAleatorio(32);
     gerados.push("CRON_SECRET");
   }
-  ctx.segredos.push(senhaBanco, authSecret, cronSecret);
+  // O token vale para toda a vida da instalação: trocar invalida a coleta.
+  if (!FORMATO_METRICAS_TOKEN.test(metricasToken)) {
+    metricasToken = segredoAleatorio(32);
+    gerados.push("METRICAS_TOKEN");
+  }
+  ctx.segredos.push(senhaBanco, authSecret, cronSecret, metricasToken);
 
   const usuarioUrl = encodeURIComponent(postgresUsuario);
   const senhaUrl = encodeURIComponent(senhaBanco);
@@ -251,6 +260,7 @@ export function executar(ctx) {
     ["DIRECT_URL", ["controlador", "completo"].includes(configuracao.perfil) ? "" : bancoUrl],
     ["AUTH_SECRET", authSecret],
     ["CRON_SECRET", cronSecret],
+    ["METRICAS_TOKEN", metricasToken],
     ["COMMIT_SHA", commit],
     ["TZ_APP", configuracao.fuso],
     ["PERMITIR_HTTP", "false"],
@@ -284,10 +294,21 @@ export function executar(ctx) {
   const portaHttp = String(configuracao.portaHttp);
   const portaHttps = String(configuracao.portaHttps);
   const proxy = resolverProxy(configuracao);
+  const instalacaoNova = !appExistente && !opsExistente;
+  const observabilidadeAtual = opsAtual.get("OBSERVABILIDADE_HABILITADA");
+  const observabilidadeHabilitada =
+    observabilidadeAtual && observabilidadeAtual.trim()
+      ? observabilidadeAtual
+      : instalacaoNova
+        ? "true"
+        : "false";
+  const prometheusPorta = valor(opsAtual, "PROMETHEUS_PORTA", "9090");
   const opsDesejado = new Map([
     ...Object.entries(proxy.ambiente),
     ["PROXY_HTTP_PORTA", portaHttp],
     ["PROXY_HTTPS_PORTA", portaHttps],
+    ["OBSERVABILIDADE_HABILITADA", observabilidadeHabilitada],
+    ["PROMETHEUS_PORTA", prometheusPorta],
     ["CERTBOT_CERTS_DIR", `${ctx.caminhos.appDir}/infra/servidor/nginx/certificados`],
     ["APP_DIR", ctx.caminhos.appDir],
     ["APP_ENV_FILE", ctx.caminhos.appEnv],

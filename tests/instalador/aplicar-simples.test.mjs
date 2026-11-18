@@ -1426,8 +1426,10 @@ describe("aplicar do perfil simples", () => {
     const auth = valorEnv(appTexto, "AUTH_SECRET");
     const senhaBanco = valorEnv(appTexto, "POSTGRES_PASSWORD");
     const cron = valorEnv(appTexto, "CRON_SECRET");
+    const metricas = valorEnv(appTexto, "METRICAS_TOKEN");
     const senhaAdminTexto = fs.readFileSync(senhaAdmin, "utf8").trim();
-    for (const segredo of [auth, senhaBanco, cron, senhaAdminTexto]) {
+    assert.match(metricas, /^[A-Za-z0-9_-]{32,200}$/);
+    for (const segredo of [auth, senhaBanco, cron, metricas, senhaAdminTexto]) {
       assert.ok(segredo.length >= 8);
       assert.equal(resultado.stdout.includes(segredo), false, "segredo no stdout");
       assert.equal(
@@ -1441,10 +1443,118 @@ describe("aplicar do perfil simples", () => {
       const logTexto = fs.readFileSync(log, "utf8");
       assert.equal(logTexto.includes(auth), false, "segredo no log");
       assert.equal(logTexto.includes(senhaBanco), false, "segredo no log");
+      assert.equal(logTexto.includes(metricas), false, "token no log");
+      assert.equal(logTexto.includes(senhaAdminTexto), false, "senha inicial no log");
     }
+    assert.ok(
+      resultado.json.etapas
+        .find((etapa) => etapa.id === "ambiente")
+        .avisos.some(
+          (item) => item.codigo === "A_SEGREDO_GERADO" && item.mensagem.includes("METRICAS_TOKEN"),
+        ),
+    );
+    assert.equal(resultado.stdout.includes(metricas), false, "token no JSON");
     assert.equal(cenario.up, 1);
     assert.equal(cenario.backups, 1);
     assert.equal(cenario.verificacoesBackup, 1);
+  });
+
+  it("gera o token de métricas na primeira execução e o preserva depois", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const cenario = cenarioPadrao();
+    const primeiro = executar(
+      argumentos(raiz, senhaAdmin),
+      criarDeps({ raiz, cenario, chamadas: [] }),
+    );
+    assert.equal(primeiro.codigo, 0, primeiro.stderr || JSON.stringify(primeiro.json?.erros));
+    const appEnv = path.join(raiz, "etc/frequenciapp/app.env");
+    const token = valorEnv(fs.readFileSync(appEnv, "utf8"), "METRICAS_TOKEN");
+    assert.match(token, /^[A-Za-z0-9_-]{32,200}$/);
+    const segundo = executar(
+      argumentos(raiz, senhaAdmin),
+      criarDeps({ raiz, cenario, chamadas: [] }),
+    );
+    assert.equal(segundo.codigo, 0, segundo.stderr || JSON.stringify(segundo.json?.erros));
+    assert.equal(valorEnv(fs.readFileSync(appEnv, "utf8"), "METRICAS_TOKEN"), token);
+  });
+
+  it("preserva o token de métricas válido e substitui o inválido", () => {
+    const valido = "t".repeat(43);
+    const casos = [
+      ["válido", valido, valido],
+      ["inválido", "curto", null],
+    ];
+    for (const [rotulo, anterior, esperado] of casos) {
+      const { raiz, senhaAdmin } = prepararRaiz();
+      const configDir = path.join(raiz, "etc/frequenciapp");
+      fs.mkdirSync(configDir, { recursive: true });
+      const appEnv = path.join(configDir, "app.env");
+      fs.writeFileSync(appEnv, `METRICAS_TOKEN=${anterior}\n`);
+      const resultado = executar(
+        argumentos(raiz, senhaAdmin),
+        criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+      );
+      assert.equal(
+        resultado.codigo,
+        0,
+        `${rotulo}: ${resultado.stderr || JSON.stringify(resultado.json?.erros)}`,
+      );
+      const token = valorEnv(fs.readFileSync(appEnv, "utf8"), "METRICAS_TOKEN");
+      assert.match(token, /^[A-Za-z0-9_-]{32,200}$/, rotulo);
+      if (esperado) assert.equal(token, esperado, rotulo);
+      else assert.notEqual(token, anterior, rotulo);
+    }
+  });
+
+  it("habilita a observabilidade e a porta do painel na instalação nova", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+    const ops = fs.readFileSync(path.join(raiz, "etc/frequenciapp/ops.env"), "utf8");
+    assert.equal(valorEnv(ops, "OBSERVABILIDADE_HABILITADA"), "true");
+    assert.equal(valorEnv(ops, "PROMETHEUS_PORTA"), "9090");
+  });
+
+  it("mantém a observabilidade desligada em instalação existente sem a variável", () => {
+    const { raiz, senhaAdmin } = prepararRaiz();
+    const configDir = path.join(raiz, "etc/frequenciapp");
+    fs.mkdirSync(configDir, { recursive: true });
+    fs.writeFileSync(path.join(configDir, "app.env"), "POSTGRES_DB=frequencia\n");
+    const resultado = executar(
+      argumentos(raiz, senhaAdmin),
+      criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+    );
+    assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+    const ops = fs.readFileSync(path.join(configDir, "ops.env"), "utf8");
+    assert.equal(valorEnv(ops, "OBSERVABILIDADE_HABILITADA"), "false");
+    assert.equal(valorEnv(ops, "PROMETHEUS_PORTA"), "9090");
+  });
+
+  it("preserva a escolha existente de observabilidade e a porta do painel", () => {
+    for (const [habilitada, porta] of [
+      ["false", "9191"],
+      ["true", "9091"],
+    ]) {
+      const { raiz, senhaAdmin } = prepararRaiz();
+      const configDir = path.join(raiz, "etc/frequenciapp");
+      fs.mkdirSync(configDir, { recursive: true });
+      fs.writeFileSync(path.join(configDir, "app.env"), "POSTGRES_DB=frequencia\n");
+      fs.writeFileSync(
+        path.join(configDir, "ops.env"),
+        `OBSERVABILIDADE_HABILITADA=${habilitada}\nPROMETHEUS_PORTA=${porta}\n`,
+      );
+      const resultado = executar(
+        argumentos(raiz, senhaAdmin),
+        criarDeps({ raiz, cenario: cenarioPadrao(), chamadas: [] }),
+      );
+      assert.equal(resultado.codigo, 0, resultado.stderr || JSON.stringify(resultado.json?.erros));
+      const ops = fs.readFileSync(path.join(configDir, "ops.env"), "utf8");
+      assert.equal(valorEnv(ops, "OBSERVABILIDADE_HABILITADA"), habilitada);
+      assert.equal(valorEnv(ops, "PROMETHEUS_PORTA"), porta);
+    }
   });
 
   it("aplica o perfil completo com Dropbox e controlador", () => {

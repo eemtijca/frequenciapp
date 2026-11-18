@@ -166,7 +166,7 @@ const PADROES_SEGREDO = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----/,
   /AGE-SECRET-KEY-[A-Z0-9]+/,
   /\bsl\.[A-Za-z0-9_-]{20,}\b/,
-  /\b(?:AUTH_SECRET|CRON_SECRET|POSTGRES_PASSWORD)\s*[:=]\s*\S+/i,
+  /\b(?:AUTH_SECRET|CRON_SECRET|METRICAS_TOKEN|POSTGRES_PASSWORD)\s*[:=]\s*\S+/i,
   /\bBearer\s+[A-Za-z0-9._-]{8,}/i,
   /[a-z][a-z0-9+.-]*:\/\/[^/\s@:]+:[^/\s@]+@/i,
 ];
