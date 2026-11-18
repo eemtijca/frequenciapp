@@ -1,18 +1,20 @@
 # Observabilidade
 
-Guia da coleta Prometheus do FrequenciApp na auto-hospedagem. A aplicação expõe métricas operacionais em `/api/metricas`, o Prometheus as coleta pela rede interna do Compose e o conjunto cobre aplicação, host, HTTPS, certificado, entrega de alertas e idade do último backup. A decisão está na [ADR-079](adr/079-observabilidade-com-prometheus.md).
+Guia da coleta Prometheus do FrequenciApp na auto-hospedagem. A aplicação expõe métricas operacionais em `/api/metricas`, o Prometheus as coleta pela rede interna do Compose e o conjunto cobre aplicação, ações de domínio, host, HTTPS, certificado, entrega de alertas, idade do último backup e a coleta opcional no cluster Kubernetes. A decisão está na [ADR-079](adr/079-observabilidade-com-prometheus.md).
 
 ## O que é observado
 
 - Requisições HTTP da API: contagem por método, rota e status, duração e requisições em andamento.
 - Pool de conexões do PostgreSQL, latência das consultas e falhas de coleta.
 - Fila de envio às planilhas: itens por estado e idade do item aberto mais antigo.
+- Ações de domínio: salvamentos de frequência e conflitos de revisão, itens processados da fila de planilhas e avisos da agenda de notificações, por resultado.
 - Processo Node.js: CPU, memória, descritores de arquivo, event loop, coletas de lixo e versão do runtime.
+- Coleta no cluster: quando o chart Helm habilita o ServiceMonitor, o Prometheus Operator coleta `/api/metricas` pela porta `http` do Service, com o token lido do Secret.
 - Host: CPU, carga, memória, uptime, disco e sistemas de arquivos, pelo node exporter.
 - Sonda HTTPS: disponibilidade de `https://proxy:443/api/saude` e validade do certificado TLS, pelo blackbox exporter.
 - Entrega de alertas: falhas de notificação do Alertmanager.
 - Idade do último backup: instante do último backup verificado do banco.
-- Saúde da coleta: os alvos `frequenciapp`, `prometheus`, `node-exporter`, `blackbox` e `alertmanager`.
+- Saúde da coleta: os alvos `frequenciapp`, `prometheus`, `node-exporter`, `blackbox` e `alertmanager`; no cluster, o alvo criado pelo ServiceMonitor.
 
 Não são observados páginas, navegador, service worker, dados de alunos, conteúdo de requisição, SQL, parâmetros de consulta, nome de arquivo de backup, caminho de diretório, chave de cifra ou conteúdo escolar.
 
@@ -38,6 +40,7 @@ Caddy ou Nginx (80 e 443, alias de rede proxy)
 
 - O proxy recebe a requisição pública e responde 404 para `/api/metricas` antes de encaminhar ao aplicativo.
 - `src/proxy.ts` injeta `x-frequenciapp-rota` e `x-frequenciapp-metodo` nas demais rotas de API. `executarRota` mede a duração, captura o status e registra a métrica.
+- Os contadores de domínio são incrementados nos adaptadores de rota: `POST /api/frequencias` registra `salvo` ou `conflito`, `/api/planilha/fila/agenda` e `/api/planilha/fila/processar` somam o resumo da fila, e `/api/notificacoes/agenda` soma o resumo dos avisos. A camada de aplicação não importa métricas.
 - A rota não entra na especificação OpenAPI pública e não usa `executarRota`, para não se autoinstrumentar.
 - O Prometheus coleta `http://app:3000/api/metricas` a cada 30 segundos, com tempo limite de 10 segundos e avaliação das regras a cada 30 segundos.
 - O token fica em `app.env`. O entrypoint do Prometheus grava o valor em `/tmp/metricas-token`, com permissão restrita, e o `prometheus.yml` apenas referencia o arquivo.
@@ -158,6 +161,9 @@ O receptor de e-mail usa TLS (`smtp_require_tls: true` e `require_tls: true`). O
 | `frequenciapp_db_query_duration_seconds`                   | histogram | nenhum                           | segundos      | Latência das consultas ao banco.            |
 | `frequenciapp_fila_planilha_itens`                         | gauge     | `estado`                         | itens         | Profundidade da fila de planilhas.          |
 | `frequenciapp_fila_planilha_mais_antiga_timestamp_seconds` | gauge     | nenhum                           | segundos Unix | Idade da fila.                              |
+| `frequenciapp_frequencias_salvas_total`                    | counter   | `resultado`                      | salvamentos   | Salvamentos e conflitos de revisão.         |
+| `frequenciapp_fila_planilha_processados_total`             | counter   | `resultado`                      | itens         | Itens processados da fila de planilhas.     |
+| `frequenciapp_notificacoes_enviadas_total`                 | counter   | `resultado`                      | avisos        | Avisos da agenda de notificações.           |
 | `frequenciapp_coleta_erros_total`                          | counter   | `coletor`                        | erros         | Falhas de coleta por coletor.               |
 | `frequenciapp_coleta_duracao_seconds`                      | gauge     | `coletor`                        | segundos      | Duração da coleta por coletor.              |
 | `node_cpu_seconds_total`                                   | counter   | `cpu`, `mode`                    | segundos      | Tempo de CPU do host por modo.              |
@@ -178,6 +184,8 @@ Labels do pool: `total`, `idle`, `in_use` e `waiting`. O valor de `in_use` é a 
 Labels da fila: `AGUARDANDO`, `EM_ANDAMENTO`, `FALHOU`, `CONCLUIDO` e `DESCARTADO`. Em uma coleta bem-sucedida, os cinco estados aparecem, inclusive com zero. Quando a fila está vazia, o gauge da mais antiga vale `0`.
 
 Labels do coletor: `pool` e `fila`.
+
+Labels de resultado de frequência: `salvo` e `conflito`. Um salvamento recusado por revisão incrementa `conflito` e responde 409; erros de validação não alteram o contador. Labels de resultado da fila: `concluido` e `falha`. Labels de resultado das notificações: `enviada`, `expirada`, `falha` e `ignorada`. Nos resumos da fila e das notificações, os contadores só recebem incremento quando o valor é maior que zero.
 
 O label `route` é um padrão, nunca o caminho com identificador. Por exemplo, `/api/alunos/<uuid>` vira `/api/alunos/:id`, datas viram `:dia`, números viram `:numero` e caminhos com mais de oito segmentos viram `/api/:rota-longa`. Fora de `/api/`, o valor é `fora-da-api`. Quando a leitura do cabeçalho falha, o valor é `desconhecida` e o método é `DESCONHECIDO`.
 
@@ -256,6 +264,38 @@ Idade do item aberto mais antigo, em segundos:
   and on() (frequenciapp_fila_planilha_mais_antiga_timestamp_seconds > 0)
 ```
 
+Salvamentos de frequência por resultado:
+
+```promql
+sum by (resultado) (rate(frequenciapp_frequencias_salvas_total[5m]))
+```
+
+Proporção de conflitos de revisão:
+
+```promql
+sum(rate(frequenciapp_frequencias_salvas_total{resultado="conflito"}[5m]))
+  /
+sum(rate(frequenciapp_frequencias_salvas_total[5m]))
+```
+
+Itens da fila de planilhas processados por resultado:
+
+```promql
+sum by (resultado) (rate(frequenciapp_fila_planilha_processados_total[5m]))
+```
+
+Notificações da agenda por resultado:
+
+```promql
+sum by (resultado) (rate(frequenciapp_notificacoes_enviadas_total[5m]))
+```
+
+Avisos enviados nas últimas 24 horas:
+
+```promql
+sum(increase(frequenciapp_notificacoes_enviadas_total{resultado="enviada"}[1d]))
+```
+
 Requisições em andamento:
 
 ```promql
@@ -313,6 +353,39 @@ Falhas de notificação do Alertmanager:
 ```promql
 rate(alertmanager_notifications_failed_total{job="alertmanager"}[10m])
 ```
+
+## Kubernetes
+
+O chart Helm de `infra/kubernetes/frequenciapp` também pode ser coletado pelo Prometheus Operator. A aplicação continua expondo `GET /api/metricas` com o mesmo token, e o chart oferece um `ServiceMonitor` opcional pela porta `http` do Service. O guia do chart está em [kubernetes.md](kubernetes.md).
+
+```yaml
+metrics:
+  token: ""
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      equipe: observabilidade
+    bearerTokenSecret:
+      name: ""
+      key: METRICAS_TOKEN
+```
+
+- `metrics.serviceMonitor.enabled` vem desligado. Com `false`, o chart não renderiza o `ServiceMonitor` e nenhuma CRD é necessária.
+- `metrics.serviceMonitor.interval` e `scrapeTimeout` usam a sintaxe de duração do Prometheus, com 30 e 10 segundos por padrão.
+- `metrics.serviceMonitor.labels` acrescenta rótulos ao objeto. O seletor do Prometheus Operator precisa incluí-los para a coleta acontecer.
+- `metrics.serviceMonitor.bearerTokenSecret.name` vazio usa o `existingSecret` ou o Secret gerenciado pelo chart. `bearerTokenSecret.key` tem `METRICAS_TOKEN` como padrão.
+
+Com o Secret gerenciado, isto é, `secrets.create=true` e `existingSecret` vazio, preencher `metrics.token` com 32 a 200 caracteres entre letras, números, hífen e sublinhado. O chart grava a chave `METRICAS_TOKEN` no Secret. Com `existingSecret`, o chart não altera o Secret externo, e o operador precisa criar a chave `METRICAS_TOKEN` no Secret apontado por `existingSecret` ou em outro Secret indicado em `bearerTokenSecret.name`. Sem `secrets.create`, sem `existingSecret` e sem `bearerTokenSecret.name`, o template do ServiceMonitor falha por falta de Secret. Depois de alterar o Secret externo, atualizar `existingSecretRevision` para a aplicação reiniciar e passar a ler o token novo.
+
+O `ServiceMonitor` exige o Prometheus Operator e a CRD `monitoring.coreos.com/v1`. O chart não instala nenhum dos dois. Sem a CRD, o `helm template` renderiza o objeto, mas o `kubectl apply` falha. Conferir a instalação com:
+
+```bash
+kubectl get crd servicemonitors.monitoring.coreos.com
+```
+
+A coleta usa a porta `http` do Service, o caminho `/api/metricas`, o intervalo e o tempo limite configurados, `authorization.type: Bearer` e `credentials` apontando para o Secret. O chart não publica a rota: o Ingress opcional encaminha `/` ao aplicativo e não cria regra para `/api/metricas`. O bloqueio na borda do cluster depende do Ingress controller ou de NetworkPolicy e não é automatizado pelo chart. A recomendação é bloquear a rota no Ingress ou restringir quem alcança a porta do aplicativo, sem criar regra pública para o caminho. Dentro do cluster, a rota continua exigindo o token: sem token configurado, responde 404; com token errado, 401.
 
 ## Retenção e volume
 
@@ -440,6 +513,9 @@ O restante da observabilidade continua funcionando. O alvo `alertmanager:9093` v
 - O Alertmanager entra na rede `publica` apenas para alcançar o webhook ou o SMTP. Não há porta publicada, e o acesso ao serviço continua restrito às redes do projeto.
 - A ponte `prometheus-ui` publica somente `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha apenas para `prometheus:9090`. Ela roda sem privilégios, com `cap_drop: ALL`, `no-new-privileges` e sistema de arquivos somente leitura.
 - Caddy e Nginx respondem 404 para `/api/metricas` antes do proxy. O bloqueio público não depende do token.
+- No cluster, o ServiceMonitor lê o token do Secret pelo campo `credentials`. Com `existingSecret`, o chart não altera o Secret externo e a chave `METRICAS_TOKEN` é responsabilidade do operador.
+- O chart não instala o Prometheus Operator nem a CRD `monitoring.coreos.com/v1`. Habilitar o ServiceMonitor sem a CRD faz a aplicação do manifesto falhar, e o token não é criado automaticamente fora do Secret gerenciado.
+- O Ingress opcional do chart encaminha `/` ao aplicativo. O bloqueio de `/api/metricas` na borda depende do Ingress controller ou de NetworkPolicy e não é automatizado pelo chart.
 - O Prometheus inicia sem lifecycle e sem admin API. Não há recarga remota nem exclusão de dados por HTTP. Alterar configuração exige reiniciar o contêiner.
 - O token de backup acompanha o `app.env` cifrado quando `BACKUP_INCLUIR_AMBIENTE=true`. O arquivo de backup precisa do mesmo cuidado de um segredo.
 - Para trocar o token, gerar outro, atualizar o `app.env` e recriar a aplicação e o Prometheus. No perfil com controlador, a recriação passa pela entrada estável. A coleta fica indisponível até os dois lados usarem o mesmo valor.
@@ -447,9 +523,11 @@ O restante da observabilidade continua funcionando. O alvo `alertmanager:9093` v
 
 ## LGPD
 
-As métricas são operacionais, locais e agregadas. Elas registram requisições por padrão de rota, status, duração, conexões do pool, latência de consultas e contagens da fila. Também registram CPU, memória, disco, sistemas de arquivos, disponibilidade da sonda HTTPS, validade do certificado, falhas de notificação e o instante do último backup verificado. Não contêm dados de alunos, de contas ou de escolas.
+As métricas são operacionais, locais e agregadas. Elas registram requisições por padrão de rota, status, duração, conexões do pool, latência de consultas, contagens da fila, salvamentos de frequência, conflitos de revisão, itens processados e avisos da agenda. Também registram CPU, memória, disco, sistemas de arquivos, disponibilidade da sonda HTTPS, validade do certificado, falhas de notificação e o instante do último backup verificado. Não contêm dados de alunos, de contas ou de escolas.
 
 O Prometheus roda na infraestrutura da escola, sem telemetria de terceiros. O histórico de 15 dias fica no volume `prometheus_data`, e o Alertmanager guarda silêncios e estado de notificação em `alertmanager_data`. Os dois volumes ficam fora do backup e podem ser descartados sem perda de dados escolares. O painel é restrito ao loopback e ao túnel SSH do operador.
+
+No cluster, a coleta usa o mesmo endpoint autenticado e o token do Secret. As séries continuam operacionais e agregadas, sem dados de alunos, contas ou escolas, e o histórico fica no Prometheus do cluster, fora do backup do chart.
 
 O detalhamento do tratamento de dados está em [lgpd.md](lgpd.md).
 
@@ -570,6 +648,7 @@ O limite de 1 GB evita crescimento indefinido. Se o volume crescer acima do espe
 ## Limitações
 
 - A aplicação é um único processo. As métricas refletem essa instância, sem agregação entre réplicas.
+- Os contadores de domínio são incrementados por processo. Com mais de uma réplica, cada Pod expõe a própria contagem, e o total depende da agregação do Prometheus. Reiniciar o processo zera os contadores.
 - Não há métricas de página, de navegador, de latência de renderização nem de service worker.
 - Os histogramas são clássicos, com buckets fixos. O p95 é aproximado, e a agregação entre rotas diferentes perde precisão.
 - O label `route` é normalizado. Rotas fora do padrão aparecem como `desconhecida` ou `fora-da-api`.
@@ -582,14 +661,18 @@ O limite de 1 GB evita crescimento indefinido. Se o volume crescer acima do espe
 - O painel não tem autenticação. O acesso depende do loopback e do túnel SSH.
 - O histórico não é copiado no backup. Recriar o volume perde os 15 dias anteriores.
 - O node exporter não substitui os logs do Docker nem o journal do sistema.
+- O ServiceMonitor exige o Prometheus Operator e a CRD `monitoring.coreos.com/v1`. O chart não instala nenhum dos dois, e a coleta no cluster não funciona apenas com o chart.
+- Com `existingSecret`, a chave `METRICAS_TOKEN` precisa ser criada fora do Helm. O chart não altera o Secret externo nem cria a chave em um Secret existente.
+- O Ingress opcional do chart encaminha `/` ao aplicativo. O chart não bloqueia `/api/metricas` na borda, o que depende do Ingress controller ou de NetworkPolicy.
+- O ServiceMonitor só é selecionado se os rótulos do objeto, incluindo os de `metrics.serviceMonitor.labels`, estiverem cobertos pelo seletor do Prometheus Operator. Um ServiceMonitor sem correspondência no seletor não gera coleta.
 
-## Próximas fases
+## Fases entregues
 
-Estes itens pertencem à fase 3 e ainda não estão disponíveis:
+As três fases da observabilidade estão disponíveis:
 
-- contadores de frequências salvas e de conflitos de revisão;
-- contadores de itens da fila de planilhas processados e de notificações enviadas;
-- ServiceMonitor opcional no chart Helm, para clusters com Prometheus Operator.
+- Fase 1: registro, métricas HTTP, pool, consultas e fila, endpoint autenticado, Prometheus na rede interna, painel no loopback e bloqueio no proxy.
+- Fase 2: node exporter, blackbox exporter, Alertmanager opt-in, regras de disco, memória, TLS, certificado e idade do último backup.
+- Fase 3: contadores de frequências, fila e notificações, além do ServiceMonitor opcional no chart Helm para clusters com Prometheus Operator.
 
 ## Referências
 

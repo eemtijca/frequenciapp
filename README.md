@@ -187,6 +187,8 @@ O instalador `instalar.sh` é o caminho recomendado em VPS. Ele segue o contrato
 
 No caminho de nuvem, o build da Vercel apenas gera o cliente Prisma; as migrações são aplicadas pelo workflow de implantação em cada push na `main` ou manualmente com `pnpm run db:deploy`. A agenda de notificações usa o `CRON_SECRET`. As demais formas de publicação estão em [docs/deploy.md](docs/deploy.md) e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
 
+A auto-hospedagem inclui a coleta Prometheus opcional, com a rota interna `/api/metricas` protegida por token, e o chart Helm oferece o ServiceMonitor opcional para clusters com Prometheus Operator. O guia está em [docs/observabilidade.md](docs/observabilidade.md) e [docs/kubernetes.md](docs/kubernetes.md).
+
 ### Instalação rápida em VPS Ubuntu 26.04
 
 Pré-requisitos: VPS com Ubuntu 26.04 LTS, DNS do domínio apontando para o servidor, portas 80 e 443 liberadas no provedor, uma conta com `sudo` e Node.js 24 ou superior no `PATH` para executar `planejar`. O bootstrap só instala o runtime oficial em comandos que alteram o host; o procedimento do Node 24 está em [docs/instalador.md](docs/instalador.md).
