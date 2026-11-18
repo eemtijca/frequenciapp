@@ -22,6 +22,8 @@ import { diaLocal, diasEntre, ehDomingo } from "@/domain/frequencia";
 import { selecionarSchema } from "@/infra/schema-postgres.mjs";
 
 const origem = process.env.APP_URL ?? "http://localhost:3000";
+const metricasToken = process.env.METRICAS_TOKEN ?? "";
+const medirMetricas = metricasToken.length > 0;
 const cliente = new pg.Client({ connectionString: process.env.DATABASE_URL });
 const prefixo = "QA Antecipadas";
 const justificativasFixture = novasJustificativasFixture();
@@ -60,6 +62,19 @@ async function entrar(login: string, senha: string) {
   const resposta = await chamar("/api/auth/entrar", "POST", { login, senha }, "");
   expect(resposta.status).toBe(200);
   return resposta.headers.get("set-cookie")?.split(";")[0] ?? "";
+}
+async function contadoresDeFrequencia(): Promise<{ salvo: number; conflito: number }> {
+  const resposta = await fetch(`${origem}/api/metricas`, {
+    headers: { Authorization: `Bearer ${metricasToken}` },
+  });
+  expect(resposta.status).toBe(200);
+  const texto = await resposta.text();
+  const valor = (resultado: "salvo" | "conflito") => {
+    const prefixo = `frequenciapp_frequencias_salvas_total{resultado="${resultado}"}`;
+    const linha = texto.split("\n").find((item) => item.startsWith(prefixo));
+    return Number(linha?.split(" ").at(-1) ?? 0);
+  };
+  return { salvo: valor("salvo"), conflito: valor("conflito") };
 }
 const dados = (dia = historico, mais: Record<string, unknown> = {}) => ({
   alunoId: aluno,
@@ -256,6 +271,7 @@ afterAll(async () => {
 });
 describe("Justificativas antecipadas", () => {
   it("permite somente justificativa no futuro e mantém a Chamada normal bloqueada", async () => {
+    const metricasAntes = medirMetricas ? await contadoresDeFrequencia() : null;
     expect(
       (
         await chamar(
@@ -266,6 +282,7 @@ describe("Justificativas antecipadas", () => {
       ).status,
     ).toBe(400);
     expect((await chamar("/api/frequencias", "POST", corpoChamada(futuro))).status).toBe(400);
+    if (metricasAntes) expect(await contadoresDeFrequencia()).toEqual(metricasAntes);
     expect(
       (
         await chamar(
@@ -389,6 +406,7 @@ describe("Justificativas antecipadas", () => {
     expect((await lerChamada()).frequencia.faltas).toEqual([]);
   });
   it("corrige só o aluno escolhido em chamada já salva e preserva a confirmação do colega", async () => {
+    const metricasAntes = medirMetricas ? await contadoresDeFrequencia() : null;
     const r = await chamar(
       "/api/frequencias",
       "POST",
@@ -423,6 +441,11 @@ describe("Justificativas antecipadas", () => {
     expect(
       (await chamar("/api/frequencias", "POST", corpoChamada(historico, { revisao: 1 }))).status,
     ).toBe(409);
+    if (metricasAntes) {
+      const metricasDepois = await contadoresDeFrequencia();
+      expect(metricasDepois.salvo - metricasAntes.salvo).toBe(1);
+      expect(metricasDepois.conflito - metricasAntes.conflito).toBe(1);
+    }
   });
   it("acompanha o aluno transferido sem aplicar a justificativa na turma antiga", async () => {
     await gravar(dados());

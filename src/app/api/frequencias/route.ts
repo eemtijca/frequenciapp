@@ -22,6 +22,7 @@ import {
   json,
   origemPermitida,
 } from "@/infra/http";
+import { registrarFrequencia } from "@/infra/metricas";
 
 export const dynamic = "force-dynamic";
 
@@ -104,12 +105,14 @@ export async function POST(requisicao: Request): Promise<Response> {
     if (!sessao.ok) return sessao.resposta;
     const resultado = await salvarFrequencia(sessao.usuario, await corpoJson(requisicao));
     if (resultado.situacao === "conflito") {
+      registrarFrequencia("conflito");
       return erroApi(
         "Esta frequência foi atualizada por outra pessoa. A versão mais recente está abaixo; confira as marcações e salve de novo.",
         409,
         { conflito: true, frequencia: resultado.frequencia },
       );
     }
+    registrarFrequencia("salvo");
     after(() => processarFilaDaAgenda());
     return json({ frequencia: resultado.frequencia });
   });

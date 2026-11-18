@@ -18,8 +18,9 @@ O contrato portátil está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A 
 - CronJobs opcionais de backup do banco e das planilhas.
 - PVC próprio para o backup do banco e para o backup das planilhas.
 - HPA e PDB opcionais.
+- ServiceMonitor opcional para a coleta Prometheus, dependente do Prometheus Operator.
 
-O chart não instala PostgreSQL, cert-manager, ingress controller, External Secrets ou operador de backup. Essas escolhas ficam com a organização.
+O chart não instala PostgreSQL, cert-manager, ingress controller, External Secrets, operador de backup, Prometheus Operator nem a CRD `monitoring.coreos.com/v1`. Essas escolhas ficam com a organização.
 
 ## Instalação
 
@@ -42,16 +43,17 @@ O exemplo com `--set` serve para leitura. Em produção, usar um arquivo de valo
 
 O modo recomendado é `existingSecret`. As chaves esperadas:
 
-| Chave          | Obrigatória | Uso               |
-| -------------- | ----------- | ----------------- |
-| `DATABASE_URL` | sim         | Runtime           |
-| `DIRECT_URL`   | não         | Migrações         |
-| `AUTH_SECRET`  | sim         | Sessões           |
-| `CRON_SECRET`  | sim         | Agenda e fila     |
-| `GOOGLE_*`     | não         | Planilhas         |
-| `PUSH_VAPID_*` | não         | Notificações      |
-| `FERIADOS_*`   | não         | Calendário        |
-| `ADMIN_*`      | não         | Bootstrap inicial |
+| Chave            | Obrigatória | Uso                                             |
+| ---------------- | ----------- | ----------------------------------------------- |
+| `DATABASE_URL`   | sim         | Runtime                                         |
+| `DIRECT_URL`     | não         | Migrações                                       |
+| `AUTH_SECRET`    | sim         | Sessões                                         |
+| `CRON_SECRET`    | sim         | Agenda e fila                                   |
+| `GOOGLE_*`       | não         | Planilhas                                       |
+| `PUSH_VAPID_*`   | não         | Notificações                                    |
+| `FERIADOS_*`     | não         | Calendário                                      |
+| `ADMIN_*`        | não         | Bootstrap inicial                               |
+| `METRICAS_TOKEN` | não         | Coleta Prometheus; sem ela, a rota responde 404 |
 
 Para External Secrets, criar o Secret com as mesmas chaves e apontar `existingSecret` para o nome.
 
@@ -79,6 +81,52 @@ ingress:
 ```
 
 Para CA interna, criar um Secret TLS com o certificado da escola e apontar `ingress.tls[0].secretName`. O controlador precisa repassar `X-Forwarded-For`, `X-Forwarded-Proto` e `X-Forwarded-Host`.
+
+## Métricas e ServiceMonitor
+
+A aplicação expõe `GET /api/metricas` com autenticação Bearer. No cluster, o chart pode declarar um `ServiceMonitor` para o Prometheus Operator coletar a rota pela porta `http` do Service. A coleta é opcional e o chart não instala o Prometheus Operator nem publica a rota. O catálogo de métricas, as consultas e o token estão em [observabilidade.md](observabilidade.md).
+
+```yaml
+metrics:
+  token: ""
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      equipe: observabilidade
+    bearerTokenSecret:
+      name: ""
+      key: METRICAS_TOKEN
+```
+
+- `metrics.serviceMonitor.enabled` vem desligado. Com `false`, nenhum `ServiceMonitor` é renderizado e o cluster não precisa da CRD.
+- `metrics.serviceMonitor.interval` e `scrapeTimeout` usam a sintaxe de duração do Prometheus, com 30 e 10 segundos por padrão.
+- `metrics.serviceMonitor.labels` acrescenta rótulos ao objeto. O seletor do Prometheus Operator precisa incluir esses rótulos para a coleta acontecer.
+- `metrics.serviceMonitor.bearerTokenSecret.name` vazio usa o `existingSecret` ou o Secret gerenciado pelo chart. `bearerTokenSecret.key` tem `METRICAS_TOKEN` como padrão e pode apontar para outra chave.
+- O endpoint usa a porta `http`, o caminho `/api/metricas`, `authorization.type: Bearer` e `credentials` no Secret.
+
+Com o Secret gerenciado, isto é, `secrets.create=true` e `existingSecret` vazio, preencher `metrics.token` com 32 a 200 caracteres entre letras, números, hífen e sublinhado. O chart grava a chave `METRICAS_TOKEN` no Secret criado por ele. Sem `secrets.create`, sem `existingSecret` e sem `bearerTokenSecret.name`, o template falha por falta de Secret. Não preencher `metrics.token` e `secrets.data.METRICAS_TOKEN` ao mesmo tempo, porque o chart recusa a combinação.
+
+Com `existingSecret`, o chart não altera o Secret externo. Incluir `--from-literal=METRICAS_TOKEN=...` no mesmo `kubectl create secret` da instalação, ou atualizar a chave depois:
+
+```bash
+kubectl -n frequenciapp patch secret frequenciapp-segredos \
+  --type merge \
+  --patch '{"stringData":{"METRICAS_TOKEN":"<token-de-32-a-200-caracteres>"}}'
+```
+
+Depois de alterar o Secret externo, atualizar `existingSecretRevision` no `helm upgrade` para a aplicação reiniciar e passar a ler o token novo. Sem essa atualização, o Pod continua com o valor anterior.
+
+O `ServiceMonitor` exige o Prometheus Operator e a CRD `monitoring.coreos.com/v1`. O chart não instala nenhum dos dois. Sem a CRD, o `helm template` renderiza o objeto, mas o `kubectl apply` falha. Conferir a instalação com:
+
+```bash
+kubectl get crd servicemonitors.monitoring.coreos.com
+```
+
+Com a flag desligada, a rota continua disponível dentro do Pod e responde 404 sem token configurado, 401 com token errado e 200 com o token correto. Um ServiceMonitor criado fora do chart também pode coletar a rota, desde que aponte para o Secret correto.
+
+O chart não publica a rota. O Ingress opcional encaminha `/` ao aplicativo e não cria regra para `/api/metricas`. O bloqueio na borda do cluster depende do Ingress controller ou de NetworkPolicy. A recomendação é bloquear a rota no Ingress ou restringir quem alcança a porta do aplicativo, sem criar regra pública para o caminho. O token continua obrigatório dentro do cluster e não substitui o bloqueio de borda.
 
 ## Migrações
 
@@ -156,7 +204,7 @@ O ensaio reproduzível roda em contêiner, sem cluster:
 bash tests/kubernetes/validar.sh
 ```
 
-O script executa `helm lint`, `helm template`, `kubeconform -strict`, testa a recusa do gate sem backup, o modo de ensaio, os checksums de ConfigMap e Secret, os dois PVCs, o estado persistente, o `timeZone`, a recusa de backup sem PVC e sem remoto, o modo somente remoto e as oito combinações da agenda.
+O script executa `helm lint`, `helm template`, `kubeconform -strict`, testa a ausência do ServiceMonitor por padrão e a renderização com a flag ligada, com porta `http`, caminho `/api/metricas`, autorização Bearer, intervalo, tempo limite, rótulos adicionais e apontamento para o Secret. Também cobre a recusa do gate sem backup, o modo de ensaio, os checksums de ConfigMap e Secret, os dois PVCs, o estado persistente, o `timeZone`, a recusa de backup sem PVC e sem remoto, o modo somente remoto e as oito combinações da agenda.
 
 Validação manual:
 
@@ -167,6 +215,27 @@ helm template frequenciapp infra/kubernetes/frequenciapp \
   --set existingSecret=frequenciapp-segredos \
   --set image.tag=1.2.3 >/tmp/frequenciapp.yaml
 kubeconform -strict -summary /tmp/frequenciapp.yaml
+```
+
+Com o ServiceMonitor habilitado:
+
+```bash
+helm template frequenciapp infra/kubernetes/frequenciapp \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set image.tag=1.2.3 \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.serviceMonitor.bearerTokenSecret.name=frequenciapp-segredos >/tmp/servicemonitor.yaml
+kubeconform -strict -summary -ignore-missing-schemas /tmp/servicemonitor.yaml
+```
+
+O `-ignore-missing-schemas` é necessário no segundo caso: a CRD `monitoring.coreos.com/v1` não faz parte dos esquemas padrão do kubeconform, e sem a opção a validação do `ServiceMonitor` falha como tipo desconhecido. A opção dispensa apenas os esquemas ausentes; os recursos conhecidos continuam validados com `-strict`.
+
+Sem `helm` ou `kubeconform` no host, executar as mesmas etapas nas imagens fixadas de `.github/workflows/servidor.yml`. O `helm lint`, o `helm template` e o `kubeconform` não exigem cluster, Prometheus Operator nem CRD instalada.
+
+Com o chart instalado em um cluster:
+
+```bash
 helm test frequenciapp --namespace frequenciapp
 ```
 
@@ -175,7 +244,10 @@ O `helm test` verifica `/api/saude` pelo Service interno.
 ## Limitações
 
 - O chart não instala PostgreSQL.
-- O chart não instala cert-manager, ingress controller ou External Secrets.
+- O chart não instala cert-manager, ingress controller, External Secrets, operador de backup, Prometheus Operator nem a CRD `monitoring.coreos.com/v1`.
+- O ServiceMonitor depende do Prometheus Operator e de o seletor do operador cobrir os rótulos do objeto. Sem a CRD, o manifesto do ServiceMonitor não pode ser aplicado.
+- Com `existingSecret`, a chave `METRICAS_TOKEN` precisa ser criada e atualizada fora do Helm.
+- O Ingress opcional encaminha `/` ao aplicativo e não bloqueia `/api/metricas` na borda. O bloqueio depende do Ingress controller ou de NetworkPolicy.
 - O backup local em PVC não é recuperação de desastre. Manter destino remoto.
 - O gate reconhece apenas o recibo do backup do banco feito pelo chart. Snapshots externos não contam.
 - O CronJob de backup usa a imagem de backup.

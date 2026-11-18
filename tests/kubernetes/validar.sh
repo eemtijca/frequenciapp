@@ -44,6 +44,12 @@ kubeconform_file() {
   docker_run -i "$KUBECONFORM_IMAGE" -strict -summary -kubernetes-version 1.27.0 - <"$1"
 }
 
+kubeconform_servicemonitor() {
+  # A CRD do Prometheus Operator não está nos esquemas padrão do kubeconform.
+  docker_run -i "$KUBECONFORM_IMAGE" -strict -summary -kubernetes-version 1.27.0 \
+    -ignore-missing-schemas - <"$1"
+}
+
 falhar() {
   printf '[kubernetes] %s\n' "$*" >&2
   exit 1
@@ -123,6 +129,9 @@ recusar_renderizacao() {
 printf '[kubernetes] Lint do chart\n'
 helm lint "$CHART" --namespace frequenciapp --set existingSecret=frequenciapp-segredos
 helm lint "$CHART" --namespace frequenciapp "${valores_backup[@]}"
+helm lint "$CHART" --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set metrics.serviceMonitor.enabled=true
 
 printf '[kubernetes] Template e kubeconform\n'
 helm template frequenciapp "$CHART" \
@@ -134,6 +143,83 @@ helm template frequenciapp "$CHART" \
   "${valores_backup[@]}" >"$TMP/upgrade.yaml"
 kubeconform_file "$TMP/instalacao.yaml"
 kubeconform_file "$TMP/upgrade.yaml"
+
+printf '[kubernetes] ServiceMonitor opcional\n'
+exigir_ausencia 'kind: ServiceMonitor' "$TMP/instalacao.yaml"
+
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set image.tag=1.2.3 \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.serviceMonitor.bearerTokenSecret.name=frequenciapp-segredos \
+  --set metrics.serviceMonitor.labels.equipe=observabilidade >"$TMP/servicemonitor.yaml"
+exigir_texto 'kind: ServiceMonitor' "$TMP/servicemonitor.yaml"
+exigir_texto 'name: frequenciapp' "$TMP/servicemonitor.yaml"
+exigir_texto 'port: http' "$TMP/servicemonitor.yaml"
+exigir_texto 'path: /api/metricas' "$TMP/servicemonitor.yaml"
+exigir_texto 'type: Bearer' "$TMP/servicemonitor.yaml"
+exigir_texto 'interval: "30s"' "$TMP/servicemonitor.yaml"
+exigir_texto 'scrapeTimeout: "10s"' "$TMP/servicemonitor.yaml"
+exigir_texto 'app.kubernetes.io/managed-by: Helm' "$TMP/servicemonitor.yaml"
+exigir_texto 'equipe: observabilidade' "$TMP/servicemonitor.yaml"
+grep -A2 'credentials:' "$TMP/servicemonitor.yaml" | grep -q 'name: "frequenciapp-segredos"' ||
+  falhar 'O ServiceMonitor não aponta para o Secret do token.'
+grep -A2 'credentials:' "$TMP/servicemonitor.yaml" | grep -q 'key: "METRICAS_TOKEN"' ||
+  falhar 'O ServiceMonitor não usa a chave METRICAS_TOKEN.'
+kubeconform_servicemonitor "$TMP/servicemonitor.yaml"
+
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.serviceMonitor.bearerTokenSecret.key=TOKEN_CUSTOM \
+  --show-only templates/servicemonitor.yaml >"$TMP/servicemonitor-derivado.yaml"
+grep -A2 'credentials:' "$TMP/servicemonitor-derivado.yaml" | grep -q 'name: "frequenciapp-segredos"' ||
+  falhar 'O ServiceMonitor não deriva o nome do existingSecret.'
+grep -A2 'credentials:' "$TMP/servicemonitor-derivado.yaml" | grep -q 'key: "TOKEN_CUSTOM"' ||
+  falhar 'O ServiceMonitor não usa a chave configurada.'
+
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set secrets.create=true \
+  --set metrics.token=token-sintetico \
+  --set metrics.serviceMonitor.enabled=true \
+  --show-only templates/servicemonitor.yaml >"$TMP/servicemonitor-gerenciado.yaml"
+grep -A2 'credentials:' "$TMP/servicemonitor-gerenciado.yaml" | grep -q 'name: "frequenciapp"' ||
+  falhar 'O ServiceMonitor não deriva o nome do Secret gerenciado.'
+
+if helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set metrics.serviceMonitor.enabled=true \
+  --show-only templates/servicemonitor.yaml >"$TMP/servicemonitor-sem-secret.yaml" 2>"$TMP/servicemonitor-sem-secret.log"; then
+  falhar 'O ServiceMonitor foi renderizado sem nome de Secret.'
+fi
+exigir_texto 'metrics.serviceMonitor.bearerTokenSecret.name' "$TMP/servicemonitor-sem-secret.log"
+
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set secrets.create=true \
+  --set metrics.token=token-sintetico \
+  --show-only templates/secret.yaml >"$TMP/secret-metricas.yaml"
+exigir_texto 'METRICAS_TOKEN: "token-sintetico"' "$TMP/secret-metricas.yaml"
+
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set secrets.create=true \
+  --set-string secrets.data.AUTH_SECRET=segredo-sintetico \
+  --show-only templates/secret.yaml >"$TMP/secret-sem-metricas.yaml"
+exigir_ausencia 'METRICAS_TOKEN' "$TMP/secret-sem-metricas.yaml"
+
+if helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set secrets.create=true \
+  --set metrics.token=token-sintetico \
+  --set-string secrets.data.METRICAS_TOKEN=outro-token \
+  --show-only templates/secret.yaml >"$TMP/secret-conflitante.yaml" 2>"$TMP/secret-conflitante.log"; then
+  falhar 'O chart aceitou dois valores para METRICAS_TOKEN.'
+fi
+exigir_texto 'Use apenas metrics.token ou secrets.data.METRICAS_TOKEN' "$TMP/secret-conflitante.log"
 
 printf '[kubernetes] Gate de backup\n'
 exigir_texto 'helm.sh/hook: pre-upgrade,pre-rollback' "$TMP/upgrade.yaml"

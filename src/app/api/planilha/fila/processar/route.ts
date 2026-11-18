@@ -2,6 +2,7 @@
 import { processarFila } from "@/application/fila-planilha";
 import { despacharIntencoesEscolares } from "@/application/outbox-escolar";
 import { erroApi, executarRota, exigirAdmin, json, origemPermitida } from "@/infra/http";
+import { registrarFilaProcessada } from "@/infra/metricas";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -14,6 +15,8 @@ export async function POST(requisicao: Request): Promise<Response> {
     await despacharIntencoesEscolares().catch(() =>
       console.error("Intenções escolares aguardam nova tentativa."),
     );
-    return json(await processarFila({ limite: 20 }));
+    const resumo = await processarFila({ limite: 20 });
+    registrarFilaProcessada(resumo);
+    return json(resumo);
   });
 }

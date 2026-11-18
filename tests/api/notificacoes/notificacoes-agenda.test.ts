@@ -1,19 +1,25 @@
 // Agenda contra PostgreSQL real, com transporte simulado: horários,
 // preferências, origem histórica e concorrência sem enviar push externo.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { GET as enviarAgenda } from "@/app/api/notificacoes/agenda/route";
 import { banco } from "@/infra/banco";
 import * as moduloBanco from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
+import { registro } from "@/infra/metricas";
 import { enviarAvisosDaAgenda, contarChamadasPendentes } from "@/application/notificacoes-agenda";
 import { atualizarPreferenciasNotificacoes } from "@/application/notificacoes-configuracao";
 import { diaLocal, diaDaSemanaIso } from "@/domain/frequencia";
 import type { Identidade } from "@/domain/usuarios";
 
-const { enviar } = vi.hoisted(() => ({ enviar: vi.fn() }));
+const { enviar, segredoDaAgenda } = vi.hoisted(() => ({
+  enviar: vi.fn(),
+  segredoDaAgenda: "segredo-sintetico-da-agenda-para-testes-000",
+}));
 vi.mock("@/infra/web-push", () => ({
   pushConfigurado: () => true,
   conferirParVapid: () => undefined,
   enviarPush: enviar,
+  segredoDaAgendaConfere: (cabecalho: string | null) => cabecalho === `Bearer ${segredoDaAgenda}`,
 }));
 
 const db = banco();
@@ -49,6 +55,36 @@ async function chamada(turmaId = turmas[0] ?? "") {
       alunos: { create: { alunoId } },
     },
   });
+}
+
+interface ContadoresDeAvisos {
+  enviada: number;
+  expirada: number;
+  falha: number;
+  ignorada: number;
+}
+
+async function contadoresDeAvisos(): Promise<ContadoresDeAvisos> {
+  const texto = await registro.metrics();
+  const valor = (resultado: "enviada" | "expirada" | "falha" | "ignorada") => {
+    const prefixo = `frequenciapp_notificacoes_enviadas_total{resultado="${resultado}"}`;
+    const linha = texto.split("\n").find((item) => item.startsWith(prefixo));
+    return Number(linha?.split(" ").at(-1) ?? 0);
+  };
+  return {
+    enviada: valor("enviada"),
+    expirada: valor("expirada"),
+    falha: valor("falha"),
+    ignorada: valor("ignorada"),
+  };
+}
+
+function pedirAgenda() {
+  return enviarAgenda(
+    new Request("http://localhost:3000/api/notificacoes/agenda", {
+      headers: { Authorization: `Bearer ${segredoDaAgenda}` },
+    }),
+  );
 }
 
 beforeAll(async () => {
@@ -322,5 +358,65 @@ describe("tipos independentes e novas chamadas", () => {
     await expect(
       atualizarPreferenciasNotificacoes(diretor, { resumoDiario: false }),
     ).rejects.toThrow("Troque a palavra-chave");
+  });
+});
+
+describe("rota da agenda e contadores", () => {
+  it("conta o aviso enviado a partir do resumo da agenda", async () => {
+    await dispositivo(coordenacao);
+    const antes = await contadoresDeAvisos();
+    const resposta = await pedirAgenda();
+    expect(resposta.status).toBe(200);
+    expect(await resposta.json()).toMatchObject({ enviadas: 1 });
+    const depois = await contadoresDeAvisos();
+    expect(depois.enviada - antes.enviada).toBe(1);
+    expect(depois.expirada - antes.expirada).toBe(0);
+    expect(depois.falha - antes.falha).toBe(0);
+    expect(depois.ignorada - antes.ignorada).toBe(0);
+  });
+
+  it("conta a falha e responde 503 sem enviar de novo no mesmo pedido", async () => {
+    await dispositivo(coordenacao);
+    enviar.mockResolvedValueOnce("falha");
+    const antes = await contadoresDeAvisos();
+    const resposta = await pedirAgenda();
+    expect(resposta.status).toBe(503);
+    expect(await resposta.json()).toMatchObject({ falhas: 1 });
+    const depois = await contadoresDeAvisos();
+    expect(depois.falha - antes.falha).toBe(1);
+    expect(depois.enviada - antes.enviada).toBe(0);
+  });
+
+  it("conta a assinatura expirada removida no envio", async () => {
+    await dispositivo(coordenacao);
+    enviar.mockResolvedValueOnce("expirada");
+    const antes = await contadoresDeAvisos();
+    const resposta = await pedirAgenda();
+    expect(resposta.status).toBe(200);
+    expect(await resposta.json()).toMatchObject({ expiradas: 1 });
+    const depois = await contadoresDeAvisos();
+    expect(depois.expirada - antes.expirada).toBe(1);
+    expect(depois.falha - antes.falha).toBe(0);
+  });
+
+  it("conta a entrega já confirmada sem chamar o transporte", async () => {
+    const assinatura = await dispositivo(coordenacao);
+    await db.entregaPush.create({
+      data: {
+        assinaturaId: assinatura.id,
+        dia: DATA,
+        tipo: "CHAMADAS_PENDENTES",
+        referencia: "",
+        enviadaEm: new Date(),
+      },
+    });
+    const antes = await contadoresDeAvisos();
+    const resposta = await pedirAgenda();
+    expect(resposta.status).toBe(200);
+    expect(await resposta.json()).toMatchObject({ ignoradas: 1 });
+    expect(enviar).not.toHaveBeenCalled();
+    const depois = await contadoresDeAvisos();
+    expect(depois.ignorada - antes.ignorada).toBe(1);
+    expect(depois.enviada - antes.enviada).toBe(0);
   });
 });

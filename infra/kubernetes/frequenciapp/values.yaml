@@ -89,6 +89,24 @@ secrets:
   create: false
   data: {}
 
+# Métricas Prometheus. O ServiceMonitor exige o Prometheus Operator e a CRD
+# monitoring.coreos.com/v1 no cluster; o chart não instala nenhum dos dois.
+metrics:
+  # Preenchido, entra como METRICAS_TOKEN no Secret gerenciado pelo chart.
+  # Use de 32 a 200 caracteres entre letras, números, hífen e sublinhado.
+  # Com existingSecret, a chave precisa ser criada fora do Helm.
+  token: ""
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    # Labels adicionais para o seletor do Prometheus Operator.
+    labels: {}
+    bearerTokenSecret:
+      # Vazio usa o existingSecret ou o Secret gerenciado pelo chart.
+      name: ""
+      key: METRICAS_TOKEN
+
 extraEnv: []
 extraEnvFrom: []
 

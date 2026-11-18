@@ -1,0 +1,25 @@
+{{/* ServiceMonitor opcional. Requer o Prometheus Operator e a CRD instalados no cluster. */}}
+{{- if .Values.metrics.serviceMonitor.enabled }}
+{{- $rotulos := include "frequenciapp.labels" . | fromYaml }}
+{{- $rotulos = merge $rotulos .Values.metrics.serviceMonitor.labels }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "frequenciapp.fullname" . }}
+  labels:
+    {{- toYaml $rotulos | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "frequenciapp.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /api/metricas
+      interval: {{ .Values.metrics.serviceMonitor.interval | quote }}
+      scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout | quote }}
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ include "frequenciapp.metricsSecretName" . | quote }}
+          key: {{ default "METRICAS_TOKEN" .Values.metrics.serviceMonitor.bearerTokenSecret.key | quote }}
+{{- end }}
