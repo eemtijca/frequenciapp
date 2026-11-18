@@ -17,6 +17,7 @@
 | [testes.md](testes.md)                                 | Suítes, convenções e cobertura.                                        |
 | [deploy.md](deploy.md)                                 | Docker Compose, Vercel e outras formas de publicar.                    |
 | [auto-hospedagem.md](auto-hospedagem.md)               | Servidor próprio com Caddy, Nginx, agenda e atualização.               |
+| [observabilidade.md](observabilidade.md)               | Prometheus, métricas, painel, alertas e diagnóstico.                   |
 | [controlador-manutencao.md](controlador-manutencao.md) | Controlador opt-in, journal, pins, limites e volta ao caminho simples. |
 | [instalador.md](instalador.md)                         | Contrato do instalador, comandos, JSON, canais e matriz.               |
 | [kubernetes.md](kubernetes.md)                         | Chart Helm, Ingress, migração, agenda e backup.                        |
@@ -93,3 +94,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-076](adr/076-instalador-cross-distro.md): instalador cross-distro com bootstrap Bash, CLI Node, detecção e testes em Docker.
 - [ADR-077](adr/077-canais-de-atualizacao.md): canais `release` e `main`, estado, downgrade, backup e readoção do controlador.
 - [ADR-078](adr/078-reconfiguracao-restrita-das-rotinas.md): seletores explícitos, cron reconhecido e reconfiguração recuperável sem mover a trava.
+- [ADR-079](adr/079-observabilidade-com-prometheus.md): coleta Prometheus autenticada, rede interna, painel no loopback e alertas sem notificação externa.

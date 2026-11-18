@@ -134,6 +134,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- A auto-hospedagem passa a oferecer observabilidade com Prometheus na rede interna. A aplicação expõe `/api/metricas` protegido por `METRICAS_TOKEN`, com métricas de requisições, latência, pool, consultas e fila de planilhas. O painel escuta apenas no loopback e é alcançado por túnel SSH, com retenção de 15 dias e 1 GB; Caddy e Nginx bloqueiam a rota pública. As cinco regras de alerta da fase 1 aparecem no painel, sem Alertmanager. O guia está em [observabilidade.md](docs/observabilidade.md) e a decisão na [ADR-079](docs/adr/079-observabilidade-com-prometheus.md).
+
 - A auto-hospedagem passa a oferecer um controlador de manutenção opt-in, com perfil próprio, snapshot imutável, journal durável, pins de backup e entrada estável `executar`. O caminho simples continua o padrão e ignora os artefatos do controlador, inclusive o marcador de atualização. A transição entre simples e controlador instala e remove rotinas de forma explícita, e a atualização recusa a aplicação quando o guard de migração muda, exigindo readoção administrativa. A decisão está na [ADR-065](docs/adr/065-atualizacao-e-recuperacao-verificaveis.md).
 
 - O backup do banco passa a aceitar o perfil Dropbox opt-in, com upload sempre por rclone e verificação, listagem, download e exclusão condicional pelo cliente nativo. A retenção preserva cinco cópias por padrão, exige autorização para mínimo menor, usa journal separado em `expurgos/dropbox` e mantém o caminho rclone como padrão quando `BACKUP_DROPBOX_CONFIG` não existe. As planilhas continuam no rclone, em pasta própria, e a restauração remota usa `baixar-backup.sh`. O guia está em [dropbox-retencao.md](docs/dropbox-retencao.md).

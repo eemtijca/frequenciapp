@@ -419,6 +419,7 @@ Em uma issue no GitHub. Vulnerabilidades seguem o [SECURITY.md](SECURITY.md).
 | [docs/deploy.md](docs/deploy.md)                                                           | Docker Compose, Vercel e outras formas.             |
 | [docs/instalador.md](docs/instalador.md)                                                   | Contrato do instalador, flags, JSON e erros.        |
 | [docs/auto-hospedagem.md](docs/auto-hospedagem.md)                                         | Servidor próprio, proxy TLS, agenda e atualização.  |
+| [docs/observabilidade.md](docs/observabilidade.md)                                         | Prometheus, métricas, painel e alertas.             |
 | [docs/controlador-manutencao.md](docs/controlador-manutencao.md)                           | Adoção do controlador, journal, pins e reversão.    |
 | [docs/dropbox-retencao.md](docs/dropbox-retencao.md)                                       | Token, pasta, retenção e restauração no Dropbox.    |
 | [docs/kubernetes.md](docs/kubernetes.md)                                                   | Chart Helm, Ingress, migração, agenda e backup.     |

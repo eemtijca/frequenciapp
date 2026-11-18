@@ -69,6 +69,12 @@ CSV de grade e relação registram preparação na auditoria, apenas com conta, 
 
 O desenvolvedor do aplicativo não tem acesso a dados de produção: o software roda na infraestrutura escolhida pela escola, sem telemetria e sem dependência de terceiros contratados. A consulta opcional de feriados, quando a administração a aciona, envia somente o ano e o recorte geográfico configurado, sem dados de alunos ou de contas. A integração opcional com o Google Planilhas é configurada pela própria escola, na conta Google dela, e só envia o que cada finalidade exige: a frequência por turma de origem, saídas e entradas em outro arquivo e a frequência por aluno e dia, com as presenças parciais, em um terceiro arquivo distinto, com os campos necessários a cada registro. O Registro na SEDUC é uma confirmação manual da equipe; o aplicativo não transmite dados ao sistema da Seduc. A escola, ao usar o sistema, responde pelos dados que insere, mantendo a caderneta digital dentro da mesma finalidade da caderneta de papel.
 
+## Observabilidade
+
+As métricas do Prometheus são operacionais, locais e agregadas. Elas registram requisições por rota padronizada, status, duração, conexões do pool, latência de consultas e contagens da fila de planilhas. Não contêm nome, matrícula, e-mail, identificador de aluno, identificador de turma, código de escola, conteúdo de requisição, SQL nem parâmetro de consulta.
+
+O Prometheus roda na infraestrutura da escola, sem telemetria de terceiros, e mantém 15 dias de histórico no volume `prometheus_data`. O volume não entra no backup e pode ser descartado sem perda de dados escolares. O acesso ao painel fica restrito ao loopback do servidor e ao túnel SSH do operador. O guia está em [observabilidade.md](observabilidade.md).
+
 ## Repositório limpo
 
 - O histórico de versões e os arquivos atuais não contêm dados reais de pessoas.

@@ -203,6 +203,16 @@ No perfil simples, a retomada com escolhas explícitas precisa incluir a etapa `
 
 Em controlador já adotado, o `aplicar` usa a [reconfiguração restrita](controlador-manutencao.md#reconfiguração-dos-seletores), sem repetir o pipeline. O legado sem recibo de cron exige `--adotar-cron-sha256 <hash>` com o SHA-256 exato revisado pelo administrador; essa autorização não é gravada como padrão reutilizável. Configurações divergentes, journal incerto e readoção ampla pendente continuam bloqueados.
 
+### Observabilidade
+
+A etapa `ambiente` gera `METRICAS_TOKEN` no `app.env` quando o valor está ausente ou inválido e preserva o token existente nas execuções seguintes. O token aceita de 32 a 200 caracteres entre letras, números, hífen e sublinhado, é segredo e não aparece em JSON, log ou mensagem. Sem o token, `/api/metricas` responde 404.
+
+Em `ops.env`, `OBSERVABILIDADE_HABILITADA` controla a coleta e `PROMETHEUS_PORTA` define a porta do painel. A instalação nova grava `OBSERVABILIDADE_HABILITADA=true`; a instalação existente sem a variável permanece desligada. A flag controla a inclusão de `compose.observabilidade.yml` na lista Compose, e `PROMETHEUS_PORTA` tem padrão `9090`.
+
+Uma instalação existente pode ativar a coleta depois, com decisão explícita, conforme [observabilidade.md](observabilidade.md#instalação-existente). A mudança altera o ambiente e a lista Compose.
+
+Em perfil com controlador já adotado, `OBSERVABILIDADE_HABILITADA` e `PROMETHEUS_PORTA` não estão entre os cinco seletores da reconfiguração restrita. O `aplicar` executa apenas `reconfigurar-rotinas` e recusa a configuração alterada com `Configuração mudou; adoção explícita necessária`. Para receber as variáveis e o overlay, é preciso readoção revisada, conforme [controlador-manutencao.md](controlador-manutencao.md#observabilidade). A atualização comum não aplica essas variáveis sem a readoção.
+
 ### situacao
 
 O `situacao` é somente leitura. Ele mostra containers, saúde, versão instalada, canal, tag, commit, imagem, digest, idade do último backup confirmado, timers, agenda, espaço em disco e pendências do controlador.

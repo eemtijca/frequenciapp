@@ -138,6 +138,14 @@ A primeira transição cria uma geração física em `geracoes/<uuid>/` e um per
 
 Antes de publicar qualquer arquivo ativo, uma intenção versão 1 registra em diretório privado os bytes e hashes anteriores e desejados. Cada publicação é atômica por arquivo e sincronizada; o conjunto não é uma troca atômica única. Uma interrupção bloqueia a entrada normal. A retomada repete o `aplicar --retomar` com as mesmas escolhas e só aceita arquivos que ainda correspondam exatamente ao estado antigo ou novo comprovado. Um terceiro valor, identidade divergente ou operação incerta alheia exige revisão, sem rollback nem limpeza automática. Os bytes da configuração na intenção são sensíveis e não devem entrar em logs públicos ou issues.
 
+### Observabilidade
+
+O perfil adotado guarda hashes de `app.env`, de `ops.env` e da lista Compose. `METRICAS_TOKEN`, `OBSERVABILIDADE_HABILITADA` e `PROMETHEUS_PORTA` não são seletores de rotina. Acrescentar o token, a flag ou `compose.observabilidade.yml` altera essa configuração e invalida o perfil.
+
+O `aplicar` com controlador adotado executa apenas a reconfiguração restrita das rotinas (`reconfigurar-rotinas`) e recusa a configuração alterada com `Configuração mudou; adoção explícita necessária`. Para receber as variáveis e o overlay, a instalação precisa de readoção revisada, com novo snapshot e conferência de identidade. A atualização comum não aplica as variáveis nem inclui o overlay; ela preserva a topologia adotada.
+
+O caminho de ativação está em [observabilidade.md](observabilidade.md#instalação-existente) e a readoção em [Readoção](#readoção).
+
 ## Journal
 
 Cada operação do controlador, exceto leitura, `estado` e instalação de rotinas, recebe um identificador UUID e uma pasta em `dados/journal/<uuid>/`:

@@ -58,6 +58,7 @@ O perfil simples é o padrão. Os demais são opt-in e não podem bloquear o cam
 compose.servidor.yml
 compose.servidor-caddy.yml
 compose.servidor-nginx.yml
+compose.observabilidade.yml
 infra/servidor/
   Caddyfile
   Caddyfile.ipv4
@@ -71,6 +72,11 @@ infra/servidor/
   backup/
     Dockerfile
   servidor.env.example
+infra/observabilidade/
+  prometheus/
+    prometheus.yml
+    regras.yml
+    entrypoint.sh
 scripts/servidor/
   comum.sh
   compose.sh
@@ -86,7 +92,7 @@ scripts/servidor/
   instalar-rotinas.sh
 ```
 
-A aplicação e o banco ficam sem portas publicadas. Apenas o proxy publica 80 e 443.
+A aplicação e o banco ficam sem portas publicadas. Apenas o proxy publica 80 e 443. Com a observabilidade ligada, a ponte do painel publica 9090 somente no loopback do host.
 
 ## Preparar o servidor
 
@@ -105,25 +111,35 @@ A aplicação e o banco ficam sem portas publicadas. Apenas o proxy publica 80 e
 13. Adotar a identidade com `scripts/servidor/identidade.sh --adotar --confirmar`.
 14. Instalar o cron e testar backup e restauração.
 
-Os arquivos de ambiente não entram no Git. O `app.env` contém `AUTH_SECRET`, credenciais do banco e opcionais do Google, push e feriados. O `ops.env` contém domínio, TLS, backup e atualização.
+Os arquivos de ambiente não entram no Git. O `app.env` contém `AUTH_SECRET`, credenciais do banco e opcionais do Google, push, feriados e o token de métricas. O `ops.env` contém domínio, TLS, backup, atualização e observabilidade.
 
 ## Variáveis principais
 
 ### Aplicação e banco
 
-| Variável            | Obrigatória | Uso                                             |
-| ------------------- | ----------- | ----------------------------------------------- |
-| `DATABASE_URL`      | sim         | Conexão de runtime                              |
-| `DIRECT_URL`        | não         | Migrações e administração                       |
-| `DATABASE_SCHEMA`   | não         | Schema explícito, padrão `public`               |
-| `AUTH_SECRET`       | sim         | Sessões e chaves derivadas                      |
-| `TZ_APP`            | não         | Fuso da escola                                  |
-| `PERMITIR_HTTP`     | não         | Mantenha `false` com TLS                        |
-| `POSTGRES_USER`     | não         | Usuário do Compose                              |
-| `POSTGRES_PASSWORD` | não         | Senha do Compose, apenas desenvolvimento        |
-| `POSTGRES_DB`       | não         | Banco do Compose                                |
-| `MIGRAR_NA_PARTIDA` | não         | `true` no Compose, `false` em migração separada |
-| `COMMIT_SHA`        | não         | Revisão exibida em `/api/saude`                 |
+| Variável            | Obrigatória | Uso                                                               |
+| ------------------- | ----------- | ----------------------------------------------------------------- |
+| `DATABASE_URL`      | sim         | Conexão de runtime                                                |
+| `DIRECT_URL`        | não         | Migrações e administração                                         |
+| `DATABASE_SCHEMA`   | não         | Schema explícito, padrão `public`                                 |
+| `AUTH_SECRET`       | sim         | Sessões e chaves derivadas                                        |
+| `TZ_APP`            | não         | Fuso da escola                                                    |
+| `PERMITIR_HTTP`     | não         | Mantenha `false` com TLS                                          |
+| `POSTGRES_USER`     | não         | Usuário do Compose                                                |
+| `POSTGRES_PASSWORD` | não         | Senha do Compose, apenas desenvolvimento                          |
+| `POSTGRES_DB`       | não         | Banco do Compose                                                  |
+| `MIGRAR_NA_PARTIDA` | não         | `true` no Compose, `false` em migração separada                   |
+| `COMMIT_SHA`        | não         | Revisão exibida em `/api/saude`                                   |
+| `METRICAS_TOKEN`    | não         | Token da coleta Prometheus; sem ele, `/api/metricas` responde 404 |
+
+### Observabilidade
+
+A coleta e o painel são opcionais e não sobem em instalações existentes sem decisão explícita. O guia completo está em [observabilidade.md](observabilidade.md).
+
+| Variável                     | Padrão                                             | Uso                                                      |
+| ---------------------------- | -------------------------------------------------- | -------------------------------------------------------- |
+| `OBSERVABILIDADE_HABILITADA` | `false` em instalações existentes, `true` em novas | Inclui `compose.observabilidade.yml` no projeto Compose. |
+| `PROMETHEUS_PORTA`           | `9090`                                             | Porta do painel no loopback do host.                     |
 
 ### Proxy e TLS
 
@@ -482,6 +498,15 @@ O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database
 - Alertar quando o certificado estiver próximo do vencimento.
 - Monitorar espaço em disco do banco, dos logs e do backup.
 - Revisar a agenda do GitHub quando ela for usada na nuvem.
+- Com a observabilidade ligada, seguir [observabilidade.md](observabilidade.md). O painel do Prometheus reúne `/targets` e `/alerts`, e as cinco regras da fase 1 cobrem indisponibilidade, erros 5xx, latência, pool e fila. Sem Alertmanager, o alerta aparece apenas no painel.
+- Conferir `up{job="frequenciapp"}` em `1` e a idade do item aberto mais antigo da fila.
+
+### Validar a observabilidade
+
+1. `curl -s -o /dev/null -w '%{http_code}\n' https://dominio/api/metricas` deve devolver `404`.
+2. O túnel SSH de [observabilidade.md](observabilidade.md#painel-e-acesso) deve abrir `http://localhost:9090` e mostrar o alvo `frequenciapp` em `/targets`.
+3. `ss -lntp | grep 9090` deve mostrar `127.0.0.1:9090`, nunca `0.0.0.0:9090`.
+4. A coleta com o token do ambiente deve devolver `200` e linhas `frequenciapp_`, conforme o comando do guia.
 
 ## Segurança
 
@@ -624,6 +649,15 @@ Não editar o checksum em `_prisma_migrations`, não remover linhas do históric
 - Imagem alvo indisponível no registro.
 - Espaço insuficiente para build.
 
+### Observabilidade sem coleta
+
+- Conferir `scripts/servidor/compose.sh ps` e os serviços `prometheus` e `prometheus-ui`.
+- Conferir `up{job="frequenciapp"}` e o último erro em `/targets`.
+- Um 404 no alvo indica `METRICAS_TOKEN` ausente na aplicação. Um 401 indica token divergente entre a aplicação e o Prometheus.
+- Conferir a rede `interna` e o alvo `app:3000`.
+- Conferir os logs com `scripts/servidor/compose.sh logs --tail 200 prometheus`.
+- Validar configuração e regras com `promtool`, conforme [observabilidade.md](observabilidade.md#validar-configuração-e-regras).
+
 ## Identidade operacional
 
 As rotinas exigem Node.js e `jq` no host. O `COMPOSE_PROJECT_NAME` é obrigatório e deve ser definido em `/etc/frequenciapp/ops.env`; sem ele, as rotinas recusam a operação. A identidade reúne o ID do daemon, o projeto, os serviços `app` e `db`, os labels do Compose e as montagens persistentes do banco.
@@ -656,6 +690,7 @@ A atualização só aceita backup remoto confirmado quando `verificadoRemoto` é
 - [Operação](operacao.md)
 - [Ambiente](ambiente.md)
 - [Segurança](seguranca.md)
+- [Observabilidade](observabilidade.md)
 - [Caddy: HTTPS automático](https://caddyserver.com/docs/automatic-https)
 - [Caddy: opções globais](https://caddyserver.com/docs/caddyfile/options)
 - [Nginx: imagem oficial](https://hub.docker.com/_/nginx)
