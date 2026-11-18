@@ -3,6 +3,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { criarPoliticaDeSeguranca } from "@/infra/csp";
+import { rotaDeMetrica } from "@/infra/metricas-rota";
 
 function hostProprio(req: NextRequest): string {
   const hostPublico =
@@ -65,6 +66,10 @@ export function proxy(request: NextRequest) {
 
   const cabecalhosRequisicao = new Headers(request.headers);
   cabecalhosRequisicao.set("x-nonce", nonce);
+  // A rota normalizada e o método alimentam as métricas HTTP em executarRota.
+  // O set sobrescreve qualquer valor enviado pelo cliente.
+  cabecalhosRequisicao.set("x-frequenciapp-rota", rotaDeMetrica(request.nextUrl.pathname));
+  cabecalhosRequisicao.set("x-frequenciapp-metodo", request.method);
   // O Next extrai o nonce do CSP da requisição para os próprios scripts.
   cabecalhosRequisicao.set("Content-Security-Policy", csp);
 
