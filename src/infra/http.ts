@@ -1,11 +1,21 @@
 // Auxiliares das rotas: resposta JSON sem cache, guardas por capacidade,
 // defesa CSRF, leitura limitada do corpo e tradução de qualquer exceção.
+import { headers } from "next/headers";
 import { ambiente } from "@/infra/ambiente";
 import { identidadeAtual } from "@/application/sessao";
 import { ErroHttp, traduzirErro } from "@/infra/erros";
+import { observarRequisicao, requisicaoFinalizada, requisicaoIniciada } from "@/infra/metricas";
 import { temCapacidade, type Capacidade, type Identidade } from "@/domain/usuarios";
 
 const LIMITE_DE_CORPO = 200_000;
+const ROTA_DESCONHECIDA = "desconhecida";
+const METODO_DESCONHECIDO = "DESCONHECIDO";
+const ROTA_DE_METRICAS = "/api/metricas";
+
+interface ContextoDeRequisicao {
+  method: string;
+  route: string;
+}
 
 export function json(dados: unknown, status = 200): Response {
   return Response.json(dados, { status, headers: { "Cache-Control": "no-store" } });
@@ -25,12 +35,48 @@ export function erroApi(
  * detalhes registrados apenas no log do servidor.
  */
 export async function executarRota(manipulador: () => Promise<Response>): Promise<Response> {
+  const contexto = await contextoDaRequisicao();
+  const instrumentar = contexto.route !== ROTA_DE_METRICAS;
+  const inicio = performance.now();
+  let status = 500;
+  if (instrumentar) comFalhaSilenciosa(requisicaoIniciada);
   try {
-    return await manipulador();
+    const resposta = await manipulador();
+    status = resposta.status;
+    return resposta;
   } catch (erro) {
-    const { mensagem, status } = traduzirErro(erro);
+    const traduzido = traduzirErro(erro);
+    status = traduzido.status;
     const extra = erro instanceof ErroHttp && erro.codigo ? { codigo: erro.codigo } : undefined;
-    return erroApi(mensagem, status, extra);
+    return erroApi(traduzido.mensagem, status, extra);
+  } finally {
+    if (instrumentar) {
+      const duracaoSegundos = (performance.now() - inicio) / 1000;
+      comFalhaSilenciosa(requisicaoFinalizada);
+      comFalhaSilenciosa(() => observarRequisicao(contexto, status, duracaoSegundos));
+    }
+  }
+}
+
+/** A leitura falha fora de um contexto de requisição e devolve o rótulo neutro. */
+async function contextoDaRequisicao(): Promise<ContextoDeRequisicao> {
+  try {
+    const cabecalhos = await headers();
+    return {
+      method: cabecalhos.get("x-frequenciapp-metodo") || METODO_DESCONHECIDO,
+      route: cabecalhos.get("x-frequenciapp-rota") || ROTA_DESCONHECIDA,
+    };
+  } catch {
+    return { method: METODO_DESCONHECIDO, route: ROTA_DESCONHECIDA };
+  }
+}
+
+/** A métrica é acessória: qualquer falha é ignorada para preservar a resposta. */
+function comFalhaSilenciosa(acao: () => void): void {
+  try {
+    acao();
+  } catch {
+    // Métrica nunca derruba a rota.
   }
 }
 

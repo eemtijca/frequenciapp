@@ -114,6 +114,8 @@ montar_compose_em() {
   local lista=()
   local arquivo
   local relativo
+  local overlay
+  local presente
 
   if [ -n "${COMPOSE_ARQUIVOS:-}" ]; then
     local IFS=':'
@@ -130,6 +132,18 @@ montar_compose_em() {
       nginx) lista+=("$raiz/compose.servidor-nginx.yml") ;;
       *) erro "PROXY_TIPO inválido: $tipo. Use caddy ou nginx." ;;
     esac
+  fi
+
+  if [ "${OBSERVABILIDADE_HABILITADA:-false}" = "true" ]; then
+    overlay="$raiz/compose.observabilidade.yml"
+    presente=false
+    for arquivo in "${lista[@]}"; do
+      if [ "$arquivo" = "$overlay" ]; then
+        presente=true
+        break
+      fi
+    done
+    [ "$presente" = true ] || lista+=("$overlay")
   fi
 
   for arquivo in "${lista[@]}"; do

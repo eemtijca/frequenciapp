@@ -1,0 +1,6 @@
+# Fixture da sobreposição de observabilidade.
+services:
+  prometheus:
+    image: prom/prometheus:v3.16.0
+  prometheus-ui:
+    image: alpine/socat:1.8.1.3

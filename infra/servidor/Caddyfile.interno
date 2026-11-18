@@ -20,6 +20,10 @@
 	tls internal
 	encode zstd gzip
 
+	# Métricas são exclusivas do coletor interno: o proxy interno responde 404.
+	@metricas path /api/metricas
+	respond @metricas 404
+
 	reverse_proxy app:3000 {
 		health_uri /api/saude
 		health_interval 30s

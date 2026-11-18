@@ -14,7 +14,7 @@ Guia de desenvolvimento do FrequenciApp: como preparar o ambiente, abrir issues,
 
 ## Ambiente de desenvolvimento
 
-Pré-requisitos: Node.js 20.19 ou superior e Docker com Compose no modo recomendado, ou um PostgreSQL 17 próprio, conforme [docs/ambiente.md](docs/ambiente.md).
+Pré-requisitos: Node.js 22.12 ou superior e Docker com Compose no modo recomendado, ou um PostgreSQL 17 próprio, conforme [docs/ambiente.md](docs/ambiente.md).
 
 ```bash
 pnpm install --frozen-lockfile

@@ -101,6 +101,18 @@ A cópia completa exige novamente a senha atual da administração por `POST /ap
 - A conta de implantação no grupo `docker` tem privilégio equivalente a root. Usar conta dedicada, chave SSH e acesso restrito.
 - `MIGRAR_NA_PARTIDA=false` não dispensa a migração: ela precisa ocorrer em Job ou etapa anterior à aplicação.
 
+### Métricas Prometheus
+
+- `/api/metricas` é uma rota interna. Sem `METRICAS_TOKEN`, responde 404; com token errado, 401; com o token válido, 200. A comparação usa `timingSafeEqual` e não depende de cabeçalhos de encaminhamento.
+- O token tem de 32 a 200 caracteres, fica no `app.env` com modo 600 e não aparece no `prometheus.yml`, em labels, em logs ou em mensagens do instalador. O Prometheus o grava em `/tmp/metricas-token`, com permissão restrita.
+- O Prometheus fica apenas na rede `interna`, sem portas publicadas e sem saída para a internet. A ponte `prometheus-ui` publica o painel somente em `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha apenas para `prometheus:9090`.
+- Caddy e Nginx respondem 404 para `/api/metricas` antes do proxy. O bloqueio público não depende do token.
+- O painel não tem autenticação própria. O acesso fica restrito ao loopback e ao túnel SSH. O Prometheus inicia sem lifecycle e sem admin API.
+- Nenhum label recebe nome, matrícula, e-mail, identificador de aluno, identificador de turma, código de escola, SQL ou conteúdo de requisição. O label de rota é um padrão, a fila publica apenas contagens por estado e o histograma do banco não usa SQL.
+- O volume `prometheus_data` não entra no backup. O `app.env` cifrado pode conter o token e precisa do mesmo cuidado de um segredo.
+
+O guia operacional está em [observabilidade.md](observabilidade.md).
+
 ## Superfície de dependências
 
 Distribuição enxuta: framework, UI, Prisma 7 com adaptador pg, zod, Motion e dotenv para o CLI. Nenhuma dependência de serviços externos em runtime, o que elimina toda uma classe de risco de integração. O service worker é código próprio, auditável em um arquivo.

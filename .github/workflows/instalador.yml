@@ -91,7 +91,7 @@ jobs:
             tests/servidor/controlador tests/instalador infra/servidor \
             docker/app/migrar.mjs src/infra/schema-postgres.mjs package.json instalar.sh .env.example \
             compose.yml compose.servidor.yml compose.servidor-caddy.yml \
-            compose.servidor-nginx.yml | tar -x -C "$contexto"
+            compose.servidor-nginx.yml compose.observabilidade.yml | tar -x -C "$contexto"
           docker build --network default \
             -f "$contexto/tests/servidor/controlador/Dockerfile" \
             -t "frequenciapp-instalador-unit-teste:${{ github.run_id }}-${{ github.run_attempt }}" "$contexto"
@@ -131,7 +131,7 @@ jobs:
             tests/servidor/controlador tests/instalador infra/servidor \
             docker/app/migrar.mjs src/infra/schema-postgres.mjs package.json instalar.sh .env.example \
             compose.yml compose.servidor.yml compose.servidor-caddy.yml \
-            compose.servidor-nginx.yml | tar -x -C "$contexto"
+            compose.servidor-nginx.yml compose.observabilidade.yml | tar -x -C "$contexto"
           docker build --network default \
             -f "$contexto/tests/servidor/controlador/Dockerfile" \
             -t "frequenciapp-controlador-teste:${{ github.run_id }}-${{ github.run_attempt }}" "$contexto"

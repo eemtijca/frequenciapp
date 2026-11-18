@@ -5,7 +5,7 @@
   "packageManager": "pnpm@12.11.2",
   "description": "Registro de frequência escolar para professores, mobile-first.",
   "engines": {
-    "node": ">=20.19.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "node scripts/assets/copiar-swagger-ui.mjs && next dev -p 3000",
@@ -60,6 +60,7 @@
     "@hookform/resolvers": "^7.0.5",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
+    "@prometheus-io/client": "^0.16.1",
     "@radix-ui/react-alert-dialog": "^1.2.1",
     "@radix-ui/react-collapsible": "^1.2.1",
     "@radix-ui/react-dialog": "^1.3.1",

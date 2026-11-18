@@ -7,6 +7,8 @@ tmp=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-validar.XXXXXX")
 trap 'rm -rf "$tmp"' EXIT
 
 export AUTH_SECRET="segredo-dummy-de-32-bytes-para-validacao"
+export METRICAS_TOKEN="token-dummy-de-validacao-com-32-caracteres"
+export PROMETHEUS_PORTA=9090
 export POSTGRES_USER="frequencia"
 export POSTGRES_PASSWORD="frequencia"
 export POSTGRES_DB="frequencia"
@@ -27,6 +29,10 @@ POSTGRES_DB=$POSTGRES_DB
 EOF
 chmod 600 "$APP_ENV_FILE"
 
+# Token sintético da validação: vai para um arquivo restrito e nunca é impresso.
+printf '%s' "$METRICAS_TOKEN" >"$tmp/metricas-token"
+chmod 600 "$tmp/metricas-token"
+
 for script in "$REPO"/scripts/servidor/*.sh; do
   bash -n "$script"
 done
@@ -37,17 +43,41 @@ docker run --rm \
   koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d \
   -x -P scripts/servidor -P scripts/servidor/controlador scripts/servidor/*.sh scripts/servidor/controlador/*.sh
 
+docker run --rm \
+  -v "$REPO:/mnt" \
+  -w /mnt \
+  koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d \
+  -x infra/observabilidade/prometheus/entrypoint.sh
+
 docker compose \
   -f "$REPO/compose.yml" \
   -f "$REPO/compose.servidor.yml" \
   -f "$REPO/compose.servidor-caddy.yml" \
+  -f "$REPO/compose.observabilidade.yml" \
   config --quiet
 
 docker compose \
   -f "$REPO/compose.yml" \
   -f "$REPO/compose.servidor.yml" \
   -f "$REPO/compose.servidor-nginx.yml" \
+  -f "$REPO/compose.observabilidade.yml" \
   config --quiet
+
+# A configuração referencia /etc/prometheus/regras.yml e /tmp/metricas-token.
+# O mesmo UID do host mantém a leitura possível em worktrees de permissões restritas.
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$REPO/infra/observabilidade/prometheus:/etc/prometheus:ro" \
+  -v "$tmp/metricas-token:/tmp/metricas-token:ro" \
+  --entrypoint /bin/promtool \
+  prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06 \
+  check config /etc/prometheus/prometheus.yml
+
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$REPO/infra/observabilidade/prometheus:/etc/prometheus:ro" \
+  -v "$tmp/metricas-token:/tmp/metricas-token:ro" \
+  --entrypoint /bin/promtool \
+  prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06 \
+  check rules /etc/prometheus/regras.yml
 
 # A integração adapta os três modos e prova TLS sem SNI com CA sintética, sem rede externa.
 setpriv --no-new-privs node "$REPO/tests/servidor/caddy-integracao.mjs"

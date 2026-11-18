@@ -1,0 +1,63 @@
+# Regras de alerta da fase 1: indisponibilidade, erros, latência, pool e fila.
+
+groups:
+  - name: frequenciapp
+    rules:
+      - alert: FrequenciappIndisponivel
+        expr: up{job="frequenciapp"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "A coleta do FrequenciApp falhou."
+          description: "O alvo app:3000 não responde há mais de 2 minutos."
+
+      - alert: FrequenciappErros5xx
+        expr: |
+          (
+            sum(rate(frequenciapp_http_requests_total{status=~"5.."}[5m]))
+            /
+            sum(rate(frequenciapp_http_requests_total[5m]))
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taxa de erros 5xx acima de 5%."
+          description: "A proporção de respostas 5xx passou de 5% nos últimos 5 minutos."
+
+      - alert: FrequenciappLatenciaP95
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(frequenciapp_http_request_duration_seconds_bucket[5m]))
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latência p95 acima de 5 segundos."
+          description: "O percentil 95 das requisições passou de 5 segundos nos últimos 5 minutos."
+
+      - alert: FrequenciappPoolAguardando
+        expr: frequenciapp_db_pool_connections{state="waiting"} > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Requisições aguardando conexão do banco."
+          description: "O pool tem requisições aguardando conexão há mais de 10 minutos."
+
+      - alert: FrequenciappFilaPlanilhaParada
+        expr: |
+          (
+            frequenciapp_fila_planilha_itens{estado=~"AGUARDANDO|EM_ANDAMENTO|FALHOU"} > 0
+            and
+            (time() - frequenciapp_fila_planilha_mais_antiga_timestamp_seconds) > 3600
+          )
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Fila de envio à planilha parada."
+          description: "O item aberto mais antigo da fila passou de 1 hora."

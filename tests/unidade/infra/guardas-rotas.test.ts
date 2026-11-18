@@ -87,6 +87,12 @@ describe("guardas das rotas da API", () => {
         expect(GUARDA.test(item.corpo)).toBe(false);
         return;
       }
+      if (chave === "metricas GET") {
+        // A rota interna usa Bearer METRICAS_TOKEN, não cookie de sessão.
+        expect(item.corpo).toMatch(/tokenConfere\([\s\S]*?authorization/);
+        expect(GUARDA.test(item.corpo)).toBe(false);
+        return;
+      }
       if (chave in PUBLICAS) {
         expect(GUARDA.test(item.corpo)).toBe(false);
         return;

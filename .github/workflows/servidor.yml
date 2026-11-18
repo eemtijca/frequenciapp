@@ -5,11 +5,13 @@ on:
   pull_request:
     paths:
       - "compose.servidor*.yml"
+      - "compose.observabilidade.yml"
       - "compose.yml"
       - "Dockerfile"
       - ".dockerignore"
       - "docker/app/**"
       - "src/infra/schema-postgres.mjs"
+      - "infra/observabilidade/**"
       - "infra/servidor/**"
       - "infra/kubernetes/**"
       - "scripts/servidor/**"

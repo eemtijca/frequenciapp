@@ -28,6 +28,7 @@ const nextConfig: NextConfig = {
   output: process.env.VERCEL ? undefined : "standalone",
   poweredByHeader: false,
   reactStrictMode: true,
+  serverExternalPackages: ["@prometheus-io/client"],
   // A versão em Markdown da referência é lida do disco na rota /api/docs/api.md;
   // o arquivo precisa acompanhar a função no standalone e na Vercel.
   outputFileTracingIncludes: {

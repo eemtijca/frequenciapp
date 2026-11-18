@@ -13,6 +13,9 @@ Variáveis de ambiente e execução local. A aplicação valida `DATABASE_URL`, 
 | PERMITIR_HTTP     | não         | `false`             | Aceita implantação sem TLS: cookie sem Secure, sem HSTS e sem upgrade para HTTPS no CSP. Ver a seção de HTTP sem TLS abaixo. |
 | MIGRAR_NA_PARTIDA | não         | `true`              | Aplica as migrações no entrypoint. Use `false` quando a plataforma roda a migração em Job separado.                          |
 | COMMIT_SHA        | não         | `local`             | Revisão exibida em `/api/saude`.                                                                                             |
+| METRICAS_TOKEN    | não         |                     | Token da coleta Prometheus em `/api/metricas`. Sem ele, a rota responde 404. Gere com `openssl rand -hex 32`.                |
+
+`METRICAS_TOKEN` é opcional e restrito ao coletor interno. Sem o token, a rota `/api/metricas` responde 404; com token errado, 401; com o token válido, 200. O bloqueio do acesso público fica no Caddy e no Nginx. O guia está em [observabilidade.md](observabilidade.md).
 
 Para as planilhas de frequência e de saídas por OAuth, configure as cinco variáveis juntas:
 
@@ -94,7 +97,7 @@ O usuário PostgreSQL da URL precisa existir e ter permissões no schema escolhi
 
 ## Execução local sem Docker
 
-Pré-requisitos: Node.js 20.19 ou superior e um PostgreSQL 17 acessível.
+Pré-requisitos: Node.js 22.12 ou superior e um PostgreSQL 17 acessível.
 
 O CI e a imagem da aplicação usam Node 26, com versão e digest registrados em `scripts/github/ferramentas.json`. A imagem instala Corepack em versão explícita antes de habilitar o pnpm fixado no `packageManager`; Node 26 não inclui esse executável. O bootstrap do instalador usa um runtime privado Node 24 independente e não exige trocar o Node do sistema.
 
