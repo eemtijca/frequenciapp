@@ -28,7 +28,7 @@ O agendador continua sendo o GitHub Actions. O workflow `notificacoes.yml` chama
 - Docker com Compose.
 - Emuladores do Floci (`floci`, `floci-az` e `floci-gcp`).
 - AWS CLI, Azure CLI e gcloud apenas para inspeção manual; os scripts usam `curl` e o próprio Terraform.
-- Node 20.19 ou superior para construir a imagem da aplicação.
+- Node 22.12 ou superior para construir a imagem da aplicação.
 
 ## Estrutura
 

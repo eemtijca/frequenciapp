@@ -92,7 +92,7 @@ A demonstração pública fica em https://frequenciappjca.vercel.app. Para exper
 
 ## Pré-requisitos
 
-- Node.js 20.19 ou superior.
+- Node.js 22.12 ou superior.
 - Docker com Compose no modo recomendado.
 - PostgreSQL 17 próprio, como alternativa ao Compose.
 

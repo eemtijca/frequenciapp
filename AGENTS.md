@@ -20,7 +20,7 @@ FrequenciApp: aplicativo de frequência escolar para a coordenação de uma esco
 
 ## Comandos
 
-Pré-requisitos: Node.js 20.19 ou superior e PostgreSQL 17 (ou Docker Compose). O CI e a imagem Docker usam Node 26. O bootstrap independente do instalador mantém o runtime Node 24.
+Pré-requisitos: Node.js 22.12 ou superior e PostgreSQL 17 (ou Docker Compose). O CI e a imagem Docker usam Node 26. O bootstrap independente do instalador mantém o runtime Node 24.
 
 - Gerenciador é pnpm, com `pnpm-lock.yaml` versionado; não use bun, yarn nem npm nos comandos.
 - Ambiente local: `pnpm install --frozen-lockfile`; `cp .env.example .env` com `AUTH_SECRET` de 32 caracteres ou mais; `pnpm exec prisma migrate deploy`; depois `pnpm run criar-admin`, `pnpm run criar-coordenacao` e `pnpm run seed` com as variáveis `ADMIN_*`, `CONTA_*` e `SEED_*`. A semente simula um ano letivo com nove turmas e 35 a 50 alunos por turma; parâmetros e limpeza em `docs/ambiente.md`.
