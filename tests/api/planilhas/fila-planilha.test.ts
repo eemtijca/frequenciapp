@@ -10,6 +10,8 @@ const EMAIL_ADMIN = process.env.TESTE_ADMIN_EMAIL ?? "direcao@escola.exemplo";
 const SENHA_ADMIN = process.env.TESTE_ADMIN_SENHA ?? "DirecaoFrequencia2026";
 const EMAIL_COORDENACAO = process.env.TESTE_COORDENACAO_EMAIL ?? "demo@escola.exemplo";
 const SENHA_COORDENACAO = process.env.TESTE_COORDENACAO_SENHA ?? "DemoFrequencia2026";
+const metricasToken = process.env.METRICAS_TOKEN ?? "";
+const medirMetricas = metricasToken.length > 0;
 const ABA = "Saiu mais cedo";
 const CABECALHO = [
   "Data",
@@ -188,6 +190,35 @@ async function processar(): Promise<ResumoFila> {
   return json<ResumoFila>(resposta);
 }
 
+interface ContadoresDaFila {
+  concluido: number;
+  falha: number;
+}
+
+async function contadoresDaFila(): Promise<ContadoresDaFila> {
+  const resposta = await fetch(`${APP_URL}/api/metricas`, {
+    headers: { Authorization: `Bearer ${metricasToken}` },
+  });
+  expect(resposta.status).toBe(200);
+  const texto = await resposta.text();
+  const valor = (resultado: "concluido" | "falha") => {
+    const prefixo = `frequenciapp_fila_planilha_processados_total{resultado="${resultado}"}`;
+    const linha = texto.split("\n").find((item) => item.startsWith(prefixo));
+    return Number(linha?.split(" ").at(-1) ?? 0);
+  };
+  return { concluido: valor("concluido"), falha: valor("falha") };
+}
+
+function somarResumos(resumos: ResumoFila[]): ContadoresDaFila {
+  return resumos.reduce(
+    (total, resumo) => ({
+      concluido: total.concluido + resumo.concluidos,
+      falha: total.falha + resumo.falhas,
+    }),
+    { concluido: 0, falha: 0 },
+  );
+}
+
 beforeAll(async () => {
   const conexao = process.env.DATABASE_URL;
   if (conexao?.startsWith("postgresql://")) {
@@ -286,8 +317,15 @@ describe("ordem de entrada", () => {
     await inserirItem("2026-09-01");
     await inserirItem("2026-09-02");
     await inserirItem("2026-09-03");
+    const metricasAntes = medirMetricas ? await contadoresDaFila() : null;
     // Dois pedidos ao mesmo tempo não duplicam o envio de nenhum item.
-    await Promise.all([processar(), processar()]);
+    const resumos = await Promise.all([processar(), processar()]);
+    if (metricasAntes) {
+      const metricasDepois = await contadoresDaFila();
+      const esperado = somarResumos(resumos);
+      expect(metricasDepois.concluido - metricasAntes.concluido).toBe(esperado.concluido);
+      expect(metricasDepois.falha - metricasAntes.falha).toBe(esperado.falha);
+    }
     expect(
       await esperar(async () => (await fila()).every((item) => item.estado === "CONCLUIDO")),
     ).toBe(true);
@@ -372,7 +410,13 @@ describe("falhas e retentativas", () => {
     const [condenado, seguinte] = await fila();
     await sql().query("update fila_planilha set tentativas = 4 where id = $1", [condenado?.id]);
     await vencerEspera(condenado?.id ?? "");
+    const metricasAntes = medirMetricas ? await contadoresDaFila() : null;
     const resumo = await processar();
+    if (metricasAntes) {
+      const metricasDepois = await contadoresDaFila();
+      expect(metricasDepois.falha - metricasAntes.falha).toBe(resumo.falhas);
+      expect(metricasDepois.concluido - metricasAntes.concluido).toBe(resumo.concluidos);
+    }
     expect(resumo.processados).toBe(2);
     const itens = await fila();
     expect(itens[0]).toMatchObject({ id: condenado?.id, estado: "FALHOU", tentativas: 5 });
@@ -380,7 +424,15 @@ describe("falhas e retentativas", () => {
     expect(itens[1]).toMatchObject({ id: seguinte?.id, estado: "AGUARDANDO", tentativas: 1 });
     google?.recusarGravacoes(false);
     await vencerEspera(seguinte?.id ?? "");
-    await processar();
+    const metricasAntesDoSucesso = medirMetricas ? await contadoresDaFila() : null;
+    const sucesso = await processar();
+    if (metricasAntesDoSucesso) {
+      const metricasDepoisDoSucesso = await contadoresDaFila();
+      expect(metricasDepoisDoSucesso.concluido - metricasAntesDoSucesso.concluido).toBe(
+        sucesso.concluidos,
+      );
+      expect(metricasDepoisDoSucesso.falha - metricasAntesDoSucesso.falha).toBe(sucesso.falhas);
+    }
     expect((await fila())[1]?.estado).toBe("CONCLUIDO");
     expect(linhaDe("QF Hugo")).toBeGreaterThan(0);
   });
@@ -465,11 +517,17 @@ describe("agenda com segredo", () => {
   it.skipIf(!process.env.CRON_SECRET)("recolhe o que sobrou na fila", async () => {
     await sql().query("delete from fila_planilha where tipo = 'SAIDAS'");
     const id = await inserirItem("2026-09-01");
+    const metricasAntes = medirMetricas ? await contadoresDaFila() : null;
     const resposta = await fetch(`${APP_URL}/api/planilha/fila/agenda`, {
       headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
     });
     expect(resposta.status).toBe(200);
     const resumo = await json<ResumoFila>(resposta);
+    if (metricasAntes) {
+      const metricasDepois = await contadoresDaFila();
+      expect(metricasDepois.concluido - metricasAntes.concluido).toBe(resumo.concluidos);
+      expect(metricasDepois.falha - metricasAntes.falha).toBe(resumo.falhas);
+    }
     expect(resumo.processados).toBeGreaterThanOrEqual(1);
     expect((await fila()).find((item) => item.id === id)?.estado).toBe("CONCLUIDO");
   });

@@ -1,17 +1,33 @@
 // Registro Prometheus do processo: métricas padrão do Node, identificação
 // da versão e observação das requisições HTTP.
 import { collectDefaultMetrics, Counter, Gauge, Histogram, Registry } from "@prometheus-io/client";
+import type { ResumoDoProcessamento } from "@/domain/fila-planilha";
 import { COMMIT, VERSAO } from "@/infra/versao";
 
 const globalComMetricas = globalThis as unknown as {
   __frequenciappMetricas?: Metricas;
 };
 
+export type ResultadoDeFrequencia = "salvo" | "conflito";
+export type ResultadoDaFila = "concluido" | "falha";
+export type ResultadoDeNotificacao = "enviada" | "expirada" | "falha" | "ignorada";
+
+/** Totais devolvidos pela agenda de notificações. */
+export interface TotaisDeNotificacoes {
+  enviadas: number;
+  expiradas: number;
+  falhas: number;
+  ignoradas: number;
+}
+
 export interface Metricas {
   registro: Registry;
   requisicoes: Counter<"method" | "route" | "status">;
   duracao: Histogram<"method" | "route">;
   emAndamento: Gauge;
+  frequenciasSalvas: Counter<"resultado">;
+  filaPlanilhaProcessados: Counter<"resultado">;
+  notificacoesEnviadas: Counter<"resultado">;
 }
 
 function criarMetricas(): Metricas {
@@ -47,7 +63,36 @@ function criarMetricas(): Metricas {
     registers: [registro],
   });
 
-  return { registro, requisicoes, duracao, emAndamento };
+  const frequenciasSalvas = new Counter({
+    name: "frequenciapp_frequencias_salvas_total",
+    help: "Salvamentos de frequência por resultado.",
+    labelNames: ["resultado"] as const,
+    registers: [registro],
+  });
+
+  const filaPlanilhaProcessados = new Counter({
+    name: "frequenciapp_fila_planilha_processados_total",
+    help: "Itens processados da fila de planilhas por resultado.",
+    labelNames: ["resultado"] as const,
+    registers: [registro],
+  });
+
+  const notificacoesEnviadas = new Counter({
+    name: "frequenciapp_notificacoes_enviadas_total",
+    help: "Avisos da agenda por resultado.",
+    labelNames: ["resultado"] as const,
+    registers: [registro],
+  });
+
+  return {
+    registro,
+    requisicoes,
+    duracao,
+    emAndamento,
+    frequenciasSalvas,
+    filaPlanilhaProcessados,
+    notificacoesEnviadas,
+  };
 }
 
 /** Registro único por processo, preservado no recarregamento do desenvolvimento. */
@@ -93,6 +138,52 @@ export function observarRequisicao(
       status: String(status),
     });
     duracao.observe({ method: contexto.method, route: contexto.route }, duracaoSegundos);
+  } catch {
+    // Métrica nunca derruba a rota.
+  }
+}
+
+/** Conta o desfecho de um salvamento de frequência sem derrubar a rota. */
+export function registrarFrequencia(resultado: ResultadoDeFrequencia): void {
+  try {
+    metricas().frequenciasSalvas.inc({ resultado });
+  } catch {
+    // Métrica nunca derruba a rota.
+  }
+}
+
+/** Soma ao contador os concluídos e as falhas do resumo da fila de planilhas. */
+export function registrarFilaProcessada(
+  resumo: Pick<ResumoDoProcessamento, "concluidos" | "falhas">,
+): void {
+  try {
+    const { filaPlanilhaProcessados } = metricas();
+    if (resumo.concluidos > 0) {
+      filaPlanilhaProcessados.inc({ resultado: "concluido" }, resumo.concluidos);
+    }
+    if (resumo.falhas > 0) {
+      filaPlanilhaProcessados.inc({ resultado: "falha" }, resumo.falhas);
+    }
+  } catch {
+    // Métrica nunca derruba a rota.
+  }
+}
+
+/** Soma ao contador os avisos enviados, expirados, com falha e ignorados. */
+export function registrarNotificacoes(totais: TotaisDeNotificacoes): void {
+  try {
+    const { notificacoesEnviadas } = metricas();
+    const resultados: [ResultadoDeNotificacao, number][] = [
+      ["enviada", totais.enviadas],
+      ["expirada", totais.expiradas],
+      ["falha", totais.falhas],
+      ["ignorada", totais.ignoradas],
+    ];
+    for (const [resultado, valor] of resultados) {
+      if (Number.isFinite(valor) && valor > 0) {
+        notificacoesEnviadas.inc({ resultado }, valor);
+      }
+    }
   } catch {
     // Métrica nunca derruba a rota.
   }
