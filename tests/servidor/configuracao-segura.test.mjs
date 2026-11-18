@@ -147,6 +147,23 @@ test("a validação recusa comandos, substituições e quebras de linha escapada
   }
 });
 
+test("o token de métricas fica fora da configuração versionada", () => {
+  const compose = ler("compose.observabilidade.yml");
+  const prometheus = ler("infra/observabilidade/prometheus/prometheus.yml");
+  const validar = ler("infra/servidor/validar.sh");
+  const entrypoint = ler("infra/observabilidade/prometheus/entrypoint.sh");
+  const token = /export METRICAS_TOKEN="([^"]+)"/.exec(validar)?.[1] ?? "";
+
+  assert.match(token, /^[A-Za-z0-9_-]{32,200}$/);
+  assert.ok(!/echo[^\n]*\$\{?METRICAS_TOKEN/.test(validar), "O token não pode ser impresso.");
+  assert.match(compose, /METRICAS_TOKEN: \$\{METRICAS_TOKEN:\?/);
+  assert.ok(!prometheus.includes("METRICAS_TOKEN"), "O YAML não recebe o token.");
+  assert.match(prometheus, /credentials_file: \/tmp\/metricas-token/);
+  assert.match(validar, /chmod 600 "\$tmp\/metricas-token"/);
+  assert.match(entrypoint, /umask 077/);
+  assert.match(entrypoint, /\$\{#METRICAS_TOKEN\}/);
+});
+
 test("o shell carrega todos os horários sem executá-los como comandos", () => {
   const esperado = {
     AGENDA_HORARIO: "*/5 * * * *",

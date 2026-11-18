@@ -273,6 +273,103 @@ function conferirAcme(politica, perfil) {
   assert.equal(politica.issuers[0].profile, perfil);
 }
 
+function conferirBloqueioDeMetricas(adaptado, rotulo) {
+  for (const servidor of Object.values(adaptado.apps.http.servers)) {
+    const subrotas = (servidor.routes ?? []).flatMap((rota) => rota.handle ?? []);
+    const rotas = subrotas
+      .filter((handler) => handler.handler === "subroute")
+      .map((handler) => handler.routes ?? [])
+      .find((lista) => lista.some((rota) => temHandler(rota, "reverse_proxy")));
+    if (!rotas) continue;
+
+    const bloqueio = rotas.findIndex(
+      (rota) =>
+        temHandler(rota, "static_response", "404") &&
+        rota.match?.some((match) => match.path?.includes("/api/metricas")),
+    );
+    const proxy = rotas.findIndex((rota) => temHandler(rota, "reverse_proxy"));
+    assert.ok(bloqueio >= 0, `${rotulo}: bloqueio de /api/metricas ausente.`);
+    assert.ok(proxy > bloqueio, `${rotulo}: bloqueio precisa vir antes do proxy.`);
+    const handler = rotas[proxy].handle.find((item) => item.handler === "reverse_proxy");
+    assert.equal(handler.health_checks?.active?.uri, "/api/saude", `${rotulo}: saúde ativa.`);
+    return;
+  }
+  assert.fail(`${rotulo}: subrota com proxy ausente.`);
+}
+
+function temHandler(rota, nome, status) {
+  return (rota.handle ?? []).some(
+    (handler) =>
+      handler.handler === nome && (status === undefined || String(handler.status_code) === status),
+  );
+}
+
+// Cliente sintético executado ao lado do Caddy: /api/metricas precisa responder 404
+// sem chegar à aplicação e /api/saude precisa continuar sendo encaminhada.
+const codigoClienteMetricas = String.raw`import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import http from "node:http";
+import https from "node:https";
+import tls from "node:tls";
+
+const ip = "203.0.113.10";
+const recebidas = [];
+const app = http.createServer((pedido, resposta) => {
+  recebidas.push(pedido.url);
+  resposta.end("aplicacao-sintetica\n");
+});
+await new Promise((resolve, reject) => {
+  app.once("error", reject);
+  app.listen(3000, "127.0.0.1", resolve);
+});
+
+function requisitar(caminho) {
+  return new Promise((resolve, reject) => {
+    const pedido = https.request(
+      {
+        host: "127.0.0.1",
+        port: 8443,
+        path: caminho,
+        servername: "",
+        ca: readFileSync("/fixture/ca.pem"),
+        rejectUnauthorized: true,
+        headers: { Host: ip },
+        checkServerIdentity: (_nome, certificado) => tls.checkServerIdentity(ip, certificado),
+      },
+      (resposta) => {
+        let corpo = "";
+        resposta.setEncoding("utf8");
+        resposta.on("data", (parte) => {
+          corpo += parte;
+        });
+        resposta.on("end", () => resolve({ status: resposta.statusCode, corpo }));
+      },
+    );
+    pedido.once("error", reject);
+    pedido.end();
+  });
+}
+
+try {
+  const metricas = await requisitar("/api/metricas");
+  assert.equal(metricas.status, 404);
+  assert.doesNotMatch(metricas.corpo, /aplicacao-sintetica/);
+  assert.ok(!recebidas.includes("/api/metricas"), "O proxy entregou /api/metricas à aplicação.");
+
+  const saude = await requisitar("/api/saude");
+  assert.equal(saude.status, 200);
+  assert.match(saude.corpo, /aplicacao-sintetica/);
+  assert.ok(recebidas.includes("/api/saude"), "O proxy não entregou /api/saude à aplicação.");
+
+  process.stdout.write(
+    "Bloqueio: /api/metricas responde 404 sem chegar ao app e /api/saude continua no proxy.\n",
+  );
+} finally {
+  app.closeAllConnections();
+  await new Promise((resolve) => app.close(resolve));
+}
+`;
+
 try {
   process.stdout.write(`Evidências sintéticas preservadas em ${pasta}\n`);
   for (const imagem of [imagemCaddy, imagemNode]) {
@@ -307,6 +404,7 @@ try {
     ),
     undefined,
   );
+  conferirBloqueioDeMetricas(dns, "Caddyfile");
   for (const dominio of ["frequencia.example.invalid", ip]) {
     const interno = adaptar("Caddyfile.interno", dominio);
     assert.equal(
@@ -314,12 +412,16 @@ try {
         .issuers[0].module,
       "internal",
     );
+    conferirBloqueioDeMetricas(interno, `Caddyfile.interno ${dominio}`);
   }
-  process.stdout.write("Compose e adaptação: FQDN ACME e TLS interno (FQDN/IPv4) preservados.\n");
+  process.stdout.write(
+    "Compose e adaptação: FQDN ACME, TLS interno (FQDN/IPv4) e bloqueio de /api/metricas preservados.\n",
+  );
   const ipv4 = adaptar("Caddyfile.ipv4", ip);
   const politica = ipv4.apps.tls.automation.policies.find((p) => p.subjects?.includes(ip));
   process.stdout.write(`Política IPv4 observada: ${JSON.stringify(politica)}\n`);
   conferirAcme(politica, "shortlived");
+  conferirBloqueioDeMetricas(ipv4, "Caddyfile.ipv4");
   const servidores = Object.values(ipv4.apps.http.servers);
   const servidor = servidores.find((s) => s.listen?.includes(":443"));
   assert.ok(servidor, "Servidor HTTPS ausente.");
@@ -397,6 +499,7 @@ try {
     "servidor.pem",
   ]);
   copyFileSync(join(repo, "tests/servidor/caddy-cliente.mjs"), join(pasta, "cliente.mjs"));
+  salvar("cliente-metricas.mjs", codigoClienteMetricas);
   for (const negativo of [false, true]) {
     const config = structuredClone(ipv4);
     if (negativo)
@@ -411,6 +514,19 @@ try {
         criar("cliente", imagemNode, ["/fixture/cliente.mjs", nome], [], `container:${caddy.id}`),
       )}\n`,
     );
+    if (!negativo) {
+      process.stdout.write(
+        `${rodar(
+          criar(
+            "cliente-metricas",
+            imagemNode,
+            ["/fixture/cliente-metricas.mjs"],
+            [],
+            `container:${caddy.id}`,
+          ),
+        )}\n`,
+      );
+    }
     docker("stop", "--time", "3", caddy.id);
     terminar(caddy);
   }

@@ -20,9 +20,10 @@ describe("servidor auto-hospedado", () => {
     expect(compose).toContain('profiles: ["backup"]');
   });
 
-  it("mantém Caddy público e interno com proxy e saúde", async () => {
+  it("mantém Caddy público, interno e IPv4 com proxy e saúde", async () => {
     const publico = await ler("infra/servidor/Caddyfile");
     const interno = await ler("infra/servidor/Caddyfile.interno");
+    const ipv4 = await ler("infra/servidor/Caddyfile.ipv4");
 
     expect(publico).toContain("acme_ca {$ACME_CA}");
     expect(publico).toContain("reverse_proxy app:3000");
@@ -30,6 +31,25 @@ describe("servidor auto-hospedado", () => {
     expect(publico).toContain("admin off");
     expect(interno).toContain("tls internal");
     expect(interno).toContain("reverse_proxy app:3000");
+    expect(ipv4).toContain("default_sni {$DOMINIO}");
+    expect(ipv4).toContain("reverse_proxy app:3000");
+  });
+
+  it("bloqueia /api/metricas no Caddy antes do proxy e preserva /api/saude", async () => {
+    for (const arquivo of [
+      "infra/servidor/Caddyfile",
+      "infra/servidor/Caddyfile.interno",
+      "infra/servidor/Caddyfile.ipv4",
+    ]) {
+      const conteudo = await ler(arquivo);
+
+      expect(conteudo, arquivo).toContain("@metricas path /api/metricas");
+      expect(conteudo, arquivo).toContain("respond @metricas 404");
+      expect(conteudo.indexOf("respond @metricas 404"), arquivo).toBeLessThan(
+        conteudo.indexOf("reverse_proxy app:3000"),
+      );
+      expect(conteudo, arquivo).toContain("health_uri /api/saude");
+    }
   });
 
   it("mantém Nginx com HTTP inicial, HTTPS e cabeçalhos de proxy", async () => {
@@ -47,6 +67,23 @@ describe("servidor auto-hospedado", () => {
     expect(https).toContain("proxy_pass http://app:3000");
     expect(https).toContain("X-Forwarded-For");
     expect(https).toContain("X-Forwarded-Proto");
+  });
+
+  it("bloqueia /api/metricas no Nginx com correspondência exata", async () => {
+    const http = await ler("infra/servidor/nginx/frequenciapp-http.conf");
+    const https = await ler("infra/servidor/nginx/frequenciapp-https.conf");
+    const bloco = "location = /api/metricas {\n        return 404;\n    }";
+    const httpsServidor = https.slice(https.indexOf("listen 443 ssl"));
+
+    for (const [arquivo, conteudo] of [
+      ["frequenciapp-http.conf", http],
+      ["frequenciapp-https.conf", httpsServidor],
+    ] as const) {
+      expect(conteudo, arquivo).toContain(bloco);
+      expect(conteudo.indexOf("location = /api/metricas"), arquivo).toBeLessThan(
+        conteudo.indexOf("location / {"),
+      );
+    }
   });
 
   it("mantém backup com Compose, URL, GPG, age e retenção mínima", async () => {
@@ -188,6 +225,38 @@ describe("servidor auto-hospedado", () => {
     expect(values).toContain("agenda:");
     expect(values).toContain("backup:");
     expect(values).toContain("existingSecret");
+  });
+
+  it("valida Prometheus, token em arquivo e overlay do Compose nos dois proxies", async () => {
+    const validar = await ler("infra/servidor/validar.sh");
+    const observabilidade = await ler("compose.observabilidade.yml");
+    const prometheus = await ler("infra/observabilidade/prometheus/prometheus.yml");
+    const token = /export METRICAS_TOKEN="([^"]+)"/.exec(validar)?.[1] ?? "";
+
+    expect(token).toMatch(/^[A-Za-z0-9_-]{32,200}$/);
+    expect(validar).toContain("export PROMETHEUS_PORTA=9090");
+    expect(validar.match(/compose\.observabilidade\.yml/g)).toHaveLength(2);
+    expect(validar).toContain("infra/observabilidade/prometheus/entrypoint.sh");
+    expect(validar).toContain(
+      "prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06",
+    );
+    expect(validar).toContain('-v "$REPO/infra/observabilidade/prometheus:/etc/prometheus:ro"');
+    expect(validar).toContain("check config /etc/prometheus/prometheus.yml");
+    expect(validar).toContain("check rules /etc/prometheus/regras.yml");
+    expect(validar).toContain('-v "$tmp/metricas-token:/tmp/metricas-token:ro"');
+    expect(validar).toContain('printf \'%s\' "$METRICAS_TOKEN" >"$tmp/metricas-token"');
+    expect(validar).not.toMatch(/echo[^\n]*METRICAS_TOKEN/);
+
+    expect(observabilidade).toContain(
+      "prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06",
+    );
+    expect(observabilidade).toContain(
+      "alpine/socat:1.8.1.3@sha256:71131702f671a88b3808a70b7330f9679cd9b9933adcafadc191508edfe55bba",
+    );
+    expect(observabilidade).toContain('"127.0.0.1:${PROMETHEUS_PORTA:-9090}:9090"');
+    expect(observabilidade).toContain("METRICAS_TOKEN: ${METRICAS_TOKEN:?");
+    expect(prometheus).toContain("credentials_file: /tmp/metricas-token");
+    expect(prometheus).toContain("- /etc/prometheus/regras.yml");
   });
 
   it("publica imagens AMD64 e ARM64 e desativa workflows por variável", async () => {
