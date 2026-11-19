@@ -1,0 +1,13 @@
+# Módulo do blackbox para o alvo externo: Host, SNI e CA iguais ao domínio do vhost.
+modules:
+  https_2xx:
+    prober: http
+    timeout: 5s
+    http:
+      valid_status_codes: [200]
+      preferred_ip_protocol: ip4
+      headers:
+        Host: frequencia.exemplo.invalid
+      tls_config:
+        server_name: frequencia.exemplo.invalid
+        ca_file: /fixture/ca.pem

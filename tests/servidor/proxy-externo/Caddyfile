@@ -1,0 +1,12 @@
+# Vhosts sintéticos do ensaio de proxy externo; o certificado e a CA vêm da fixture.
+https://frequencia.exemplo.invalid {
+	tls /fixture/servidor.pem /fixture/servidor.key
+	@metricas path /api/metricas
+	respond @metricas 404
+	reverse_proxy app:3000
+}
+
+https://painel.exemplo.invalid {
+	tls /fixture/servidor.pem /fixture/servidor.key
+	respond "outro-vhost-sintetico" 200
+}

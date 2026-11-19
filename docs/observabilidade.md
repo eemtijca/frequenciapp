@@ -11,7 +11,7 @@ Guia da coleta Prometheus do FrequenciApp na auto-hospedagem. A aplicação exp�
 - Processo Node.js: CPU, memória, descritores de arquivo, event loop, coletas de lixo e versão do runtime.
 - Coleta no cluster: quando o chart Helm habilita o ServiceMonitor, o Prometheus Operator coleta `/api/metricas` pela porta `http` do Service, com o token lido do Secret.
 - Host: CPU, carga, memória, uptime, disco e sistemas de arquivos, pelo node exporter.
-- Sonda HTTPS: disponibilidade de `https://proxy:443/api/saude` e validade do certificado TLS, pelo blackbox exporter.
+- Sonda HTTPS: disponibilidade de `https://proxy:443/api/saude`, alvo específico da receita Compose, e validade do certificado TLS, pelo blackbox exporter.
 - Entrega de alertas: falhas de notificação do Alertmanager.
 - Idade do último backup: instante do último backup verificado do banco.
 - Saúde da coleta: os alvos `frequenciapp`, `prometheus`, `node-exporter`, `blackbox` e `alertmanager`; no cluster, o alvo criado pelo ServiceMonitor.
@@ -53,6 +53,21 @@ Caddy ou Nginx (80 e 443, alias de rede proxy)
 - O Prometheus, o node exporter, o blackbox exporter e o Alertmanager não publicam portas. A aplicação e o banco também continuam sem portas no host. Apenas o proxy publica 80 e 443.
 - O Docker não publica portas de um contêiner ligado apenas a uma rede `internal`. Por isso a ponte `prometheus-ui` publica `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha somente para `prometheus:9090`. A ponte participa das redes `interna` e `painel`. A rede `painel` é uma bridge comum, sem `internal: true`, criada apenas para o Docker publicar a porta no loopback; nenhum outro serviço entra nela. A rede `publica`, usada pelo proxy e pelos exporters que precisam de saída, não alcança o painel. A rede `interna` é a rede de confiança da coleta e do aplicativo. A ponte não aceita destino arbitrário, e o painel continua restrito ao loopback.
 - O volume nomeado `prometheus_data` guarda o histórico do Prometheus. O volume `alertmanager_data` guarda silêncios e estado de notificação.
+
+### Proxy reverso gerenciado fora do projeto
+
+O alvo `https://proxy:443/api/saude` pertence à receita Compose. Nela, Caddy ou Nginx são serviços deste projeto, ocupam o alias `proxy` na rede `publica` e recebem a sonda pelo nome de serviço. Um proxy gerenciado, uma CDN ou um balanceador externo não participam desse projeto e não respondem por esse nome.
+
+Quando o proxy é externo:
+
+- o alvo do blackbox precisa ser um hostname ou IP alcançável pela rede `publica`. O nome `proxy:443` só funciona se esse alias existir na rede do exporter.
+- o cabeçalho `Host`, o SNI em `server_name` e a CA em `ca_file` precisam corresponder ao domínio e à cadeia apresentada pelo proxy efetivo. Com CA pública, basta o conjunto de CAs do sistema. Com CA interna ou privada, monte a CA e aponte `ca_file`, sem desativar a validação TLS.
+- o bloqueio de `/api/metricas` é responsabilidade do proxy efetivo. O `Caddyfile` e o `nginx.conf` versionados provam o bloqueio apenas quando são a configuração aplicada. Em proxy gerenciado, a regra equivalente precisa ser conferida no painel ou na configuração efetiva.
+- o backend continua privado e autenticado. A aplicação não publica porta, a coleta usa `Authorization: Bearer` com `METRICAS_TOKEN` e o proxy não encaminha `/api/metricas`.
+
+Um alvo interno, como `https://app:3000` ou `http://proxy:80`, prova apenas que a sonda alcança aquele nome pela rede Docker. Ele não prova o domínio público, o certificado apresentado ao cliente nem o bloqueio do proxy efetivo.
+
+O ensaio `tests/servidor/proxy-externo.mjs` usa um proxy separado, vhosts sintéticos e uma CA de fixture. Ele confirma saúde 200 no domínio, certificado confiado pela CA da fixture, `/api/metricas` com 404 sem chegar ao backend e coleta autenticada com 200. O ensaio não publica portas, não reinicia serviço real e não substitui a conferência do proxy gerenciado. O roteiro manual está em [auto-hospedagem.md](auto-hospedagem.md#proxy-reverso-externo).
 
 ## Como habilitar
 
@@ -135,6 +150,8 @@ ss -lntp | grep 9090
 ```
 
 O primeiro comando deve devolver `404`, porque o proxy bloqueia a rota pública. O segundo deve mostrar `127.0.0.1:9090`, nunca `0.0.0.0:9090`.
+
+Com proxy externo, o primeiro comando continua sendo a prova da borda pública, mas não comprova a regra do provedor. O [roteiro manual](auto-hospedagem.md#roteiro-manual-do-proxy-externo) confere o certificado, o vhost e a coleta autenticada, e o ensaio sintético documenta o limite.
 
 Dentro do contêiner da aplicação, a coleta com o token do próprio ambiente confirma a rota:
 
@@ -575,6 +592,7 @@ O restante da observabilidade continua funcionando. O alvo `alertmanager:9093` v
 - O Alertmanager entra na rede `publica` apenas para alcançar o webhook ou o SMTP. Não há porta publicada, e o acesso ao serviço continua restrito às redes do projeto.
 - A ponte `prometheus-ui` publica somente `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha apenas para `prometheus:9090`. Ela roda sem privilégios, com `cap_drop: ALL`, `no-new-privileges` e sistema de arquivos somente leitura. A ponte está em `interna` e `painel`, e a rede `publica` não alcança a escuta 9090.
 - Caddy e Nginx respondem 404 para `/api/metricas` antes do proxy. O bloqueio público não depende do token.
+- Com proxy externo, o bloqueio de `/api/metricas` precisa existir na configuração efetiva do provedor. O arquivo do repositório não comprova a regra aplicada.
 - No cluster, o Pod e o `ServiceMonitor` leem o mesmo Secret e a mesma chave. Quando o Secret alternativo ou a chave diferem do Secret do Pod, o chart injeta `METRICAS_TOKEN` explícito no Pod, que vence o `envFrom`. Com `existingSecret`, o chart não altera o Secret externo e a chave é responsabilidade do operador.
 - O chart não instala o Prometheus Operator nem a CRD `monitoring.coreos.com/v1`. Habilitar o ServiceMonitor sem a CRD faz a aplicação do manifesto falhar, e o token não é criado automaticamente fora do Secret gerenciado.
 - O Ingress opcional do chart encaminha `/` ao aplicativo. A recomendação é não expor `/api/metricas` na borda e bloquear o caminho no Ingress controller ou restringir a porta do Pod com NetworkPolicy. O chart não cria essas regras.
@@ -662,11 +680,13 @@ Quando `up{job="blackbox"}` vale `1`, mas `probe_success{job="blackbox"}` não e
 Quando `probe_success{job="blackbox"}` vale `0` por 5 minutos, o alerta `FrequenciappSondaHttps` dispara com gravidade `critical`. A mensagem indica apenas que a sonda não obteve 200: a causa pode ser o serviço, o proxy ou a própria sonda.
 
 1. Conferir `probe_success{job="blackbox"}` e o último erro do alvo `blackbox` em `/targets`.
-2. Conferir se o `DOMINIO` está correto em `/etc/frequenciapp/ops.env` e se o proxy declara o alias `proxy` na rede `publica`.
-3. Conferir se o Caddy ou o Nginx responde `200` em `/api/saude` por dentro da rede.
+2. Conferir se o `DOMINIO` está correto em `/etc/frequenciapp/ops.env` e se o alvo corresponde ao arranjo. Na receita Compose, o Caddy ou o Nginx declara o alias `proxy` na rede `publica`. Com proxy externo, o alvo precisa ser um host alcançável pela rede `publica`, e `headers.Host`, `server_name` e `ca_file` precisam corresponder ao domínio e à CA do proxy efetivo.
+3. Conferir se o Caddy ou o Nginx responde `200` em `/api/saude` por dentro da rede ou, com proxy externo, se o domínio responde `200` pela rede do exporter.
 4. Conferir `probe_http_status_code` e `probe_duration_seconds` para separar recusa, tempo limite e status inesperado.
-5. Em TLS interno, conferir se a CA da escola está montada e configurada em `ca_file` no `blackbox.yml`. Sem esse ajuste, a validação do certificado falha mesmo com o serviço no ar.
-6. Conferir os logs com `scripts/servidor/compose.sh logs --tail 200 blackbox-exporter`.
+5. Em TLS interno ou com CA privada, conferir se a CA está montada e configurada em `ca_file` no `blackbox.yml`. Sem esse ajuste, a validação do certificado falha mesmo com o serviço no ar.
+6. Conferir `probe_ssl_earliest_cert_expiry` e se o certificado apresentado tem o domínio esperado. Não desativar a validação TLS para contornar a divergência.
+7. Conferir os logs com `scripts/servidor/compose.sh logs --tail 200 blackbox-exporter`.
+8. Com proxy externo, conferir a regra de bloqueio de `/api/metricas` na configuração efetiva e o roteiro de [auto-hospedagem.md](auto-hospedagem.md#proxy-reverso-externo).
 
 ### Certificado expirando
 
@@ -764,6 +784,8 @@ O limite de 1 GB evita crescimento indefinido. Se o volume crescer acima do espe
 - Em TLS interno, o blackbox precisa da CA da escola montada e de `ca_file` no `blackbox.yml`. Sem esse ajuste, a sonda falha na validação do certificado.
 - A métrica de idade do backup só existe depois de um backup verificado. Antes do primeiro backup, a regra `FrequenciappBackupAtrasado` não dispara por ausência da série.
 - O alvo `alertmanager:9093` fica fora do ar em `/targets` quando o perfil está desligado. Não há regra sobre esse alvo, então a condição não gera notificação.
+- O alvo `https://proxy:443/api/saude` só existe na receita Compose. Com proxy externo, o alvo, o Host, o SNI e a CA são responsabilidade do operador.
+- O bloqueio de `/api/metricas` no proxy gerenciado não é verificado pelo repositório. O ensaio sintético usa vhosts de fixture e não comprova a configuração do provedor.
 - O painel não tem autenticação. O acesso depende do loopback e de um acesso administrativo local ou túnel temporário.
 - O histórico não é copiado no backup. Recriar o volume perde os 15 dias anteriores.
 - O node exporter não substitui os logs do Docker nem o journal do sistema.

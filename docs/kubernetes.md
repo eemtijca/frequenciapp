@@ -147,7 +147,7 @@ kubectl get crd servicemonitors.monitoring.coreos.com
 
 Com a flag desligada, a rota continua disponível dentro do Pod e responde 404 sem token configurado, 401 com token errado e 200 com o token correto. Um `ServiceMonitor` criado fora do chart também pode coletar a rota, desde que aponte para o mesmo Secret e a mesma chave do Pod.
 
-O chart não publica a rota. O Ingress opcional encaminha `/` ao aplicativo e não cria regra para `/api/metricas`. A recomendação é não expor a rota na borda: bloquear o caminho no Ingress controller e, quando possível, restringir a porta do Pod com NetworkPolicy que permita apenas o namespace do Prometheus. O token continua obrigatório dentro do cluster e não substitui o bloqueio de borda. O Ingress e a NetworkPolicy são responsabilidade do operador; o chart não os cria.
+O chart não publica a rota. O Ingress opcional encaminha `/` ao aplicativo e não cria regra para `/api/metricas`. A recomendação é não expor a rota na borda: bloquear o caminho no Ingress controller e, quando possível, restringir a porta do Pod com NetworkPolicy que permita apenas o namespace do Prometheus. O token continua obrigatório dentro do cluster e não substitui o bloqueio de borda. O Ingress e a NetworkPolicy são responsabilidade do operador; o chart não os cria. Quando o Ingress é gerenciado fora do chart, ele é o proxy efetivo: o certificado e o bloqueio precisam ser conferidos no provedor, conforme o [contrato de proxy externo](observabilidade.md#proxy-reverso-gerenciado-fora-do-projeto).
 
 ## Migrações
 
