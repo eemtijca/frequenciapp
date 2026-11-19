@@ -73,7 +73,7 @@ O desenvolvedor do aplicativo não tem acesso a dados de produção: o software 
 
 As métricas do Prometheus são operacionais, locais e agregadas. Elas registram requisições por rota padronizada, status, duração, conexões do pool, latência de consultas e contagens da fila de planilhas. Não contêm nome, matrícula, e-mail, identificador de aluno, identificador de turma, código de escola, conteúdo de requisição, SQL nem parâmetro de consulta.
 
-O Prometheus roda na infraestrutura da escola, sem telemetria de terceiros, e mantém 15 dias de histórico no volume `prometheus_data`. O volume não entra no backup e pode ser descartado sem perda de dados escolares. O acesso ao painel fica restrito ao loopback do servidor e ao túnel SSH do operador. O guia está em [observabilidade.md](observabilidade.md).
+O Prometheus roda na infraestrutura da escola, sem telemetria de terceiros, e mantém 15 dias de histórico no volume `prometheus_data`. O volume não entra no backup e pode ser descartado sem perda de dados escolares. O acesso ao painel fica restrito ao loopback do servidor, com acesso administrativo local ou túnel temporário. O guia está em [observabilidade.md](observabilidade.md).
 
 ## Repositório limpo
 

@@ -9,7 +9,7 @@ import { executar } from "../../../scripts/instalador/passos/controlador.mjs";
 import { fixture } from "./fixture.mjs";
 import { estadoInicial } from "../../../scripts/instalador/estado.mjs";
 
-function instalador(f, extras = [], nodeExtras = []) {
+function instalador(f, extras = [], nodeExtras = [], ambiente = {}) {
   return f.executar(
     process.execPath,
     [
@@ -30,6 +30,7 @@ function instalador(f, extras = [], nodeExtras = []) {
         HOME: f.raiz,
         TMPDIR: f.raiz,
         INSTALADOR_RAIZ: f.raiz,
+        ...ambiente,
       },
     },
   );
@@ -186,17 +187,10 @@ test("aplicar público retoma o journal depois da interrupção da publicação 
       "--backup-planilhas-habilitado",
       "false",
     ];
-    const interromper = `${f.raiz}/interromper.mjs`,
-      transporte = `${f.raiz}/transporte.mjs`;
-    f.gravar(
-      interromper,
-      `import fs from 'node:fs';const original=fs.renameSync;fs.renameSync=(a,b)=>{original(a,b);if(b===${JSON.stringify(`${f.config}/app.env`)})process.kill(process.pid,'SIGKILL');};\n`,
-    );
-    f.gravar(
-      transporte,
-      `import cp from 'node:child_process';import {syncBuiltinESMExports} from 'node:module';const original=cp.spawnSync;cp.spawnSync=(bin,args,o)=>original(bin,args.includes('reconfigurar-rotinas')&&args.includes('--confirmar')?['--import',${JSON.stringify(interromper)},...args]:args,o);syncBuiltinESMExports();\n`,
-    );
-    const falha = instalador(f, opcoes, ["--import", transporte]);
+    const transporte = path.join(import.meta.dirname, "hooks/transporte-reconfigurar.mjs");
+    const falha = instalador(f, opcoes, ["--import", transporte], {
+      HOOK_ALVO: `${f.config}/app.env`,
+    });
     assert.equal(falha.error, undefined);
     assert.equal(falha.signal, null);
     assert.ok(Number.isInteger(falha.status) && falha.status !== 0);

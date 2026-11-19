@@ -1,10 +1,23 @@
 // Exercita a reconfiguração administrativa pública sem Docker, cron ou rede reais.
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { fixture } from "./fixture.mjs";
+
+const interromper = path.join(import.meta.dirname, "hooks/interromper-rename.mjs");
+const aguardar = path.join(import.meta.dirname, "hooks/aguardar-trava.mjs");
+
+function ambiente(f, extras = {}) {
+  return {
+    PATH: `${f.bin}:/usr/local/bin:/usr/bin:/bin`,
+    HOME: f.raiz,
+    TMPDIR: f.raiz,
+    ...extras,
+  };
+}
 
 const seletores = {
   AGENDA_HABILITADA: "false",
@@ -215,15 +228,13 @@ test("retoma cada publicação interrompida apenas de bytes antigos ou novos com
       const p = JSON.parse(fs.readFileSync(f.perfil));
       const lock = `${p.locks}/operacoes-${p.alvo}.lock`,
         inode = fs.statSync(lock).ino;
-      const hook = `${f.raiz}/interromper.mjs`;
-      f.gravar(
-        hook,
-        `import fs from 'node:fs'; const original=fs.renameSync; fs.renameSync=(a,b)=>{original(a,b); if(b===${JSON.stringify(alvo)}) process.kill(process.pid,'SIGKILL');};\n`,
-      );
       const r = f.executar(
         process.execPath,
-        ["--import", hook, f.cli, "reconfigurar-rotinas", f.perfil, "--confirmar"],
-        { input: JSON.stringify({ seletores, destino: f.destino }) },
+        ["--import", interromper, f.cli, "reconfigurar-rotinas", f.perfil, "--confirmar"],
+        {
+          input: JSON.stringify({ seletores, destino: f.destino }),
+          env: ambiente(f, { HOOK_ALVO: alvo }),
+        },
       );
       assert.equal(r.error, undefined);
       assert.equal(r.signal, "SIGKILL", alvo);
@@ -248,15 +259,13 @@ test("retoma cada publicação interrompida apenas de bytes antigos ou novos com
 test("não retoma publicação quando um terceiro valor aparece depois do crash", () => {
   const f = fixture();
   try {
-    const hook = `${f.raiz}/interromper.mjs`;
-    f.gravar(
-      hook,
-      `import fs from 'node:fs'; const original=fs.renameSync; fs.renameSync=(a,b)=>{original(a,b);if(b===${JSON.stringify(`${f.config}/app.env`)})process.kill(process.pid,'SIGKILL');};\n`,
-    );
     const r = f.executar(
       process.execPath,
-      ["--import", hook, f.cli, "reconfigurar-rotinas", f.perfil, "--confirmar"],
-      { input: JSON.stringify({ seletores, destino: f.destino }) },
+      ["--import", interromper, f.cli, "reconfigurar-rotinas", f.perfil, "--confirmar"],
+      {
+        input: JSON.stringify({ seletores, destino: f.destino }),
+        env: ambiente(f, { HOOK_ALVO: `${f.config}/app.env` }),
+      },
     );
     assert.equal(r.signal, "SIGKILL");
     fs.appendFileSync(`${f.config}/app.env`, "OUTRO_VALOR=nao-comprovado\n");
@@ -296,25 +305,20 @@ test("entrada que leu a geração antiga revalida depois da trava e não dispara
   try {
     f.ok(comando(f));
     const p = JSON.parse(fs.readFileSync(f.perfil));
-    const hook = `${f.raiz}/aguardar.mjs`,
-      pronto = `${f.raiz}/pronto`,
+    const pronto = `${f.raiz}/pronto`,
       liberar = `${f.raiz}/liberar`;
-    f.gravar(
-      hook,
-      `import fs from 'node:fs';import cp from 'node:child_process';import {syncBuiltinESMExports} from 'node:module';const original=cp.spawnSync;cp.spawnSync=(bin,args,o)=>{if(bin==='/bin/bash'&&args[0].endsWith('/trancar.sh')){fs.writeFileSync(${JSON.stringify(pronto)},'pronto');const fim=Date.now()+15000;while(!fs.existsSync(${JSON.stringify(liberar)})){if(Date.now()>fim)throw Error('espera de teste esgotada');Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20);}}return original(bin,args,o);};syncBuiltinESMExports();\n`,
-    );
     filho = spawn(
       process.execPath,
       [
         "--import",
-        hook,
+        aguardar,
         `${p.snapshot}/scripts/servidor/controlador/cli.mjs`,
         "executar",
         f.perfil,
         "agenda",
       ],
       {
-        env: { PATH: "/usr/local/bin:/usr/bin:/bin", HOME: f.raiz, TMPDIR: f.raiz },
+        env: ambiente(f, { HOOK_PRONTO: pronto, HOOK_LIBERAR: liberar }),
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
@@ -357,16 +361,14 @@ test("entrada que leu a geração antiga revalida depois da trava e não dispara
 test("retoma o temporário do cron após interrupção imediatamente antes do rename", () => {
   const f = fixture();
   try {
-    const hook = `${f.raiz}/antes-rename.mjs`;
     const cron = `${f.destino}/cron.d/frequenciapp`;
-    f.gravar(
-      hook,
-      `import fs from 'node:fs'; const original=fs.renameSync;fs.renameSync=(a,b)=>{if(b===${JSON.stringify(cron)})process.kill(process.pid,'SIGKILL');return original(a,b);};\n`,
-    );
     const r = f.executar(
       process.execPath,
-      ["--import", hook, f.cli, "reconfigurar-rotinas", f.perfil, "--confirmar"],
-      { input: JSON.stringify({ seletores, destino: f.destino }) },
+      ["--import", interromper, f.cli, "reconfigurar-rotinas", f.perfil, "--confirmar"],
+      {
+        input: JSON.stringify({ seletores, destino: f.destino }),
+        env: ambiente(f, { HOOK_ALVO: cron, HOOK_MOMENTO: "antes" }),
+      },
     );
     assert.equal(r.error, undefined);
     assert.equal(r.signal, "SIGKILL");

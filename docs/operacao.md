@@ -206,7 +206,7 @@ curl -s https://seu-dominio/api/saude
 
 A rota consulta o banco: responde `{"ok":true}` com a conexão saudável e 503 quando o banco não responde. O serviço `app` do Compose usa essa rota como healthcheck, então `docker compose ps` mostra `healthy` quando aplicação e banco estão prontos.
 
-A saúde é uma verificação binária. Para latência, erros por rota, saturação do pool e fila de planilhas, usar o painel do Prometheus descrito em [observabilidade.md](observabilidade.md). O painel reúne os alvos, as regras e os cinco alertas da fase 1. Sem Alertmanager, o alerta aparece apenas no painel e exige o túnel SSH.
+A saúde é uma verificação binária. Para latência, erros por rota, saturação do pool e fila de planilhas, usar o painel do Prometheus descrito em [observabilidade.md](observabilidade.md). O painel reúne os alvos, as regras de alerta e o estado das notificações. Sem Alertmanager, o alerta aparece apenas no painel e exige acesso administrativo local ou túnel temporário.
 
 ## Implantação de atualização
 

@@ -227,6 +227,10 @@ docker run --rm --user "$(id -u):$(id -g)" \
 # A integração adapta os três modos e prova TLS sem SNI com CA sintética, sem rede externa.
 setpriv --no-new-privs node "$REPO/tests/servidor/caddy-integracao.mjs"
 
+# O ensaio de proxy externo usa contêiner separado, vhosts sintéticos e CA da fixture,
+# sem publicar portas e sem instalar um proxy gerenciado real.
+setpriv --no-new-privs node "$REPO/tests/servidor/proxy-externo.mjs"
+
 docker build -t frequenciapp-nginx:validar "$REPO/infra/servidor/nginx"
 
 docker run --rm --add-host app:127.0.0.1 \

@@ -297,6 +297,88 @@ As duas pilhas:
 
 Não execute Caddy e Nginx ao mesmo tempo. `PROXY_TIPO` escolhe uma sobreposição.
 
+## Proxy reverso externo
+
+O guia padrão usa Caddy ou Nginx deste projeto. Quando o TLS e o roteamento ficam em um proxy gerenciado, uma CDN ou um balanceador fora do projeto, a pilha continua válida, mas a sonda e o bloqueio de `/api/metricas` mudam de responsável. O detalhamento do contrato está em [observabilidade.md](observabilidade.md#proxy-reverso-gerenciado-fora-do-projeto).
+
+### Ajustar a sonda
+
+O alvo `https://proxy:443/api/saude` é específico da receita Compose, na qual o proxy do projeto ocupa o alias `proxy` na rede `publica`. Com proxy externo:
+
+1. Trocar o alvo em `infra/observabilidade/prometheus/prometheus.yml` por um hostname ou IP alcançável pela rede `publica` do blackbox exporter. O caminho continua `/api/saude`.
+2. Manter `headers.Host` e `tls_config.server_name` iguais ao domínio público, mesmo quando o alvo for um IP.
+3. Apontar `tls_config.ca_file` para a CA que emitiu o certificado do proxy. Com CA pública, manter o conjunto de CAs do sistema. Nunca desativar a validação TLS.
+4. Recriar o blackbox exporter e o Prometheus, porque os arquivos são montados na partida.
+5. Conferir `probe_success{job="blackbox"}` e `probe_ssl_earliest_cert_expiry` em `/targets`.
+
+O arquivo do repositório é uma referência. A configuração aplicada ao proxy gerenciado não é versionada aqui e precisa ser conferida no painel ou no repositório do provedor.
+
+### Conferir o bloqueio efetivo
+
+O bloqueio de `/api/metricas` pertence ao proxy que atende o domínio. O `Caddyfile` e o `nginx.conf` do repositório só provam o bloqueio quando são a configuração aplicada.
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://dominio/api/metricas
+```
+
+O resultado precisa ser `404`. Conferir também na configuração efetiva do provedor que a regra vem antes do encaminhamento e que não existe rota alternativa por outro hostname, IP ou caminho equivalente. A coleta interna continua exigindo o token, então um `200` público indica falha de borda mesmo que o backend recuse a requisição sem credencial.
+
+### Roteiro manual do proxy externo
+
+1. Confirmar que o domínio resolve para o proxy e que o hostname ou IP do alvo é alcançável pela rede `publica` do blackbox exporter.
+2. Conferir o certificado com SNI e CA corretos, sem `-k`:
+
+   ```bash
+   openssl s_client -connect proxy.exemplo.br:443 -servername frequencia.exemplo.br \
+     -CAfile /etc/frequenciapp/ca-interna.pem </dev/null
+   ```
+
+3. Confirmar a saúde do domínio com `Host` e SNI iguais ao domínio. O resultado esperado é `200` em `/api/saude`.
+4. Confirmar o bloqueio de `/api/metricas` no proxy efetivo e que a rota não chega ao backend.
+5. Confirmar o backend privado e autenticado: a aplicação não publica porta, a coleta sem token responde `401` ou `404` e a coleta com `METRICAS_TOKEN` responde `200`.
+6. Registrar a evidência da configuração do proxy, sem token, sem dado de aluno e sem caminho de host.
+
+O ensaio sintético do repositório reproduz esse roteiro com um proxy separado, vhosts sintéticos e uma CA de fixture:
+
+```bash
+setpriv --no-new-privs node tests/servidor/proxy-externo.mjs
+```
+
+Ele prova o padrão, não a configuração do provedor. Nenhuma porta é publicada e nenhum serviço real é reiniciado. O ensaio usa as imagens fixadas do repositório e espera que elas já estejam presentes; `pnpm run servidor:validar` prepara o ambiente.
+
+### Diagnóstico com proxy externo
+
+- `probe_success` em `0` e `probe_http_status_code` em `0` indicam falha de resolução, conexão ou TLS antes do HTTP.
+- Certificado recusado indica SNI, `ca_file` ou cadeia divergente. Conferir o SAN do certificado e a CA do proxy, sem desativar a validação.
+- `/api/saude` com `404` ou `421` indica `Host`, SNI ou vhost errado no proxy externo.
+- `/api/saude` com `502` ou `503` indica que o proxy alcançou a borda, mas não o backend.
+- `probe_success` em `1` e `/api/metricas` público em `200` indicam bloqueio ausente no proxy efetivo.
+- Conferir os logs do exporter com `scripts/servidor/compose.sh logs --tail 200 blackbox-exporter`.
+
+### Retorno ao proxy do projeto
+
+Para voltar ao Caddy ou ao Nginx deste projeto:
+
+1. Definir `PROXY_TIPO=caddy` ou `PROXY_TIPO=nginx` no `ops.env`.
+2. Remover o proxy externo da frente do domínio ou manter apenas o encaminhamento de TCP para as portas 80 e 443 do host, sem duplicar TLS e sem deixar dois proxies terminando TLS ao mesmo tempo.
+3. Restaurar o alvo `https://proxy:443/api/saude` em `prometheus.yml`, com `Host` e `server_name` iguais ao `DOMINIO`. Remover `ca_file` quando a CA voltar a ser pública.
+4. Recriar a pilha e conferir `/api/saude`, `/api/metricas` público com `404`, o painel no loopback e os alvos em `/targets`.
+5. No perfil com controlador adotado, tratar a troca como mudança de topologia e executar a readoção revisada descrita em [controlador-manutencao.md](controlador-manutencao.md#observabilidade).
+
+### O que informar ao pedir ajuda
+
+Ao relatar um problema com proxy externo, incluir apenas dados operacionais:
+
+- domínio público e o alvo configurado no blackbox, como hostname ou IP e porta;
+- rede pela qual o exporter alcança o proxy e o alias usado, quando existir;
+- valores de `Host`, `server_name` e tipo de CA, sem o conteúdo de chaves ou tokens;
+- saída de `probe_success`, `probe_http_status_code` e `probe_ssl_earliest_cert_expiry`;
+- código HTTP de `/api/saude` e `/api/metricas` no domínio público;
+- trecho da regra do proxy efetivo, sem credenciais;
+- se o controlador está adotado e se a entrada estável está em uso.
+
+Não informar `METRICAS_TOKEN`, senha SMTP, URL de webhook, dado de aluno, turma, escola ou caminho de host.
+
 ## Alertas externos
 
 O Alertmanager é opt-in e não publica portas. Para receber notificações por webhook ou e-mail, configurar apenas um receptor no `ops.env` e subir o serviço com o perfil `alertas`:
@@ -531,6 +613,7 @@ O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database
 - Conferir `up{job="frequenciapp"}`, `up{job="node-exporter"}` e `up{job="blackbox"}` em `1` e, com o perfil `alertas`, `up{job="alertmanager"}` em `1`.
 - Conferir `probe_success{job="blackbox"}` em `1` e os dias restantes em `probe_ssl_earliest_cert_expiry`.
 - Separar a falha da sonda do estado do site: `up{job="blackbox"}` fora do ar, `probe_success` ausente e `probe_success` igual a `0` têm regras e janelas próprias.
+- Com proxy externo, ajustar o alvo, o Host, o SNI e a CA no exporter e conferir o bloqueio de `/api/metricas` no proxy efetivo, conforme [Proxy reverso externo](#proxy-reverso-externo).
 - Conferir a idade do item aberto mais antigo da fila e a idade do último backup verificado.
 
 As treze regras cobrem indisponibilidade, erros 5xx, latência, pool, fila, disco, memória, sonda HTTPS, coletor da sonda, ausência de amostra, certificado, falha de notificação e atraso do backup. Sem o perfil `alertas`, o alerta aparece apenas no painel. A tabela completa está em [observabilidade.md](observabilidade.md#alertas).
@@ -546,6 +629,7 @@ As treze regras cobrem indisponibilidade, erros 5xx, latência, pool, fila, disc
 7. Depois do primeiro backup verificado, `frequenciapp_backup_ultimo_sucesso_timestamp_seconds` deve aparecer com o instante do backup.
 8. Com o perfil `alertas`, `alertmanager_notifications_failed_total` deve estar disponível e o teste com `amtool alert add` deve chegar ao receptor.
 9. `pnpm run servidor:validar` deve passar, incluindo `promtool test rules` com as séries sintéticas de sonda e coletor.
+10. Com proxy externo, seguir o [roteiro manual](#roteiro-manual-do-proxy-externo), executar `setpriv --no-new-privs node tests/servidor/proxy-externo.mjs` e registrar que o ensaio sintético não comprova a configuração do provedor.
 
 A matriz de respostas de `/api/metricas` é: borda pública, Caddy ou Nginx, 404 antes do proxy; rota interna sem `METRICAS_TOKEN` configurado, 404; token ausente ou errado, 401; token correto, 200 com `text/plain; version=0.0.4; charset=utf-8` e `Cache-Control: no-store`; falha de coleta, 503 com corpo JSON curto. O detalhamento está em [observabilidade.md](observabilidade.md#respostas-da-rota). A rota continua fora do OpenAPI público.
 
@@ -718,9 +802,10 @@ Não editar o checksum em `_prisma_migrations`, não remover linhas do históric
 
 - Quando `probe_success{job="blackbox"}` vale `0` por 5 minutos, o alerta `FrequenciappSondaHttps` dispara com gravidade `critical`. A mensagem não afirma que o site está fora do ar: a falha pode ser do serviço, do proxy ou da sonda.
 - Conferir `probe_success{job="blackbox"}` e o último erro do alvo `blackbox` em `/targets`.
-- Conferir o `DOMINIO` em `/etc/frequenciapp/ops.env` e o alias `proxy` na rede `publica` do Caddy ou do Nginx.
+- Conferir o `DOMINIO` em `/etc/frequenciapp/ops.env` e, na receita Compose, o alias `proxy` na rede `publica` do Caddy ou do Nginx.
+- Com proxy externo, conferir o alvo alcançável pela rede `publica`, o Host, o SNI e a CA, além do bloqueio de `/api/metricas` na configuração efetiva, em [Proxy reverso externo](#proxy-reverso-externo).
 - Conferir `probe_http_status_code` para separar recusa, tempo limite e status inesperado.
-- Em TLS interno, conferir a CA da escola montada e o `ca_file` no `blackbox.yml`.
+- Em TLS interno ou com CA privada, conferir a CA montada e o `ca_file` no `blackbox.yml`.
 - Conferir os logs com `scripts/servidor/compose.sh logs --tail 200 blackbox-exporter`.
 
 ### Certificado TLS expirando
