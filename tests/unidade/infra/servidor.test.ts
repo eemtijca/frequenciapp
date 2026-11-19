@@ -260,6 +260,32 @@ describe("servidor auto-hospedado", () => {
     expect(prometheus).toContain("- /etc/prometheus/regras.yml");
   });
 
+  it("isola a ponte do painel em interna e painel, sem publica", async () => {
+    const observabilidade = await ler("compose.observabilidade.yml");
+    const blocoPrometheus = observabilidade.slice(
+      observabilidade.indexOf("  prometheus:"),
+      observabilidade.indexOf("  prometheus-ui:"),
+    );
+    const blocoPonte = observabilidade.slice(
+      observabilidade.indexOf("  prometheus-ui:"),
+      observabilidade.indexOf("  node-exporter:"),
+    );
+
+    expect(observabilidade).toMatch(/^networks:\n(?:  #.*\n)*  painel:$/m);
+    expect(blocoPrometheus).toContain("    networks:\n      - interna\n");
+    expect(blocoPrometheus).not.toContain("- painel");
+    expect(blocoPrometheus).not.toContain("- publica");
+
+    expect(blocoPonte).toContain("    networks:\n      - interna\n      - painel\n");
+    expect(blocoPonte).not.toContain("publica");
+    expect(blocoPonte).toContain('"127.0.0.1:${PROMETHEUS_PORTA:-9090}:9090"');
+    // A rede painel existe apenas para publicar a ponte no loopback, como bridge comum.
+    expect(observabilidade.match(/^      - painel$/gm)).toHaveLength(1);
+    expect(observabilidade.slice(observabilidade.indexOf("\nnetworks:"))).not.toContain(
+      "internal: true",
+    );
+  });
+
   it("coleta o host com node exporter na rede interna", async () => {
     const observabilidade = await ler("compose.observabilidade.yml");
     const prometheus = await ler("infra/observabilidade/prometheus/prometheus.yml");

@@ -63,6 +63,8 @@ describe("GET /api/metricas", () => {
     const resposta = await GET(pedir({ Authorization: `Bearer ${TOKEN}` }));
 
     expect(resposta.status).toBe(404);
+    expect(resposta.headers.get("cache-control")).toBe("no-store");
+    await expect(resposta.json()).resolves.toEqual({ error: "Recurso não encontrado." });
     expect(estado.chamadasAoBanco).toBe(0);
   });
 
@@ -74,6 +76,8 @@ describe("GET /api/metricas", () => {
     expect(semToken.status).toBe(401);
     expect(tokenErrado.status).toBe(401);
     expect(tamanhoDiferente.status).toBe(401);
+    await expect(semToken.json()).resolves.toEqual({ error: "Acesso não permitido." });
+    await expect(tokenErrado.json()).resolves.toEqual({ error: "Acesso não permitido." });
     expect(estado.chamadasAoBanco).toBe(0);
   });
 
@@ -109,5 +113,11 @@ describe("GET /api/metricas", () => {
 
     expect(semColeta.status).toBe(503);
     expect(semBanco.status).toBe(503);
+    await expect(semColeta.json()).resolves.toEqual({
+      error: "As métricas não puderam ser coletadas.",
+    });
+    await expect(semBanco.json()).resolves.toEqual({
+      error: "As métricas não puderam ser coletadas.",
+    });
   });
 });

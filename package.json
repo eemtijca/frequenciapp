@@ -46,6 +46,7 @@
     "seed:limpar": "SEED_LIMPAR=true SEED_APENAS_LIMPAR=true node scripts/seed/seed.mjs",
     "etiquetas:sync": "node scripts/github/sincronizar-etiquetas.mjs",
     "icones:gerar": "node scripts/assets/gerar-icones.mjs",
+    "rotas:gerar": "node scripts/gerar-rotas-metrica.mjs",
     "lint:api": "redocly lint docs/openapi.json",
     "infra:fmt": "terraform fmt -recursive infra/terraform",
     "infra:validar": "bash infra/terraform/validar.sh",

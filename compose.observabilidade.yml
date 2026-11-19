@@ -1,5 +1,6 @@
 # Observabilidade auto-hospedada: Prometheus, node exporter, blackbox e
-# Alertmanager ficam na rede interna; apenas a ponte socat expõe o painel no loopback.
+# Alertmanager ficam na rede interna; a ponte socat publica o painel apenas no
+# loopback, pela rede `painel`, sem participar da rede `publica`.
 
 services:
   prometheus:
@@ -41,7 +42,7 @@ services:
       - "127.0.0.1:${PROMETHEUS_PORTA:-9090}:9090"
     networks:
       - interna
-      - publica
+      - painel
     depends_on:
       prometheus:
         condition: service_started
@@ -146,6 +147,11 @@ services:
       timeout: 5s
       retries: 3
       start_period: 15s
+
+networks:
+  # Bridge comum exigida pelo Docker para publicar a porta no loopback. Nenhum
+  # outro serviço entra nela, e a rede `publica` não alcança a escuta 9090.
+  painel:
 
 volumes:
   prometheus_data:

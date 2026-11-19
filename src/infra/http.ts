@@ -5,11 +5,11 @@ import { ambiente } from "@/infra/ambiente";
 import { identidadeAtual } from "@/application/sessao";
 import { ErroHttp, traduzirErro } from "@/infra/erros";
 import { observarRequisicao, requisicaoFinalizada, requisicaoIniciada } from "@/infra/metricas";
+import { metodoDeMetrica, rotaDeMetrica } from "@/infra/metricas-rota";
 import { temCapacidade, type Capacidade, type Identidade } from "@/domain/usuarios";
 
 const LIMITE_DE_CORPO = 200_000;
 const ROTA_DESCONHECIDA = "desconhecida";
-const METODO_DESCONHECIDO = "DESCONHECIDO";
 const ROTA_DE_METRICAS = "/api/metricas";
 
 interface ContextoDeRequisicao {
@@ -58,16 +58,21 @@ export async function executarRota(manipulador: () => Promise<Response>): Promis
   }
 }
 
-/** A leitura falha fora de um contexto de requisição e devolve o rótulo neutro. */
+/**
+ * O proxy grava os cabeçalhos, mas o valor passa outra vez pelo registro antes
+ * de virar label: nem um cabeçalho forjado leva caminho livre para a métrica.
+ * Fora de um contexto de requisição, a leitura falha e devolve o rótulo neutro.
+ */
 async function contextoDaRequisicao(): Promise<ContextoDeRequisicao> {
   try {
     const cabecalhos = await headers();
+    const rota = cabecalhos.get("x-frequenciapp-rota");
     return {
-      method: cabecalhos.get("x-frequenciapp-metodo") || METODO_DESCONHECIDO,
-      route: cabecalhos.get("x-frequenciapp-rota") || ROTA_DESCONHECIDA,
+      method: metodoDeMetrica(cabecalhos.get("x-frequenciapp-metodo")),
+      route: rota ? rotaDeMetrica(rota) : ROTA_DESCONHECIDA,
     };
   } catch {
-    return { method: METODO_DESCONHECIDO, route: ROTA_DESCONHECIDA };
+    return { method: metodoDeMetrica(undefined), route: ROTA_DESCONHECIDA };
   }
 }
 
