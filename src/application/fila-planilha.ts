@@ -6,6 +6,7 @@ import { esquemaEscopoConferencia } from "@/application/fila-conferencia";
 import { banco } from "@/infra/banco";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
+import { registrarFilaProcessada } from "@/infra/metricas";
 import { comTransacao } from "@/infra/transacoes";
 import {
   DIAS_GUARDAR_CONCLUIDOS,
@@ -147,12 +148,27 @@ export interface ResultadoDoProcessamento {
 let emProcessamento: Promise<ResumoDoProcessamento> | null = null;
 let novaRodada = false;
 
+/** Soma as transições das rodadas; o estado final vem da última rodada. */
+function somarResumos(
+  total: ResumoDoProcessamento,
+  rodada: ResumoDoProcessamento,
+): ResumoDoProcessamento {
+  return {
+    processados: total.processados + rodada.processados,
+    concluidos: total.concluidos + rodada.concluidos,
+    falhas: total.falhas + rodada.falhas,
+    abertos: rodada.abertos,
+    aguardandoAte: rodada.aguardandoAte,
+  };
+}
+
 /**
  * Processa os itens da frente, um por vez e na ordem de entrada, até esvaziar a fila, ser
  * barrada por espera ou reserva, ou atingir o limite. Várias chamadas no mesmo processo
  * se fundem em uma rodada; entre instâncias, a reserva com prazo garante um consumidor.
  * O primeiro chamador lidera e recebe `compartilhado: false`; os demais apenas aguardam
- * a mesma promessa e recebem `compartilhado: true`.
+ * a mesma promessa e recebem `compartilhado: true`. A métrica é incrementada pelo
+ * consumidor em cada transição efetivada, independentemente de quem liderou.
  */
 export function processarFila(opcoes: { limite?: number } = {}): Promise<ResultadoDoProcessamento> {
   if (emProcessamento) {
@@ -164,7 +180,7 @@ export function processarFila(opcoes: { limite?: number } = {}): Promise<Resulta
     let resumo = await processarRodada(opcoes.limite ?? LIMITE_PADRAO);
     while (novaRodada) {
       novaRodada = false;
-      resumo = await processarRodada(opcoes.limite ?? LIMITE_PADRAO);
+      resumo = somarResumos(resumo, await processarRodada(opcoes.limite ?? LIMITE_PADRAO));
     }
     return resumo;
   })().finally(() => {
@@ -261,6 +277,9 @@ async function processarRodada(limite: number): Promise<ResumoDoProcessamento> {
       },
     });
     if (finalizado.count !== 1) break;
+    registrarFilaProcessada(
+      desfecho.estado === "CONCLUIDO" ? { concluidos: 1, falhas: 0 } : { concluidos: 0, falhas: 1 },
+    );
     resumo.processados += 1;
     if (desfecho.estado === "CONCLUIDO") resumo.concluidos += 1;
     else resumo.falhas += 1;

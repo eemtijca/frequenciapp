@@ -1,6 +1,7 @@
 // Intercala dois módulos consumidores independentes sobre um repositório sintético com CAS.
 import { afterEach, expect, it, vi } from "vitest";
 const d = vi.hoisted(() => ({ frente: vi.fn(), atualizar: vi.fn(), enviar: vi.fn() }));
+const m = vi.hoisted(() => ({ registrarFilaProcessada: vi.fn() }));
 vi.mock("@/infra/banco", () => ({
   banco: () => ({
     filaPlanilha: {
@@ -11,13 +12,31 @@ vi.mock("@/infra/banco", () => ({
     },
   }),
 }));
+vi.mock("@/infra/metricas", () => ({ registrarFilaProcessada: m.registrarFilaProcessada }));
 vi.mock("@/application/planilha", () => ({ enviarAposSalvar: vi.fn() }));
 vi.mock("@/application/planilha-comum", () => ({ lerLinha: vi.fn(), modoCompletoAtivo: vi.fn() }));
 vi.mock("@/application/planilha-saidas", () => ({ enviarSaidasAposRegistro: vi.fn() }));
 vi.mock("@/application/planilha-entradas", () => ({ enviarEntradasAposRegistro: d.enviar }));
+
+function itemFila(id: string, sequencia = 1, estado = "AGUARDANDO") {
+  return {
+    id,
+    sequencia,
+    estado,
+    tipo: "ENTRADAS" as const,
+    autorId: "qa",
+    turmaId: null,
+    dia: new Date("2026-06-15T00:00:00Z"),
+    tentativas: 0,
+    proximaTentativaEm: null as Date | null,
+    reservadoAte: null as Date | null,
+  };
+}
+
 afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
+  m.registrarFilaProcessada.mockClear();
 });
 it.each(["enviado", "falhou"])("o dono vencido não finaliza o novo dono: %s", async (resultado) => {
   vi.useFakeTimers();
@@ -87,8 +106,11 @@ it.each(["enviado", "falhou"])("o dono vencido não finaliza o novo dono: %s", a
   expect(item).toEqual(reservaB);
   expect(resumoA.processados).toBe(0);
   expect(resumoA.concluidos).toBe(0);
+  expect(m.registrarFilaProcessada).not.toHaveBeenCalled();
   liberarB("enviado");
   expect((await trabalhoB).resumo.concluidos).toBe(1);
+  expect(m.registrarFilaProcessada).toHaveBeenCalledTimes(1);
+  expect(m.registrarFilaProcessada).toHaveBeenCalledWith({ concluidos: 1, falhas: 0 });
 });
 
 it("só o primeiro chamador lidera e os concorrentes compartilham o mesmo resumo", async () => {
@@ -117,4 +139,91 @@ it("só o primeiro chamador lidera e os concorrentes compartilham o mesmo resumo
   expect(resultadoB.resumo).toEqual(resultadoLider.resumo);
   // A rodada repetida atende os seguidores uma vez, sem uma execução por chamada.
   expect(d.frente).toHaveBeenCalledTimes(2);
+  expect(m.registrarFilaProcessada).not.toHaveBeenCalled();
+});
+
+it("acumula a transição da primeira rodada quando um concorrente pede outra", async () => {
+  let chamadas = 0;
+  d.frente.mockImplementation(async () => {
+    chamadas += 1;
+    return chamadas === 1 ? [itemFila("qa")] : [];
+  });
+  d.atualizar.mockResolvedValue({ count: 1 });
+  let liberar: (situacao: string) => void = () => undefined;
+  let entrou: () => void = () => undefined;
+  const inicio = new Promise<void>((resolver) => {
+    entrou = resolver;
+  });
+  d.enviar.mockImplementationOnce(() => {
+    entrou();
+    return new Promise<string>((resolver) => {
+      liberar = resolver;
+    });
+  });
+  vi.resetModules();
+  const modulo = await import("@/application/fila-planilha");
+  const lider = modulo.processarFila({ limite: 1 });
+  await inicio;
+  const seguidor = modulo.processarFila({ limite: 1 });
+  liberar("enviado");
+  const [resultadoLider, resultadoSeguidor] = await Promise.all([lider, seguidor]);
+  expect(resultadoLider.compartilhado).toBe(false);
+  expect(resultadoSeguidor.compartilhado).toBe(true);
+  expect(resultadoLider.resumo).toMatchObject({ processados: 1, concluidos: 1, falhas: 0 });
+  expect(resultadoSeguidor.resumo).toEqual(resultadoLider.resumo);
+  expect(m.registrarFilaProcessada).toHaveBeenCalledTimes(1);
+  expect(m.registrarFilaProcessada).toHaveBeenCalledWith({ concluidos: 1, falhas: 0 });
+  expect(d.frente).toHaveBeenCalledTimes(2);
+});
+
+it("soma duas rodadas com transições distintas", async () => {
+  let chamadas = 0;
+  d.frente.mockImplementation(async () => {
+    chamadas += 1;
+    if (chamadas === 1) return [itemFila("qa")];
+    if (chamadas === 2) return [itemFila("qb", 2)];
+    return [];
+  });
+  d.atualizar.mockResolvedValue({ count: 1 });
+  let liberar: (situacao: string) => void = () => undefined;
+  let entrou: () => void = () => undefined;
+  const inicio = new Promise<void>((resolver) => {
+    entrou = resolver;
+  });
+  d.enviar
+    .mockImplementationOnce(() => {
+      entrou();
+      return new Promise<string>((resolver) => {
+        liberar = resolver;
+      });
+    })
+    .mockResolvedValueOnce("enviado");
+  vi.resetModules();
+  const modulo = await import("@/application/fila-planilha");
+  const lider = modulo.processarFila({ limite: 2 });
+  await inicio;
+  const seguidor = modulo.processarFila({ limite: 2 });
+  liberar("enviado");
+  const [resultadoLider, resultadoSeguidor] = await Promise.all([lider, seguidor]);
+  expect(resultadoLider.resumo).toMatchObject({ processados: 2, concluidos: 2, falhas: 0 });
+  expect(resultadoSeguidor.resumo).toEqual(resultadoLider.resumo);
+  expect(m.registrarFilaProcessada).toHaveBeenCalledTimes(2);
+  expect(m.registrarFilaProcessada).toHaveBeenNthCalledWith(1, { concluidos: 1, falhas: 0 });
+  expect(m.registrarFilaProcessada).toHaveBeenNthCalledWith(2, { concluidos: 1, falhas: 0 });
+  expect(d.frente).toHaveBeenCalledTimes(3);
+});
+
+it("conta falha na tentativa e concluido na tentativa seguinte", async () => {
+  d.frente.mockResolvedValue([itemFila("qa")]);
+  d.atualizar.mockResolvedValue({ count: 1 });
+  d.enviar.mockResolvedValueOnce("falhou").mockResolvedValueOnce("enviado");
+  vi.resetModules();
+  const modulo = await import("@/application/fila-planilha");
+  const primeira = await modulo.processarFila({ limite: 1 });
+  expect(primeira.resumo).toMatchObject({ processados: 1, concluidos: 0, falhas: 1 });
+  expect(m.registrarFilaProcessada).toHaveBeenLastCalledWith({ concluidos: 0, falhas: 1 });
+  const segunda = await modulo.processarFila({ limite: 1 });
+  expect(segunda.resumo).toMatchObject({ processados: 1, concluidos: 1, falhas: 0 });
+  expect(m.registrarFilaProcessada).toHaveBeenLastCalledWith({ concluidos: 1, falhas: 0 });
+  expect(m.registrarFilaProcessada).toHaveBeenCalledTimes(2);
 });
