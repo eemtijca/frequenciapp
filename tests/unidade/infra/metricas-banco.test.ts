@@ -1,16 +1,38 @@
-// Coletas de banco e fila: pool, consultas, estados da fila e falhas isoladas.
+// Coletas de banco e fila: pool, consultas, amostra compartilhada, validade curta
+// e falhas isoladas.
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { EstadoItemFila } from "@/domain/fila-planilha";
 import { metricas } from "@/infra/metricas";
-import { registrarMetricasDoBanco, type FonteDeMetricasDoBanco } from "@/infra/metricas-banco";
+import {
+  registrarMetricasDoBanco,
+  type AmostraDaFila,
+  type FonteDeMetricasDoBanco,
+} from "@/infra/metricas-banco";
 
 const AGORA = new Date("2026-01-02T03:04:05.000Z");
+const VALIDADE_MS = 15_000;
+
+interface Adiado<T> {
+  promessa: Promise<T>;
+  resolver(valor: T): void;
+}
+
+function adiar<T>(): Adiado<T> {
+  let resolver: (valor: T) => void = () => undefined;
+  const promessa = new Promise<T>((resolverPromessa) => {
+    resolver = resolverPromessa;
+  });
+  return { promessa, resolver };
+}
 
 const estado = {
-  grupos: [] as { estado: EstadoItemFila; quantidade: number }[],
+  contagens: new Map<EstadoItemFila, number>(),
   maisAntiga: null as Date | null,
   falharFila: false,
   falharPool: false,
+  chamadasFila: 0,
+  fila: null as Promise<AmostraDaFila> | null,
+  agora: AGORA.getTime(),
   ouvintes: [] as ((duracaoMilissegundos: number) => void)[],
 };
 
@@ -30,18 +52,17 @@ const fonte: FonteDeMetricasDoBanco = {
     },
   },
   fila: {
-    contarPorEstado: async () => {
+    lerAmostra: async () => {
+      estado.chamadasFila += 1;
+      if (estado.fila) return estado.fila;
       if (estado.falharFila) throw new Error("falha sintética da fila");
-      return estado.grupos;
-    },
-    maisAntigaAberta: async () => {
-      if (estado.falharFila) throw new Error("falha sintética da fila");
-      return estado.maisAntiga;
+      return { contagens: estado.contagens, maisAntiga: estado.maisAntiga };
     },
   },
   assinarConsulta: (ouvinte) => {
     estado.ouvintes.push(ouvinte);
   },
+  agora: () => estado.agora,
 };
 
 beforeAll(() => {
@@ -49,20 +70,24 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
-  estado.grupos = [];
+  // Cada teste começa com a amostra anterior vencida.
+  estado.agora += VALIDADE_MS + 60_000;
+  estado.contagens = new Map();
   estado.maisAntiga = null;
   estado.falharFila = false;
   estado.falharPool = false;
+  estado.chamadasFila = 0;
+  estado.fila = null;
 });
 
-/** Valor de uma série exata do texto Prometheus. */
+/** Valor de uma série exata do texto Prometheus; zero quando a série ainda não existe. */
 function valorDaSerie(texto: string, serie: string): number {
   for (const linha of texto.split("\n")) {
     if (linha.startsWith(`${serie} `)) {
       return Number(linha.slice(serie.length + 1));
     }
   }
-  return Number.NaN;
+  return 0;
 }
 
 async function textoDoRegistro(): Promise<string> {
@@ -82,12 +107,12 @@ describe("pool de conexões", () => {
 
 describe("fila de planilhas", () => {
   it("publica os cinco estados, inclusive zerados, e a idade do item mais antigo", async () => {
-    estado.grupos = [
-      { estado: "AGUARDANDO", quantidade: 2 },
-      { estado: "EM_ANDAMENTO", quantidade: 1 },
-      { estado: "FALHOU", quantidade: 1 },
-      { estado: "CONCLUIDO", quantidade: 4 },
-    ];
+    estado.contagens = new Map([
+      ["AGUARDANDO", 2],
+      ["EM_ANDAMENTO", 1],
+      ["FALHOU", 1],
+      ["CONCLUIDO", 4],
+    ]);
     estado.maisAntiga = AGORA;
 
     const texto = await textoDoRegistro();
@@ -100,10 +125,13 @@ describe("fila de planilhas", () => {
     expect(valorDaSerie(texto, "frequenciapp_fila_planilha_mais_antiga_timestamp_seconds")).toBe(
       AGORA.getTime() / 1000,
     );
+    expect(valorDaSerie(texto, "frequenciapp_fila_planilha_atualizado_timestamp_seconds")).toBe(
+      estado.agora / 1000,
+    );
   });
 
-  it("publica zero no timestamp quando não há item aberto", async () => {
-    estado.grupos = [];
+  it("publica zero real quando a fila está vazia", async () => {
+    estado.contagens = new Map();
     estado.maisAntiga = null;
 
     const texto = await textoDoRegistro();
@@ -120,6 +148,115 @@ describe("fila de planilhas", () => {
       ).toBe(0);
     }
     expect(valorDaSerie(texto, "frequenciapp_fila_planilha_mais_antiga_timestamp_seconds")).toBe(0);
+    expect(valorDaSerie(texto, "frequenciapp_fila_planilha_atualizado_timestamp_seconds")).toBe(
+      estado.agora / 1000,
+    );
+    expect(estado.chamadasFila).toBe(1);
+  });
+
+  it("reutiliza a amostra dentro da validade e consulta de novo depois dela", async () => {
+    estado.contagens = new Map([["AGUARDANDO", 1]]);
+    estado.maisAntiga = AGORA;
+    const primeiro = await textoDoRegistro();
+    const lidoEm = estado.agora;
+
+    estado.contagens = new Map([["AGUARDANDO", 5]]);
+    estado.agora = lidoEm + VALIDADE_MS - 1;
+    const dentroDaValidade = await textoDoRegistro();
+
+    expect(estado.chamadasFila).toBe(1);
+    expect(
+      valorDaSerie(dentroDaValidade, 'frequenciapp_fila_planilha_itens{estado="AGUARDANDO"}'),
+    ).toBe(1);
+    expect(
+      valorDaSerie(dentroDaValidade, "frequenciapp_fila_planilha_atualizado_timestamp_seconds"),
+    ).toBe(lidoEm / 1000);
+
+    estado.agora = lidoEm + VALIDADE_MS;
+    const depoisDaValidade = await textoDoRegistro();
+
+    expect(estado.chamadasFila).toBe(2);
+    expect(
+      valorDaSerie(depoisDaValidade, 'frequenciapp_fila_planilha_itens{estado="AGUARDANDO"}'),
+    ).toBe(5);
+    expect(
+      valorDaSerie(depoisDaValidade, "frequenciapp_fila_planilha_atualizado_timestamp_seconds"),
+    ).toBe(estado.agora / 1000);
+    // A amostra anterior foi realmente publicada antes da troca.
+    expect(valorDaSerie(primeiro, 'frequenciapp_fila_planilha_itens{estado="AGUARDANDO"}')).toBe(1);
+  });
+
+  it("compartilha uma única consulta entre raspagens concorrentes", async () => {
+    const pendente = adiar<AmostraDaFila>();
+    estado.contagens = new Map([["FALHOU", 3]]);
+    estado.maisAntiga = AGORA;
+    estado.fila = pendente.promessa;
+
+    const primeira = textoDoRegistro();
+    const segunda = textoDoRegistro();
+    await Promise.resolve();
+    expect(estado.chamadasFila).toBe(1);
+
+    pendente.resolver({ contagens: estado.contagens, maisAntiga: AGORA });
+    const [textoA, textoB] = await Promise.all([primeira, segunda]);
+
+    expect(estado.chamadasFila).toBe(1);
+    for (const texto of [textoA, textoB]) {
+      expect(valorDaSerie(texto, 'frequenciapp_fila_planilha_itens{estado="FALHOU"}')).toBe(3);
+      expect(valorDaSerie(texto, "frequenciapp_fila_planilha_atualizado_timestamp_seconds")).toBe(
+        estado.agora / 1000,
+      );
+    }
+
+    // A raspagem seguinte ainda reutiliza a amostra recém-lida.
+    await textoDoRegistro();
+    expect(estado.chamadasFila).toBe(1);
+  });
+
+  it("mantém a última amostra válida na falha e recupera na leitura seguinte", async () => {
+    estado.contagens = new Map([
+      ["AGUARDANDO", 2],
+      ["CONCLUIDO", 1],
+    ]);
+    estado.maisAntiga = AGORA;
+    await textoDoRegistro();
+    const lidoEm = estado.agora;
+    const antes = await textoDoRegistro();
+    const errosAntes = valorDaSerie(antes, 'frequenciapp_coleta_erros_total{coletor="fila"}');
+
+    estado.agora = lidoEm + VALIDADE_MS + 1;
+    estado.falharFila = true;
+    const falha = await textoDoRegistro();
+
+    expect(valorDaSerie(falha, 'frequenciapp_coleta_erros_total{coletor="fila"}')).toBe(
+      errosAntes + 1,
+    );
+    expect(valorDaSerie(falha, 'frequenciapp_fila_planilha_itens{estado="AGUARDANDO"}')).toBe(2);
+    expect(valorDaSerie(falha, 'frequenciapp_fila_planilha_itens{estado="CONCLUIDO"}')).toBe(1);
+    expect(valorDaSerie(falha, "frequenciapp_fila_planilha_atualizado_timestamp_seconds")).toBe(
+      lidoEm / 1000,
+    );
+    expect(estado.chamadasFila).toBe(2);
+
+    estado.agora += 1;
+    estado.falharFila = false;
+    estado.contagens = new Map([["AGUARDANDO", 0]]);
+    estado.maisAntiga = null;
+    const recuperada = await textoDoRegistro();
+
+    expect(estado.chamadasFila).toBe(3);
+    expect(valorDaSerie(recuperada, 'frequenciapp_coleta_erros_total{coletor="fila"}')).toBe(
+      errosAntes + 1,
+    );
+    expect(valorDaSerie(recuperada, 'frequenciapp_fila_planilha_itens{estado="AGUARDANDO"}')).toBe(
+      0,
+    );
+    expect(
+      valorDaSerie(recuperada, "frequenciapp_fila_planilha_mais_antiga_timestamp_seconds"),
+    ).toBe(0);
+    expect(
+      valorDaSerie(recuperada, "frequenciapp_fila_planilha_atualizado_timestamp_seconds"),
+    ).toBe(estado.agora / 1000);
   });
 });
 
@@ -163,6 +300,7 @@ describe("falhas de coleta", () => {
 
     estado.falharFila = true;
     estado.falharPool = true;
+    estado.agora += VALIDADE_MS + 1;
 
     const texto = await textoDoRegistro();
 

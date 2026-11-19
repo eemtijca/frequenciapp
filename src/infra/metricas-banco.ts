@@ -12,6 +12,9 @@ const ESTADOS_DA_FILA: readonly EstadoItemFila[] = [
   "DESCARTADO",
 ];
 
+/** Duas raspagens próximas reutilizam a última leitura válida da fila. */
+const VALIDADE_DA_AMOSTRA_MS = 15_000;
+
 const globalComMetricasDoBanco = globalThis as unknown as {
   __frequenciappMetricasDoBanco?: boolean;
 };
@@ -24,9 +27,13 @@ export interface PoolDeConexoes {
 }
 
 /** Consultas mínimas da fila de planilhas, sem expor o cliente Prisma. */
+export interface AmostraDaFila {
+  contagens: ReadonlyMap<EstadoItemFila, number>;
+  maisAntiga: Date | null;
+}
+
 export interface FilaDePlanilhas {
-  contarPorEstado(): Promise<readonly { estado: EstadoItemFila; quantidade: number }[]>;
-  maisAntigaAberta(): Promise<Date | null>;
+  lerAmostra(): Promise<AmostraDaFila>;
 }
 
 /** Fonte estrutural montada em banco.ts com o pool, a fila e o evento de consulta. */
@@ -34,6 +41,8 @@ export interface FonteDeMetricasDoBanco {
   pool: PoolDeConexoes;
   fila: FilaDePlanilhas;
   assinarConsulta(ouvinte: (duracaoMilissegundos: number) => void): void;
+  /** Relógio da validade da amostra; o padrão é o relógio do processo. */
+  agora?: () => number;
 }
 
 /** Registra as métricas de banco e fila uma única vez por processo. */
@@ -42,12 +51,17 @@ export function registrarMetricasDoBanco(fonte: FonteDeMetricasDoBanco): void {
   globalComMetricasDoBanco.__frequenciappMetricasDoBanco = true;
 
   const { registro } = metricas();
+  const agora = fonte.agora ?? Date.now;
 
   const erros = new Counter({
     name: "frequenciapp_coleta_erros_total",
     help: "Falhas de coleta por coletor.",
     labelNames: ["coletor"] as const,
     registers: [registro],
+    collect: async () => {
+      // A falha da fila entra no mesmo texto que a raspagem que a provocou.
+      await coletarFila();
+    },
   });
 
   const duracaoDaColeta = new Gauge({
@@ -93,9 +107,8 @@ export function registrarMetricasDoBanco(fonte: FonteDeMetricasDoBanco): void {
     registers: [registro],
     collect: async () => {
       const dados = await coletarFila();
-      if (dados) {
-        filaMaisAntiga.set(dados.maisAntiga ? dados.maisAntiga.getTime() / 1000 : 0);
-      }
+      if (!dados) return;
+      filaMaisAntiga.set(dados.maisAntiga ? dados.maisAntiga.getTime() / 1000 : 0);
     },
   });
 
@@ -113,32 +126,46 @@ export function registrarMetricasDoBanco(fonte: FonteDeMetricasDoBanco): void {
     },
   });
 
-  interface DadosDaFila {
-    contagens: Map<EstadoItemFila, number>;
-    maisAntiga: Date | null;
+  const filaAtualizada = new Gauge({
+    name: "frequenciapp_fila_planilha_atualizado_timestamp_seconds",
+    help: "Instante da última leitura válida da fila de planilhas, em segundos Unix.",
+    registers: [registro],
+    collect: async () => {
+      // A raspagem que inicia a leitura espera a amostra para publicar o carimbo novo.
+      await coletarFila();
+    },
+  });
+
+  let amostraDaFila: AmostraDaFila | null = null;
+  let amostraEm = 0;
+  let coletaDaFila: Promise<AmostraDaFila | null> | null = null;
+
+  /** Amostra compartilhada enquanto estiver dentro da validade curta. */
+  function amostraValida(instante: number): AmostraDaFila | null {
+    if (!amostraDaFila) return null;
+    const idade = instante - amostraEm;
+    return idade >= 0 && idade < VALIDADE_DA_AMOSTRA_MS ? amostraDaFila : null;
   }
 
-  let coletaDaFila: Promise<DadosDaFila | null> | null = null;
-
-  /** Uma consulta por raspagem, compartilhada pelos dois gauges da fila. */
-  function coletarFila(): Promise<DadosDaFila | null> {
+  /** Uma consulta por amostra, compartilhada pelas séries da fila e por raspagens próximas. */
+  function coletarFila(): Promise<AmostraDaFila | null> {
+    const atual = amostraValida(agora());
+    if (atual) return Promise.resolve(atual);
     coletaDaFila ??= lerFila().finally(() => {
       coletaDaFila = null;
     });
     return coletaDaFila;
   }
 
-  async function lerFila(): Promise<DadosDaFila | null> {
+  async function lerFila(): Promise<AmostraDaFila | null> {
     const inicio = performance.now();
     try {
-      const contagens = new Map<EstadoItemFila, number>();
-      for (const grupo of await fonte.fila.contarPorEstado()) {
-        if (ESTADOS_DA_FILA.includes(grupo.estado)) {
-          contagens.set(grupo.estado, grupo.quantidade);
-        }
-      }
-      const maisAntiga = await fonte.fila.maisAntigaAberta();
-      return { contagens, maisAntiga };
+      const dados = await fonte.fila.lerAmostra();
+      const lidoEm = agora();
+      amostraDaFila = dados;
+      amostraEm = lidoEm;
+      filaAtualizada.set(lidoEm / 1000);
+      return dados;
     } catch {
       erros.inc({ coletor: "fila" });
       return null;

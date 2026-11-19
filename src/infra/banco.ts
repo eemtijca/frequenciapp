@@ -6,7 +6,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { AsyncLocalStorage } from "node:async_hooks";
 import type { EstadoItemFila } from "@/domain/fila-planilha";
 import { ambiente } from "@/infra/ambiente";
-import { registrarMetricasDoBanco } from "@/infra/metricas-banco";
+import { registrarMetricasDoBanco, type AmostraDaFila } from "@/infra/metricas-banco";
 import { identificadorPostgres, resolverSchema } from "./schema-postgres.mjs";
 
 const globalComBanco = globalThis as unknown as {
@@ -16,6 +16,12 @@ const globalComBanco = globalThis as unknown as {
 
 // Itens abertos contam para a idade da fila e para o alerta de fila parada.
 const ESTADOS_ABERTOS: EstadoItemFila[] = ["AGUARDANDO", "EM_ANDAMENTO", "FALHOU"];
+
+// Orçamento da coleta da fila: o servidor cancela antes do cliente e a transação
+// fecha antes do tempo limite de raspagem de 10 segundos.
+const TEMPO_LIMITE_FILA_MS = 2_000;
+const TEMPO_TRANSACAO_FILA_MS = 4_000;
+const TEMPO_CONSULTA_POOL_MS = 8_000;
 
 // Permite que um lote reutilize a mesma transação sem abrir outra conexão.
 const contextoTransacao = new AsyncLocalStorage<Prisma.TransactionClient>();
@@ -34,6 +40,8 @@ function criarCliente(): PrismaClient {
   const pool = new pg.Pool({
     connectionString: ambiente.databaseUrl,
     max: ambiente.poolMaxConexoes,
+    // Proteção cliente: nenhuma consulta fica pendente além do orçamento da coleta.
+    query_timeout: TEMPO_CONSULTA_POOL_MS,
   });
   const adaptador = new PrismaPg(pool, {
     schema: schemaDoBanco(),
@@ -46,30 +54,55 @@ function criarCliente(): PrismaClient {
   registrarMetricasDoBanco({
     pool,
     fila: {
-      contarPorEstado: async () => {
-        const grupos = await prisma.filaPlanilha.groupBy({
-          by: ["estado"],
-          _count: { _all: true },
-        });
-        return grupos.map((grupo) => ({
-          estado: grupo.estado,
-          quantidade: grupo._count._all,
-        }));
-      },
-      maisAntigaAberta: async () => {
-        const item = await prisma.filaPlanilha.findFirst({
-          where: { estado: { in: ESTADOS_ABERTOS } },
-          orderBy: { criadoEm: "asc" },
-          select: { criadoEm: true },
-        });
-        return item?.criadoEm ?? null;
-      },
+      lerAmostra: () => lerAmostraDaFila(prisma),
     },
     assinarConsulta: (ouvinte) => {
       prisma.$on("query", (evento) => ouvinte(evento.duration));
     },
   });
   return prisma;
+}
+
+interface LinhaDaFila {
+  estado: EstadoItemFila;
+  quantidade: number;
+  mais_antiga: Date | null;
+}
+
+/** Uma consulta agregada por amostra, com prazo de servidor e de transação. */
+async function lerAmostraDaFila(prisma: PrismaClient): Promise<AmostraDaFila> {
+  return prisma.$transaction(
+    async (tx) => {
+      await tx.$executeRaw(
+        Prisma.sql`SET LOCAL statement_timeout = ${Prisma.raw(String(TEMPO_LIMITE_FILA_MS))}`,
+      );
+      const linhas = await tx.$queryRaw<LinhaDaFila[]>(Prisma.sql`
+        SELECT contagens.estado, contagens.quantidade, abertos.mais_antiga
+        FROM (
+          SELECT estado, count(*)::int AS quantidade
+          FROM ${objetoDoBanco("fila_planilha")}
+          GROUP BY estado
+        ) AS contagens
+        CROSS JOIN (
+          SELECT min(criado_em) AS mais_antiga
+          FROM ${objetoDoBanco("fila_planilha")}
+          WHERE estado IN (${Prisma.join(ESTADOS_ABERTOS)})
+        ) AS abertos
+      `);
+      const contagens = new Map<EstadoItemFila, number>();
+      let maisAntiga: Date | null = null;
+      for (const linha of linhas) {
+        contagens.set(linha.estado, linha.quantidade);
+        if (!maisAntiga && linha.mais_antiga) maisAntiga = linha.mais_antiga;
+      }
+      return { contagens, maisAntiga };
+    },
+    {
+      isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+      maxWait: 1_000,
+      timeout: TEMPO_TRANSACAO_FILA_MS,
+    },
+  );
 }
 
 /** Qualifica tabelas e tipos do SQL direto sem depender da sessão do pooler. */

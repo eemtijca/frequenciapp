@@ -83,10 +83,38 @@ it.each(["enviado", "falhou"])("o dono vencido não finaliza o novo dono: %s", a
   await inicioB;
   const reservaB = { ...item };
   liberarA(resultado);
-  const resumoA = await trabalhoA;
+  const resumoA = (await trabalhoA).resumo;
   expect(item).toEqual(reservaB);
   expect(resumoA.processados).toBe(0);
   expect(resumoA.concluidos).toBe(0);
   liberarB("enviado");
-  expect((await trabalhoB).concluidos).toBe(1);
+  expect((await trabalhoB).resumo.concluidos).toBe(1);
+});
+
+it("só o primeiro chamador lidera e os concorrentes compartilham o mesmo resumo", async () => {
+  let pendente = true;
+  let liberarFrente: () => void = () => undefined;
+  d.frente.mockImplementation(() => {
+    if (!pendente) return Promise.resolve([]);
+    return new Promise((resolver) => {
+      liberarFrente = () => {
+        pendente = false;
+        resolver([]);
+      };
+    });
+  });
+  vi.resetModules();
+  const modulo = await import("@/application/fila-planilha");
+  const lider = modulo.processarFila({ limite: 1 });
+  const seguidorA = modulo.processarFila({ limite: 1 });
+  const seguidorB = modulo.processarFila({ limite: 1 });
+  liberarFrente();
+  const [resultadoLider, resultadoA, resultadoB] = await Promise.all([lider, seguidorA, seguidorB]);
+  expect(resultadoLider.compartilhado).toBe(false);
+  expect(resultadoA.compartilhado).toBe(true);
+  expect(resultadoB.compartilhado).toBe(true);
+  expect(resultadoA.resumo).toEqual(resultadoLider.resumo);
+  expect(resultadoB.resumo).toEqual(resultadoLider.resumo);
+  // A rodada repetida atende os seguidores uma vez, sem uma execução por chamada.
+  expect(d.frente).toHaveBeenCalledTimes(2);
 });

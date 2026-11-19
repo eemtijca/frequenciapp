@@ -12,8 +12,8 @@ export async function GET(requisicao: Request): Promise<Response> {
     if (!segredoDaAgendaConfere(requisicao.headers.get("authorization"))) {
       return erroApi("Acesso não permitido.", 403);
     }
-    const resumo = await processarFilaDaAgenda();
-    registrarFilaProcessada(resumo);
+    const { resumo, compartilhado } = await processarFilaDaAgenda();
+    if (!compartilhado) registrarFilaProcessada(resumo);
     return json(resumo);
   });
 }

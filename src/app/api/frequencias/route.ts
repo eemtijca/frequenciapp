@@ -22,7 +22,7 @@ import {
   json,
   origemPermitida,
 } from "@/infra/http";
-import { registrarFrequencia } from "@/infra/metricas";
+import { registrarFrequencia, registrarFilaProcessada } from "@/infra/metricas";
 
 export const dynamic = "force-dynamic";
 
@@ -113,7 +113,10 @@ export async function POST(requisicao: Request): Promise<Response> {
       );
     }
     registrarFrequencia("salvo");
-    after(() => processarFilaDaAgenda());
+    after(async () => {
+      const { resumo, compartilhado } = await processarFilaDaAgenda();
+      if (!compartilhado) registrarFilaProcessada(resumo);
+    });
     return json({ frequencia: resultado.frequencia });
   });
 }
