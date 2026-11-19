@@ -106,57 +106,106 @@ carregar_imagens_do_estado() {
   fi
 }
 
-montar_compose_em() {
-  local raiz="$1"
-  [[ "${COMPOSE_PROJECT_NAME:-}" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || erro "Defina COMPOSE_PROJECT_NAME explicitamente."
-  local tipo="${PROXY_TIPO:-caddy}"
-  local arquivos=()
-  local lista=()
-  local arquivo
-  local relativo
-  local overlay
-  local presente
+# Imprime a lista efetiva de arquivos Compose, um caminho absoluto por linha.
+# Uma lista explícita em COMPOSE_ARQUIVOS é autoritativa: o overlay só entra se
+# estiver citado. Sem lista explícita, a base vem de PROXY_TIPO e o overlay é
+# acrescentado quando a observabilidade está habilitada. Caminhos são
+# resolvidos por readlink -f para impedir duplicata por relativo, absoluto ou link.
+listar_compose_em() {
+  local raiz="${1:-}"
+  [ -n "$raiz" ] || erro "Raiz Compose obrigatória."
+  raiz=$(cd "$raiz" && pwd -P) || erro "Diretório do projeto Compose inválido: $1"
+  local overlay="$raiz/compose.observabilidade.yml"
+  local overlay_resolvido
+  local explicita=false
+  local tem_overlay=false
+  local item
+  local resolvido
+  local -a lista=()
+  local -a itens=()
+  local -A vistos=()
+
+  if command -v readlink >/dev/null; then
+    overlay_resolvido=$(readlink -f -- "$overlay" 2>/dev/null || true)
+  fi
+  [ -n "${overlay_resolvido:-}" ] || overlay_resolvido="$overlay"
 
   if [ -n "${COMPOSE_ARQUIVOS:-}" ]; then
-    local IFS=':'
-    for relativo in $COMPOSE_ARQUIVOS; do
-      case "$relativo" in
-        /*) lista+=("$relativo") ;;
-        *) lista+=("$raiz/$relativo") ;;
+    explicita=true
+    IFS=':' read -r -a itens <<<"$COMPOSE_ARQUIVOS"
+    for item in "${itens[@]}"; do
+      [ -n "$item" ] || erro "COMPOSE_ARQUIVOS contém item vazio."
+      case "$item" in
+        /*) lista+=("$item") ;;
+        *) lista+=("$raiz/$item") ;;
       esac
     done
   else
     lista+=("$raiz/compose.yml" "$raiz/compose.servidor.yml")
-    case "$tipo" in
+    case "${PROXY_TIPO:-caddy}" in
       caddy) lista+=("$raiz/compose.servidor-caddy.yml") ;;
       nginx) lista+=("$raiz/compose.servidor-nginx.yml") ;;
-      *) erro "PROXY_TIPO inválido: $tipo. Use caddy ou nginx." ;;
+      *)
+        erro "PROXY_TIPO inválido: ${PROXY_TIPO:-}. Use caddy ou nginx."
+        ;;
     esac
+    if [ "${OBSERVABILIDADE_HABILITADA:-false}" = "true" ]; then
+      lista+=("$overlay")
+    fi
   fi
 
-  if [ "${OBSERVABILIDADE_HABILITADA:-false}" = "true" ]; then
-    overlay="$raiz/compose.observabilidade.yml"
-    presente=false
-    for arquivo in "${lista[@]}"; do
-      if [ "$arquivo" = "$overlay" ]; then
-        presente=true
-        break
-      fi
-    done
-    [ "$presente" = true ] || lista+=("$overlay")
-  fi
+  for item in "${lista[@]}"; do
+    if command -v readlink >/dev/null; then
+      resolvido=$(readlink -f -- "$item" 2>/dev/null || true)
+    fi
+    [ -n "${resolvido:-}" ] || resolvido="$item"
+    if [ -n "${vistos[$resolvido]:-}" ]; then
+      continue
+    fi
+    vistos[$resolvido]=1
+    if [ "$resolvido" = "$overlay_resolvido" ]; then
+      tem_overlay=true
+    elif [ -f "$resolvido" ] && [ -f "$overlay" ] && cmp -s -- "$resolvido" "$overlay"; then
+      # O snapshot guarda o overlay como compose/<i>.yml; o conteúdo identifica
+      # a mesma sobreposição sem reintroduzir o caminho do checkout mutável.
+      tem_overlay=true
+    fi
+    printf '%s\n' "$resolvido"
+    resolvido=""
+  done
 
+  if [ "$explicita" = true ] &&
+    [ "${OBSERVABILIDADE_HABILITADA:-false}" = "true" ] &&
+    [ "$tem_overlay" = false ]; then
+    erro "OBSERVABILIDADE_HABILITADA=true exige compose.observabilidade.yml em COMPOSE_ARQUIVOS."
+  fi
+}
+
+montar_compose_em() {
+  local raiz="${1:-}"
+  [ -n "$raiz" ] || erro "Diretório do projeto Compose obrigatório."
+  raiz=$(cd "$raiz" && pwd -P) || erro "Diretório do projeto Compose inválido: $1"
+  [[ "${COMPOSE_PROJECT_NAME:-}" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || erro "Defina COMPOSE_PROJECT_NAME explicitamente."
+  local lista_texto
+  local arquivo
+  local arquivos=()
+  local -a lista=()
+
+  lista_texto=$(listar_compose_em "$raiz") || erro "Lista Compose efetiva inválida."
+  mapfile -t lista <<<"$lista_texto"
   for arquivo in "${lista[@]}"; do
+    [ -n "$arquivo" ] || continue
     [ -f "$arquivo" ] || erro "Arquivo Compose não encontrado: $arquivo"
     arquivos+=(-f "$arquivo")
   done
+  [ "${#arquivos[@]}" -gt 0 ] || erro "Nenhum arquivo Compose foi resolvido."
 
   COMPOSE=(docker compose --project-name "$COMPOSE_PROJECT_NAME" --project-directory "$raiz" \
     --env-file "$APP_ENV_FILE" --env-file "$OPS_ENV_FILE" "${arquivos[@]}")
 }
 
 montar_compose() {
-  montar_compose_em "$APP_DIR"
+  montar_compose_em "${COMPOSE_DIR:-$APP_DIR}"
 }
 
 compose() {

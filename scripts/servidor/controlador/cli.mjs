@@ -81,13 +81,96 @@ function opcoes(args) {
   exigir(Boolean(o["--plano"]) !== Boolean(o["--confirmar"]), "Escolher --plano ou --confirmar.");
   return o;
 }
-function inventariar(raiz, relativo, arquivos) {
+function inventariar(raiz, relativo, arquivos, ignorar = new Set()) {
+  if (ignorar.has(relativo)) return;
   const nome = path.join(raiz, relativo),
     s = protegido(nome, fs.lstatSync(nome).isDirectory() ? "diretorio" : "arquivo");
   if (s.isDirectory())
     for (const n of fs.readdirSync(nome).sort())
-      inventariar(raiz, path.join(relativo, n), arquivos);
+      inventariar(raiz, path.join(relativo, n), arquivos, ignorar);
   else arquivos[relativo] = fs.readFileSync(nome);
+}
+function mesmoArquivo(a, b) {
+  try {
+    return fs.realpathSync(a) === fs.realpathSync(b);
+  } catch {
+    return path.resolve(a) === path.resolve(b);
+  }
+}
+// Usa a mesma resolução do comum.sh para não manter duas listas divergentes.
+function resolverCompose(fonte, p, env) {
+  const r = spawnSync(
+    "/bin/bash",
+    [
+      "--noprofile",
+      "--norc",
+      "-c",
+      'set -Eeuo pipefail; . "$1"; listar_compose_em "$2"',
+      "compose",
+      `${fonte}/scripts/servidor/comum.sh`,
+      p.app,
+    ],
+    {
+      env: { ...env, APP_DIR: p.app },
+      encoding: "utf8",
+      maxBuffer: 4 * 1024 * 1024,
+    },
+  );
+  exigir(
+    !r.error && !r.signal && r.status === 0,
+    (r.stderr ?? "").trim() || "Não foi possível resolver a lista Compose efetiva.",
+  );
+  const lista = r.stdout
+    .split("\n")
+    .map((n) => n.trim())
+    .filter(Boolean);
+  exigir(
+    lista.length > 0 && lista.every((n) => path.isAbsolute(n)),
+    "Lista Compose efetiva inválida.",
+  );
+  return lista;
+}
+// Copia o overlay, as configurações da observabilidade e o que o proxy usa.
+function copiarConfiguracoes(p, env, composes, arquivos) {
+  const overlay = `${p.app}/compose.observabilidade.yml`;
+  if (fs.existsSync(overlay)) {
+    protegido(overlay);
+    arquivos["compose.observabilidade.yml"] = fs.readFileSync(overlay);
+  }
+  const nomes = new Set(composes.map((n) => path.basename(n)));
+  const overlayNaLista = composes.some((n) => mesmoArquivo(n, overlay));
+  const infra = `${p.app}/infra/observabilidade`;
+  if (fs.existsSync(infra)) inventariar(p.app, "infra/observabilidade", arquivos);
+  else
+    exigir(
+      env.OBSERVABILIDADE_HABILITADA !== "true" && !overlayNaLista,
+      "Configuração de observabilidade não encontrada no checkout.",
+    );
+  if (nomes.has("compose.servidor-caddy.yml")) {
+    const relativo = env.CADDYFILE || "infra/servidor/Caddyfile";
+    exigir(
+      !path.isAbsolute(relativo),
+      "CADDYFILE absoluto não é copiado para o snapshot; usar caminho relativo ao checkout.",
+    );
+    const absoluto = path.resolve(p.app, relativo);
+    exigir(
+      absoluto.startsWith(`${p.app}/`),
+      "CADDYFILE precisa ficar dentro do checkout para entrar no snapshot.",
+    );
+    exigir(fs.existsSync(absoluto), `Arquivo do Caddy não encontrado: ${relativo}`);
+    protegido(absoluto);
+    arquivos[path.relative(p.app, absoluto)] = fs.readFileSync(absoluto);
+  }
+  if (nomes.has("compose.servidor-nginx.yml")) {
+    const nginx = `${p.app}/infra/servidor/nginx`;
+    exigir(fs.existsSync(nginx), "Diretório do Nginx não encontrado no checkout.");
+    inventariar(
+      p.app,
+      "infra/servidor/nginx",
+      arquivos,
+      new Set(["infra/servidor/nginx/certificados"]),
+    );
+  }
 }
 function validarOperadorEConfig(p) {
   operador(p.operador);
@@ -168,13 +251,20 @@ function instalar(args) {
       !env.BACKUP_DATABASE_URL,
     "Primeiro perfil aceita apenas banco interno Compose sem conexões URL paralelas.",
   );
-  const composes = env.COMPOSE_ARQUIVOS
-    ? env.COMPOSE_ARQUIVOS.split(":")
-    : ["compose.yml", "compose.servidor.yml", `compose.servidor-${env.PROXY_TIPO ?? "caddy"}.yml`];
-  p.compose = composes.map((n, i) => {
-    const original = path.isAbsolute(n) ? n : `${p.app}/${n}`;
+  const composes = resolverCompose(fonte, p, env);
+  const overlay = `${p.app}/compose.observabilidade.yml`;
+  if (env.OBSERVABILIDADE_HABILITADA === "true")
+    exigir(
+      composes.some((n) => mesmoArquivo(n, overlay)),
+      "OBSERVABILIDADE_HABILITADA=true exige compose.observabilidade.yml na lista Compose efetiva.",
+    );
+  for (const original of composes) {
+    exigir(fs.existsSync(original), `Arquivo Compose não encontrado: ${original}`);
     protegido(original);
-    arquivos[`compose/${i}.yml`] = fs.readFileSync(original);
+  }
+  copiarConfiguracoes(p, env, composes, arquivos);
+  p.compose = composes.map((n, i) => {
+    arquivos[`compose/${i}.yml`] = fs.readFileSync(n);
     return `${p.snapshot}/compose/${i}.yml`;
   });
   // A captura somente leitura precisa conferir a identidade atual antes de qualquer instalação.
@@ -185,8 +275,9 @@ function instalar(args) {
       ...env,
       TMPDIR: process.env.TMPDIR ?? "/tmp",
       APP_DIR: p.app,
+      COMPOSE_DIR: p.app,
       SERVIDOR_SCRIPTS_DIR: `${fonte}/scripts/servidor`,
-      COMPOSE_ARQUIVOS: composes.map((n) => (path.isAbsolute(n) ? n : `${p.app}/${n}`)).join(":"),
+      COMPOSE_ARQUIVOS: composes.join(":"),
     },
     'montar_compose; conferir_identidade conferir; [ "$SERVIDOR_ALVO_CHAVE" = "$1" ]',
     [p.alvo],

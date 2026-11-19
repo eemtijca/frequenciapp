@@ -1,4 +1,4 @@
-// Cobre a inclusão condicional do overlay de observabilidade na lista Compose.
+// Cobre a resolução única da lista Compose e a política do overlay de observabilidade.
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -21,29 +21,37 @@ function preparar(t) {
   t.after(() => fs.rmSync(raiz, { recursive: true, force: true }));
   const app = path.join(raiz, "app");
   fs.mkdirSync(app);
-  for (const nome of ARQUIVOS) fs.writeFileSync(path.join(app, nome), "services: {}\n");
+  for (const nome of ARQUIVOS) fs.writeFileSync(path.join(app, nome), `# ${nome}\nservices: {}\n`);
   const rotina = path.join(raiz, "montar.sh");
   fs.writeFileSync(
     rotina,
     'set -Eeuo pipefail\n. "$1"\nmontar_compose\nprintf "%s\\n" "${COMPOSE[@]}"\n',
     { mode: 0o700 },
   );
-  return { app, rotina };
+  const listar = path.join(raiz, "listar.sh");
+  fs.writeFileSync(listar, 'set -Eeuo pipefail\n. "$1"\nlistar_compose_em "$2"\n', {
+    mode: 0o700,
+  });
+  return { app, rotina, listar };
 }
 
-function montar({ app, rotina }, variaveis = {}) {
-  return spawnSync("/bin/bash", [rotina, COMUM], {
+function executar(f, script, variaveis = {}, raiz = f.app) {
+  return spawnSync("/bin/bash", [script, COMUM, ...(script === f.listar ? [raiz] : [])], {
     encoding: "utf8",
     env: {
       PATH: "/usr/local/bin:/usr/bin:/bin",
-      HOME: app,
-      TMPDIR: app,
-      APP_DIR: app,
+      HOME: f.app,
+      TMPDIR: f.app,
+      APP_DIR: f.app,
       COMPOSE_PROJECT_NAME: "sintetico",
       PROXY_TIPO: "caddy",
       ...variaveis,
     },
   });
+}
+
+function montar(f, variaveis = {}) {
+  return executar(f, f.rotina, variaveis);
 }
 
 function arquivos(resultado) {
@@ -58,14 +66,12 @@ function arquivos(resultado) {
   return lista;
 }
 
-test("inclui o overlay quando a observabilidade está habilitada", (t) => {
-  const f = preparar(t);
-  const lista = arquivos(montar(f, { OBSERVABILIDADE_HABILITADA: "true" }));
-  assert.deepEqual(
-    lista,
-    ARQUIVOS.map((nome) => path.join(f.app, nome)),
-  );
-});
+function recusa(resultado, motivo) {
+  assert.equal(resultado.error, undefined);
+  assert.equal(resultado.signal, null);
+  assert.notEqual(resultado.status, 0);
+  assert.match(resultado.stderr, motivo);
+}
 
 test("não inclui o overlay quando a observabilidade está desligada ou ausente", (t) => {
   const f = preparar(t);
@@ -78,42 +84,115 @@ test("não inclui o overlay quando a observabilidade está desligada ou ausente"
   }
 });
 
-test("acrescenta o overlay ao COMPOSE_ARQUIVOS e não duplica", (t) => {
+test("inclui o overlay implícito quando a observabilidade está habilitada", (t) => {
+  const f = preparar(t);
+  const lista = arquivos(montar(f, { OBSERVABILIDADE_HABILITADA: "true" }));
+  assert.deepEqual(
+    lista,
+    ARQUIVOS.map((nome) => path.join(f.app, nome)),
+  );
+});
+
+test("lista explícita com overlay relativo, absoluto ou link não duplica", (t) => {
   const f = preparar(t);
   const base = ["compose.yml", "compose.servidor.yml", "compose.servidor-caddy.yml"];
   const esperado = ARQUIVOS.map((nome) => path.join(f.app, nome));
-  const acrescentado = arquivos(
-    montar(f, {
-      OBSERVABILIDADE_HABILITADA: "true",
-      COMPOSE_ARQUIVOS: base.join(":"),
-    }),
-  );
-  assert.deepEqual(acrescentado, esperado);
-  const repetido = arquivos(
-    montar(f, {
-      OBSERVABILIDADE_HABILITADA: "true",
-      COMPOSE_ARQUIVOS: [...base, "compose.observabilidade.yml"].join(":"),
-    }),
-  );
-  assert.deepEqual(repetido, esperado);
-  const absoluto = arquivos(
+  for (const overlay of [
+    "compose.observabilidade.yml",
+    path.join(f.app, "compose.observabilidade.yml"),
+    "./compose.observabilidade.yml",
+  ]) {
+    const lista = arquivos(
+      montar(f, {
+        OBSERVABILIDADE_HABILITADA: "true",
+        COMPOSE_ARQUIVOS: [...base, overlay, overlay].join(":"),
+      }),
+    );
+    assert.deepEqual(lista, esperado);
+  }
+  fs.symlinkSync("compose.observabilidade.yml", path.join(f.app, "overlay-link.yml"));
+  const porLink = arquivos(
     montar(f, {
       OBSERVABILIDADE_HABILITADA: "true",
       COMPOSE_ARQUIVOS: [
-        ...base.map((nome) => path.join(f.app, nome)),
-        path.join(f.app, "compose.observabilidade.yml"),
+        ...base,
+        "compose.observabilidade.yml",
+        path.join(f.app, "overlay-link.yml"),
       ].join(":"),
     }),
   );
-  assert.deepEqual(absoluto, esperado);
+  assert.deepEqual(porLink, esperado);
 });
 
-test("recusa a instalação quando o overlay habilitado não existe", (t) => {
+test("deduplica caminhos relativos, absolutos e links do mesmo Compose", (t) => {
   const f = preparar(t);
-  fs.rmSync(path.join(f.app, "compose.observabilidade.yml"));
-  const resultado = montar(f, { OBSERVABILIDADE_HABILITADA: "true" });
+  fs.symlinkSync("compose.yml", path.join(f.app, "compose-link.yml"));
+  const resultado = executar(f, f.listar, {
+    COMPOSE_ARQUIVOS: [
+      "compose.yml",
+      path.join(f.app, "compose.yml"),
+      "./compose.yml",
+      "compose-link.yml",
+    ].join(":"),
+  });
   assert.equal(resultado.error, undefined);
   assert.equal(resultado.signal, null);
-  assert.notEqual(resultado.status, 0);
-  assert.match(resultado.stderr, /Arquivo Compose não encontrado: .*compose\.observabilidade\.yml/);
+  assert.equal(resultado.status, 0, resultado.stderr);
+  assert.deepEqual(resultado.stdout.trim().split("\n"), [path.join(f.app, "compose.yml")]);
+});
+
+test("recusa lista explícita sem overlay quando a flag está ligada", (t) => {
+  const f = preparar(t);
+  const resultado = montar(f, {
+    OBSERVABILIDADE_HABILITADA: "true",
+    COMPOSE_ARQUIVOS: ["compose.yml", "compose.servidor.yml", "compose.servidor-caddy.yml"].join(
+      ":",
+    ),
+  });
+  recusa(resultado, /OBSERVABILIDADE_HABILITADA=true exige compose\.observabilidade\.yml/);
+});
+
+test("respeita overlay explícito com a flag desligada", (t) => {
+  const f = preparar(t);
+  const lista = arquivos(
+    montar(f, {
+      OBSERVABILIDADE_HABILITADA: "false",
+      COMPOSE_ARQUIVOS: ARQUIVOS.join(":"),
+    }),
+  );
+  assert.deepEqual(
+    lista,
+    ARQUIVOS.map((nome) => path.join(f.app, nome)),
+  );
+});
+
+test("recusa overlays e Compose ausentes antes de montar", (t) => {
+  const f = preparar(t);
+  fs.rmSync(path.join(f.app, "compose.observabilidade.yml"));
+  recusa(
+    montar(f, { OBSERVABILIDADE_HABILITADA: "true" }),
+    /Arquivo Compose não encontrado: .*compose\.observabilidade\.yml/,
+  );
+
+  fs.rmSync(path.join(f.app, "compose.servidor.yml"));
+  recusa(montar(f, {}), /Arquivo Compose não encontrado: .*compose\.servidor\.yml/);
+});
+
+test("recusa PROXY_TIPO inválido na lista implícita", (t) => {
+  const f = preparar(t);
+  recusa(montar(f, { PROXY_TIPO: "traefik" }), /PROXY_TIPO inválido: traefik/);
+});
+
+test("normaliza a raiz relativa antes de resolver a lista", (t) => {
+  const f = preparar(t);
+  const resultado = executar(
+    f,
+    f.listar,
+    { COMPOSE_ARQUIVOS: "compose.yml" },
+    path.relative(process.cwd(), f.app),
+  );
+  assert.equal(resultado.error, undefined);
+  assert.equal(resultado.signal, null);
+  assert.equal(resultado.status, 0, resultado.stderr);
+  assert.deepEqual(resultado.stdout.trim().split("\n"), [path.join(f.app, "compose.yml")]);
 });

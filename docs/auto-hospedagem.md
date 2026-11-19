@@ -157,6 +157,8 @@ A coleta e o painel são opcionais e não sobem em instalações existentes sem 
 
 O node exporter e o blackbox exporter sobem com a observabilidade. O Alertmanager é opt-in pelo perfil Compose `alertas` e aceita apenas um receptor por vez: o webhook ou o conjunto completo de e-mail. As variáveis `ALERTA_*` ficam no `ops.env`, e o webhook, o token opcional e a senha SMTP são segredos. O entrypoint grava esses valores em arquivos com modo 600 em `/tmp` e usa os campos nativos `url_file`, `http_config.authorization.credentials_file` e `smtp_auth_password_file`, sem segredo em argumento de processo. O detalhamento está em [observabilidade.md](observabilidade.md#segredos-e-conteúdo-dos-alertas).
 
+Com `COMPOSE_ARQUIVOS` definida, a lista é autoritativa. Com `OBSERVABILIDADE_HABILITADA=true`, `compose.observabilidade.yml` precisa estar citado nela, ou a operação é recusada antes de qualquer mutação. Com a flag desligada, citar o overlay mantém uma escolha explícita revisada. Sem `COMPOSE_ARQUIVOS`, a lista padrão inclui o overlay quando a flag está ligada.
+
 ### Proxy e TLS
 
 | Variável            | Padrão                                | Uso                                 |
@@ -173,16 +175,16 @@ O node exporter e o blackbox exporter sobem com a observabilidade. O Alertmanage
 
 ### Instalação Compose e serviços
 
-| Variável                            | Padrão                                 | Uso                                     |
-| ----------------------------------- | -------------------------------------- | --------------------------------------- |
-| `COMPOSE_PROJECT_NAME`              | obrigatório                            | Nome explícito do projeto Compose       |
-| `SERVIDOR_IDENTIDADE_ARQUIVO`       | `$SERVIDOR_CONFIG_DIR/identidade.json` | Registro privado da identidade adotada  |
-| `SERVIDOR_LOCK_DIR`                 | `/var/lock/frequenciapp`               | Diretório 0700 das travas por projeto   |
-| `COMPOSE_ARQUIVOS`                  | arquivos de referência                 | Lista separada por `:`                  |
-| `SERVIDOR_SERVICO_APP`              | `app`                                  | Serviço da aplicação                    |
-| `SERVIDOR_SERVICO_DB`               | `db`                                   | Serviço do banco                        |
-| `SERVIDOR_SERVICO_PROXY`            | `caddy` ou `nginx`                     | Serviço do proxy                        |
-| `SERVIDOR_SERVICO_BACKUP_PLANILHAS` | `backup-planilhas`                     | Serviço opcional de backup de planilhas |
+| Variável                            | Padrão                                 | Uso                                                                      |
+| ----------------------------------- | -------------------------------------- | ------------------------------------------------------------------------ |
+| `COMPOSE_PROJECT_NAME`              | obrigatório                            | Nome explícito do projeto Compose                                        |
+| `SERVIDOR_IDENTIDADE_ARQUIVO`       | `$SERVIDOR_CONFIG_DIR/identidade.json` | Registro privado da identidade adotada                                   |
+| `SERVIDOR_LOCK_DIR`                 | `/var/lock/frequenciapp`               | Diretório 0700 das travas por projeto                                    |
+| `COMPOSE_ARQUIVOS`                  | arquivos de referência                 | Lista separada por `:`. Com a observabilidade ligada, incluir o overlay. |
+| `SERVIDOR_SERVICO_APP`              | `app`                                  | Serviço da aplicação                                                     |
+| `SERVIDOR_SERVICO_DB`               | `db`                                   | Serviço do banco                                                         |
+| `SERVIDOR_SERVICO_PROXY`            | `caddy` ou `nginx`                     | Serviço do proxy                                                         |
+| `SERVIDOR_SERVICO_BACKUP_PLANILHAS` | `backup-planilhas`                     | Serviço opcional de backup de planilhas                                  |
 
 ### Backup e atualização
 
@@ -525,6 +527,7 @@ O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database
 - Monitorar espaço em disco do banco, dos logs e do backup, pela regra `FrequenciappDiscoBaixo`.
 - Revisar a agenda do GitHub quando ela for usada na nuvem.
 - Com a observabilidade ligada, seguir [observabilidade.md](observabilidade.md). O painel do Prometheus reúne `/targets`, `/alerts` e `/rules`.
+- Com controlador adotado, conferir que o snapshot contém o overlay, `infra/observabilidade/**` e o Caddyfile ou o diretório do Nginx. A entrada estável usa o snapshot como projeto Compose e não lê esses arquivos do checkout mutável.
 - Conferir `up{job="frequenciapp"}`, `up{job="node-exporter"}` e `up{job="blackbox"}` em `1` e, com o perfil `alertas`, `up{job="alertmanager"}` em `1`.
 - Conferir `probe_success{job="blackbox"}` em `1` e os dias restantes em `probe_ssl_earliest_cert_expiry`.
 - Separar a falha da sonda do estado do site: `up{job="blackbox"}` fora do ar, `probe_success` ausente e `probe_success` igual a `0` têm regras e janelas próprias.

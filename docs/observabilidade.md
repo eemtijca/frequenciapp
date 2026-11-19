@@ -86,7 +86,7 @@ openssl rand -hex 32
    PROMETHEUS_PORTA=9090
    ```
 
-3. Incluir `compose.observabilidade.yml` na lista de arquivos Compose. O caminho padrão do `scripts/servidor/compose.sh` já inclui a sobreposição quando a variável está em `true`. Quando `COMPOSE_ARQUIVOS` está definida, acrescentar o arquivo à lista separada por `:`.
+3. Incluir `compose.observabilidade.yml` na lista de arquivos Compose. Sem `COMPOSE_ARQUIVOS`, o caminho padrão do `scripts/servidor/compose.sh` já inclui a sobreposição quando a variável está em `true`. Com `COMPOSE_ARQUIVOS` definida, a lista é autoritativa: com a flag ligada, acrescentar o arquivo à lista separada por `:`; sem ele, a operação é recusada antes de qualquer mutação. Com a flag desligada, citar o overlay na lista explícita mantém a escolha revisada.
 4. Recriar a pilha para a aplicação e o Prometheus receberem o token e o volume.
 5. Executar um backup verificado para publicar a métrica de idade.
 
@@ -96,7 +96,9 @@ No perfil simples:
 scripts/servidor/compose.sh up -d
 ```
 
-No perfil com controlador adotado, a inclusão de um serviço novo altera a topologia e os hashes do ambiente. A reconfiguração restrita altera apenas os cinco seletores de rotina e não inclui `OBSERVABILIDADE_HABILITADA`, `PROMETHEUS_PORTA` nem o overlay. A mudança exige readoção revisada, conforme [controlador-manutencao.md](controlador-manutencao.md#observabilidade). Depois da readoção, a subida usa a entrada estável. O instalador não move o prefixo nem a trava ativa por conta própria.
+No perfil com controlador adotado, a inclusão de um serviço novo altera a topologia e os hashes do ambiente. A reconfiguração restrita altera apenas os cinco seletores de rotina e não inclui `OBSERVABILIDADE_HABILITADA`, `PROMETHEUS_PORTA` nem o overlay. A mudança exige readoção revisada, conforme [controlador-manutencao.md](controlador-manutencao.md#observabilidade). Depois da readoção, a subida usa a entrada estável.
+
+O snapshot do controlador copia `compose.observabilidade.yml`, `infra/observabilidade/**` e o Caddyfile ou o diretório do Nginx. A entrada estável usa o snapshot como diretório do projeto Compose (`COMPOSE_DIR`) e não lê esses arquivos do checkout mutável. Uma mudança no overlay, em `infra/observabilidade` ou no Caddyfile exige nova adoção revisada; a atualização comum preserva a topologia adotada. `CERTBOT_CERTS_DIR` permanece no checkout e precisa ser absoluto.
 
 ### Habilitar o Alertmanager
 
