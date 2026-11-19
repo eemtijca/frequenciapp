@@ -119,6 +119,7 @@ services:
     command: ["--storage.path=/alertmanager"]
     environment:
       ALERTA_WEBHOOK_URL: ${ALERTA_WEBHOOK_URL:-}
+      ALERTA_WEBHOOK_TOKEN: ${ALERTA_WEBHOOK_TOKEN:-}
       ALERTA_EMAIL_PARA: ${ALERTA_EMAIL_PARA:-}
       ALERTA_EMAIL_DE: ${ALERTA_EMAIL_DE:-}
       ALERTA_SMTP_SMARTHOST: ${ALERTA_SMTP_SMARTHOST:-}

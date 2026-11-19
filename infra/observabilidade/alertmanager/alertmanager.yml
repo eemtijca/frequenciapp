@@ -1,5 +1,6 @@
-# Modelo do Alertmanager: o entrypoint substitui a URL de exemplo pelo webhook
-# configurado e valida o resultado antes de iniciar o serviço.
+# Modelo do Alertmanager: a URL do webhook fica em arquivo restrito e a
+# configuração gerada usa url_file. O entrypoint grava esse arquivo, a senha
+# SMTP e um eventual token de autorização fora da configuração.
 route:
   receiver: frequenciapp
   group_by: ["alertname"]
@@ -10,5 +11,6 @@ route:
 receivers:
   - name: frequenciapp
     webhook_configs:
-      - url: http://127.0.0.1:9099/alerta
+      - url_file: /tmp/alertmanager-webhook-url
+        # AUTORIZACAO_WEBHOOK
         send_resolved: true
