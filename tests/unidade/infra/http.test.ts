@@ -16,7 +16,7 @@ vi.mock("@/infra/ambiente", () => ({ ambiente: { authSecret: "segredo-sintetico-
 vi.mock("@/application/sessao", () => ({ identidadeAtual: vi.fn() }));
 
 import { ErroHttp } from "@/infra/erros";
-import { json, executarRota } from "@/infra/http";
+import { erroApi, json, executarRota } from "@/infra/http";
 import { metricas } from "@/infra/metricas";
 
 function requisitar(rota: string, metodo: string): void {
@@ -47,7 +47,7 @@ afterEach(() => {
 
 describe("instrumentação de executarRota", () => {
   it("registra status e duração de uma resposta bem-sucedida", async () => {
-    requisitar("/api/http-sucesso", "POST");
+    requisitar("/api/frequencias", "POST");
 
     const resposta = await executarRota(async () => {
       await new Promise((resolver) => setTimeout(resolver, 5));
@@ -57,16 +57,16 @@ describe("instrumentação de executarRota", () => {
     expect(resposta.status).toBe(201);
     const texto = await metricas().registro.metrics();
     expect(texto).toContain(
-      'frequenciapp_http_requests_total{method="POST",route="/api/http-sucesso",status="201"} 1',
+      'frequenciapp_http_requests_total{method="POST",route="/api/frequencias",status="201"} 1',
     );
     expect(texto).toContain(
-      'frequenciapp_http_request_duration_seconds_count{method="POST",route="/api/http-sucesso"} 1',
+      'frequenciapp_http_request_duration_seconds_count{method="POST",route="/api/frequencias"} 1',
     );
-    expect(somaDaDuracao(texto, "/api/http-sucesso")).toBeGreaterThan(0);
+    expect(somaDaDuracao(texto, "/api/frequencias")).toBeGreaterThan(0);
   });
 
   it("registra o status traduzido quando o manipulador lança", async () => {
-    requisitar("/api/http-erro", "DELETE");
+    requisitar("/api/alunos/:id", "DELETE");
 
     const resposta = await executarRota(async () => {
       throw new ErroHttp("Registro em conflito.", 409);
@@ -75,9 +75,27 @@ describe("instrumentação de executarRota", () => {
     expect(resposta.status).toBe(409);
     const texto = await metricas().registro.metrics();
     expect(texto).toContain(
-      'frequenciapp_http_requests_total{method="DELETE",route="/api/http-erro",status="409"} 1',
+      'frequenciapp_http_requests_total{method="DELETE",route="/api/alunos/:id",status="409"} 1',
     );
     expect(await valorEmAndamento()).toBe(0);
+  });
+
+  it("registra 401 e 404 com o rótulo estático da rota", async () => {
+    requisitar("/api/justificativas/:codigo", "GET");
+    const semSessao = await executarRota(async () => erroApi("Sua sessão expirou.", 401));
+
+    requisitar("/api/turmas/:id", "GET");
+    const semRota = await executarRota(async () => erroApi("Recurso não encontrado.", 404));
+
+    expect(semSessao.status).toBe(401);
+    expect(semRota.status).toBe(404);
+    const texto = await metricas().registro.metrics();
+    expect(texto).toContain(
+      'frequenciapp_http_requests_total{method="GET",route="/api/justificativas/:codigo",status="401"} 1',
+    );
+    expect(texto).toContain(
+      'frequenciapp_http_requests_total{method="GET",route="/api/turmas/:id",status="404"} 1',
+    );
   });
 
   it("continua funcionando fora de um contexto de requisição", async () => {
@@ -88,8 +106,34 @@ describe("instrumentação de executarRota", () => {
     expect(resposta.status).toBe(200);
     const texto = await metricas().registro.metrics();
     expect(texto).toContain(
-      'frequenciapp_http_requests_total{method="DESCONHECIDO",route="desconhecida",status="200"} 1',
+      'frequenciapp_http_requests_total{method="OUTRO",route="desconhecida",status="200"} 1',
     );
+  });
+
+  it("transforma método inventado em OUTRO", async () => {
+    requisitar("/api/saude", "NAVE");
+
+    const resposta = await executarRota(async () => json({ ok: true }));
+
+    expect(resposta.status).toBe(200);
+    const texto = await metricas().registro.metrics();
+    expect(texto).toContain(
+      'frequenciapp_http_requests_total{method="OUTRO",route="/api/saude",status="200"} 1',
+    );
+    expect(texto).not.toContain('method="NAVE"');
+  });
+
+  it("reduz um caminho livre no cabeçalho ao template da rota", async () => {
+    requisitar("/api/alunos/ana-paula.souza_2", "GET");
+
+    const resposta = await executarRota(async () => json({ ok: true }));
+
+    expect(resposta.status).toBe(200);
+    const texto = await metricas().registro.metrics();
+    expect(texto).toContain(
+      'frequenciapp_http_requests_total{method="GET",route="/api/alunos/:id",status="200"} 1',
+    );
+    expect(texto).not.toContain("ana-paula");
   });
 
   it("não derruba a rota quando a métrica falha", async () => {
@@ -114,7 +158,7 @@ describe("instrumentação de executarRota", () => {
   });
 
   it("incrementa e zera o gauge de requisições em andamento", async () => {
-    requisitar("/api/http-em-andamento", "GET");
+    requisitar("/api/alunos", "GET");
     let durante = -1;
 
     const resposta = await executarRota(async () => {

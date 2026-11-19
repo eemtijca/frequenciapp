@@ -35,11 +35,11 @@ Caddy ou Nginx (80 e 443, alias de rede proxy)
         +--> volume prometheus_data
         +--> prometheus-ui (socat, ponte TCP)
                  |
-                 +--> 127.0.0.1:9090 (painel, acesso por túnel SSH)
+                 +--> 127.0.0.1:9090 (painel, acesso local no servidor)
 ```
 
 - O proxy recebe a requisição pública e responde 404 para `/api/metricas` antes de encaminhar ao aplicativo.
-- `src/proxy.ts` injeta `x-frequenciapp-rota` e `x-frequenciapp-metodo` nas demais rotas de API. `executarRota` mede a duração, captura o status e registra a métrica.
+- `src/proxy.ts` injeta `x-frequenciapp-rota` e `x-frequenciapp-metodo` nas demais rotas de API. O rótulo de rota vem de `src/infra/metricas-rotas.ts`, um registro estático gerado a partir de `src/app/api/**/route.ts`; o método é restrito ao catálogo de métodos HTTP. `executarRota` mede a duração, captura o status e registra a métrica.
 - Os contadores de domínio são incrementados nos adaptadores de rota: `POST /api/frequencias` registra `salvo` ou `conflito`, `/api/planilha/fila/agenda` e `/api/planilha/fila/processar` somam o resumo da fila, e `/api/notificacoes/agenda` soma o resumo dos avisos. A camada de aplicação não importa métricas.
 - A rota não entra na especificação OpenAPI pública e não usa `executarRota`, para não se autoinstrumentar.
 - O Prometheus coleta `http://app:3000/api/metricas` a cada 30 segundos, com tempo limite de 10 segundos e avaliação das regras a cada 30 segundos.
@@ -48,7 +48,7 @@ Caddy ou Nginx (80 e 443, alias de rede proxy)
 - O blackbox exporter entra nas redes `interna` e `publica` para alcançar o alias `proxy`, que o Caddy e o Nginx declaram na rede `publica`. A sonda usa `Host` e `server_name` iguais ao domínio, por isso funciona com os dois proxies.
 - O Alertmanager entra nas redes `interna` e `publica`. A rede `interna` permite que o Prometheus o colete e envie alertas; a rede `publica` existe apenas para alcançar o webhook ou o servidor SMTP do receptor.
 - O Prometheus, o node exporter, o blackbox exporter e o Alertmanager não publicam portas. A aplicação e o banco também continuam sem portas no host. Apenas o proxy publica 80 e 443.
-- O Docker não publica portas de um contêiner ligado apenas a uma rede `internal`. Por isso a ponte `prometheus-ui` publica `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha somente para `prometheus:9090`. A ponte não aceita destino arbitrário, e o painel continua restrito ao loopback.
+- O Docker não publica portas de um contêiner ligado apenas a uma rede `internal`. Por isso a ponte `prometheus-ui` publica `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha somente para `prometheus:9090`. A ponte participa das redes `interna` e `painel`. A rede `painel` é uma bridge comum, sem `internal: true`, criada apenas para o Docker publicar a porta no loopback; nenhum outro serviço entra nela. A rede `publica`, usada pelo proxy e pelos exporters que precisam de saída, não alcança o painel. A rede `interna` é a rede de confiança da coleta e do aplicativo. A ponte não aceita destino arbitrário, e o painel continua restrito ao loopback.
 - O volume nomeado `prometheus_data` guarda o histórico do Prometheus. O volume `alertmanager_data` guarda silêncios e estado de notificação.
 
 ## Como habilitar
@@ -149,6 +149,18 @@ O Alertmanager aceita apenas um receptor por vez: o webhook em `ALERTA_WEBHOOK_U
 
 O receptor de e-mail usa TLS (`smtp_require_tls: true` e `require_tls: true`). O servidor SMTP precisa aceitar a autenticação e o remetente configurados.
 
+### Respostas da rota
+
+| Contexto                                                               | Resposta                                                                   |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Borda pública, Caddy ou Nginx                                          | 404 antes do proxy, sem a aplicação receber a requisição                   |
+| Rota interna sem `METRICAS_TOKEN` configurado                          | 404                                                                        |
+| Rota interna com token configurado e `Authorization` ausente ou errado | 401                                                                        |
+| Token correto                                                          | 200, `text/plain; version=0.0.4; charset=utf-8`, `Cache-Control: no-store` |
+| Falha ao coletar no banco ou ao serializar o registro                  | 503, corpo JSON curto                                                      |
+
+O teste de unidade cobre 404, 401, 200 e 503. O teste de integração do Caddy mantém um backend sintético ativo e comprova que a borda responde 404 sem encaminhar `/api/metricas`. A rota continua fora do OpenAPI público.
+
 ## Catálogo de métricas
 
 | Métrica                                                    | Tipo      | Labels                           | Unidade       | Uso                                         |
@@ -187,7 +199,7 @@ Labels do coletor: `pool` e `fila`.
 
 Labels de resultado de frequência: `salvo` e `conflito`. Um salvamento recusado por revisão incrementa `conflito` e responde 409; erros de validação não alteram o contador. Labels de resultado da fila: `concluido` e `falha`. Labels de resultado das notificações: `enviada`, `expirada`, `falha` e `ignorada`. Nos resumos da fila e das notificações, os contadores só recebem incremento quando o valor é maior que zero.
 
-O label `route` é um padrão, nunca o caminho com identificador. Por exemplo, `/api/alunos/<uuid>` vira `/api/alunos/:id`, datas viram `:dia`, números viram `:numero` e caminhos com mais de oito segmentos viram `/api/:rota-longa`. Fora de `/api/`, o valor é `fora-da-api`. Quando a leitura do cabeçalho falha, o valor é `desconhecida` e o método é `DESCONHECIDO`.
+O label `route` é um template estático, nunca o caminho recebido. O registro é gerado de `src/app/api/**/route.ts`: `/api/alunos/[id]` vira `/api/alunos/:id`, `/api/calendario-letivo/[dia]` vira `/api/calendario-letivo/:dia` e `/api/justificativas/[codigo]` vira `/api/justificativas/:codigo`. Caminho de API fora do registro vira `desconhecida`; fora de `/api/` vira `fora-da-api`. Quando a leitura do cabeçalho falha, a rota é `desconhecida`. O método é `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` ou `OPTIONS`, e qualquer outro valor vira `OUTRO`.
 
 As métricas do node exporter são padrão do projeto e variam com a versão e com os coletores habilitados. O coletor de textfile acrescenta `node_textfile_mtime_seconds` e `node_textfile_scrape_error`; as métricas do arquivo de backup são publicadas sem prefixo adicional, como `frequenciapp_backup_ultimo_sucesso_timestamp_seconds`.
 
@@ -404,7 +416,7 @@ scripts/servidor/compose.sh --profile alertas exec -T alertmanager du -sh /alert
 
 ## Painel e acesso
 
-O painel do Prometheus não tem autenticação própria. Ele escuta somente no loopback do servidor, e o acesso acontece por túnel SSH:
+O painel do Prometheus não tem autenticação própria. Ele escuta somente no loopback do servidor, e o acesso é local no host, pelo navegador do console ou de uma sessão administrativa. Não há suposição de SSH: quando o recurso existir, um túnel administrativo temporário também serve:
 
 ```bash
 ssh -L 9090:127.0.0.1:9090 usuario@servidor
@@ -437,7 +449,7 @@ O healthcheck do contêiner usa, no perfil simples:
 scripts/servidor/compose.sh exec -T prometheus promtool check healthy --url=http://127.0.0.1:9090
 ```
 
-Não abrir o painel no firewall nem publicá-lo em Caddy, Nginx ou CDN. A ausência de autenticação e o conteúdo operacional tornam o loopback o único limite aceitável.
+Não abrir o painel no firewall nem publicá-lo em Caddy, Nginx ou CDN. A ponte não participa da rede `publica`, e a ausência de autenticação e o conteúdo operacional tornam o loopback o único limite aceitável.
 
 ## Alertas
 
@@ -505,13 +517,13 @@ O restante da observabilidade continua funcionando. O alvo `alertmanager:9093` v
 - `/api/metricas` exige `Authorization: Bearer` com o token configurado. A comparação usa `timingSafeEqual`.
 - O token tem de 32 a 200 caracteres, fica no `app.env` com modo 600 e não aparece no `prometheus.yml`, em labels, em logs ou em mensagens do instalador.
 - O entrypoint do Prometheus valida o formato e o comprimento do token, aplica `umask 077` e grava `/tmp/metricas-token` com permissão restrita.
-- O Prometheus fica apenas na rede `interna`, sem portas publicadas e sem saída para a internet.
+- O Prometheus fica apenas na rede `interna`, sem portas publicadas e sem saída para a internet. A ponte `prometheus-ui` usa `interna` e `painel`, sem `publica`; a rede `painel` é uma bridge comum usada somente para a publicação no loopback. A rede `publica` não alcança o painel.
 - O node exporter monta o sistema de arquivos do host somente leitura em `/host`, usa `pid: host` e roda com `cap_drop: ALL` e `no-new-privileges`.
 - O blackbox exporter não recebe credenciais. A sonda usa `/api/saude`, que é pública por projeto, e não envia token.
 - O receptor do Alertmanager fica apenas no `ops.env`, fora do Git. O webhook e a senha SMTP são segredos.
 - O entrypoint do Alertmanager aplica `umask 077`, grava a configuração gerada em `/tmp/alertmanager.yml`, valida com `amtool check-config` e não exibe a saída do `amtool` para não registrar valores do receptor.
 - O Alertmanager entra na rede `publica` apenas para alcançar o webhook ou o SMTP. Não há porta publicada, e o acesso ao serviço continua restrito às redes do projeto.
-- A ponte `prometheus-ui` publica somente `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha apenas para `prometheus:9090`. Ela roda sem privilégios, com `cap_drop: ALL`, `no-new-privileges` e sistema de arquivos somente leitura.
+- A ponte `prometheus-ui` publica somente `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha apenas para `prometheus:9090`. Ela roda sem privilégios, com `cap_drop: ALL`, `no-new-privileges` e sistema de arquivos somente leitura. A ponte está em `interna` e `painel`, e a rede `publica` não alcança a escuta 9090.
 - Caddy e Nginx respondem 404 para `/api/metricas` antes do proxy. O bloqueio público não depende do token.
 - No cluster, o ServiceMonitor lê o token do Secret pelo campo `credentials`. Com `existingSecret`, o chart não altera o Secret externo e a chave `METRICAS_TOKEN` é responsabilidade do operador.
 - O chart não instala o Prometheus Operator nem a CRD `monitoring.coreos.com/v1`. Habilitar o ServiceMonitor sem a CRD faz a aplicação do manifesto falhar, e o token não é criado automaticamente fora do Secret gerenciado.
@@ -519,13 +531,13 @@ O restante da observabilidade continua funcionando. O alvo `alertmanager:9093` v
 - O Prometheus inicia sem lifecycle e sem admin API. Não há recarga remota nem exclusão de dados por HTTP. Alterar configuração exige reiniciar o contêiner.
 - O token de backup acompanha o `app.env` cifrado quando `BACKUP_INCLUIR_AMBIENTE=true`. O arquivo de backup precisa do mesmo cuidado de um segredo.
 - Para trocar o token, gerar outro, atualizar o `app.env` e recriar a aplicação e o Prometheus. No perfil com controlador, a recriação passa pela entrada estável. A coleta fica indisponível até os dois lados usarem o mesmo valor.
-- Nenhum label recebe nome, matrícula, e-mail, identificador de aluno, identificador de turma, código de escola, SQL ou conteúdo de requisição.
+- Nenhum label recebe nome, matrícula, e-mail, identificador de aluno, identificador de turma, código de escola, SQL ou conteúdo de requisição. O label de rota vem do registro estático e o método vem do catálogo fixo.
 
 ## LGPD
 
 As métricas são operacionais, locais e agregadas. Elas registram requisições por padrão de rota, status, duração, conexões do pool, latência de consultas, contagens da fila, salvamentos de frequência, conflitos de revisão, itens processados e avisos da agenda. Também registram CPU, memória, disco, sistemas de arquivos, disponibilidade da sonda HTTPS, validade do certificado, falhas de notificação e o instante do último backup verificado. Não contêm dados de alunos, de contas ou de escolas.
 
-O Prometheus roda na infraestrutura da escola, sem telemetria de terceiros. O histórico de 15 dias fica no volume `prometheus_data`, e o Alertmanager guarda silêncios e estado de notificação em `alertmanager_data`. Os dois volumes ficam fora do backup e podem ser descartados sem perda de dados escolares. O painel é restrito ao loopback e ao túnel SSH do operador.
+O Prometheus roda na infraestrutura da escola, sem telemetria de terceiros. O histórico de 15 dias fica no volume `prometheus_data`, e o Alertmanager guarda silêncios e estado de notificação em `alertmanager_data`. Os dois volumes ficam fora do backup e podem ser descartados sem perda de dados escolares. O painel é restrito ao loopback do servidor, com acesso local ou túnel administrativo temporário.
 
 No cluster, a coleta usa o mesmo endpoint autenticado e o token do Secret. As séries continuam operacionais e agregadas, sem dados de alunos, contas ou escolas, e o histórico fica no Prometheus do cluster, fora do backup do chart.
 
@@ -549,6 +561,12 @@ O token da aplicação e o token do Prometheus divergem. Conferir `METRICAS_TOKE
 ### Coleta com 404
 
 Um 404 no alvo `frequenciapp` indica que a aplicação está sem `METRICAS_TOKEN`. A rota responde 404 de propósito quando o token não está configurado. Um 404 no domínio público é o comportamento esperado do proxy e não é falha.
+
+### Coleta com 503
+
+1. Conferir o último erro do alvo em `/targets` e os logs da aplicação.
+2. Conferir a conexão com o banco e o coletor da fila.
+3. O 503 indica falha de coleta ou de serialização do registro. A coleta fica indisponível até o coletor voltar, sem alterar as demais rotas.
 
 ### Fila parada
 
@@ -629,7 +647,7 @@ O log do Prometheus mostra falhas de coleta, erros de configuração e a inicial
 
 ### Painel não abre
 
-1. Conferir se o túnel SSH está ativo e se a porta local não está ocupada.
+1. Conferir se o acesso é local no host ou se o túnel administrativo temporário está ativo, com a porta local livre.
 2. Conferir `ss -lntp | grep 9090` no servidor.
 3. Conferir `PROMETHEUS_PORTA` e o destino do túnel.
 4. Conferir se o firewall não bloqueia a porta local da estação.
@@ -651,14 +669,14 @@ O limite de 1 GB evita crescimento indefinido. Se o volume crescer acima do espe
 - Os contadores de domínio são incrementados por processo. Com mais de uma réplica, cada Pod expõe a própria contagem, e o total depende da agregação do Prometheus. Reiniciar o processo zera os contadores.
 - Não há métricas de página, de navegador, de latência de renderização nem de service worker.
 - Os histogramas são clássicos, com buckets fixos. O p95 é aproximado, e a agregação entre rotas diferentes perde precisão.
-- O label `route` é normalizado. Rotas fora do padrão aparecem como `desconhecida` ou `fora-da-api`.
+- O label `route` vem de um registro gerado. Uma rota nova só aparece no label depois de `pnpm run rotas:gerar`; até lá, o caminho cai em `desconhecida`. Caminhos fora de `/api/` aparecem como `fora-da-api`.
 - O `sample_limit` de 20000 falha a coleta inteira quando a cardinalidade explode, em vez de entregar dados parciais.
 - O Alertmanager é opt-in. Sem o perfil `alertas` e um receptor, os alertas ficam apenas no painel.
 - O receptor de e-mail depende do servidor SMTP da escola, da autenticação e do TLS. Uma indisponibilidade do servidor impede a entrega mesmo com o Alertmanager saudável.
 - Em TLS interno, o blackbox precisa da CA da escola montada e de `ca_file` no `blackbox.yml`. Sem esse ajuste, a sonda falha na validação do certificado.
 - A métrica de idade do backup só existe depois de um backup verificado. Antes do primeiro backup, a regra `FrequenciappBackupAtrasado` não dispara por ausência da série.
 - O alvo `alertmanager:9093` fica fora do ar em `/targets` quando o perfil está desligado. Não há regra sobre esse alvo, então a condição não gera notificação.
-- O painel não tem autenticação. O acesso depende do loopback e do túnel SSH.
+- O painel não tem autenticação. O acesso depende do loopback e de um acesso administrativo local ou túnel temporário.
 - O histórico não é copiado no backup. Recriar o volume perde os 15 dias anteriores.
 - O node exporter não substitui os logs do Docker nem o journal do sistema.
 - O ServiceMonitor exige o Prometheus Operator e a CRD `monitoring.coreos.com/v1`. O chart não instala nenhum dos dois, e a coleta no cluster não funciona apenas com o chart.

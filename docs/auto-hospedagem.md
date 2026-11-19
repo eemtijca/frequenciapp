@@ -98,7 +98,7 @@ scripts/servidor/
   instalar-rotinas.sh
 ```
 
-A aplicação e o banco ficam sem portas publicadas. Apenas o proxy publica 80 e 443. Com a observabilidade ligada, a ponte do painel publica 9090 somente no loopback do host. O Prometheus, o node exporter, o blackbox exporter e o Alertmanager não publicam porta alguma.
+A aplicação e o banco ficam sem portas publicadas. Apenas o proxy publica 80 e 443. Com a observabilidade ligada, a ponte do painel publica 9090 somente no loopback do host, pelas redes `interna` e `painel`, sem `publica`. O Prometheus, o node exporter, o blackbox exporter e o Alertmanager não publicam porta alguma, e nenhum outro serviço entra na rede `painel`.
 
 ## Preparar o servidor
 
@@ -532,13 +532,15 @@ As onze regras cobrem indisponibilidade, erros 5xx, latência, pool, fila, disco
 ### Validar a observabilidade
 
 1. `curl -s -o /dev/null -w '%{http_code}\n' https://dominio/api/metricas` deve devolver `404`.
-2. O túnel SSH de [observabilidade.md](observabilidade.md#painel-e-acesso) deve abrir `http://localhost:9090` e mostrar os alvos `frequenciapp`, `node-exporter` e `blackbox` em `/targets`.
+2. O acesso local ao painel, ou o túnel administrativo temporário de [observabilidade.md](observabilidade.md#painel-e-acesso), deve abrir `http://localhost:9090` e mostrar os alvos `frequenciapp`, `node-exporter` e `blackbox` em `/targets`.
 3. Com o perfil `alertas`, o alvo `alertmanager` também deve aparecer em `/targets`. Sem o perfil, ele aparece fora do ar e nenhuma regra dispara por isso.
 4. `ss -lntp | grep 9090` deve mostrar `127.0.0.1:9090`, nunca `0.0.0.0:9090`.
 5. A coleta com o token do ambiente deve devolver `200` e linhas `frequenciapp_`, conforme o comando do guia.
 6. A consulta `probe_success{job="blackbox"}` deve devolver `1`, e `probe_ssl_earliest_cert_expiry` deve estar presente.
 7. Depois do primeiro backup verificado, `frequenciapp_backup_ultimo_sucesso_timestamp_seconds` deve aparecer com o instante do backup.
 8. Com o perfil `alertas`, `alertmanager_notifications_failed_total` deve estar disponível e o teste com `amtool alert add` deve chegar ao receptor.
+
+A matriz de respostas de `/api/metricas` é: borda pública, Caddy ou Nginx, 404 antes do proxy; rota interna sem `METRICAS_TOKEN` configurado, 404; token ausente ou errado, 401; token correto, 200 com `text/plain; version=0.0.4; charset=utf-8` e `Cache-Control: no-store`; falha de coleta, 503 com corpo JSON curto. O detalhamento está em [observabilidade.md](observabilidade.md#respostas-da-rota). A rota continua fora do OpenAPI público.
 
 ## Segurança
 
@@ -685,7 +687,7 @@ Não editar o checksum em `_prisma_migrations`, não remover linhas do históric
 
 - Conferir `scripts/servidor/compose.sh ps` e os serviços `prometheus`, `prometheus-ui`, `node-exporter` e `blackbox-exporter`.
 - Conferir `up{job="frequenciapp"}` e o último erro em `/targets`.
-- Um 404 no alvo indica `METRICAS_TOKEN` ausente na aplicação. Um 401 indica token divergente entre a aplicação e o Prometheus.
+- Um 404 no alvo indica `METRICAS_TOKEN` ausente na aplicação. Um 401 indica token divergente entre a aplicação e o Prometheus. Um 503 indica falha de coleta ou de serialização do registro; conferir os logs da aplicação.
 - Conferir a rede `interna` e o alvo `app:3000`.
 - Conferir os logs com `scripts/servidor/compose.sh logs --tail 200 prometheus`.
 - Validar configuração e regras com `promtool`, conforme [observabilidade.md](observabilidade.md#validar-configuração-e-regras).

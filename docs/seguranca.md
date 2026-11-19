@@ -103,12 +103,13 @@ A cópia completa exige novamente a senha atual da administração por `POST /ap
 
 ### Métricas Prometheus
 
-- `/api/metricas` é uma rota interna. Sem `METRICAS_TOKEN`, responde 404; com token errado, 401; com o token válido, 200. A comparação usa `timingSafeEqual` e não depende de cabeçalhos de encaminhamento.
+- `/api/metricas` é uma rota interna. Sem `METRICAS_TOKEN`, responde 404; com token errado, 401; com o token válido, 200 com `text/plain; version=0.0.4; charset=utf-8` e `Cache-Control: no-store`. Falha de coleta responde 503 com corpo JSON curto. A borda pública responde 404 antes do proxy. A comparação usa `timingSafeEqual` e não depende de cabeçalhos de encaminhamento.
 - O token tem de 32 a 200 caracteres, fica no `app.env` com modo 600 e não aparece no `prometheus.yml`, em labels, em logs ou em mensagens do instalador. O Prometheus o grava em `/tmp/metricas-token`, com permissão restrita.
-- O Prometheus fica apenas na rede `interna`, sem portas publicadas e sem saída para a internet. A ponte `prometheus-ui` publica o painel somente em `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha apenas para `prometheus:9090`.
+- O Prometheus fica apenas na rede `interna`, sem portas publicadas e sem saída para a internet. A ponte `prometheus-ui` publica o painel somente em `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha apenas para `prometheus:9090`. A ponte usa `interna` e `painel`, sem `publica`.
+- A rede `publica` alcança o proxy e os exporters que precisam de saída, mas não o painel. A rede `interna` é a rede de confiança da coleta e do aplicativo, e nenhum outro serviço entra na rede `painel`.
 - Caddy e Nginx respondem 404 para `/api/metricas` antes do proxy. O bloqueio público não depende do token.
-- O painel não tem autenticação própria. O acesso fica restrito ao loopback e ao túnel SSH. O Prometheus inicia sem lifecycle e sem admin API.
-- Nenhum label recebe nome, matrícula, e-mail, identificador de aluno, identificador de turma, código de escola, SQL ou conteúdo de requisição. O label de rota é um padrão, a fila publica apenas contagens por estado e o histograma do banco não usa SQL.
+- O painel não tem autenticação própria. O acesso fica restrito ao loopback, por console local ou túnel administrativo temporário. O Prometheus inicia sem lifecycle e sem admin API.
+- Nenhum label recebe nome, matrícula, e-mail, identificador de aluno, identificador de turma, código de escola, SQL ou conteúdo de requisição. O label de rota vem do registro estático de `src/infra/metricas-rotas.ts`, o método vem do catálogo fixo e a fila publica apenas contagens por estado.
 - O volume `prometheus_data` não entra no backup. O `app.env` cifrado pode conter o token e precisa do mesmo cuidado de um segredo.
 
 O guia operacional está em [observabilidade.md](observabilidade.md).
