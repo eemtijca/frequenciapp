@@ -13,9 +13,41 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
 
-# Correções de segurança em dependências transitivas. O fast-uri é usado pelo
-# ajv e o minimatch 10 pelo parser do typescript-eslint; as versões fixadas
-# abaixo são as primeiras sem os alertas do Dependabot.
+# Correções de segurança em dependências transitivas. Cada chave tem a forma
+# pacote@versao e substitui apenas a ocorrência resolvida daquela versão, sem
+# tocar nas demais. O critério é a primeira versão sem alerta do pnpm audit para
+# a cadeia que usa o pacote. As trocas de versão principal foram conferidas com
+# o CLI do Vercel, o build e a suíte de testes.
 overrides:
+  # Cadeia do vercel 65.14.0. O tar 7.5.23 fecha o alerta critical de
+  # descompressão e os demais alertas de leitura de arquivo; o smol-toml 1.9.1
+  # fecha o DoS de TOML e o js-yaml 4.3.2 fecha o consumo quadrático de CPU.
+  tar@7.5.11: 7.5.23
+  smol-toml@1.5.2: 1.9.1
+  js-yaml@4.1.1: 4.3.2
+  # O undici 5 não tem correção completa e sobe para o major 6, que é o mesmo
+  # major já usado pelo @vercel/blob. Com isso, o @fastify/busboy 2.1.1 deixa
+  # de ser resolvido; a entrada 3.2.6 permanece como defesa para a linha 2.x.
+  undici@5.28.4: 6.29.1
+  undici@5.29.0: 6.29.1
+  "@fastify/busboy@2.1.1": 3.2.6
+  # O path-to-regexp 6.3.0 e o 8.4.0 fecham as expressões regulares com
+  # backtracking; o ajv 8.18.0 fecha o ReDoS da opção $data.
+  path-to-regexp@6.1.0: 6.3.0
+  path-to-regexp@8.3.0: 8.4.0
+  ajv@8.6.3: 8.18.0
+  # O @vercel/nft usa o glob no rastreio de arquivos do build; o major 14 é a
+  # linha corrigida e a compatibilidade foi conferida no build local.
+  glob@13.0.7: 14.0.2
+  # O zod 4.6.7 fecha a exaustão de memória. A linha 3.22.4 não tem correção no
+  # major 3, então sobe para o major 4 junto com a 4.1.11; o CLI do Vercel e o
+  # build local conferem a compatibilidade.
+  zod@4.1.11: 4.6.7
+  zod@3.22.4: 4.6.7
+  # O fast-uri é usado pelo ajv e o minimatch 10.2.6 é a entrada mantida da
+  # correção anterior. As versões abaixo são as primeiras sem alerta.
   fast-uri@3.1.8: 3.1.9
   minimatch@10.2.6: 11.0.1
+  # O minimatch 10.1.1 vem do @vercel/python-analysis e fecha o ReDoS com a
+  # 11.0.1, a mesma versão usada na entrada anterior.
+  minimatch@10.1.1: 11.0.1
