@@ -242,6 +242,7 @@ export function lerAmbiente(p, capturarLegado = false) {
     HOME: p.dados,
     TMPDIR: p.dados,
     APP_DIR: p.app,
+    COMPOSE_DIR: p.snapshot,
     APP_ENV_FILE: p.appEnv,
     OPS_ENV_FILE: p.opsEnv,
     SERVIDOR_CONFIG_DIR: p.config,
@@ -258,6 +259,9 @@ export function lerAmbiente(p, capturarLegado = false) {
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_CONFIG_GLOBAL: "/dev/null",
   });
+  // O projeto Compose passa a ser o snapshot; certificados continuam no checkout.
+  if (env.CERTBOT_CERTS_DIR && !path.isAbsolute(env.CERTBOT_CERTS_DIR))
+    env.CERTBOT_CERTS_DIR = path.resolve(p.app, env.CERTBOT_CERTS_DIR);
   return env;
 }
 export function verificarEstadoLegado(p) {

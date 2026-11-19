@@ -60,18 +60,18 @@ Depois de uma troca de canal que mude o `migradorSha256`, a readoção ampla exi
 
 O instalador grava:
 
-| Caminho                                                 | Papel                                                                                           |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `/opt/frequenciapp-controlador/perfil.json`             | Perfil imutável da adoção, com caminhos, hashes e `migradorSha256`.                             |
-| `/opt/frequenciapp-controlador/executar`                | Entrada estável, executável apenas por root.                                                    |
-| `/opt/frequenciapp-controlador/snapshot/`               | Cópia física dos scripts de servidor, do migrador e dos arquivos Compose.                       |
-| `/opt/frequenciapp-controlador/snapshot/manifesto.json` | Mapa de nomes e SHA-256 de cada membro do snapshot.                                             |
-| `/opt/frequenciapp-controlador/dados/estado/`           | `estado.json`, `falha.json`, `ultimo-backup.json` e o marcador de atualização, quando presente. |
-| `/opt/frequenciapp-controlador/dados/journal/`          | Intenções, observações e conclusões das operações.                                              |
-| `/opt/frequenciapp-controlador/dados/pins/`             | Cópias físicas de backup, recibo, ponteiro e checksums.                                         |
-| `/opt/frequenciapp-controlador/dados/backups/`          | Backups produzidos pelo perfil.                                                                 |
-| `/opt/frequenciapp-controlador/dados/logs/`             | Logs das rotinas estáveis.                                                                      |
-| `/opt/frequenciapp-controlador/dados/locks/`            | Raiz própria de travas quando não existe raiz anterior.                                         |
+| Caminho                                                 | Papel                                                                                                                                                     |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/opt/frequenciapp-controlador/perfil.json`             | Perfil imutável da adoção, com caminhos, hashes e `migradorSha256`.                                                                                       |
+| `/opt/frequenciapp-controlador/executar`                | Entrada estável, executável apenas por root.                                                                                                              |
+| `/opt/frequenciapp-controlador/snapshot/`               | Cópia física dos scripts de servidor, do migrador, dos arquivos Compose, do overlay de observabilidade e das configurações de observabilidade e do proxy. |
+| `/opt/frequenciapp-controlador/snapshot/manifesto.json` | Mapa de nomes e SHA-256 de cada membro do snapshot.                                                                                                       |
+| `/opt/frequenciapp-controlador/dados/estado/`           | `estado.json`, `falha.json`, `ultimo-backup.json` e o marcador de atualização, quando presente.                                                           |
+| `/opt/frequenciapp-controlador/dados/journal/`          | Intenções, observações e conclusões das operações.                                                                                                        |
+| `/opt/frequenciapp-controlador/dados/pins/`             | Cópias físicas de backup, recibo, ponteiro e checksums.                                                                                                   |
+| `/opt/frequenciapp-controlador/dados/backups/`          | Backups produzidos pelo perfil.                                                                                                                           |
+| `/opt/frequenciapp-controlador/dados/logs/`             | Logs das rotinas estáveis.                                                                                                                                |
+| `/opt/frequenciapp-controlador/dados/locks/`            | Raiz própria de travas quando não existe raiz anterior.                                                                                                   |
 
 Com o perfil ativo, as raízes `ESTADO_DIR` e `BACKUP_DIR` já existentes são conservadas no perfil, desde que canônicas, privadas de root e sem links. `ultimo-backup.json`, os recibos no catálogo e os artefatos continuam nos mesmos caminhos e com os mesmos bytes; a adoção não copia, apaga nem recria o primeiro conjunto. Sem raiz anterior, o controlador usa o diretório correspondente sob `dados`. `LOG_DIR` continua sob o prefixo. Um `BACKUP_BANCO_DIR` independente da raiz de backups exige revisão administrativa, em vez de ocultar conjuntos em outro armazenamento.
 
@@ -82,6 +82,12 @@ A continuidade do armazenamento e da trava é exercitada com produtor Bash, GPG,
 Na derivação inicial pelo instalador, o alias usual `/var/lock` para `/run/lock` produz o caminho canônico `/run/lock/frequenciapp` antes do primeiro produtor. O literal já configurado em `ops.env` não é remapeado. Adoção legada por caminho simbólico continua recusada e exige revisão administrativa; a mudança não migra autoridades nem permite links arbitrários.
 
 O perfil guarda `versao`, `tipo` `compose-host`, caminhos absolutos, o caminho absoluto do Node usado na entrada, a lista de arquivos Compose, o `migradorSha256`, o SHA-256 do manifesto, o SHA-256 de `app.env`, de `ops.env` e de `identidade.json`, e o estado legado conferido. O `migradorSha256` é o hash de `docker/app/migrar.mjs` no momento da adoção.
+
+A lista de arquivos Compose é resolvida pela mesma função `listar_compose_em` de `scripts/servidor/comum.sh` usada pelas rotinas simples. Caminhos relativos são normalizados para absolutos, duplicatas por caminho relativo, absoluto ou link simbólico são removidas por `readlink -f` e o overlay só entra na lista efetiva quando está citado em `COMPOSE_ARQUIVOS` ou quando a lista é implícita e `OBSERVABILIDADE_HABILITADA=true`. Com lista explícita e a flag ligada, a ausência do overlay é recusada antes de qualquer mutação. Com a flag desligada, citar o overlay na lista explícita é uma escolha respeitada e documentada.
+
+O snapshot copia a lista efetiva para `compose/<i>.yml`, o overlay canônico para `compose.observabilidade.yml` quando existe, todo `infra/observabilidade/**` presente e o que o Compose de proxy referencia. Para o Caddy, entra o arquivo indicado por `CADDYFILE`, que precisa ser relativo ao checkout. Para o Nginx, entra o diretório `infra/servidor/nginx`, exceto `certificados`. Cada membro recebe SHA-256 no manifesto. `CERTBOT_CERTS_DIR` permanece no checkout e precisa ser absoluto, porque os certificados renovam fora do snapshot.
+
+A entrada estável usa o snapshot como diretório do projeto Compose. O ambiente da entrada estável define `COMPOSE_DIR` com o snapshot e `COMPOSE_ARQUIVOS` contém somente caminhos do snapshot. A aplicação da pilha e as consultas não leem o overlay, `infra/observabilidade` ou o Caddyfile do checkout mutável; a construção de imagens da atualização usa uma worktree temporária do commit alvo.
 
 A entrada estável é fixa e não carrega o ambiente do chamador:
 
@@ -140,9 +146,11 @@ Antes de publicar qualquer arquivo ativo, uma intenção versão 1 registra em d
 
 ### Observabilidade
 
-O perfil adotado guarda hashes de `app.env`, de `ops.env` e da lista Compose. `METRICAS_TOKEN`, `OBSERVABILIDADE_HABILITADA` e `PROMETHEUS_PORTA` não são seletores de rotina. Acrescentar o token, a flag ou `compose.observabilidade.yml` altera essa configuração e invalida o perfil.
+O perfil adotado guarda hashes de `app.env`, de `ops.env` e da lista Compose. `METRICAS_TOKEN`, `OBSERVABILIDADE_HABILITADA` e `PROMETHEUS_PORTA` não são seletores de rotina. Acrescentar o token, a flag, o overlay ou qualquer configuração de `infra/observabilidade` altera essa configuração e invalida o perfil.
 
-O `aplicar` com controlador adotado executa apenas a reconfiguração restrita das rotinas (`reconfigurar-rotinas`) e recusa a configuração alterada com `Configuração mudou; adoção explícita necessária`. Para receber as variáveis e o overlay, a instalação precisa de readoção revisada, com novo snapshot e conferência de identidade. A atualização comum não aplica as variáveis nem inclui o overlay; ela preserva a topologia adotada.
+O snapshot da adoção com observabilidade inclui `compose.observabilidade.yml`, `infra/observabilidade/**` e o Caddyfile ou o diretório do Nginx. A entrada estável monta o Compose com `COMPOSE_DIR` no snapshot, e `COMPOSE_ARQUIVOS` aponta somente para os arquivos copiados. A lista explícita é autoritativa: se `OBSERVABILIDADE_HABILITADA=true` e o overlay não estiver nela, a adoção e a leitura são recusadas antes de qualquer mutação. Se a flag estiver desligada, o overlay citado na lista explícita continua sendo respeitado, o que preserva a topologia escolhida.
+
+O `aplicar` com controlador adotado executa apenas a reconfiguração restrita das rotinas (`reconfigurar-rotinas`) e recusa a configuração alterada com `Configuração mudou; adoção explícita necessária`. Para receber as variáveis, o overlay e as novas configurações, a instalação precisa de readoção revisada, com novo snapshot e conferência de identidade. A atualização comum não aplica as variáveis nem altera a topologia adotada. A nova geração criada pela reconfiguração restrita copia os mesmos arquivos do snapshot e mantém os hashes no manifesto.
 
 O caminho de ativação está em [observabilidade.md](observabilidade.md#instalação-existente) e a readoção em [Readoção](#readoção).
 
@@ -258,6 +266,7 @@ A readoção é necessária quando o perfil deixou de corresponder ao ambiente. 
 | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
 | `docker/app/migrar.mjs`                                   | O `migradorSha256` diverge. A atualização recusa a fonte e a imagem antes de alterar o checkout principal. | Revisar a mudança, criar novo prefixo e instalar novo perfil.        |
 | `app.env` ou `ops.env`                                    | O hash de configuração diverge. O perfil recusa a leitura.                                                 | Revisar a configuração, criar novo prefixo e instalar novo perfil.   |
+| `COMPOSE_ARQUIVOS`, overlay ou configuração de proxy      | A lista efetiva, o snapshot ou os hashes mudam.                                                            | Revisar a topologia, criar novo prefixo e instalar novo perfil.      |
 | `identidade.json`                                         | O hash ou a identidade efetiva diverge. O perfil recusa a leitura.                                         | Reconciliar a identidade, criar novo prefixo e instalar novo perfil. |
 | Conta de operação ou grupos                               | O perfil recusa a leitura quando a conta deixa de ser não privilegiada.                                    | Corrigir a conta ou criar novo perfil.                               |
 | Snapshot, scripts ou arquivos Compose                     | O manifesto ou o hash do arquivo diverge. O perfil recusa a leitura.                                       | Arquivar o prefixo antigo e instalar novo snapshot.                  |
@@ -369,6 +378,8 @@ O controlador também não é um sistema de alta disponibilidade. A trava é loc
 - [ ] `app.env`, `ops.env` e `identidade.json` estão em modo 600.
 - [ ] A conta de operação não é root e não tem grupos administrativos nem escrita no socket Docker.
 - [ ] O banco é interno ao Compose e as três variáveis de URL estão ausentes.
+- [ ] A lista Compose e o overlay respeitam a política da flag de observabilidade.
+- [ ] O snapshot contém o overlay, `infra/observabilidade/**` e as configurações do proxy quando aplicáveis.
 - [ ] O estado legado não tem marcador, falha indeterminada ou journal não vazio.
 - [ ] Há Node.js, Docker, Git, `flock`, `jq` e espaço para snapshot, worktree e pins.
 - [ ] O plano do `instalar-controlador.sh` foi revisado e o prefixo ainda não existe.
