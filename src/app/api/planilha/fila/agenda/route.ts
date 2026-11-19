@@ -1,7 +1,6 @@
 // Recolhe os envios que sobraram na fila; autenticada por segredo, sem cookie.
 import { processarFilaDaAgenda } from "@/application/fila-planilha";
 import { erroApi, executarRota, json } from "@/infra/http";
-import { registrarFilaProcessada } from "@/infra/metricas";
 import { segredoDaAgendaConfere } from "@/infra/web-push";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +11,7 @@ export async function GET(requisicao: Request): Promise<Response> {
     if (!segredoDaAgendaConfere(requisicao.headers.get("authorization"))) {
       return erroApi("Acesso não permitido.", 403);
     }
-    const { resumo, compartilhado } = await processarFilaDaAgenda();
-    if (!compartilhado) registrarFilaProcessada(resumo);
+    const { resumo } = await processarFilaDaAgenda();
     return json(resumo);
   });
 }

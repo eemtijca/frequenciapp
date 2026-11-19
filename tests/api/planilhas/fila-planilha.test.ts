@@ -326,9 +326,12 @@ describe("ordem de entrada", () => {
     const resumos = await Promise.all([pedidoA, pedidoB]);
     if (metricasAntes) {
       const metricasDepois = await contadoresDaFila();
-      // O líder contabiliza a execução; quem apenas aguardou não duplica o resumo.
-      expect(metricasDepois.concluido - metricasAntes.concluido).toBe(resumos[0]?.concluidos);
-      expect(metricasDepois.falha - metricasAntes.falha).toBe(resumos[0]?.falhas);
+      // Cada transição efetivada conta uma vez, inclusive quando há rodada adicional.
+      expect(metricasDepois.concluido - metricasAntes.concluido).toBe(3);
+      expect(metricasDepois.falha - metricasAntes.falha).toBe(0);
+      expect(resumos[0]).toEqual(
+        expect.objectContaining({ processados: 3, concluidos: 3, falhas: 0 }),
+      );
       expect(resumos[1]).toEqual(resumos[0]);
     }
     expect(
