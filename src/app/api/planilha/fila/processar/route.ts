@@ -15,8 +15,8 @@ export async function POST(requisicao: Request): Promise<Response> {
     await despacharIntencoesEscolares().catch(() =>
       console.error("Intenções escolares aguardam nova tentativa."),
     );
-    const resumo = await processarFila({ limite: 20 });
-    registrarFilaProcessada(resumo);
+    const { resumo, compartilhado } = await processarFila({ limite: 20 });
+    if (!compartilhado) registrarFilaProcessada(resumo);
     return json(resumo);
   });
 }

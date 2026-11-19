@@ -76,6 +76,34 @@ async function contadoresDeFrequencia(): Promise<{ salvo: number; conflito: numb
   };
   return { salvo: valor("salvo"), conflito: valor("conflito") };
 }
+async function contadoresDaFila(): Promise<{ concluido: number; falha: number }> {
+  const resposta = await fetch(`${origem}/api/metricas`, {
+    headers: { Authorization: `Bearer ${metricasToken}` },
+  });
+  expect(resposta.status).toBe(200);
+  const texto = await resposta.text();
+  const valor = (resultado: "concluido" | "falha") => {
+    const prefixo = `frequenciapp_fila_planilha_processados_total{resultado="${resultado}"}`;
+    const linha = texto.split("\n").find((item) => item.startsWith(prefixo));
+    return Number(linha?.split(" ").at(-1) ?? 0);
+  };
+  return { concluido: valor("concluido"), falha: valor("falha") };
+}
+async function esperarContadorDaFila(antes: {
+  concluido: number;
+  falha: number;
+}): Promise<{ concluido: number; falha: number }> {
+  const limite = Date.now() + 15_000;
+  let depois = antes;
+  while (
+    Date.now() < limite &&
+    depois.concluido + depois.falha - antes.concluido - antes.falha < 1
+  ) {
+    await new Promise((resolver) => setTimeout(resolver, 200));
+    depois = await contadoresDaFila();
+  }
+  return depois;
+}
 const dados = (dia = historico, mais: Record<string, unknown> = {}) => ({
   alunoId: aluno,
   turmaId: turma,
@@ -464,6 +492,31 @@ describe("Justificativas antecipadas", () => {
     expect((await lerChamada(historico, outraTurma)).frequencia.faltas).toMatchObject([
       { alunoId: aluno, justificativa: primeiraJustificativa.codigo },
     ]);
+  });
+  it("conta uma única transição no processamento automático da frequência", async () => {
+    if (!medirMetricas) return;
+    await cliente.query("delete from fila_planilha where tipo = 'FREQUENCIA'");
+    await cliente.query("delete from intencoes_envio_escolar where tipo = 'FREQUENCIA'");
+    await cliente.query(
+      `insert into integracoes_planilha (id, finalidade, ativa, envio_automatico, modo, atualizado_em)
+       values ('principal', 'FREQUENCIA', true, true, 'CONSERVADOR', now())
+       on conflict (id) do update set
+         finalidade = 'FREQUENCIA', ativa = true, envio_automatico = true,
+         modo = 'CONSERVADOR', modo_completo_ate = null, atualizado_em = now()`,
+    );
+    try {
+      const antes = await contadoresDaFila();
+      const resposta = await chamar("/api/frequencias", "POST", corpoChamada(historico));
+      expect(resposta.status).toBe(200);
+      const depois = await esperarContadorDaFila(antes);
+      expect(depois.concluido + depois.falha - antes.concluido - antes.falha).toBe(1);
+    } finally {
+      await cliente.query("delete from fila_planilha where tipo = 'FREQUENCIA'");
+      await cliente.query("delete from intencoes_envio_escolar where tipo = 'FREQUENCIA'");
+      await cliente.query(
+        "update integracoes_planilha set ativa = false, envio_automatico = false where id = 'principal'",
+      );
+    }
   });
   it("protege o catálogo em uso e não apaga a frequência consolidada ao remover a agenda", async () => {
     const salva = await gravar(dados());

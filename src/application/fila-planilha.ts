@@ -138,6 +138,12 @@ async function executar(
   };
 }
 
+export interface ResultadoDoProcessamento {
+  resumo: ResumoDoProcessamento;
+  /** Verdadeiro quando a chamada apenas aguardou a execução de outro chamador. */
+  compartilhado: boolean;
+}
+
 let emProcessamento: Promise<ResumoDoProcessamento> | null = null;
 let novaRodada = false;
 
@@ -145,11 +151,14 @@ let novaRodada = false;
  * Processa os itens da frente, um por vez e na ordem de entrada, até esvaziar a fila, ser
  * barrada por espera ou reserva, ou atingir o limite. Várias chamadas no mesmo processo
  * se fundem em uma rodada; entre instâncias, a reserva com prazo garante um consumidor.
+ * O primeiro chamador lidera e recebe `compartilhado: false`; os demais apenas aguardam
+ * a mesma promessa e recebem `compartilhado: true`.
  */
-export function processarFila(opcoes: { limite?: number } = {}): Promise<ResumoDoProcessamento> {
+export function processarFila(opcoes: { limite?: number } = {}): Promise<ResultadoDoProcessamento> {
   if (emProcessamento) {
     novaRodada = true;
-    return emProcessamento;
+    const rodada = emProcessamento;
+    return rodada.then((resumo) => ({ resumo, compartilhado: true }));
   }
   const rodada = (async () => {
     let resumo = await processarRodada(opcoes.limite ?? LIMITE_PADRAO);
@@ -163,10 +172,10 @@ export function processarFila(opcoes: { limite?: number } = {}): Promise<ResumoD
     novaRodada = false;
   });
   emProcessamento = rodada;
-  return rodada;
+  return rodada.then((resumo) => ({ resumo, compartilhado: false }));
 }
 
-export async function processarFilaDaAgenda(): Promise<ResumoDoProcessamento> {
+export async function processarFilaDaAgenda(): Promise<ResultadoDoProcessamento> {
   await despacharIntencoesEscolares().catch(() =>
     console.error("Intenções escolares aguardam nova tentativa."),
   );

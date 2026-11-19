@@ -6,7 +6,7 @@ Guia da coleta Prometheus do FrequenciApp na auto-hospedagem. A aplicação exp�
 
 - Requisições HTTP da API: contagem por método, rota e status, duração e requisições em andamento.
 - Pool de conexões do PostgreSQL, latência das consultas e falhas de coleta.
-- Fila de envio às planilhas: itens por estado e idade do item aberto mais antigo.
+- Fila de envio às planilhas: itens por estado, idade do item aberto mais antigo e instante da última leitura válida.
 - Ações de domínio: salvamentos de frequência e conflitos de revisão, itens processados da fila de planilhas e avisos da agenda de notificações, por resultado.
 - Processo Node.js: CPU, memória, descritores de arquivo, event loop, coletas de lixo e versão do runtime.
 - Coleta no cluster: quando o chart Helm habilita o ServiceMonitor, o Prometheus Operator coleta `/api/metricas` pela porta `http` do Service, com o token lido do Secret.
@@ -40,7 +40,10 @@ Caddy ou Nginx (80 e 443, alias de rede proxy)
 
 - O proxy recebe a requisição pública e responde 404 para `/api/metricas` antes de encaminhar ao aplicativo.
 - `src/proxy.ts` injeta `x-frequenciapp-rota` e `x-frequenciapp-metodo` nas demais rotas de API. O rótulo de rota vem de `src/infra/metricas-rotas.ts`, um registro estático gerado a partir de `src/app/api/**/route.ts`; o método é restrito ao catálogo de métodos HTTP. `executarRota` mede a duração, captura o status e registra a métrica.
-- Os contadores de domínio são incrementados nos adaptadores de rota: `POST /api/frequencias` registra `salvo` ou `conflito`, `/api/planilha/fila/agenda` e `/api/planilha/fila/processar` somam o resumo da fila, e `/api/notificacoes/agenda` soma o resumo dos avisos. A camada de aplicação não importa métricas.
+- Os contadores de domínio são incrementados nos adaptadores de rota: `POST /api/frequencias` registra `salvo` ou `conflito`, `/api/planilha/fila/agenda` e `/api/planilha/fila/processar` somam o resumo da fila, e `/api/notificacoes/agenda` soma o resumo dos avisos. A camada de aplicação não importa métricas. Cada execução liderada por esses adaptadores é contabilizada uma única vez: o primeiro chamador lidera a rodada e soma o resumo das transições terminais, e quem apenas aguarda a mesma promessa não soma de novo.
+- O processamento automático depois de salvar a frequência usa o mesmo caminho e contabiliza quando lidera a execução. Cada tentativa processada conta uma vez: `concluido` quando o item termina e `falha` quando a tentativa termina sem conclusão, inclusive ao agendar nova tentativa. Um item que falha e depois conclui soma uma falha e um concluído.
+- A fila é lida em uma única consulta agregada, com as contagens por estado e o item aberto mais antigo. A leitura roda em transação com `statement_timeout` de 2 segundos, tempo limite de transação de 4 segundos e `query_timeout` de 8 segundos no pool, todos abaixo do tempo limite de raspagem de 10 segundos.
+- A amostra da fila é compartilhada pelas séries da fila e por raspagens próximas durante 15 segundos. Uma consulta em andamento é reaproveitada, nunca sobreposta. Em falha ou tempo limite, a última amostra válida permanece e `frequenciapp_coleta_erros_total{coletor="fila"}` aumenta.
 - A rota não entra na especificação OpenAPI pública e não usa `executarRota`, para não se autoinstrumentar.
 - O Prometheus coleta `http://app:3000/api/metricas` a cada 30 segundos, com tempo limite de 10 segundos e avaliação das regras a cada 30 segundos.
 - O token fica em `app.env`. O entrypoint do Prometheus grava o valor em `/tmp/metricas-token`, com permissão restrita, e o `prometheus.yml` apenas referencia o arquivo.
@@ -191,6 +194,7 @@ O teste de unidade cobre 404, 401, 200 e 503. O teste de integração do Caddy m
 | `frequenciapp_db_query_duration_seconds`                   | histogram | nenhum                           | segundos      | Latência das consultas ao banco.            |
 | `frequenciapp_fila_planilha_itens`                         | gauge     | `estado`                         | itens         | Profundidade da fila de planilhas.          |
 | `frequenciapp_fila_planilha_mais_antiga_timestamp_seconds` | gauge     | nenhum                           | segundos Unix | Idade da fila.                              |
+| `frequenciapp_fila_planilha_atualizado_timestamp_seconds`  | gauge     | nenhum                           | segundos Unix | Instante da última leitura válida da fila.  |
 | `frequenciapp_frequencias_salvas_total`                    | counter   | `resultado`                      | salvamentos   | Salvamentos e conflitos de revisão.         |
 | `frequenciapp_fila_planilha_processados_total`             | counter   | `resultado`                      | itens         | Itens processados da fila de planilhas.     |
 | `frequenciapp_notificacoes_enviadas_total`                 | counter   | `resultado`                      | avisos        | Avisos da agenda de notificações.           |
@@ -213,9 +217,13 @@ Labels do pool: `total`, `idle`, `in_use` e `waiting`. O valor de `in_use` é a 
 
 Labels da fila: `AGUARDANDO`, `EM_ANDAMENTO`, `FALHOU`, `CONCLUIDO` e `DESCARTADO`. Em uma coleta bem-sucedida, os cinco estados aparecem, inclusive com zero. Quando a fila está vazia, o gauge da mais antiga vale `0`.
 
+A amostra da fila é compartilhada e vale por 15 segundos. O carimbo `frequenciapp_fila_planilha_atualizado_timestamp_seconds` só avança em uma leitura válida. Em falha ou tempo limite, as séries mantêm a última amostra válida e o carimbo não avança. Se nunca houve leitura válida, as séries da fila não existem. Assim, zero real é `itens=0`, `mais_antiga=0` e carimbo recente; amostra antiga tem valores anteriores com carimbo antigo; falha mantém o carimbo e incrementa `frequenciapp_coleta_erros_total{coletor="fila"}`.
+
 Labels do coletor: `pool` e `fila`.
 
 Labels de resultado de frequência: `salvo` e `conflito`. Um salvamento recusado por revisão incrementa `conflito` e responde 409; erros de validação não alteram o contador. Labels de resultado da fila: `concluido` e `falha`. Labels de resultado das notificações: `enviada`, `expirada`, `falha` e `ignorada`. Nos resumos da fila e das notificações, os contadores só recebem incremento quando o valor é maior que zero.
+
+O contador `frequenciapp_fila_planilha_processados_total` mede as transições terminais de cada tentativa, por execução real, não chamadas HTTP, nos caminhos instrumentados: processamento manual, agenda e o automático depois de salvar a frequência. O primeiro chamador lidera a rodada e soma o resumo; chamadas concorrentes que apenas aguardam a mesma promessa não somam. Cada tentativa processada conta uma vez: `concluido` quando o item termina e `falha` quando a tentativa termina sem conclusão, inclusive ao agendar nova tentativa ou esgotar o limite. Um item que falha e depois conclui soma uma falha e um concluído. A contagem é local ao processo e reinicia com ele.
 
 O label `route` é um template estático, nunca o caminho recebido. O registro é gerado de `src/app/api/**/route.ts`: `/api/alunos/[id]` vira `/api/alunos/:id`, `/api/calendario-letivo/[dia]` vira `/api/calendario-letivo/:dia` e `/api/justificativas/[codigo]` vira `/api/justificativas/:codigo`. Caminho de API fora do registro vira `desconhecida`; fora de `/api/` vira `fora-da-api`. Quando a leitura do cabeçalho falha, a rota é `desconhecida`. O método é `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `HEAD` ou `OPTIONS`, e qualquer outro valor vira `OUTRO`.
 
@@ -596,9 +604,12 @@ Um 404 no alvo `frequenciapp` indica que a aplicação está sem `METRICAS_TOKEN
 ### Fila parada
 
 1. Conferir `frequenciapp_fila_planilha_itens` e a idade em `/alerts`.
-2. Conferir a agenda do servidor em [auto-hospedagem.md](auto-hospedagem.md).
-3. Conferir `frequenciapp_coleta_erros_total{coletor="fila"}`.
-4. Conferir a Fila de envios na Gestão e os logs da aplicação.
+2. Conferir `frequenciapp_fila_planilha_atualizado_timestamp_seconds`. Um carimbo antigo indica amostra desatualizada, não fila vazia.
+3. Conferir `frequenciapp_coleta_erros_total{coletor="fila"}` e a duração em `frequenciapp_coleta_duracao_seconds{coletor="fila"}`. Falha ou tempo limite mantém a última amostra válida e incrementa o contador de erros.
+4. Conferir a agenda do servidor em [auto-hospedagem.md](auto-hospedagem.md).
+5. Conferir a Fila de envios na Gestão e os logs da aplicação.
+
+Zero real aparece como os cinco estados em `0`, `mais_antiga` em `0` e carimbo recente. Uma lacuna nas séries da fila significa que nenhuma leitura válida ocorreu desde a partida do processo. A consulta tem prazo de 2 segundos no servidor, 4 segundos na transação e 8 segundos no cliente, abaixo do tempo limite de raspagem de 10 segundos.
 
 ### Coletor da sonda indisponível
 
@@ -715,7 +726,8 @@ O limite de 1 GB evita crescimento indefinido. Se o volume crescer acima do espe
 ## Limitações
 
 - A aplicação é um único processo. As métricas refletem essa instância, sem agregação entre réplicas.
-- Os contadores de domínio são incrementados por processo. Com mais de uma réplica, cada Pod expõe a própria contagem, e o total depende da agregação do Prometheus. Reiniciar o processo zera os contadores.
+- A amostra da fila é local ao processo e vale por 15 segundos. Em falha de leitura, as séries mantêm a última amostra válida e o carimbo não avança. A ausência das séries da fila indica que nenhuma leitura válida ocorreu desde a partida do processo.
+- Os contadores de domínio são incrementados por processo. Com mais de uma réplica, cada Pod expõe a própria contagem, e o total depende da agregação do Prometheus. Reiniciar o processo zera os contadores. A fila conta as transições terminais de cada tentativa, por execução real, não chamadas HTTP.
 - Não há métricas de página, de navegador, de latência de renderização nem de service worker.
 - Os histogramas são clássicos, com buckets fixos. O p95 é aproximado, e a agregação entre rotas diferentes perde precisão.
 - O label `route` vem de um registro gerado. Uma rota nova só aparece no label depois de `pnpm run rotas:gerar`; até lá, o caminho cai em `desconhecida`. Caminhos fora de `/api/` aparecem como `fora-da-api`.

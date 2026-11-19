@@ -209,16 +209,6 @@ async function contadoresDaFila(): Promise<ContadoresDaFila> {
   return { concluido: valor("concluido"), falha: valor("falha") };
 }
 
-function somarResumos(resumos: ResumoFila[]): ContadoresDaFila {
-  return resumos.reduce(
-    (total, resumo) => ({
-      concluido: total.concluido + resumo.concluidos,
-      falha: total.falha + resumo.falhas,
-    }),
-    { concluido: 0, falha: 0 },
-  );
-}
-
 beforeAll(async () => {
   const conexao = process.env.DATABASE_URL;
   if (conexao?.startsWith("postgresql://")) {
@@ -318,13 +308,28 @@ describe("ordem de entrada", () => {
     await inserirItem("2026-09-02");
     await inserirItem("2026-09-03");
     const metricasAntes = medirMetricas ? await contadoresDaFila() : null;
-    // Dois pedidos ao mesmo tempo não duplicam o envio de nenhum item.
-    const resumos = await Promise.all([processar(), processar()]);
+    // Uma trava externa segura a primeira consulta e garante que os dois pedidos
+    // concorrentes compartilhem a mesma execução antes de qualquer finalização.
+    const primeira = (async () => {
+      await sql().query("BEGIN");
+      try {
+        await sql().query("LOCK TABLE fila_planilha IN ACCESS EXCLUSIVE MODE");
+        const pedidoA = processar();
+        const pedidoB = processar();
+        await new Promise((resolver) => setTimeout(resolver, 300));
+        return { pedidoA, pedidoB };
+      } finally {
+        await sql().query("ROLLBACK");
+      }
+    })();
+    const { pedidoA, pedidoB } = await primeira;
+    const resumos = await Promise.all([pedidoA, pedidoB]);
     if (metricasAntes) {
       const metricasDepois = await contadoresDaFila();
-      const esperado = somarResumos(resumos);
-      expect(metricasDepois.concluido - metricasAntes.concluido).toBe(esperado.concluido);
-      expect(metricasDepois.falha - metricasAntes.falha).toBe(esperado.falha);
+      // O líder contabiliza a execução; quem apenas aguardou não duplica o resumo.
+      expect(metricasDepois.concluido - metricasAntes.concluido).toBe(resumos[0]?.concluidos);
+      expect(metricasDepois.falha - metricasAntes.falha).toBe(resumos[0]?.falhas);
+      expect(resumos[1]).toEqual(resumos[0]);
     }
     expect(
       await esperar(async () => (await fila()).every((item) => item.estado === "CONCLUIDO")),
