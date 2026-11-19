@@ -1,3 +1,11 @@
+{{- include "frequenciapp.validateMetrics" . }}
+{{- $segredoPod := include "frequenciapp.secretName" . }}
+{{- $segredoToken := include "frequenciapp.metricsTokenSecretName" . }}
+{{- $chaveToken := include "frequenciapp.metricsTokenKey" . }}
+{{- $metricas := default (dict) .Values.metrics }}
+{{- $serviceMonitor := default (dict) $metricas.serviceMonitor }}
+{{- $coletaHabilitada := $serviceMonitor.enabled }}
+{{- $tokenExplicito := and $coletaHabilitada (or (ne $segredoPod $segredoToken) (ne $chaveToken "METRICAS_TOKEN")) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -74,6 +82,14 @@ spec:
           env:
             - name: COMMIT_SHA
               value: {{ default (default .Chart.AppVersion .Values.image.tag) .Values.config.COMMIT_SHA | quote }}
+            {{- /* env vence envFrom: o token explícito garante o mesmo valor do ServiceMonitor. */}}
+            {{- if $tokenExplicito }}
+            - name: METRICAS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $segredoToken | quote }}
+                  key: {{ $chaveToken | quote }}
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

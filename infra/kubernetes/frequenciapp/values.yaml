@@ -103,8 +103,12 @@ metrics:
     # Labels adicionais para o seletor do Prometheus Operator.
     labels: {}
     bearerTokenSecret:
-      # Vazio usa o existingSecret ou o Secret gerenciado pelo chart.
+      # Vazio usa o existingSecret ou o Secret gerenciado pelo chart. Com um
+      # Secret diferente do Secret do Pod e a coleta habilitada, o Pod recebe
+      # METRICAS_TOKEN explícito deste Secret, que vence o envFrom.
       name: ""
+      # Chave do token. Fora de METRICAS_TOKEN, o Pod recebe um env
+      # METRICAS_TOKEN explícito apontando para esta chave.
       key: METRICAS_TOKEN
 
 extraEnv: []

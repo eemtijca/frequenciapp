@@ -412,12 +412,29 @@ metrics:
       key: METRICAS_TOKEN
 ```
 
-- `metrics.serviceMonitor.enabled` vem desligado. Com `false`, o chart não renderiza o `ServiceMonitor` e nenhuma CRD é necessária.
+- `metrics.serviceMonitor.enabled` vem desligado. Com `false`, o chart não renderiza o `ServiceMonitor`, nenhuma CRD é necessária e o Pod mantém apenas o `envFrom` do Secret principal.
 - `metrics.serviceMonitor.interval` e `scrapeTimeout` usam a sintaxe de duração do Prometheus, com 30 e 10 segundos por padrão.
 - `metrics.serviceMonitor.labels` acrescenta rótulos ao objeto. O seletor do Prometheus Operator precisa incluí-los para a coleta acontecer.
-- `metrics.serviceMonitor.bearerTokenSecret.name` vazio usa o `existingSecret` ou o Secret gerenciado pelo chart. `bearerTokenSecret.key` tem `METRICAS_TOKEN` como padrão.
+- `metrics.serviceMonitor.bearerTokenSecret.name` vazio usa o `existingSecret` ou o Secret gerenciado pelo chart. Preenchido com outro nome, o Pod recebe `METRICAS_TOKEN` explícito desse Secret, porque `env` vence `envFrom`, e o `ServiceMonitor` usa o mesmo Secret.
+- `metrics.serviceMonitor.bearerTokenSecret.key` tem `METRICAS_TOKEN` como padrão. Com outra chave, o Pod recebe `METRICAS_TOKEN` explícito dessa chave e o `ServiceMonitor` usa a mesma chave.
 
-Com o Secret gerenciado, isto é, `secrets.create=true` e `existingSecret` vazio, preencher `metrics.token` com 32 a 200 caracteres entre letras, números, hífen e sublinhado. O chart grava a chave `METRICAS_TOKEN` no Secret. Com `existingSecret`, o chart não altera o Secret externo, e o operador precisa criar a chave `METRICAS_TOKEN` no Secret apontado por `existingSecret` ou em outro Secret indicado em `bearerTokenSecret.name`. Sem `secrets.create`, sem `existingSecret` e sem `bearerTokenSecret.name`, o template do ServiceMonitor falha por falta de Secret. Depois de alterar o Secret externo, atualizar `existingSecretRevision` para a aplicação reiniciar e passar a ler o token novo.
+### Modos de token no cluster
+
+| Modo               | Configuração                                                               | Origem do token                                    | Pod                                                                                                         |
+| ------------------ | -------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Secret gerenciado  | `secrets.create=true`, `existingSecret` vazio e `metrics.token` preenchido | Chave `METRICAS_TOKEN` no Secret criado pelo chart | `envFrom` do Secret gerenciado, sem variável duplicada                                                      |
+| `existingSecret`   | `existingSecret` preenchido e `bearerTokenSecret.name` vazio               | Chave `bearerTokenSecret.key` no Secret existente  | `envFrom` do Secret existente. Com a chave padrão, sem variável duplicada; com chave própria, env explícito |
+| Secret alternativo | `bearerTokenSecret.name` com outro nome                                    | Chave `bearerTokenSecret.key` nesse Secret         | `envFrom` do Secret principal e env `METRICAS_TOKEN` explícito do Secret alternativo                        |
+
+Em todos os modos, o Pod e o `ServiceMonitor` leem o mesmo Secret e a mesma chave. Com o Secret gerenciado, preencher `metrics.token` com 32 a 200 caracteres entre letras, números, hífen e sublinhado. Com `existingSecret`, o chart não altera o Secret externo, e a chave `METRICAS_TOKEN` é responsabilidade do operador. Sem `secrets.create`, sem `existingSecret` e sem `bearerTokenSecret.name`, o template falha por falta de Secret. Com o `ServiceMonitor` ligado, o chart também recusa chave vazia e Secret gerenciado sem `metrics.token` ou `secrets.data.METRICAS_TOKEN`.
+
+### Rotação do token no cluster
+
+- Secret gerenciado: alterar `metrics.token` e executar `helm upgrade`. O checksum do Secret muda e o rollout acontece.
+- `existingSecret` sem Secret alternativo: atualizar a chave no Secret externo e subir `existingSecretRevision` no mesmo `helm upgrade`.
+- Secret alternativo: atualizar o Secret alternativo e reiniciar o Deployment com `kubectl -n frequenciapp rollout restart deployment/<release>`, ou subir `existingSecretRevision` para provocar o rollout. O checksum do Pod não cobre o Secret alternativo.
+
+Depois da rotação, conferir o alvo no Prometheus. Um 401 indica que o Pod e o `ServiceMonitor` ainda apontam para valores diferentes.
 
 O `ServiceMonitor` exige o Prometheus Operator e a CRD `monitoring.coreos.com/v1`. O chart não instala nenhum dos dois. Sem a CRD, o `helm template` renderiza o objeto, mas o `kubectl apply` falha. Conferir a instalação com:
 
@@ -425,7 +442,7 @@ O `ServiceMonitor` exige o Prometheus Operator e a CRD `monitoring.coreos.com/v1
 kubectl get crd servicemonitors.monitoring.coreos.com
 ```
 
-A coleta usa a porta `http` do Service, o caminho `/api/metricas`, o intervalo e o tempo limite configurados, `authorization.type: Bearer` e `credentials` apontando para o Secret. O chart não publica a rota: o Ingress opcional encaminha `/` ao aplicativo e não cria regra para `/api/metricas`. O bloqueio na borda do cluster depende do Ingress controller ou de NetworkPolicy e não é automatizado pelo chart. A recomendação é bloquear a rota no Ingress ou restringir quem alcança a porta do aplicativo, sem criar regra pública para o caminho. Dentro do cluster, a rota continua exigindo o token: sem token configurado, responde 404; com token errado, 401.
+A coleta usa a porta `http` do Service, o caminho `/api/metricas`, o intervalo e o tempo limite configurados, `authorization.type: Bearer` e `credentials` apontando para o Secret. O chart não publica a rota: o Ingress opcional encaminha `/` ao aplicativo e não cria regra para `/api/metricas`. A recomendação é não expor a rota na borda: bloquear o caminho no Ingress controller e, quando possível, restringir a porta do Pod com NetworkPolicy que permita apenas o namespace do Prometheus. O Ingress e a NetworkPolicy são responsabilidade do operador; o chart não os cria. Dentro do cluster, a rota continua exigindo o token: sem token configurado, responde 404; com token errado, 401.
 
 ## Retenção e volume
 
@@ -558,9 +575,9 @@ O restante da observabilidade continua funcionando. O alvo `alertmanager:9093` v
 - O Alertmanager entra na rede `publica` apenas para alcançar o webhook ou o SMTP. Não há porta publicada, e o acesso ao serviço continua restrito às redes do projeto.
 - A ponte `prometheus-ui` publica somente `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha apenas para `prometheus:9090`. Ela roda sem privilégios, com `cap_drop: ALL`, `no-new-privileges` e sistema de arquivos somente leitura. A ponte está em `interna` e `painel`, e a rede `publica` não alcança a escuta 9090.
 - Caddy e Nginx respondem 404 para `/api/metricas` antes do proxy. O bloqueio público não depende do token.
-- No cluster, o ServiceMonitor lê o token do Secret pelo campo `credentials`. Com `existingSecret`, o chart não altera o Secret externo e a chave `METRICAS_TOKEN` é responsabilidade do operador.
+- No cluster, o Pod e o `ServiceMonitor` leem o mesmo Secret e a mesma chave. Quando o Secret alternativo ou a chave diferem do Secret do Pod, o chart injeta `METRICAS_TOKEN` explícito no Pod, que vence o `envFrom`. Com `existingSecret`, o chart não altera o Secret externo e a chave é responsabilidade do operador.
 - O chart não instala o Prometheus Operator nem a CRD `monitoring.coreos.com/v1`. Habilitar o ServiceMonitor sem a CRD faz a aplicação do manifesto falhar, e o token não é criado automaticamente fora do Secret gerenciado.
-- O Ingress opcional do chart encaminha `/` ao aplicativo. O bloqueio de `/api/metricas` na borda depende do Ingress controller ou de NetworkPolicy e não é automatizado pelo chart.
+- O Ingress opcional do chart encaminha `/` ao aplicativo. A recomendação é não expor `/api/metricas` na borda e bloquear o caminho no Ingress controller ou restringir a porta do Pod com NetworkPolicy. O chart não cria essas regras.
 - O Prometheus inicia sem lifecycle e sem admin API. Não há recarga remota nem exclusão de dados por HTTP. Alterar configuração exige reiniciar o contêiner.
 - O token de backup acompanha o `app.env` cifrado quando `BACKUP_INCLUIR_AMBIENTE=true`. O arquivo de backup precisa do mesmo cuidado de um segredo.
 - Para trocar o token, gerar outro, atualizar o `app.env` e recriar a aplicação e o Prometheus. No perfil com controlador, a recriação passa pela entrada estável. A coleta fica indisponível até os dois lados usarem o mesmo valor.
@@ -602,6 +619,14 @@ Um 404 no alvo `frequenciapp` indica que a aplicação está sem `METRICAS_TOKEN
 1. Conferir o último erro do alvo em `/targets` e os logs da aplicação.
 2. Conferir a conexão com o banco e o coletor da fila.
 3. O 503 indica falha de coleta ou de serialização do registro. A coleta fica indisponível até o coletor voltar, sem alterar as demais rotas.
+
+### Coleta no cluster
+
+1. Conferir o alvo criado pelo `ServiceMonitor` em `/targets` e o último erro.
+2. Um 404 indica que o Pod está sem `METRICAS_TOKEN`. Conferir a variável com `kubectl -n frequenciapp exec deployment/<release> -- printenv METRICAS_TOKEN` e a existência da chave no Secret principal.
+3. Um 401 indica que o Pod e o `ServiceMonitor` usam tokens diferentes. Comparar a variável do Pod com o Secret e a chave em `spec.endpoints[].authorization.credentials` do `ServiceMonitor`.
+4. Com Secret alternativo, conferir se `bearerTokenSecret.name` e `bearerTokenSecret.key` existem e se o Pod recebeu a variável `METRICAS_TOKEN` explícita.
+5. Conferir se a CRD `monitoring.coreos.com/v1` e o operador estão instalados e se o seletor do Prometheus Operator cobre os rótulos do `ServiceMonitor`.
 
 ### Fila parada
 
@@ -744,7 +769,8 @@ O limite de 1 GB evita crescimento indefinido. Se o volume crescer acima do espe
 - O node exporter não substitui os logs do Docker nem o journal do sistema.
 - O ServiceMonitor exige o Prometheus Operator e a CRD `monitoring.coreos.com/v1`. O chart não instala nenhum dos dois, e a coleta no cluster não funciona apenas com o chart.
 - Com `existingSecret`, a chave `METRICAS_TOKEN` precisa ser criada fora do Helm. O chart não altera o Secret externo nem cria a chave em um Secret existente.
-- O Ingress opcional do chart encaminha `/` ao aplicativo. O chart não bloqueia `/api/metricas` na borda, o que depende do Ingress controller ou de NetworkPolicy.
+- O checksum do Pod cobre o Secret principal, não o Secret alternativo. Rotacionar o token no Secret alternativo exige reiniciar o Deployment ou alterar `existingSecretRevision`.
+- O Ingress opcional do chart encaminha `/` ao aplicativo. A recomendação é não expor `/api/metricas` na borda e bloquear o caminho no Ingress controller ou restringir a porta do Pod com NetworkPolicy. O chart não cria essas regras.
 - O ServiceMonitor só é selecionado se os rótulos do objeto, incluindo os de `metrics.serviceMonitor.labels`, estiverem cobertos pelo seletor do Prometheus Operator. Um ServiceMonitor sem correspondência no seletor não gera coleta.
 
 ## Fases entregues

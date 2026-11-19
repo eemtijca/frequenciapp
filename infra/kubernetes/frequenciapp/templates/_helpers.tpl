@@ -71,15 +71,54 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- required "Defina backup.filesSecret para habilitar o backup" .Values.backup.filesSecret -}}
 {{- end -}}
 
-{{/* Nome do Secret que guarda METRICAS_TOKEN para o ServiceMonitor. O valor
-explícito vence; vazio usa o existingSecret ou o Secret gerenciado. */}}
-{{- define "frequenciapp.metricsSecretName" -}}
-{{- if .Values.metrics.serviceMonitor.bearerTokenSecret.name -}}
-{{- .Values.metrics.serviceMonitor.bearerTokenSecret.name -}}
+{{/* Nome do Secret que guarda o token da coleta. A fonte é única por
+renderização: o nome explícito do ServiceMonitor vence; vazio usa o Secret do
+Pod, que é o existingSecret ou o Secret gerenciado. */}}
+{{- define "frequenciapp.metricsTokenSecretName" -}}
+{{- $metricas := default (dict) .Values.metrics -}}
+{{- $serviceMonitor := default (dict) $metricas.serviceMonitor -}}
+{{- $tokenSecret := default (dict) $serviceMonitor.bearerTokenSecret -}}
+{{- if $tokenSecret.name -}}
+{{- $tokenSecret.name -}}
 {{- else if or .Values.existingSecret .Values.secrets.create -}}
 {{- include "frequenciapp.secretName" . -}}
 {{- else -}}
-{{- required "Defina metrics.serviceMonitor.bearerTokenSecret.name, existingSecret ou secrets.create para habilitar o ServiceMonitor" "" -}}
+{{- required "Defina metrics.serviceMonitor.bearerTokenSecret.name, existingSecret ou secrets.create para o token da coleta" "" -}}
+{{- end -}}
+{{- end -}}
+
+{{/* Chave do token da coleta no Secret, com METRICAS_TOKEN como padrão. */}}
+{{- define "frequenciapp.metricsTokenKey" -}}
+{{- $metricas := default (dict) .Values.metrics -}}
+{{- $serviceMonitor := default (dict) $metricas.serviceMonitor -}}
+{{- $tokenSecret := default (dict) $serviceMonitor.bearerTokenSecret -}}
+{{- default "METRICAS_TOKEN" $tokenSecret.key -}}
+{{- end -}}
+
+{{/* Recusa combinações que deixariam o Pod e o ServiceMonitor sem o mesmo
+token quando a coleta está habilitada. */}}
+{{- define "frequenciapp.validateMetrics" -}}
+{{- $metricas := default (dict) .Values.metrics -}}
+{{- $serviceMonitor := default (dict) $metricas.serviceMonitor -}}
+{{- if $serviceMonitor.enabled -}}
+{{- $tokenSecret := default (dict) $serviceMonitor.bearerTokenSecret -}}
+{{- if not $tokenSecret.key -}}
+{{- fail "metrics.serviceMonitor.bearerTokenSecret.key precisa ser informada quando metrics.serviceMonitor.enabled=true" -}}
+{{- end -}}
+{{- $gerenciado := and .Values.secrets.create (not .Values.existingSecret) -}}
+{{- if $gerenciado -}}
+{{- $dados := default (dict) .Values.secrets.data -}}
+{{- $semToken := and (not $metricas.token) (not (hasKey $dados "METRICAS_TOKEN")) -}}
+{{- $nomeToken := $tokenSecret.name -}}
+{{- $nomePod := include "frequenciapp.fullname" . -}}
+{{- $fonteGerenciada := or (not $nomeToken) (eq $nomeToken $nomePod) -}}
+{{- if and $semToken $fonteGerenciada -}}
+{{- fail "O Secret gerenciado não tem METRICAS_TOKEN: defina metrics.token ou secrets.data.METRICAS_TOKEN, ou aponte metrics.serviceMonitor.bearerTokenSecret.name para outro Secret" -}}
+{{- end -}}
+{{- if and $fonteGerenciada (ne (include "frequenciapp.metricsTokenKey" .) "METRICAS_TOKEN") -}}
+{{- fail "O Secret gerenciado só oferece a chave METRICAS_TOKEN: use a chave padrão ou aponte metrics.serviceMonitor.bearerTokenSecret.name para outro Secret" -}}
+{{- end -}}
+{{- end -}}
 {{- end -}}
 {{- end -}}
 

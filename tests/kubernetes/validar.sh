@@ -144,51 +144,109 @@ helm template frequenciapp "$CHART" \
 kubeconform_file "$TMP/instalacao.yaml"
 kubeconform_file "$TMP/upgrade.yaml"
 
-printf '[kubernetes] ServiceMonitor opcional\n'
+printf '[kubernetes] ServiceMonitor desligado por padrão\n'
 exigir_ausencia 'kind: ServiceMonitor' "$TMP/instalacao.yaml"
-
 helm template frequenciapp "$CHART" \
   --namespace frequenciapp \
   --set existingSecret=frequenciapp-segredos \
-  --set image.tag=1.2.3 \
-  --set metrics.serviceMonitor.enabled=true \
-  --set metrics.serviceMonitor.bearerTokenSecret.name=frequenciapp-segredos \
-  --set metrics.serviceMonitor.labels.equipe=observabilidade >"$TMP/servicemonitor.yaml"
-exigir_texto 'kind: ServiceMonitor' "$TMP/servicemonitor.yaml"
-exigir_texto 'name: frequenciapp' "$TMP/servicemonitor.yaml"
-exigir_texto 'port: http' "$TMP/servicemonitor.yaml"
-exigir_texto 'path: /api/metricas' "$TMP/servicemonitor.yaml"
-exigir_texto 'type: Bearer' "$TMP/servicemonitor.yaml"
-exigir_texto 'interval: "30s"' "$TMP/servicemonitor.yaml"
-exigir_texto 'scrapeTimeout: "10s"' "$TMP/servicemonitor.yaml"
-exigir_texto 'app.kubernetes.io/managed-by: Helm' "$TMP/servicemonitor.yaml"
-exigir_texto 'equipe: observabilidade' "$TMP/servicemonitor.yaml"
-grep -A2 'credentials:' "$TMP/servicemonitor.yaml" | grep -q 'name: "frequenciapp-segredos"' ||
-  falhar 'O ServiceMonitor não aponta para o Secret do token.'
-grep -A2 'credentials:' "$TMP/servicemonitor.yaml" | grep -q 'key: "METRICAS_TOKEN"' ||
-  falhar 'O ServiceMonitor não usa a chave METRICAS_TOKEN.'
-kubeconform_servicemonitor "$TMP/servicemonitor.yaml"
+  --set metrics.serviceMonitor.bearerTokenSecret.name=frequenciapp-metricas \
+  --show-only templates/deployment.yaml >"$TMP/deployment-sm-desligado.yaml"
+exigir_ausencia '- name: METRICAS_TOKEN' "$TMP/deployment-sm-desligado.yaml"
 
-helm template frequenciapp "$CHART" \
-  --namespace frequenciapp \
-  --set existingSecret=frequenciapp-segredos \
-  --set metrics.serviceMonitor.enabled=true \
-  --set metrics.serviceMonitor.bearerTokenSecret.key=TOKEN_CUSTOM \
-  --show-only templates/servicemonitor.yaml >"$TMP/servicemonitor-derivado.yaml"
-grep -A2 'credentials:' "$TMP/servicemonitor-derivado.yaml" | grep -q 'name: "frequenciapp-segredos"' ||
-  falhar 'O ServiceMonitor não deriva o nome do existingSecret.'
-grep -A2 'credentials:' "$TMP/servicemonitor-derivado.yaml" | grep -q 'key: "TOKEN_CUSTOM"' ||
-  falhar 'O ServiceMonitor não usa a chave configurada.'
-
+printf '[kubernetes] Token no Secret gerenciado\n'
 helm template frequenciapp "$CHART" \
   --namespace frequenciapp \
   --set secrets.create=true \
   --set metrics.token=token-sintetico \
   --set metrics.serviceMonitor.enabled=true \
-  --show-only templates/servicemonitor.yaml >"$TMP/servicemonitor-gerenciado.yaml"
-grep -A2 'credentials:' "$TMP/servicemonitor-gerenciado.yaml" | grep -q 'name: "frequenciapp"' ||
-  falhar 'O ServiceMonitor não deriva o nome do Secret gerenciado.'
+  --set image.tag=1.2.3 >"$TMP/metricas-gerenciado.yaml"
+exigir_texto 'kind: ServiceMonitor' "$TMP/metricas-gerenciado.yaml"
+exigir_texto 'METRICAS_TOKEN: "token-sintetico"' "$TMP/metricas-gerenciado.yaml"
+grep -A2 'credentials:' "$TMP/metricas-gerenciado.yaml" | grep -q 'name: "frequenciapp"' ||
+  falhar 'O ServiceMonitor não aponta para o Secret gerenciado.'
+grep -A2 'credentials:' "$TMP/metricas-gerenciado.yaml" | grep -q 'key: "METRICAS_TOKEN"' ||
+  falhar 'O ServiceMonitor não usa a chave padrão METRICAS_TOKEN.'
+exigir_ausencia '- name: METRICAS_TOKEN' "$TMP/metricas-gerenciado.yaml"
+kubeconform_servicemonitor "$TMP/metricas-gerenciado.yaml"
 
+printf '[kubernetes] Token no existingSecret\n'
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set image.tag=1.2.3 \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.serviceMonitor.labels.equipe=observabilidade >"$TMP/metricas-existing.yaml"
+exigir_texto 'kind: ServiceMonitor' "$TMP/metricas-existing.yaml"
+exigir_texto 'port: http' "$TMP/metricas-existing.yaml"
+exigir_texto 'path: /api/metricas' "$TMP/metricas-existing.yaml"
+exigir_texto 'type: Bearer' "$TMP/metricas-existing.yaml"
+exigir_texto 'interval: "30s"' "$TMP/metricas-existing.yaml"
+exigir_texto 'scrapeTimeout: "10s"' "$TMP/metricas-existing.yaml"
+exigir_texto 'app.kubernetes.io/managed-by: Helm' "$TMP/metricas-existing.yaml"
+exigir_texto 'equipe: observabilidade' "$TMP/metricas-existing.yaml"
+grep -A2 'credentials:' "$TMP/metricas-existing.yaml" | grep -q 'name: "frequenciapp-segredos"' ||
+  falhar 'O ServiceMonitor não deriva o nome do existingSecret.'
+grep -A2 'credentials:' "$TMP/metricas-existing.yaml" | grep -q 'key: "METRICAS_TOKEN"' ||
+  falhar 'O ServiceMonitor não usa a chave padrão no existingSecret.'
+exigir_ausencia '- name: METRICAS_TOKEN' "$TMP/metricas-existing.yaml"
+kubeconform_servicemonitor "$TMP/metricas-existing.yaml"
+
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.serviceMonitor.bearerTokenSecret.name=frequenciapp-segredos \
+  --show-only templates/deployment.yaml >"$TMP/deployment-existing-explicito.yaml"
+exigir_ausencia '- name: METRICAS_TOKEN' "$TMP/deployment-existing-explicito.yaml"
+
+printf '[kubernetes] Chave própria no existingSecret\n'
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.serviceMonitor.bearerTokenSecret.key=TOKEN_CUSTOM \
+  --show-only templates/servicemonitor.yaml >"$TMP/servicemonitor-chave.yaml"
+grep -A2 'credentials:' "$TMP/servicemonitor-chave.yaml" | grep -q 'name: "frequenciapp-segredos"' ||
+  falhar 'O ServiceMonitor não deriva o nome do existingSecret com chave própria.'
+grep -A2 'credentials:' "$TMP/servicemonitor-chave.yaml" | grep -q 'key: "TOKEN_CUSTOM"' ||
+  falhar 'O ServiceMonitor não usa a chave configurada.'
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.serviceMonitor.bearerTokenSecret.key=TOKEN_CUSTOM \
+  --show-only templates/deployment.yaml >"$TMP/deployment-chave.yaml"
+grep -A4 -- '- name: METRICAS_TOKEN' "$TMP/deployment-chave.yaml" | grep -q 'name: "frequenciapp-segredos"' ||
+  falhar 'O Pod não lê a chave própria no mesmo Secret do ServiceMonitor.'
+grep -A4 -- '- name: METRICAS_TOKEN' "$TMP/deployment-chave.yaml" | grep -q 'key: "TOKEN_CUSTOM"' ||
+  falhar 'O Pod não usa a mesma chave própria do ServiceMonitor.'
+
+printf '[kubernetes] Secret alternativo com nome e chave próprios\n'
+helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set image.tag=1.2.3 \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.serviceMonitor.bearerTokenSecret.name=frequenciapp-metricas \
+  --set metrics.serviceMonitor.bearerTokenSecret.key=token-coleta >"$TMP/metricas-alternativo.yaml"
+exigir_texto 'kind: ServiceMonitor' "$TMP/metricas-alternativo.yaml"
+grep -A2 'credentials:' "$TMP/metricas-alternativo.yaml" | grep -q 'name: "frequenciapp-metricas"' ||
+  falhar 'O ServiceMonitor não aponta para o Secret alternativo.'
+grep -A2 'credentials:' "$TMP/metricas-alternativo.yaml" | grep -q 'key: "token-coleta"' ||
+  falhar 'O ServiceMonitor não usa a chave do Secret alternativo.'
+grep -A4 -- '- name: METRICAS_TOKEN' "$TMP/metricas-alternativo.yaml" | grep -q 'name: "frequenciapp-metricas"' ||
+  falhar 'O Pod não lê o token no Secret alternativo.'
+grep -A4 -- '- name: METRICAS_TOKEN' "$TMP/metricas-alternativo.yaml" | grep -q 'key: "token-coleta"' ||
+  falhar 'O Pod não usa a mesma chave do ServiceMonitor.'
+total_secretrefs=$(grep -c 'secretRef:' "$TMP/metricas-alternativo.yaml" || true)
+[ "$total_secretrefs" -eq 2 ] ||
+  falhar 'O Deployment deve manter o envFrom do Secret principal nos dois contêineres.'
+secretrefs_principais=$(grep -A1 'secretRef:' "$TMP/metricas-alternativo.yaml" | grep -c 'name: frequenciapp-segredos' || true)
+[ "$secretrefs_principais" -eq 2 ] ||
+  falhar 'O envFrom do Pod deixou de usar o Secret principal.'
+kubeconform_servicemonitor "$TMP/metricas-alternativo.yaml"
+
+printf '[kubernetes] Combinações recusadas\n'
 if helm template frequenciapp "$CHART" \
   --namespace frequenciapp \
   --set metrics.serviceMonitor.enabled=true \
@@ -196,6 +254,36 @@ if helm template frequenciapp "$CHART" \
   falhar 'O ServiceMonitor foi renderizado sem nome de Secret.'
 fi
 exigir_texto 'metrics.serviceMonitor.bearerTokenSecret.name' "$TMP/servicemonitor-sem-secret.log"
+
+if helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set secrets.create=true \
+  --set metrics.serviceMonitor.enabled=true \
+  --show-only templates/servicemonitor.yaml >"$TMP/servicemonitor-sem-token.yaml" 2>"$TMP/servicemonitor-sem-token.log"; then
+  falhar 'O ServiceMonitor foi renderizado com Secret gerenciado sem token.'
+fi
+exigir_texto 'O Secret gerenciado não tem METRICAS_TOKEN' "$TMP/servicemonitor-sem-token.log"
+
+if helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set secrets.create=true \
+  --set metrics.token=token-sintetico \
+  --set metrics.serviceMonitor.enabled=true \
+  --set metrics.serviceMonitor.bearerTokenSecret.key=TOKEN_CUSTOM \
+  --show-only templates/servicemonitor.yaml >"$TMP/servicemonitor-chave-gerenciada.yaml" 2>"$TMP/servicemonitor-chave-gerenciada.log"; then
+  falhar 'O ServiceMonitor aceitou chave própria no Secret gerenciado.'
+fi
+exigir_texto 'só oferece a chave METRICAS_TOKEN' "$TMP/servicemonitor-chave-gerenciada.log"
+
+if helm template frequenciapp "$CHART" \
+  --namespace frequenciapp \
+  --set existingSecret=frequenciapp-segredos \
+  --set metrics.serviceMonitor.enabled=true \
+  --set-string metrics.serviceMonitor.bearerTokenSecret.key= \
+  --show-only templates/servicemonitor.yaml >"$TMP/servicemonitor-sem-chave.yaml" 2>"$TMP/servicemonitor-sem-chave.log"; then
+  falhar 'O ServiceMonitor foi renderizado com chave vazia.'
+fi
+exigir_texto 'metrics.serviceMonitor.bearerTokenSecret.key' "$TMP/servicemonitor-sem-chave.log"
 
 helm template frequenciapp "$CHART" \
   --namespace frequenciapp \
