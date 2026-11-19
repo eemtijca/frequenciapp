@@ -107,6 +107,21 @@ O Prometheus já aponta para `alertmanager:9093` no bloco `alerting`. Com o perf
 
 No perfil com controlador, a ativação do perfil altera o conjunto de serviços e deve ser tratada como mudança de topologia, com readoção revisada.
 
+### Segredos e conteúdo dos alertas
+
+O host guarda o receptor apenas no `ops.env`, fora do Git. O entrypoint do Alertmanager grava os valores sensíveis em arquivos restritos dentro do contêiner e a configuração gerada referencia esses arquivos:
+
+| Arquivo                           | Modo | Uso                                                         |
+| --------------------------------- | ---- | ----------------------------------------------------------- |
+| `/tmp/alertmanager-webhook-url`   | 600  | URL do webhook, referenciada por `url_file`.                |
+| `/tmp/alertmanager-webhook-token` | 600  | Token Bearer opcional, referenciado por `credentials_file`. |
+| `/tmp/alertmanager-smtp-password` | 600  | Senha SMTP, referenciada por `smtp_auth_password_file`.     |
+| `/tmp/alertmanager.yml`           | 600  | Configuração gerada, sem valor secreto.                     |
+
+Os campos não secretos (`smtp_from`, `smtp_smarthost`, `smtp_auth_username` e `email.to`) entram na configuração por substituição de texto. Nenhum valor secreto passa por argumento de `sed` ou de outro processo externo. A configuração gerada é validada com `amtool check-config` antes de o serviço iniciar.
+
+As métricas de host guardam `device`, `fstype` e `mountpoint` no armazenamento local do Prometheus. O alerta `FrequenciappDiscoBaixo` agrega por `instance` e `job`, e a descrição padrão não inclui o caminho do ponto de montagem. A notificação leva o nome do alerta, a gravidade, as anotações e rótulos operacionais de alvo, como `instance` e `job`; `device`, `fstype` e `mountpoint` ficam apenas na série local. Nenhum alerta inclui dado de aluno, conta ou escola.
+
 ### Validar
 
 ```bash
@@ -135,6 +150,7 @@ Os comandos com `scripts/servidor/compose.sh exec` valem para o perfil simples. 
 | `OBSERVABILIDADE_HABILITADA` | ops.env | `false` em instalações existentes, `true` em novas | Inclui `compose.observabilidade.yml` no projeto Compose.                                                                |
 | `PROMETHEUS_PORTA`           | ops.env | `9090`                                             | Porta do painel no loopback do host. Precisa estar livre e não é aberta no firewall.                                    |
 | `ALERTA_WEBHOOK_URL`         | ops.env | vazio                                              | Receptor webhook do Alertmanager. Segredo. Exige `http://` ou `https://` e não aceita espaços.                          |
+| `ALERTA_WEBHOOK_TOKEN`       | ops.env | vazio                                              | Token Bearer opcional do webhook. Segredo. Exige `ALERTA_WEBHOOK_URL` e não aceita espaços.                             |
 | `ALERTA_EMAIL_PARA`          | ops.env | vazio                                              | Destinatário do receptor de e-mail.                                                                                     |
 | `ALERTA_EMAIL_DE`            | ops.env | vazio                                              | Remetente do receptor de e-mail.                                                                                        |
 | `ALERTA_SMTP_SMARTHOST`      | ops.env | vazio                                              | Servidor SMTP no formato `host:porta`.                                                                                  |
@@ -145,7 +161,9 @@ Os comandos com `scripts/servidor/compose.sh exec` valem para o perfil simples. 
 
 Sem `METRICAS_TOKEN`, a rota responde 404. Com token diferente do configurado, responde 401. Com o token correto, responde 200.
 
-O Alertmanager aceita apenas um receptor por vez: o webhook em `ALERTA_WEBHOOK_URL` ou o conjunto completo de `ALERTA_EMAIL_PARA`, `ALERTA_EMAIL_DE`, `ALERTA_SMTP_SMARTHOST`, `ALERTA_SMTP_USUARIO` e `ALERTA_SMTP_SENHA`. Com os dois configurados, ou com o conjunto de e-mail incompleto, o contêiner encerra com mensagem explícita e não inicia. O conjunto `ALERTA_*` é configuração sensível e fica no `ops.env` com modo 600 ou 640, fora do Git. O webhook e a senha SMTP são segredos de custódia equivalente à do token de métricas.
+O Alertmanager aceita apenas um receptor por vez: o webhook em `ALERTA_WEBHOOK_URL` ou o conjunto completo de `ALERTA_EMAIL_PARA`, `ALERTA_EMAIL_DE`, `ALERTA_SMTP_SMARTHOST`, `ALERTA_SMTP_USUARIO` e `ALERTA_SMTP_SENHA`. Com os dois configurados, ou com o conjunto de e-mail incompleto, o contêiner encerra com mensagem explícita e não inicia. O conjunto `ALERTA_*` é configuração sensível e fica no `ops.env` com modo 600 ou 640, fora do Git. O webhook, o token opcional e a senha SMTP são segredos de custódia equivalente à do token de métricas.
+
+O `ALERTA_WEBHOOK_TOKEN` é opcional e só vale com o receptor webhook. Com ele, o Alertmanager envia `Authorization: Bearer` ao destino. O token não substitui a URL e não pode ser configurado sozinho.
 
 O receptor de e-mail usa TLS (`smtp_require_tls: true` e `require_tls: true`). O servidor SMTP precisa aceitar a autenticação e o remetente configurados.
 
@@ -453,23 +471,27 @@ Não abrir o painel no firewall nem publicá-lo em Caddy, Nginx ou CDN. A ponte 
 
 ## Alertas
 
-As onze regras ficam em `infra/observabilidade/prometheus/regras.yml`.
+As treze regras ficam em `infra/observabilidade/prometheus/regras.yml`.
 
-| Alerta                                     | Condição                                                     | Tempo  | Gravidade |
-| ------------------------------------------ | ------------------------------------------------------------ | ------ | --------- |
-| `FrequenciappIndisponivel`                 | `up{job="frequenciapp"} == 0`                                | 2 min  | critical  |
-| `FrequenciappErros5xx`                     | Proporção de 5xx acima de 5% no intervalo de 5 minutos.      | 10 min | warning   |
-| `FrequenciappLatenciaP95`                  | p95 acima de 5 segundos no intervalo de 5 minutos.           | 10 min | warning   |
-| `FrequenciappPoolAguardando`               | `frequenciapp_db_pool_connections{state="waiting"} > 0`.     | 10 min | warning   |
-| `FrequenciappFilaPlanilhaParada`           | Item aberto mais antigo acima de 1 hora, com fila não vazia. | 10 min | warning   |
-| `FrequenciappDiscoBaixo`                   | Espaço livre abaixo de 15% em um sistema de arquivos.        | 15 min | warning   |
-| `FrequenciappMemoriaBaixa`                 | Memória disponível abaixo de 10% no host.                    | 10 min | warning   |
-| `FrequenciappSondaHttps`                   | `probe_success{job="blackbox"} == 0`.                        | 5 min  | critical  |
-| `FrequenciappCertificadoExpirando`         | Certificado expira em menos de 14 dias.                      | 1 h    | warning   |
-| `FrequenciappAlertmanagerFalhaNotificacao` | Falha de notificação no receptor nos últimos 10 minutos.     | 10 min | warning   |
-| `FrequenciappBackupAtrasado`               | Último backup verificado há mais de 24 horas.                | 1 h    | warning   |
+| Alerta                                     | Condição                                                                       | Tempo  | Gravidade |
+| ------------------------------------------ | ------------------------------------------------------------------------------ | ------ | --------- |
+| `FrequenciappIndisponivel`                 | `up{job="frequenciapp"} == 0`                                                  | 2 min  | critical  |
+| `FrequenciappErros5xx`                     | Proporção de 5xx acima de 5% no intervalo de 5 minutos.                        | 10 min | warning   |
+| `FrequenciappLatenciaP95`                  | p95 acima de 5 segundos no intervalo de 5 minutos.                             | 10 min | warning   |
+| `FrequenciappPoolAguardando`               | `frequenciapp_db_pool_connections{state="waiting"} > 0`.                       | 10 min | warning   |
+| `FrequenciappFilaPlanilhaParada`           | Item aberto mais antigo acima de 1 hora, com fila não vazia.                   | 10 min | warning   |
+| `FrequenciappDiscoBaixo`                   | Espaço livre abaixo de 15% em um sistema de arquivos, agregado por instância.  | 15 min | warning   |
+| `FrequenciappMemoriaBaixa`                 | Memória disponível abaixo de 10% no host.                                      | 10 min | warning   |
+| `FrequenciappSondaHttps`                   | `probe_success{job="blackbox"} == 0`.                                          | 5 min  | critical  |
+| `FrequenciappSondaColetorIndisponivel`     | `up{job="blackbox"} == 0`.                                                     | 5 min  | critical  |
+| `FrequenciappSondaSemAmostra`              | `absent(probe_success{job="blackbox"}) and on(job) (up{job="blackbox"} == 1)`. | 10 min | warning   |
+| `FrequenciappCertificadoExpirando`         | Certificado expira em menos de 14 dias.                                        | 1 h    | warning   |
+| `FrequenciappAlertmanagerFalhaNotificacao` | Falha de notificação no receptor nos últimos 10 minutos.                       | 10 min | warning   |
+| `FrequenciappBackupAtrasado`               | Último backup verificado há mais de 24 horas.                                  | 1 h    | warning   |
 
-As cinco primeiras regras vêm da fase 1 e cobrem a aplicação. A fase 2 acrescentou as regras de disco e memória, as duas de sonda e certificado, a de falha de notificação e a de atraso do backup.
+As cinco primeiras regras vêm da fase 1 e cobrem a aplicação. A fase 2 acrescentou as regras de disco e memória, as três de sonda e certificado, a de falha de notificação e a de atraso do backup.
+
+As três regras da sonda separam o estado do coletor do estado do site. `FrequenciappSondaColetorIndisponivel` dispara quando o blackbox exporter não responde à coleta por 5 minutos. `FrequenciappSondaSemAmostra` dispara quando o coletor está no ar, mas não publica `probe_success` por 10 minutos. `FrequenciappSondaHttps` dispara quando a sonda executou e não obteve resposta 200 por 5 minutos. Uma falha da sonda não afirma que o site está fora do ar: ela indica que o alvo não respondeu 200 pela rota e pelo certificado observados.
 
 A entrega depende do Alertmanager, que é opt-in. O bloco `alerting` do `prometheus.yml` aponta para `alertmanager:9093`; o Alertmanager agrupa por `alertname`, espera 30 segundos para o primeiro envio, repete o grupo a cada 5 minutos e reenvia um alerta ainda ativo a cada 4 horas. As notificações de resolução também são enviadas, porque o receptor usa `send_resolved: true`.
 
@@ -520,8 +542,9 @@ O restante da observabilidade continua funcionando. O alvo `alertmanager:9093` v
 - O Prometheus fica apenas na rede `interna`, sem portas publicadas e sem saída para a internet. A ponte `prometheus-ui` usa `interna` e `painel`, sem `publica`; a rede `painel` é uma bridge comum usada somente para a publicação no loopback. A rede `publica` não alcança o painel.
 - O node exporter monta o sistema de arquivos do host somente leitura em `/host`, usa `pid: host` e roda com `cap_drop: ALL` e `no-new-privileges`.
 - O blackbox exporter não recebe credenciais. A sonda usa `/api/saude`, que é pública por projeto, e não envia token.
-- O receptor do Alertmanager fica apenas no `ops.env`, fora do Git. O webhook e a senha SMTP são segredos.
-- O entrypoint do Alertmanager aplica `umask 077`, grava a configuração gerada em `/tmp/alertmanager.yml`, valida com `amtool check-config` e não exibe a saída do `amtool` para não registrar valores do receptor.
+- O receptor do Alertmanager fica apenas no `ops.env`, fora do Git. O webhook, o token opcional e a senha SMTP são segredos.
+- O entrypoint do Alertmanager aplica `umask 077`, grava a URL do webhook, o token opcional e a senha SMTP em arquivos com modo 600 e referencia esses arquivos por `url_file`, `http_config.authorization.credentials_file` e `smtp_auth_password_file`. Nenhum segredo passa por argumento de processo externo.
+- O entrypoint do Alertmanager grava a configuração gerada em `/tmp/alertmanager.yml`, valida com `amtool check-config` e não exibe a saída do `amtool` para não registrar valores do receptor.
 - O Alertmanager entra na rede `publica` apenas para alcançar o webhook ou o SMTP. Não há porta publicada, e o acesso ao serviço continua restrito às redes do projeto.
 - A ponte `prometheus-ui` publica somente `127.0.0.1:${PROMETHEUS_PORTA:-9090}` e encaminha apenas para `prometheus:9090`. Ela roda sem privilégios, com `cap_drop: ALL`, `no-new-privileges` e sistema de arquivos somente leitura. A ponte está em `interna` e `painel`, e a rede `publica` não alcança a escuta 9090.
 - Caddy e Nginx respondem 404 para `/api/metricas` antes do proxy. O bloqueio público não depende do token.
@@ -536,6 +559,8 @@ O restante da observabilidade continua funcionando. O alvo `alertmanager:9093` v
 ## LGPD
 
 As métricas são operacionais, locais e agregadas. Elas registram requisições por padrão de rota, status, duração, conexões do pool, latência de consultas, contagens da fila, salvamentos de frequência, conflitos de revisão, itens processados e avisos da agenda. Também registram CPU, memória, disco, sistemas de arquivos, disponibilidade da sonda HTTPS, validade do certificado, falhas de notificação e o instante do último backup verificado. Não contêm dados de alunos, de contas ou de escolas.
+
+As métricas de host podem conter `device`, `fstype` e `mountpoint` no armazenamento local do Prometheus. A notificação padrão do alerta de disco não leva o caminho do ponto de montagem: a regra agrega por `instance` e `job` e a descrição não cita o caminho.
 
 O Prometheus roda na infraestrutura da escola, sem telemetria de terceiros. O histórico de 15 dias fica no volume `prometheus_data`, e o Alertmanager guarda silêncios e estado de notificação em `alertmanager_data`. Os dois volumes ficam fora do backup e podem ser descartados sem perda de dados escolares. O painel é restrito ao loopback do servidor, com acesso local ou túnel administrativo temporário.
 
@@ -575,7 +600,28 @@ Um 404 no alvo `frequenciapp` indica que a aplicação está sem `METRICAS_TOKEN
 3. Conferir `frequenciapp_coleta_erros_total{coletor="fila"}`.
 4. Conferir a Fila de envios na Gestão e os logs da aplicação.
 
-### Sonda HTTPS falhando
+### Coletor da sonda indisponível
+
+Quando `up{job="blackbox"}` vale `0` por 5 minutos, o alerta `FrequenciappSondaColetorIndisponivel` dispara com gravidade `critical`:
+
+1. Conferir `up{job="blackbox"}` e o último erro do alvo `blackbox` em `/targets`.
+2. Conferir `scripts/servidor/compose.sh ps` e a saúde do serviço `blackbox-exporter`.
+3. Conferir os logs com `scripts/servidor/compose.sh logs --tail 200 blackbox-exporter`.
+4. Conferir se o alvo `blackbox-exporter:9115` está na rede `interna`.
+5. Enquanto o coletor estiver fora do ar, `probe_success` não é atualizado e o estado do site não pode ser confirmado.
+
+### Sonda sem amostra
+
+Quando `up{job="blackbox"}` vale `1`, mas `probe_success{job="blackbox"}` não existe por 10 minutos, o alerta `FrequenciappSondaSemAmostra` dispara com gravidade `warning`. A janela é maior porque a primeira coleta pode demorar depois de uma reinicialização.
+
+1. Conferir em `/targets` se o alvo `blackbox` está saudável e se a coleta tem sucesso.
+2. Conferir `probe_success{job="blackbox"}` em `/graph` e a última amostra recebida.
+3. Conferir `DOMINIO`, o alias `proxy` na rede `publica` e o alvo `https://proxy:443/api/saude` no `prometheus.yml`.
+4. Conferir os logs do blackbox exporter e reiniciar o serviço se a sonda estiver travada.
+
+### Sonda sem resposta 200
+
+Quando `probe_success{job="blackbox"}` vale `0` por 5 minutos, o alerta `FrequenciappSondaHttps` dispara com gravidade `critical`. A mensagem indica apenas que a sonda não obteve 200: a causa pode ser o serviço, o proxy ou a própria sonda.
 
 1. Conferir `probe_success{job="blackbox"}` e o último erro do alvo `blackbox` em `/targets`.
 2. Conferir se o `DOMINIO` está correto em `/etc/frequenciapp/ops.env` e se o proxy declara o alias `proxy` na rede `publica`.
@@ -615,7 +661,8 @@ Um 404 no alvo `frequenciapp` indica que a aplicação está sem `METRICAS_TOKEN
 4. Conferir `rate(alertmanager_notifications_failed_total{job="alertmanager"}[10m])` e os rótulos `integration` e `reason` com falha.
 5. Conferir os logs com `scripts/servidor/compose.sh --profile alertas logs --tail 200 alertmanager`.
 6. Conferir o webhook ou o servidor SMTP, a autenticação, a porta e a saída de rede pela rede `publica`.
-7. Um alerta silenciado não é notificado. Conferir a lista de silêncios antes de concluir que a entrega falhou.
+7. Conferir `url_file`, `credentials_file` e `smtp_auth_password_file` na configuração gerada em `/tmp/alertmanager.yml` e os arquivos de segredo com modo 600.
+8. Um alerta silenciado não é notificado. Conferir a lista de silêncios antes de concluir que a entrega falhou.
 
 ### Validar configuração e regras
 
@@ -627,11 +674,13 @@ scripts/servidor/compose.sh exec -T prometheus promtool check rules /etc/prometh
 scripts/servidor/compose.sh --profile alertas exec alertmanager amtool check-config /tmp/alertmanager.yml
 ```
 
-A validação do repositório roda as mesmas conferências com as imagens fixadas:
+A validação do repositório roda as mesmas conferências com as imagens fixadas e acrescenta `promtool test rules` com séries sintéticas de sucesso, falha, coletor fora do ar, ausência de amostra, recuperação e perfil de alertas desligado:
 
 ```bash
 pnpm run servidor:validar
 ```
+
+O arquivo `infra/observabilidade/prometheus/regras.test.yml` concentra esses casos. Ele não contém dados reais e usa apenas séries sintéticas.
 
 ### Logs
 

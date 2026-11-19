@@ -76,6 +76,7 @@ infra/observabilidade/
   prometheus/
     prometheus.yml
     regras.yml
+    regras.test.yml
     entrypoint.sh
   blackbox/
     blackbox.yml
@@ -147,13 +148,14 @@ A coleta e o painel são opcionais e não sobem em instalações existentes sem 
 | `OBSERVABILIDADE_HABILITADA` | `false` em instalações existentes, `true` em novas | Inclui `compose.observabilidade.yml` no projeto Compose. |
 | `PROMETHEUS_PORTA`           | `9090`                                             | Porta do painel no loopback do host.                     |
 | `ALERTA_WEBHOOK_URL`         | vazio                                              | Receptor webhook do Alertmanager. Segredo.               |
+| `ALERTA_WEBHOOK_TOKEN`       | vazio                                              | Token Bearer opcional do webhook. Segredo.               |
 | `ALERTA_EMAIL_PARA`          | vazio                                              | Destinatário do receptor de e-mail.                      |
 | `ALERTA_EMAIL_DE`            | vazio                                              | Remetente do receptor de e-mail.                         |
 | `ALERTA_SMTP_SMARTHOST`      | vazio                                              | Servidor SMTP no formato `host:porta`.                   |
 | `ALERTA_SMTP_USUARIO`        | vazio                                              | Usuário de autenticação do SMTP.                         |
 | `ALERTA_SMTP_SENHA`          | vazio                                              | Senha de autenticação do SMTP. Segredo.                  |
 
-O node exporter e o blackbox exporter sobem com a observabilidade. O Alertmanager é opt-in pelo perfil Compose `alertas` e aceita apenas um receptor por vez: o webhook ou o conjunto completo de e-mail. As variáveis `ALERTA_*` ficam no `ops.env`, e o webhook e a senha SMTP são segredos.
+O node exporter e o blackbox exporter sobem com a observabilidade. O Alertmanager é opt-in pelo perfil Compose `alertas` e aceita apenas um receptor por vez: o webhook ou o conjunto completo de e-mail. As variáveis `ALERTA_*` ficam no `ops.env`, e o webhook, o token opcional e a senha SMTP são segredos. O entrypoint grava esses valores em arquivos com modo 600 em `/tmp` e usa os campos nativos `url_file`, `http_config.authorization.credentials_file` e `smtp_auth_password_file`, sem segredo em argumento de processo. O detalhamento está em [observabilidade.md](observabilidade.md#segredos-e-conteúdo-dos-alertas).
 
 ### Proxy e TLS
 
@@ -523,11 +525,12 @@ O chart Helm aceita `agenda.timeZone`, `agenda.timeoutSeconds`, `backup.database
 - Monitorar espaço em disco do banco, dos logs e do backup, pela regra `FrequenciappDiscoBaixo`.
 - Revisar a agenda do GitHub quando ela for usada na nuvem.
 - Com a observabilidade ligada, seguir [observabilidade.md](observabilidade.md). O painel do Prometheus reúne `/targets`, `/alerts` e `/rules`.
-- Conferir `up{job="frequenciapp"}`, `up{job="node-exporter"}`, `up{job="blackbox"}` e, com o perfil `alertas`, `up{job="alertmanager"}` em `1`.
+- Conferir `up{job="frequenciapp"}`, `up{job="node-exporter"}` e `up{job="blackbox"}` em `1` e, com o perfil `alertas`, `up{job="alertmanager"}` em `1`.
 - Conferir `probe_success{job="blackbox"}` em `1` e os dias restantes em `probe_ssl_earliest_cert_expiry`.
+- Separar a falha da sonda do estado do site: `up{job="blackbox"}` fora do ar, `probe_success` ausente e `probe_success` igual a `0` têm regras e janelas próprias.
 - Conferir a idade do item aberto mais antigo da fila e a idade do último backup verificado.
 
-As onze regras cobrem indisponibilidade, erros 5xx, latência, pool, fila, disco, memória, sonda HTTPS, certificado, falha de notificação e atraso do backup. Sem o perfil `alertas`, o alerta aparece apenas no painel. A tabela completa está em [observabilidade.md](observabilidade.md#alertas).
+As treze regras cobrem indisponibilidade, erros 5xx, latência, pool, fila, disco, memória, sonda HTTPS, coletor da sonda, ausência de amostra, certificado, falha de notificação e atraso do backup. Sem o perfil `alertas`, o alerta aparece apenas no painel. A tabela completa está em [observabilidade.md](observabilidade.md#alertas).
 
 ### Validar a observabilidade
 
@@ -536,9 +539,10 @@ As onze regras cobrem indisponibilidade, erros 5xx, latência, pool, fila, disco
 3. Com o perfil `alertas`, o alvo `alertmanager` também deve aparecer em `/targets`. Sem o perfil, ele aparece fora do ar e nenhuma regra dispara por isso.
 4. `ss -lntp | grep 9090` deve mostrar `127.0.0.1:9090`, nunca `0.0.0.0:9090`.
 5. A coleta com o token do ambiente deve devolver `200` e linhas `frequenciapp_`, conforme o comando do guia.
-6. A consulta `probe_success{job="blackbox"}` deve devolver `1`, e `probe_ssl_earliest_cert_expiry` deve estar presente.
+6. As consultas `up{job="blackbox"}` e `probe_success{job="blackbox"}` devem devolver `1`, e `probe_ssl_earliest_cert_expiry` deve estar presente.
 7. Depois do primeiro backup verificado, `frequenciapp_backup_ultimo_sucesso_timestamp_seconds` deve aparecer com o instante do backup.
 8. Com o perfil `alertas`, `alertmanager_notifications_failed_total` deve estar disponível e o teste com `amtool alert add` deve chegar ao receptor.
+9. `pnpm run servidor:validar` deve passar, incluindo `promtool test rules` com as séries sintéticas de sonda e coletor.
 
 A matriz de respostas de `/api/metricas` é: borda pública, Caddy ou Nginx, 404 antes do proxy; rota interna sem `METRICAS_TOKEN` configurado, 404; token ausente ou errado, 401; token correto, 200 com `text/plain; version=0.0.4; charset=utf-8` e `Cache-Control: no-store`; falha de coleta, 503 com corpo JSON curto. O detalhamento está em [observabilidade.md](observabilidade.md#respostas-da-rota). A rota continua fora do OpenAPI público.
 
@@ -547,6 +551,7 @@ A matriz de respostas de `/api/metricas` é: borda pública, Caddy ou Nginx, 404
 - Manter `PERMITIR_HTTP=false` com TLS.
 - Não publicar as portas 3000 e 5432.
 - Proteger `app.env`, `ops.env` e `rclone.conf` com permissão 600 ou 640.
+- O receptor do Alertmanager usa arquivos com modo 600 em `/tmp` e campos nativos `url_file`, `credentials_file` e `smtp_auth_password_file`. Nenhum segredo vai para argumento de processo externo.
 - Guardar a chave privada GPG ou age fora do servidor.
 - Não usar a senha padrão `frequencia` em produção.
 - Executar o backup com a conta de implantação, não como root.
@@ -692,8 +697,23 @@ Não editar o checksum em `_prisma_migrations`, não remover linhas do históric
 - Conferir os logs com `scripts/servidor/compose.sh logs --tail 200 prometheus`.
 - Validar configuração e regras com `promtool`, conforme [observabilidade.md](observabilidade.md#validar-configuração-e-regras).
 
-### Sonda HTTPS falhando
+### Coletor da sonda indisponível
 
+- Quando `up{job="blackbox"}` vale `0` por 5 minutos, o alerta `FrequenciappSondaColetorIndisponivel` dispara com gravidade `critical`.
+- Conferir `scripts/servidor/compose.sh ps` e os logs com `scripts/servidor/compose.sh logs --tail 200 blackbox-exporter`.
+- Conferir o alvo `blackbox-exporter:9115` na rede `interna` e o último erro em `/targets`.
+- Enquanto o coletor estiver fora do ar, `probe_success` não é atualizado e o estado do site não pode ser confirmado.
+
+### Sonda sem amostra
+
+- Quando `up{job="blackbox"}` vale `1`, mas `probe_success{job="blackbox"}` não existe por 10 minutos, o alerta `FrequenciappSondaSemAmostra` dispara com gravidade `warning`.
+- Conferir em `/targets` se o alvo `blackbox` está saudável e se a coleta tem sucesso.
+- Conferir `probe_success{job="blackbox"}` em `/graph` e a última amostra recebida.
+- Conferir `DOMINIO`, o alias `proxy` e o alvo `https://proxy:443/api/saude` no `prometheus.yml`.
+
+### Sonda sem resposta 200
+
+- Quando `probe_success{job="blackbox"}` vale `0` por 5 minutos, o alerta `FrequenciappSondaHttps` dispara com gravidade `critical`. A mensagem não afirma que o site está fora do ar: a falha pode ser do serviço, do proxy ou da sonda.
 - Conferir `probe_success{job="blackbox"}` e o último erro do alvo `blackbox` em `/targets`.
 - Conferir o `DOMINIO` em `/etc/frequenciapp/ops.env` e o alias `proxy` na rede `publica` do Caddy ou do Nginx.
 - Conferir `probe_http_status_code` para separar recusa, tempo limite e status inesperado.
@@ -730,6 +750,7 @@ Não editar o checksum em `_prisma_migrations`, não remover linhas do históric
 - Conferir `rate(alertmanager_notifications_failed_total{job="alertmanager"}[10m])` e os rótulos `integration` e `reason`.
 - Conferir os logs com `scripts/servidor/compose.sh --profile alertas logs --tail 200 alertmanager`.
 - Conferir o webhook ou o SMTP, a autenticação, a porta e a saída pela rede `publica`.
+- Conferir `url_file`, `credentials_file` e `smtp_auth_password_file` na configuração gerada em `/tmp/alertmanager.yml` e os arquivos de segredo com modo 600.
 - Um alerta silenciado não é notificado. Conferir a lista de silêncios antes de concluir que a entrega falhou.
 
 ## Identidade operacional

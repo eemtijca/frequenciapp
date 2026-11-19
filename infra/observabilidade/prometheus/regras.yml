@@ -65,16 +65,18 @@ groups:
       - alert: FrequenciappDiscoBaixo
         expr: |
           (
-            node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs|overlay|squashfs",mountpoint!~"/var/lib/docker/.+"}
-            /
-            node_filesystem_size_bytes{fstype!~"tmpfs|ramfs|overlay|squashfs",mountpoint!~"/var/lib/docker/.+"}
+            min by (instance, job) (
+              node_filesystem_avail_bytes{fstype!~"tmpfs|ramfs|overlay|squashfs",mountpoint!~"/var/lib/docker/.+"}
+              /
+              node_filesystem_size_bytes{fstype!~"tmpfs|ramfs|overlay|squashfs",mountpoint!~"/var/lib/docker/.+"}
+            )
           ) < 0.15
         for: 15m
         labels:
           severity: warning
         annotations:
           summary: "Espaço em disco abaixo de 15%."
-          description: "O sistema de arquivos {{ $labels.mountpoint }} está com menos de 15% livre há mais de 15 minutos."
+          description: "Um sistema de arquivos do host está com menos de 15% livre há mais de 15 minutos. O caminho do ponto de montagem fica apenas na métrica local."
 
       - alert: FrequenciappMemoriaBaixa
         expr: |
@@ -97,7 +99,25 @@ groups:
           severity: critical
         annotations:
           summary: "A sonda HTTPS do FrequenciApp falhou."
-          description: "O alvo https://proxy:443/api/saude não respondeu 200 há mais de 5 minutos."
+          description: "A sonda não obteve resposta 200 do alvo https://proxy:443/api/saude há mais de 5 minutos. A falha pode ser do serviço observado, do proxy ou da própria sonda."
+
+      - alert: FrequenciappSondaColetorIndisponivel
+        expr: up{job="blackbox"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "O coletor da sonda HTTPS está indisponível."
+          description: "O blackbox exporter não responde à coleta há mais de 5 minutos. O estado do site não pode ser confirmado enquanto o coletor estiver fora do ar."
+
+      - alert: FrequenciappSondaSemAmostra
+        expr: absent(probe_success{job="blackbox"}) and on(job) (up{job="blackbox"} == 1)
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "A sonda HTTPS está sem amostra."
+          description: "O coletor blackbox está no ar, mas não publicou probe_success há mais de 10 minutos. A sonda pode estar travada ou sem alvo."
 
       - alert: FrequenciappCertificadoExpirando
         expr: (probe_ssl_earliest_cert_expiry{job="blackbox"} - time()) < 14 * 24 * 3600

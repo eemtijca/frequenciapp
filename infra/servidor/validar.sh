@@ -107,6 +107,15 @@ docker run --rm --user "$(id -u):$(id -g)" \
   prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06 \
   check rules /etc/prometheus/regras.yml
 
+# As séries sintéticas cobrem sonda com sucesso, falha, coletor fora do ar,
+# ausência de amostra, recuperação e perfil de alertas desligado.
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$REPO/infra/observabilidade/prometheus:/etc/prometheus:ro" \
+  -w /etc/prometheus \
+  --entrypoint /bin/promtool \
+  prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06 \
+  test rules /etc/prometheus/regras.test.yml
+
 # O blackbox não expande variáveis no YAML: a cópia temporária prova o domínio real.
 sed "s|__DOMINIO__|$DOMINIO|g" \
   "$REPO/infra/observabilidade/blackbox/blackbox.yml" >"$tmp/blackbox.yml"
@@ -118,22 +127,78 @@ docker run --rm --user "$(id -u):$(id -g)" \
   prom/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13 \
   --config.check --config.file=/etc/blackbox_exporter/blackbox.yml
 
+entrypoint_alertmanager="$REPO/infra/observabilidade/alertmanager/entrypoint.sh"
+grep -Fq 'smtp_auth_password_file: /tmp/alertmanager-smtp-password' "$entrypoint_alertmanager"
+grep -Fq 'url_file: /tmp/alertmanager-webhook-url' \
+  "$REPO/infra/observabilidade/alertmanager/alertmanager.yml"
+grep -Fq 'credentials_file: /tmp/alertmanager-webhook-token' "$entrypoint_alertmanager"
+if grep -Fq 'smtp_auth_password:' "$entrypoint_alertmanager"; then
+  echo "O entrypoint do Alertmanager não pode gravar a senha SMTP na configuração." >&2
+  exit 1
+fi
+
+trechos_sed="$(sed -n '/^[[:space:]]*sed /,/alertmanager\.yml/p' "$entrypoint_alertmanager")"
+if printf '%s\n' "$trechos_sed" | grep -Eq '\$(smtp_senha|webhook|webhook_token)'; then
+  echo "O entrypoint do Alertmanager não pode passar segredos em argumento do sed." >&2
+  exit 1
+fi
+
+regra_disco="$(awk '/alert: FrequenciappDiscoBaixo/{ativa=1} ativa{print} ativa && /^$/{exit}' \
+  "$REPO/infra/observabilidade/prometheus/regras.yml")"
+if printf '%s\n' "$regra_disco" | grep -Fq '{{ $labels.mountpoint }}'; then
+  echo "O alerta de disco não pode incluir o ponto de montagem na descrição." >&2
+  exit 1
+fi
+grep -Fq 'alert: FrequenciappSondaColetorIndisponivel' \
+  "$REPO/infra/observabilidade/prometheus/regras.yml"
+grep -Fq 'alert: FrequenciappSondaSemAmostra' \
+  "$REPO/infra/observabilidade/prometheus/regras.yml"
+grep -Fq 'absent(probe_success{job="blackbox"}) and on(job) (up{job="blackbox"} == 1)' \
+  "$REPO/infra/observabilidade/prometheus/regras.yml"
+
+# O modelo e as configurações geradas nos dois modos usam apenas campos nativos
+# de arquivo para os segredos.
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$REPO/infra/observabilidade/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro" \
   --entrypoint /bin/amtool \
   prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c \
   check-config /etc/alertmanager/alertmanager.yml
 
+mkdir -p "$tmp/alertmanager-webhook" "$tmp/alertmanager-email"
+chmod 700 "$tmp/alertmanager-webhook" "$tmp/alertmanager-email"
+
 # Os receptores abaixo são sintéticos. O --version valida a geração e encerra sem iniciar o serviço.
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$REPO/infra/observabilidade/alertmanager:/etc/alertmanager:ro" \
+  -v "$tmp/alertmanager-webhook:/tmp" \
   -e ALERTA_WEBHOOK_URL="https://monitor.exemplo.br/frequenciapp" \
+  -e ALERTA_WEBHOOK_TOKEN="token-sintetico-de-validacao" \
   --entrypoint /bin/sh \
   prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c \
   /etc/alertmanager/entrypoint.sh --version >/dev/null
 
+config_webhook="$tmp/alertmanager-webhook/alertmanager.yml"
+grep -Fq 'url_file: /tmp/alertmanager-webhook-url' "$config_webhook"
+grep -Fq 'credentials_file: /tmp/alertmanager-webhook-token' "$config_webhook"
+[ "$(stat -c '%a' "$tmp/alertmanager-webhook/alertmanager-webhook-url")" = "600" ]
+[ "$(stat -c '%a' "$tmp/alertmanager-webhook/alertmanager-webhook-token")" = "600" ]
+[ "$(cat "$tmp/alertmanager-webhook/alertmanager-webhook-url")" = "https://monitor.exemplo.br/frequenciapp" ]
+[ "$(cat "$tmp/alertmanager-webhook/alertmanager-webhook-token")" = "token-sintetico-de-validacao" ]
+if grep -Fq 'monitor.exemplo.br' "$config_webhook" ||
+  grep -Fq 'token-sintetico-de-validacao' "$config_webhook"; then
+  echo "A configuração do webhook não pode conter a URL ou o token em texto." >&2
+  exit 1
+fi
+
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$tmp/alertmanager-webhook:/config:ro" \
+  --entrypoint /bin/amtool \
+  prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c \
+  check-config /config/alertmanager.yml
+
 docker run --rm --user "$(id -u):$(id -g)" \
   -v "$REPO/infra/observabilidade/alertmanager:/etc/alertmanager:ro" \
+  -v "$tmp/alertmanager-email:/tmp" \
   -e ALERTA_EMAIL_PARA="coordenacao@escola.exemplo.br" \
   -e ALERTA_EMAIL_DE="frequenciapp@escola.exemplo.br" \
   -e ALERTA_SMTP_SMARTHOST="smtp.escola.exemplo.br:587" \
@@ -142,6 +207,22 @@ docker run --rm --user "$(id -u):$(id -g)" \
   --entrypoint /bin/sh \
   prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c \
   /etc/alertmanager/entrypoint.sh --version >/dev/null
+
+config_email="$tmp/alertmanager-email/alertmanager.yml"
+grep -Fq 'smtp_auth_password_file: /tmp/alertmanager-smtp-password' "$config_email"
+[ "$(stat -c '%a' "$tmp/alertmanager-email/alertmanager-smtp-password")" = "600" ]
+[ "$(cat "$tmp/alertmanager-email/alertmanager-smtp-password")" = "senha-sintetica-de-validacao" ]
+if grep -Fq 'smtp_auth_password:' "$config_email" ||
+  grep -Fq 'senha-sintetica-de-validacao' "$config_email"; then
+  echo "A configuração de e-mail não pode conter a senha em texto." >&2
+  exit 1
+fi
+
+docker run --rm --user "$(id -u):$(id -g)" \
+  -v "$tmp/alertmanager-email:/config:ro" \
+  --entrypoint /bin/amtool \
+  prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c \
+  check-config /config/alertmanager.yml
 
 # A integração adapta os três modos e prova TLS sem SNI com CA sintética, sem rede externa.
 setpriv --no-new-privs node "$REPO/tests/servidor/caddy-integracao.mjs"

@@ -244,6 +244,8 @@ describe("servidor auto-hospedado", () => {
     expect(validar).toContain('-v "$REPO/infra/observabilidade/prometheus:/etc/prometheus:ro"');
     expect(validar).toContain("check config /etc/prometheus/prometheus.yml");
     expect(validar).toContain("check rules /etc/prometheus/regras.yml");
+    expect(validar).toContain("test rules /etc/prometheus/regras.test.yml");
+    expect(validar).toContain("-w /etc/prometheus");
     expect(validar).toContain('-v "$tmp/metricas-token:/tmp/metricas-token:ro"');
     expect(validar).toContain('printf \'%s\' "$METRICAS_TOKEN" >"$tmp/metricas-token"');
     expect(validar).not.toMatch(/echo[^\n]*METRICAS_TOKEN/);
@@ -369,10 +371,56 @@ describe("servidor auto-hospedado", () => {
     expect(prometheus).toContain("replacement: blackbox-exporter:9115");
 
     expect(regras).toContain("alert: FrequenciappSondaHttps");
+    expect(regras).toContain("alert: FrequenciappSondaColetorIndisponivel");
+    expect(regras).toContain("alert: FrequenciappSondaSemAmostra");
     expect(regras).toContain("alert: FrequenciappCertificadoExpirando");
     expect(regras).toContain('probe_success{job="blackbox"} == 0');
+    expect(regras).toContain('up{job="blackbox"} == 0');
+    expect(regras).toContain(
+      'absent(probe_success{job="blackbox"}) and on(job) (up{job="blackbox"} == 1)',
+    );
+    expect(regras).toContain("A sonda não obteve resposta 200");
     expect(regras).toContain("probe_ssl_earliest_cert_expiry");
     expect(regras).toContain("14 * 24 * 3600");
+  });
+
+  it("não expõe o ponto de montagem na descrição do alerta de disco", async () => {
+    const regras = await ler("infra/observabilidade/prometheus/regras.yml");
+    const disco = regras.slice(
+      regras.indexOf("alert: FrequenciappDiscoBaixo"),
+      regras.indexOf("alert: FrequenciappMemoriaBaixa"),
+    );
+
+    expect(disco).toContain("node_filesystem_avail_bytes");
+    expect(disco).toContain('mountpoint!~"/var/lib/docker/.+"');
+    expect(disco).toContain("min by (instance, job)");
+    expect(disco).not.toContain("$labels.mountpoint");
+    expect(disco).toContain("O caminho do ponto de montagem fica apenas na métrica local.");
+  });
+
+  it("cobre os cenários da sonda nos testes das regras", async () => {
+    const testes = await ler("infra/observabilidade/prometheus/regras.test.yml");
+
+    for (const texto of [
+      "sonda com sucesso",
+      "sonda sem resposta 200",
+      "coletor fora do ar",
+      "coletor no ar sem amostra",
+      "recuperação do coletor e da amostra",
+      "recuperação da sonda",
+      "perfil de alertas desligado",
+    ]) {
+      expect(testes, texto).toContain(texto);
+    }
+
+    expect(testes).toContain("rule_files:\n  - regras.yml");
+    for (const alerta of [
+      "FrequenciappSondaHttps",
+      "FrequenciappSondaColetorIndisponivel",
+      "FrequenciappSondaSemAmostra",
+    ]) {
+      expect(testes, alerta).toContain(`alertname: ${alerta}`);
+    }
   });
 
   it("registra node e blackbox no inventário de ferramentas", async () => {
@@ -421,6 +469,7 @@ describe("servidor auto-hospedado", () => {
 
     for (const variavel of [
       "ALERTA_WEBHOOK_URL",
+      "ALERTA_WEBHOOK_TOKEN",
       "ALERTA_EMAIL_PARA",
       "ALERTA_EMAIL_DE",
       "ALERTA_SMTP_SMARTHOST",
@@ -430,23 +479,43 @@ describe("servidor auto-hospedado", () => {
       expect(entrypoint, variavel).toContain(variavel);
       expect(observabilidade, variavel).toContain(`${variavel}: \${${variavel}:-}`);
     }
-    expect(entrypoint).toContain("http://127.0.0.1:9099/alerta");
     expect(entrypoint).toContain("/etc/alertmanager/alertmanager.yml");
     expect(entrypoint).toContain("/tmp/alertmanager.yml");
     expect(entrypoint).toContain("umask 077");
-    expect(entrypoint).toContain("escapar_sed");
     expect(entrypoint).toContain("escapar_yaml");
     expect(entrypoint).toContain("tr -d '\\r\\n'");
     expect(entrypoint).toContain("Configure apenas um receptor: webhook ou e-mail.");
     expect(entrypoint).toContain("ALERTA_WEBHOOK_URL não pode conter espaços.");
+    expect(entrypoint).toContain("ALERTA_WEBHOOK_TOKEN exige ALERTA_WEBHOOK_URL.");
     expect(entrypoint).toContain("não podem conter quebra de linha");
     expect(entrypoint).toContain("require_tls: true");
     expect(entrypoint).toContain("send_resolved: true");
     expect(entrypoint).toContain("/bin/amtool check-config /tmp/alertmanager.yml");
     expect(entrypoint).toContain('exec /bin/alertmanager --config.file=/tmp/alertmanager.yml "$@"');
     expect(entrypoint).not.toContain("NOTIFICAR_URL");
+
+    expect(entrypoint).toContain("smtp_auth_password_file: /tmp/alertmanager-smtp-password");
+    expect(entrypoint).not.toMatch(/smtp_auth_password:/);
+    expect(entrypoint).toContain("/tmp/alertmanager-webhook-url");
+    expect(entrypoint).toContain("/tmp/alertmanager-webhook-token");
+    expect(entrypoint).toContain("credentials_file: /tmp/alertmanager-webhook-token");
+    expect(entrypoint).toContain("chmod 600 /tmp/alertmanager-smtp-password");
+    expect(entrypoint).toContain("chmod 600 /tmp/alertmanager-webhook-url");
+    expect(entrypoint).toContain("chmod 600 /tmp/alertmanager-webhook-token");
+    expect(entrypoint).toContain("AUTORIZACAO_WEBHOOK");
+    expect(entrypoint).toContain("awk");
+
+    const blocosSed = entrypoint.match(/^\s*sed(?:[^\n]*\\\n)*[^\n]*$/gm) ?? [];
+    expect(blocosSed.length).toBeGreaterThan(0);
+    for (const blocoSed of blocosSed) {
+      expect(blocoSed).not.toContain("$smtp_senha");
+      expect(blocoSed).not.toContain("$webhook");
+      expect(blocoSed).not.toContain("$webhook_token");
+    }
+
     expect(modelo).toContain("webhook_configs:");
-    expect(modelo).toContain("http://127.0.0.1:9099/alerta");
+    expect(modelo).toContain("url_file: /tmp/alertmanager-webhook-url");
+    expect(modelo).toContain("AUTORIZACAO_WEBHOOK");
     expect(modelo).toContain("send_resolved: true");
     expect(modelo).not.toContain("ALERTA_");
   });
@@ -500,6 +569,7 @@ describe("servidor auto-hospedado", () => {
 
     for (const variavel of [
       "ALERTA_WEBHOOK_URL",
+      "ALERTA_WEBHOOK_TOKEN",
       "ALERTA_EMAIL_PARA",
       "ALERTA_EMAIL_DE",
       "ALERTA_SMTP_SMARTHOST",
@@ -528,11 +598,16 @@ describe("servidor auto-hospedado", () => {
       "prom/alertmanager:v0.35.0@sha256:e638797febd034838eca8b98cdbd46f951e9bf7f178777aa8669167406a9946c",
     );
     expect(validar).toContain('-e ALERTA_WEBHOOK_URL="https://monitor.exemplo.br/frequenciapp"');
+    expect(validar).toContain('-e ALERTA_WEBHOOK_TOKEN="token-sintetico-de-validacao"');
     expect(validar).toContain('-e ALERTA_EMAIL_PARA="coordenacao@escola.exemplo.br"');
     expect(validar).toContain('-e ALERTA_SMTP_SENHA="senha-sintetica-de-validacao"');
     expect(
       validar.match(/\/etc\/alertmanager\/entrypoint\.sh --version >\/dev\/null/g),
     ).toHaveLength(2);
+    expect(validar).toContain("smtp_auth_password_file: /tmp/alertmanager-smtp-password");
+    expect(validar).toContain("url_file: /tmp/alertmanager-webhook-url");
+    expect(validar).toContain("credentials_file: /tmp/alertmanager-webhook-token");
+    expect(validar).toContain("check-config /config/alertmanager.yml");
     expect(validar).not.toMatch(/echo[^\n]*(?:ALERTA_SMTP_SENHA|ALERTA_WEBHOOK_URL)/);
   });
 
@@ -568,11 +643,24 @@ describe("servidor auto-hospedado", () => {
       "FrequenciappDiscoBaixo",
       "FrequenciappMemoriaBaixa",
       "FrequenciappSondaHttps",
+      "FrequenciappSondaColetorIndisponivel",
+      "FrequenciappSondaSemAmostra",
       "FrequenciappCertificadoExpirando",
       "FrequenciappAlertmanagerFalhaNotificacao",
       "FrequenciappBackupAtrasado",
     ]) {
       expect(observabilidade, alerta).toContain(alerta);
+    }
+
+    for (const texto of [
+      "url_file",
+      "smtp_auth_password_file",
+      "credentials_file",
+      "ALERTA_WEBHOOK_TOKEN",
+      "regras.test.yml",
+      "promtool test rules",
+    ]) {
+      expect(observabilidade, texto).toContain(texto);
     }
 
     for (const texto of [
@@ -585,6 +673,8 @@ describe("servidor auto-hospedado", () => {
       "probe_ssl_earliest_cert_expiry",
       "frequenciapp_backup_ultimo_sucesso_timestamp_seconds",
       "Alertmanager sem entrega",
+      "FrequenciappSondaColetorIndisponivel",
+      "FrequenciappSondaSemAmostra",
     ]) {
       expect(autoHospedagem, texto).toContain(texto);
     }
