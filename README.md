@@ -166,16 +166,17 @@ As camadas, o fluxo de requisição e as decisões registradas estão em [docs/a
 
 ## Testes e qualidade
 
-| Comando                    | Efeito                                                   |
-| -------------------------- | -------------------------------------------------------- |
-| `pnpm run format:check`    | Prettier em modo verificação.                            |
-| `pnpm run lint`            | ESLint com regras estritas.                              |
-| `pnpm run tsc`             | Verificação de tipos sem emissão.                        |
-| `pnpm run test:unit`       | Testes de unidade e guarda editorial.                    |
-| `pnpm run test:api`        | Contratos de API com o aplicativo no ar.                 |
-| `pnpm run test:e2e:docker` | Ponta a ponta na imagem oficial, com o aplicativo no ar. |
-| `pnpm run test:pwa:docker` | PWA contra o build de produção.                          |
-| `pnpm run capturas:readme` | Regenera as capturas do README em `docs/imagens/`.       |
+| Comando                     | Efeito                                                   |
+| --------------------------- | -------------------------------------------------------- |
+| `pnpm run format:check`     | Prettier em modo verificação.                            |
+| `pnpm run lint`             | ESLint com regras estritas.                              |
+| `pnpm run tsc`              | Verificação de tipos sem emissão.                        |
+| `pnpm run test:unit`        | Testes de unidade e guarda editorial.                    |
+| `pnpm run test:api`         | Contratos de API com o aplicativo no ar.                 |
+| `pnpm run test:e2e:docker`  | Ponta a ponta na imagem oficial, com o aplicativo no ar. |
+| `pnpm run test:pwa:docker`  | PWA contra o build de produção.                          |
+| `pnpm run capturas:readme`  | Regenera as capturas do README em `docs/imagens/`.       |
+| `pnpm run capturas:galeria` | Regenera a galeria completa e o manifesto de capturas.   |
 
 A convenção das suítes está em [docs/testes.md](docs/testes.md) e [tests/README.md](tests/README.md).
 
