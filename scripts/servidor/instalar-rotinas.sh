@@ -152,7 +152,7 @@ if [ "$BACKUP_PLANILHAS_HABILITADO" = "true" ]; then
   linha_backup_planilhas="$BACKUP_PLANILHAS_HORARIO $SERVIDOR_USUARIO \"$APP_DIR/scripts/servidor/backup-planilhas.sh\" >>\"$LOG_DIR/backup-planilhas.log\" 2>&1"
 fi
 if [ "$ATUALIZAR_HABILITADO" = "true" ]; then
-  linha_atualizar="$ATUALIZAR_HORARIO $SERVIDOR_USUARIO \"$APP_DIR/scripts/servidor/atualizar.sh\" >>\"$LOG_DIR/atualizacao.log\" 2>&1"
+  linha_atualizar="$ATUALIZAR_HORARIO $SERVIDOR_USUARIO \"$APP_DIR/scripts/servidor/atualizar.sh\" --agendado >>\"$LOG_DIR/atualizacao.log\" 2>&1"
 fi
 if [ "${PROXY_TIPO:-caddy}" = "nginx" ] && [ "${TLS_MODO:-acme}" = "acme" ]; then
   linha_certbot="$CERTBOT_RENOVAR_HORARIO $SERVIDOR_USUARIO \"$APP_DIR/scripts/servidor/renovar-certificado.sh\" >>\"$LOG_DIR/certificado.log\" 2>&1"

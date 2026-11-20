@@ -68,6 +68,8 @@ simular=false
 forcar=false
 modo_override=""
 registrar=false
+agendado=false
+permissao_manual=false
 tag_override=""
 ref_override=""
 permitir_migracoes="$ATUALIZAR_PERMITIR_MIGRACOES"
@@ -88,6 +90,11 @@ while [ "$#" -gt 0 ]; do
       ;;
     --permitir-migracoes)
       permitir_migracoes=true
+      permissao_manual=true
+      shift
+      ;;
+    --agendado)
+      agendado=true
       shift
       ;;
     --modo)
@@ -106,7 +113,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     --ajuda | -h)
       cat <<'TEXTO'
-Uso: atualizar.sh [--simular] [--forcar] [--registrar] [--permitir-migracoes] [--modo auto|release|main] [--tag vX.Y.Z] [--ref REF]
+Uso: atualizar.sh [--simular] [--forcar] [--registrar] [--agendado | --permitir-migracoes] [--modo auto|release|main] [--tag vX.Y.Z] [--ref REF]
 TEXTO
       exit 0
       ;;
@@ -115,6 +122,14 @@ TEXTO
       ;;
   esac
 done
+
+if [ "$agendado" = true ]; then
+  if [ "$registrar" = true ] || [ "$forcar" = true ] || [ "$permissao_manual" = true ] ||
+    [ "$ATUALIZAR_MIGRACAO_EXTERNA" = true ]; then
+    erro "O modo agendado não admite registro, migração externa ou permissões manuais."
+  fi
+  permitir_migracoes=false
+fi
 
 if [ "$ATUALIZAR_BACKUP_ANTES" != "true" ]; then
   erro "O backup anterior é obrigatório. ATUALIZAR_BACKUP_ANTES=false não é aceito."
@@ -501,16 +516,43 @@ log "Modo atual: ${modo_atual:-desconhecido}; modo alvo: $alvo_modo."
 log "Referência alvo: $alvo_ref ($alvo_commit)."
 
 migracoes_novas=false
-migracoes=$(git -C "$APP_DIR" diff --name-only "$commit_atual" "$alvo_commit" -- prisma/migrations || true)
+migracoes=$(git -C "$APP_DIR" diff --name-only "$commit_atual" "$alvo_commit" -- prisma/migrations) ||
+  erro "Não foi possível comparar as migrações entre as revisões."
 if [ -n "$migracoes" ]; then
   migracoes_novas=true
 fi
+
+aprovar_migracoes_agendadas() {
+  [ "$alvo_modo" = main ] && [ "$MIGRAR_NA_PARTIDA" = true ] ||
+    erro "A aprovação agendada de migrações exige a main e o migrador na partida."
+  [ "${BACKUP_MODO:-compose}" = compose ] ||
+    erro "A aprovação agendada exige banco Compose e histórico local verificável."
+  if [ "$1" != simular ]; then
+    # Um histórico incompleto faria o migrador executar SQL não aprovado no lote.
+    timeout -k 5 20 "${COMPOSE[@]}" exec -T "$SERVIDOR_SERVICO_DB" psql -XwqAt \
+      -U "${POSTGRES_USER:-frequencia}" -d "${POSTGRES_DB:-frequencia}" -v ON_ERROR_STOP=1 \
+      -v "schema=${DATABASE_SCHEMA:-public}" -f - <<'SQL' |
+BEGIN READ ONLY;
+SET LOCAL statement_timeout='5s';
+SELECT coalesce(json_agg(json_build_array(migration_name, checksum, finished_at IS NOT NULL)), '[]')
+FROM :"schema"._prisma_migrations WHERE rolled_back_at IS NULL;
+ROLLBACK;
+SQL
+      node "$DIR/aprovacao-migracoes.mjs" historico "$APP_DIR" "$commit_atual" ||
+      erro "Não foi possível comprovar o histórico da revisão instalada."
+  fi
+  node "$DIR/aprovacao-migracoes.mjs" "$1" "$APP_DIR" "$ESTADO_DIR" "$commit_atual" "$alvo_commit" "$ATUALIZAR_REMOTO" ||
+    erro "Aprovação agendada de migrações recusada. Nenhuma troca de versão foi iniciada."
+}
 
 if [ "$simular" = true ]; then
   log "Simulação: nenhuma alteração será aplicada."
   log "Backup obrigatório antes da aplicação: sim."
   if [ "$migracoes_novas" = true ]; then
-    if [ "$permitir_migracoes" = "true" ]; then
+    if [ "$agendado" = true ]; then
+      aprovar_migracoes_agendadas simular
+      log "Aprovação agendada confere com as referências locais; não foi usada."
+    elif [ "$permitir_migracoes" = "true" ]; then
       log "Migrações novas serão permitidas por opção explícita."
     else
       log "Migrações novas bloqueariam a atualização; use --permitir-migracoes."
@@ -539,7 +581,11 @@ if [ -f "$falha" ] && [ "$forcar" = false ]; then
 fi
 
 if [ "$migracoes_novas" = true ] && [ "$permitir_migracoes" != "true" ]; then
-  erro "Há migrações novas. Revise e repita com --permitir-migracoes ou defina ATUALIZAR_PERMITIR_MIGRACOES=true."
+  if [ "$agendado" = true ]; then
+    aprovar_migracoes_agendadas verificar
+  else
+    erro "Há migrações novas. Revise e repita com --permitir-migracoes ou defina ATUALIZAR_PERMITIR_MIGRACOES=true."
+  fi
 fi
 
 if [ "$migracoes_novas" = true ] && [ "$MIGRAR_NA_PARTIDA" != "true" ]; then
@@ -602,6 +648,11 @@ fi
 
 validar_compose_na_worktree "$alvo_imagem" "$alvo_backup" "$alvo_commit" ||
   erro "A configuração do Compose não é válida na versão alvo."
+
+if [ "$agendado" = true ] && [ "$migracoes_novas" = true ]; then
+  # A main e a validade podem mudar durante o backup e a construção da imagem.
+  aprovar_migracoes_agendadas consumir
+fi
 
 log "Aplicando $alvo_ref."
 git -C "$APP_DIR" checkout --detach "$alvo_commit"

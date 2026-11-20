@@ -437,7 +437,7 @@ function classificarAtualizacao(opcoes) {
       exigir(["auto", "release", "main"].includes(opcoes[++i]), "Modo de atualização inválido.");
     else
       exigir(
-        ["--forcar", "--permitir-migracoes"].includes(n),
+        ["--forcar", "--permitir-migracoes", "--agendado"].includes(n),
         "Opção de atualização desconhecida.",
       );
   }

@@ -522,6 +522,24 @@ O backup de planilhas é opcional. Quando `BACKUP_PLANILHAS_HABILITADO=false`, a
 
 A atualização automática pelo cron não é instalada por padrão. `ATUALIZAR_HABILITADO=false` mantém a rotina fora do cron; defina `true` somente depois de revisar a agenda e o rollback.
 
+#### Aprovação de migrações no cron da `main`
+
+As rotinas geradas usam `--agendado`. Nesse modo, nem `ATUALIZAR_PERMITIR_MIGRACOES=true` nem a opção manual liberam migrações. A permissão por execução, `--permitir-migracoes`, continua disponível fora do cron. Antes de adotar o fluxo em um cron personalizado, revise seu lançador: ele precisa invocar o atualizador com `--agendado` e delegar a conferência das migrações, sem remover guardas próprias de Compose ou de outros arquivos operacionais.
+
+Após conferir o backup, ensaiar o candidato em um banco isolado e obter aprovação da manutenção, gere um manifesto com os SHAs completos da revisão instalada (`BASE`) e da candidata (`ALVO`). Informe o início e o fim em UTC, no formato `AAAA-MM-DDTHH:MM:SSZ`. A janela dura no máximo 24 horas e precisa incluir a execução prevista do cron.
+
+```bash
+umask 077
+rascunho=$(mktemp "${ESTADO_DIR:?}/.aprovacao.XXXXXX")
+node scripts/servidor/aprovacao-migracoes.mjs preparar "$PWD" "$BASE" "$ALVO" "$INICIO_UTC" "$FIM_UTC" > "$rascunho"
+```
+
+O comando só gera o manifesto; não autoriza a implantação nem executa migrações. Após a revisão, publique o conteúdo de forma atômica em `$ESTADO_DIR/aprovacao-migracoes.json`, com modo `0600` e propriedade da conta que executa a operação. Não inclua o manifesto no Git. Somente adições de arquivos `migration.sql` em diretórios de migração são aceitas; edições ou remoções exigem revisão manual. O hash não classifica o SQL como seguro.
+
+O atualizador compara a base instalada, a ponta da `main`, a janela e o SHA-256 de cada SQL. Exige que o histórico ativo no banco Compose corresponda às migrações da revisão instalada, sem registros incompletos ou checksums divergentes. Repete as conferências após o backup e a preparação da imagem e registra o uso único antes de trocar a versão. Em caso de falha depois do registro, preserve o recibo `aprovacao-migracoes-<sha>.usada.json` e revise o estado do banco antes de qualquer intervenção. O backup continua obrigatório, e voltar à imagem anterior não desfaz uma migração confirmada. `--simular --agendado` verifica somente refs locais, sem consumir a aprovação.
+
+Uma instalação antiga não atualiza o próprio agendamento ao receber essa revisão. A adoção inicial do código e a atualização do cron são etapas operacionais separadas.
+
 `ATUALIZAR_VERIFICAR_IMAGEM=true` confere o rótulo da imagem antes da aplicação. `ATUALIZAR_BACKUP_ANTES=false` é rejeitado porque o backup anterior é obrigatório.
 
 Quando o healthcheck usa HTTPS com CA interna, defina `ATUALIZAR_SAUDE_CA` e `RESTAURAR_SAUDE_CA` com o caminho do certificado. Sem a CA, o `curl` usa o repositório do sistema.

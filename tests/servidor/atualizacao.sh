@@ -35,7 +35,7 @@ export ESTADO_DIR="$TMP_RAIZ/estado"
 export LOG_DIR="$TMP_RAIZ/log"
 export BACKUP_DIR="$TMP_RAIZ/backups"
 export BACKUP_BANCO_DIR="$TMP_RAIZ/backups/banco"
-mkdir -p "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_BANCO_DIR" "$SERVIDOR_CONFIG_DIR"
+mkdir -m 700 -p "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_BANCO_DIR" "$SERVIDOR_CONFIG_DIR"
 : >"$APP_ENV_FILE"
 : >"$OPS_ENV_FILE"
 chmod 600 "$APP_ENV_FILE" "$OPS_ENV_FILE"
@@ -136,7 +136,15 @@ case "$comando" in
     fi
     exit 0
     ;;
-  stop | exec)
+  exec)
+    if [[ " $* " == *" psql -XwqAt "* ]]; then
+      consulta=$(cat)
+      [[ "$consulta" == *"BEGIN READ ONLY"* && "$consulta" == *"_prisma_migrations"* ]] || exit 1
+      printf '%s\n' "${HISTORICO_SINTETICO:-[]}"
+    fi
+    exit 0
+    ;;
+  stop)
     exit 0
     ;;
   *)
@@ -210,6 +218,7 @@ preparar_repositorio() {
   mkdir -p "$REPO/scripts/servidor"
   cp "$RAIZ/scripts/servidor/atualizar.sh" "$RAIZ/scripts/servidor/comum.sh" \
     "$RAIZ/scripts/servidor/identidade.mjs" "$RAIZ/scripts/servidor/identidade.sh" \
+    "$RAIZ/scripts/servidor/aprovacao-migracoes.mjs" \
     "$REPO/scripts/servidor/"
   cp "$FAKE_BIN/backup-falso.sh" "$REPO/scripts/servidor/backup-banco.sh"
   chmod +x "$REPO/scripts/servidor/atualizar.sh" "$REPO/scripts/servidor/backup-banco.sh" \
@@ -233,7 +242,8 @@ preparar_repositorio() {
   git -C "$REPO" reset -q --hard "$COMMIT_ANTERIOR"
   export DOCKER_REVISAO_IMAGEM="$COMMIT_ALVO"
   rm -f "$DOCKER_LOG" "$DOCKER_UP_COUNTER" "$BACKUP_CHAMADAS" \
-    "$ESTADO_DIR/falha.json" "$ESTADO_DIR/estado.json" "$SERVIDOR_IDENTIDADE_ARQUIVO"
+    "$ESTADO_DIR/falha.json" "$ESTADO_DIR/estado.json" "$SERVIDOR_IDENTIDADE_ARQUIVO" \
+    "$ESTADO_DIR/aprovacao-migracoes.json" "$ESTADO_DIR"/aprovacao-migracoes-*.usada.json
   rm -rf "$SERVIDOR_LOCK_DIR"
 }
 
@@ -389,6 +399,63 @@ exigir_falha "$status" "a migração nova foi aceita sem opção explícita."
 status=$(executar_atualizacao --permitir-migracoes)
 [ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a migração liberada falhou."; }
 [ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_MIGRACAO" ] || falhar "a migração liberada não foi aplicada."
+
+# O cron não aceita permissão geral e só consome uma aprovação no momento de aplicar.
+preparar_instalacao
+git -C "$REPO" reset -q --hard "$COMMIT_ALVO"
+mkdir -p "$REPO/prisma/migrations/20260101000000_aprovada"
+printf 'select 1;\n' >"$REPO/prisma/migrations/20260101000000_aprovada/migration.sql"
+git -C "$REPO" add prisma
+git -C "$REPO" commit -qm "migracao para ensaio"
+git -C "$REPO" push -q origin main
+COMMIT_APROVADO=$(git -C "$REPO" rev-parse HEAD)
+export DOCKER_REVISAO_IMAGEM="$COMMIT_APROVADO"
+git -C "$REPO" reset -q --hard "$COMMIT_ANTERIOR"
+status=$(ATUALIZAR_PERMITIR_MIGRACOES=true executar_atualizacao --agendado)
+exigir_falha "$status" "o cron aceitou permissão geral sem aprovação."
+grep -q 'Aprovação agendada de migrações recusada' "$TMP_RAIZ/saida.log" || falhar "a aprovação não foi exigida."
+[ ! -e "$BACKUP_CHAMADAS" ] || falhar "a recusa chegou ao backup."
+
+aprovacao="$ESTADO_DIR/aprovacao-migracoes.json"
+recibo_usado="$ESTADO_DIR/aprovacao-migracoes-$COMMIT_APROVADO.usada.json"
+inicio=$(date -u -d '1 minute ago' +%FT%TZ)
+fim=$(date -u -d '10 minutes' +%FT%TZ)
+node "$REPO/scripts/servidor/aprovacao-migracoes.mjs" preparar "$REPO" "$COMMIT_ANTERIOR" "$COMMIT_APROVADO" "$inicio" "$fim" >"$TMP_RAIZ/aprovacao-correta"
+jq '.migracoes[0].sha256 = "divergente"' "$TMP_RAIZ/aprovacao-correta" >"$aprovacao"
+chmod 600 "$aprovacao"
+status=$(executar_atualizacao --agendado)
+exigir_falha "$status" "o cron aceitou checksum divergente."
+[ ! -e "$BACKUP_CHAMADAS" ] || falhar "a cópia divergente chegou ao backup."
+chmod 644 "$aprovacao"
+status=$(executar_atualizacao --agendado)
+exigir_falha "$status" "o cron aceitou aprovação sem proteção."
+grep -q 'modo 600' "$TMP_RAIZ/saida.log" || { cat "$TMP_RAIZ/saida.log"; falhar "a proteção do arquivo não foi conferida."; }
+chmod 600 "$aprovacao"
+jq '.inicio = "2000-01-01T00:00:00Z" | .fim = "2000-01-01T00:01:00Z"' "$TMP_RAIZ/aprovacao-correta" >"$aprovacao"
+status=$(executar_atualizacao --agendado)
+exigir_falha "$status" "o cron aceitou aprovação vencida."
+grep -q 'janela.*vencida' "$TMP_RAIZ/saida.log" || falhar "a validade não foi conferida."
+install -m 600 "$TMP_RAIZ/aprovacao-correta" "$aprovacao"
+status=$(HISTORICO_SINTETICO='[["20260101000000_outra","hash",false]]' executar_atualizacao --agendado)
+exigir_falha "$status" "o cron aceitou histórico divergente."
+grep -q 'histórico do banco não corresponde' "$TMP_RAIZ/saida.log" || falhar "o histórico não foi conferido."
+status=$(executar_atualizacao --simular --agendado)
+[ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a simulação da aprovação falhou."; }
+[ ! -e "$recibo_usado" ] && [ ! -e "$BACKUP_CHAMADAS" ] || falhar "a simulação usou aprovação ou executou backup."
+status=$(executar_atualizacao --agendado)
+[ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "o cron não aplicou o commit autorizado."; }
+[ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_APROVADO" ] && [ -f "$recibo_usado" ] ||
+  falhar "o commit ou o uso único da aprovação não foi registrado."
+rm "$ESTADO_DIR/estado.json"
+git -C "$REPO" reset -q --hard "$COMMIT_ANTERIOR"
+status=$(executar_atualizacao --agendado)
+exigir_falha "$status" "o cron reutilizou uma aprovação já consumida."
+grep -q 'já foi usada' "$TMP_RAIZ/saida.log" || falhar "o uso anterior não foi identificado."
+
+git -C "$REPO" push -q --force origin "$COMMIT_ALVO:refs/heads/main"
+status=$(executar_atualizacao --agendado --ref "$COMMIT_APROVADO")
+exigir_falha "$status" "o cron aceitou um SHA aprovado fora da ponta da main."
+grep -q 'main não corresponde' "$TMP_RAIZ/saida.log" || falhar "a divergência da main não foi identificada."
 
 # MIGRAR_NA_PARTIDA=false não pode trocar a imagem sem confirmação externa.
 preparar_instalacao

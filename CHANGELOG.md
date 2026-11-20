@@ -137,6 +137,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- O atualizador agendado da `main` aceita migrações novas apenas com autorização protegida, vinculada à revisão instalada, ao commit candidato, aos SHA-256 dos SQLs e a uma janela de uso único.
 - A aba Horários ganha o horário de provas bimestrais. Em Gestão, Configurações, Horários, a nova aba Provas cadastra a mesma prova para uma série inteira ou para turmas escolhidas, com data, início, fim e disciplina, recusa a turma que já tem prova na mesma janela do dia, remove provas e encerra o período, apagando o horário inteiro. Na consulta, o cartão Provas bimestrais mostra as provas da turma de hoje em diante, por data, e some quando a turma não tem prova. Novas rotas `GET` e `POST /api/provas-bimestrais`, `DELETE /api/provas-bimestrais/{id}` e `POST /api/provas-bimestrais/encerrar`, e a tabela `provas_bimestrais` ([ADR-080](docs/adr/080-horario-de-provas-bimestrais.md)).
 
 - A auto-hospedagem passa a oferecer observabilidade com Prometheus na rede interna. A aplicação expõe `/api/metricas` protegido por `METRICAS_TOKEN`, com métricas de requisições, latência, pool, consultas e fila de planilhas. O painel escuta apenas no loopback e é alcançado por túnel SSH, com retenção de 15 dias e 1 GB; Caddy e Nginx bloqueiam a rota pública. As cinco regras de alerta da fase 1 aparecem no painel, sem Alertmanager. O guia está em [observabilidade.md](docs/observabilidade.md) e a decisão na [ADR-079](docs/adr/079-observabilidade-com-prometheus.md).
