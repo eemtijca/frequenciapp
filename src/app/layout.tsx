@@ -6,6 +6,8 @@ import { ThemeProvider } from "next-themes";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import { Toaster } from "@/components/ui/sonner";
 import { ModalidadeFoco } from "@/components/ui/modalidade-foco";
+import { ProvedorAvisos } from "@/components/ui/mui/avisos";
+import { SincronizarTema } from "@/components/ui/mui/sincronizar-tema";
 import { ProvedorTema } from "@/theme/provedor-tema";
 import "./globals.css";
 
@@ -95,7 +97,9 @@ export default async function LayoutRaiz({
             disableTransitionOnChange
             nonce={nonce}
           >
+            <SincronizarTema />
             {children}
+            <ProvedorAvisos />
             <Toaster
               position="bottom-right"
               offset={20}

@@ -2,21 +2,17 @@
 // nunca em regra de negócio 4xx.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { erro } = vi.hoisted(() => ({ erro: vi.fn() }));
-vi.mock("sonner", () => ({
-  toast: {
-    error: erro,
-    success: vi.fn(),
-    info: vi.fn(),
-  },
+const { publicar } = vi.hoisted(() => ({ publicar: vi.fn() }));
+vi.mock("@/components/ui/mui/avisos", () => ({
+  publicarAviso: publicar,
 }));
 
-import { avisarErro } from "@/lib/avisos";
+import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
 import { ErroApi } from "@/lib/api-cliente";
 
 describe("avisarErro", () => {
   beforeEach(() => {
-    erro.mockClear();
+    publicar.mockClear();
   });
 
   it("não sugere conferir a internet em conflito de catálogo", () => {
@@ -30,21 +26,27 @@ describe("avisarErro", () => {
       ),
       { contexto: "Não foi possível excluir a justificativa." },
     );
-    expect(erro).toHaveBeenCalledTimes(1);
-    const [titulo, opcoes] = erro.mock.calls[0] ?? [];
-    expect(titulo).toBe("Esta justificativa está em uso em 2 registros.");
-    expect(opcoes.description).toBeUndefined();
-    expect(JSON.stringify(opcoes)).not.toContain("internet");
-    expect(JSON.stringify(opcoes)).not.toContain("chamada");
+    expect(publicar).toHaveBeenCalledTimes(1);
+    const [aviso] = publicar.mock.calls[0] ?? [];
+    expect(aviso).toMatchObject({
+      severidade: "error",
+      titulo: "Esta justificativa está em uso em 2 registros.",
+    });
+    expect(aviso.descricao).toBeUndefined();
+    expect(JSON.stringify(aviso)).not.toContain("internet");
+    expect(JSON.stringify(aviso)).not.toContain("chamada");
   });
 
   it("sugere tentar de novo em falha de servidor", () => {
     avisarErro(new ErroApi("Serviço indisponível.", 503), {
       contexto: "Não foi possível carregar.",
     });
-    expect(erro).toHaveBeenCalledWith(
-      "Serviço indisponível.",
-      expect.objectContaining({ description: "Tente de novo em instantes." }),
+    expect(publicar).toHaveBeenCalledWith(
+      expect.objectContaining({
+        severidade: "error",
+        titulo: "Serviço indisponível.",
+        descricao: "Tente de novo em instantes.",
+      }),
     );
   });
 
@@ -52,10 +54,11 @@ describe("avisarErro", () => {
     avisarErro(new TypeError("Failed to fetch"), {
       contexto: "Não foi possível carregar os dados.",
     });
-    expect(erro).toHaveBeenCalledWith(
-      "Não foi possível carregar os dados.",
+    expect(publicar).toHaveBeenCalledWith(
       expect.objectContaining({
-        description: "Confira a internet e tente de novo em instantes.",
+        severidade: "error",
+        titulo: "Não foi possível carregar os dados.",
+        descricao: "Confira a internet e tente de novo em instantes.",
       }),
     );
   });
@@ -68,12 +71,13 @@ describe("avisarErro", () => {
       tentarDeNovo: repetir,
       id: "salvar",
     });
-    expect(erro).toHaveBeenCalledWith(
-      "Falha passageira.",
+    expect(publicar).toHaveBeenCalledWith(
       expect.objectContaining({
-        description: "A chamada continua na tela.",
+        severidade: "error",
+        titulo: "Falha passageira.",
+        descricao: "A chamada continua na tela.",
+        tentarDeNovo: repetir,
         id: "salvar",
-        action: expect.objectContaining({ label: "Tentar novamente" }),
       }),
     );
   });
@@ -82,6 +86,32 @@ describe("avisarErro", () => {
     avisarErro(new ErroApi("Sua sessão expirou.", 401), {
       contexto: "Não foi possível carregar.",
     });
-    expect(erro).not.toHaveBeenCalled();
+    expect(publicar).not.toHaveBeenCalled();
+  });
+});
+
+describe("avisos de sucesso e informação", () => {
+  beforeEach(() => {
+    publicar.mockClear();
+  });
+
+  it("publica o tom de sucesso com a descrição e o id", () => {
+    avisarSucesso("Salvo.", "A chamada foi atualizada.", "chamada");
+    expect(publicar).toHaveBeenCalledWith({
+      severidade: "success",
+      titulo: "Salvo.",
+      descricao: "A chamada foi atualizada.",
+      id: "chamada",
+    });
+  });
+
+  it("publica o tom de informação com a descrição e o id", () => {
+    avisarInfo("Atenção.", "Salve antes de atualizar.", "dados");
+    expect(publicar).toHaveBeenCalledWith({
+      severidade: "info",
+      titulo: "Atenção.",
+      descricao: "Salve antes de atualizar.",
+      id: "dados",
+    });
   });
 });

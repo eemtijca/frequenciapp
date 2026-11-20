@@ -1,5 +1,7 @@
+"use client";
+
 // Avisos padrão da interface: tom único, mensagem clara e ação de repetir.
-import { toast } from "sonner";
+import { publicarAviso } from "@/components/ui/mui/avisos";
 import { ErroApi } from "@/lib/api-cliente";
 
 export function mensagemAmigavel(excecao: unknown, alternativa: string): string {
@@ -7,11 +9,11 @@ export function mensagemAmigavel(excecao: unknown, alternativa: string): string 
 }
 
 export function avisarSucesso(titulo: string, descricao?: string, id?: string): void {
-  toast.success(titulo, { description: descricao, duration: 5000, id });
+  publicarAviso({ severidade: "success", titulo, descricao, id });
 }
 
 export function avisarInfo(titulo: string, descricao?: string, id?: string): void {
-  toast.info(titulo, { description: descricao, duration: 6000, id });
+  publicarAviso({ severidade: "info", titulo, descricao, id });
 }
 
 export function avisarErro(
@@ -26,12 +28,11 @@ export function avisarErro(
         ? "Tente de novo em instantes."
         : undefined
       : "Confira a internet e tente de novo em instantes.";
-  toast.error(mensagemAmigavel(excecao, opcoes.contexto), {
-    description: opcoes.descricao ?? descricaoDaFalha,
-    duration: 8000,
+  publicarAviso({
+    severidade: "error",
+    titulo: mensagemAmigavel(excecao, opcoes.contexto),
+    descricao: opcoes.descricao ?? descricaoDaFalha,
+    tentarDeNovo: opcoes.tentarDeNovo,
     id: opcoes.id,
-    action: opcoes.tentarDeNovo
-      ? { label: "Tentar novamente", onClick: opcoes.tentarDeNovo }
-      : undefined,
   });
 }
