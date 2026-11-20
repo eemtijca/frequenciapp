@@ -1,6 +1,7 @@
 // Visões reais, com dados sintéticos e rede controlada pelo teste.
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
+import { ThemeProvider } from "@mui/material/styles";
 import VistaGrade from "@/components/grade/vista-grade";
 import VistaMovimentacoes from "@/components/relatorios/vista-movimentacoes";
 import VistaPainel from "@/components/painel/vista-painel";
@@ -14,6 +15,7 @@ import VistaHistorico from "@/components/relatorios/historico/vista-historico";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
 import { CONFIGURACOES_PADRAO } from "@/domain/frequencia";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { tema } from "@/theme/tema";
 import "@/app/globals.css";
 
 const data = "2026-11-01"; // Domingo: resumo da semana.
@@ -169,4 +171,8 @@ const telas = {
 const tela = new URLSearchParams(location.search).get("tela") as keyof typeof telas;
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Raiz ausente");
-createRoot(raiz).render(<main className="p-4">{telas[tela] ?? telas.painel}</main>);
+createRoot(raiz).render(
+  <ThemeProvider theme={tema}>
+    <main className="p-4">{telas[tela] ?? telas.painel}</main>
+  </ThemeProvider>,
+);

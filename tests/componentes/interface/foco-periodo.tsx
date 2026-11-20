@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { ThemeProvider } from "@mui/material/styles";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { tema } from "@/theme/tema";
 import "@/app/globals.css";
 
 function Fixture() {
@@ -54,4 +56,8 @@ function Fixture() {
 }
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Raiz ausente");
-createRoot(raiz).render(<Fixture />);
+createRoot(raiz).render(
+  <ThemeProvider theme={tema}>
+    <Fixture />
+  </ThemeProvider>,
+);
