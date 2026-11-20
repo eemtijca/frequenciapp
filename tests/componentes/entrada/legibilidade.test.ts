@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser } from "@playwright/test";
+import { chromium, type Browser, type Page } from "@playwright/test";
 import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
@@ -47,6 +47,10 @@ afterAll(async () => {
   rmSync(cache, { recursive: true, force: true });
 });
 
+async function aguardarTema(page: Page, tema: string) {
+  await expect.poll(() => page.locator("html").getAttribute("class")).toContain(tema);
+  await expect.poll(() => page.locator("html").getAttribute("data-mui-color-scheme")).toBe(tema);
+}
 it.each([
   ["light", 320],
   ["dark", 320],
@@ -60,7 +64,7 @@ it.each([
   try {
     await page.route("**/api/**", (rota) => rota.abort());
     await page.goto(url);
-    await expect.poll(() => page.locator("html").getAttribute("class")).toContain(tema);
+    await aguardarTema(page, tema);
     const input = page.getByLabel("E-mail ou identificador");
     const medida = await input.evaluate((el: HTMLInputElement) => {
       const estilo = getComputedStyle(el, "::placeholder");
@@ -103,7 +107,7 @@ it.each([
   try {
     await page.route("**/api/**", (rota) => rota.abort());
     await page.goto(`${url}?chamada`);
-    await expect.poll(() => page.locator("html").getAttribute("class")).toContain(tema);
+    await aguardarTema(page, tema);
     const seletor = page.locator("#dia-frequencia");
     await seletor.waitFor();
     const anterior = page.getByRole("button", { name: "Dia anterior" });
