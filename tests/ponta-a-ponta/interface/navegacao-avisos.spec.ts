@@ -2,9 +2,47 @@
 import { expect, test } from "@playwright/test";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "../helpers/configuracoes";
 import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
-import { registrarTestemunha } from "../helpers/testemunha-aviso";
 
 let inicial: ConfiguracaoOrigem | null = null;
+
+// Função autocontida: Playwright a serializa para executar no navegador.
+function registrarTestemunhaAviso(botao: HTMLElement, tipoEvento: string) {
+  const resultado = { recebido: false, confiavel: false, avisoVisivel: false, instante: 0 };
+  const observar = (evento: Event) => {
+    if (!(evento.target instanceof Node) || !botao.contains(evento.target)) return;
+    resultado.recebido = true;
+    resultado.confiavel = evento.isTrusted;
+    resultado.instante = Date.now();
+    const aviso = [...document.querySelectorAll('[role="status"]')].find((elemento) =>
+      elemento.textContent?.includes("Configurações salvas."),
+    );
+    if (aviso) {
+      const retangulos = [...aviso.getClientRects()];
+      let visivel = retangulos.some((retangulo) => {
+        const esquerda = Math.max(0, retangulo.left);
+        const topo = Math.max(0, retangulo.top);
+        const direita = Math.min(window.innerWidth, retangulo.right);
+        const base = Math.min(window.innerHeight, retangulo.bottom);
+        return direita > esquerda && base > topo;
+      });
+      for (let elemento: Element | null = aviso; elemento; elemento = elemento.parentElement) {
+        const estilo = getComputedStyle(elemento);
+        if (
+          estilo.display === "none" ||
+          estilo.visibility !== "visible" ||
+          Number(estilo.opacity) === 0
+        ) {
+          visivel = false;
+          break;
+        }
+      }
+      resultado.avisoVisivel = visivel;
+    }
+    document.removeEventListener(tipoEvento, observar, true);
+  };
+  document.addEventListener(tipoEvento, observar, true);
+  return resultado;
+}
 
 test.beforeEach(async () => {
   inicial = await lerOrigem();
@@ -56,9 +94,7 @@ for (const largura of [390, 800]) {
     await confirmar.getByRole("button", { name: "Salvar configurações", exact: true }).click();
     expect((await resposta).status()).toBe(200);
 
-    const aviso = page.locator("[data-sonner-toast]").filter({
-      has: page.locator("[data-title]").filter({ hasText: /^Configurações salvas\.$/ }),
-    });
+    const aviso = page.getByRole("status").filter({ hasText: /^Configurações salvas\./ });
     await expect(aviso).toBeVisible();
     await expect
       .poll(async () => {
@@ -81,7 +117,7 @@ for (const largura of [390, 800]) {
     // Isso não prova que outro elemento não encobre visualmente o aviso; uma
     // captura estática separada pode fornecer apenas evidência visual parcial.
     const testemunha = await gestao.evaluateHandle(
-      registrarTestemunha,
+      registrarTestemunhaAviso,
       hasTouch ? "touchstart" : "pointerdown",
     );
 

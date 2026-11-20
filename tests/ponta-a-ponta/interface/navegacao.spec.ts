@@ -1,12 +1,7 @@
 // Fumaça do shell: troca de visão pela navegação e tema.
 import { expect, test } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import {
-  abrirNavegacao,
-  abrirSeletorTema,
-  aguardarHidratacao,
-  trocarVisao,
-} from "../helpers/pagina";
+import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 test.describe("navegação", () => {
   test("troca de visão pela navegação", async ({ page }) => {
@@ -54,7 +49,11 @@ test.describe("navegação", () => {
     await aguardarHidratacao(page, 'button[aria-label*="tema" i]');
     const inicioEscuro = await page.locator("html").evaluate((el) => el.classList.contains("dark"));
     const alvo = inicioEscuro ? "Claro" : "Escuro";
-    const temas = await abrirSeletorTema(page);
+    const botaoTema = page.getByRole("banner").getByRole("button", { name: /tema/i });
+    await expect(botaoTema).toBeVisible();
+    await botaoTema.click();
+    const temas = page.getByRole("radiogroup");
+    await expect(temas).toBeVisible();
     await expect(temas.getByRole("radio")).toHaveCount(3);
     await temas.getByRole("radio", { name: alvo, exact: true }).click();
     await expect(page.locator("html")).toHaveClass(new RegExp(inicioEscuro ? "light" : "dark"));

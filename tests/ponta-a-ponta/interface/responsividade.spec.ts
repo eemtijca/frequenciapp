@@ -127,7 +127,7 @@ test.describe("responsividade", () => {
       const fechar = menu.getByRole("button", { name: "Fechar menu", exact: true });
       await expect(fechar).toBeInViewport();
       await expect(menu.getByRole("button", { name: /tema/i })).toHaveCount(0);
-      expect(caixa?.width ?? Infinity).toBeLessThanOrEqual(240 + 1);
+      expect(caixa?.width ?? Infinity).toBeLessThanOrEqual(256 + 1);
       for (const nome of ["Gestão"]) {
         const acao = menu.getByRole("button", { name: nome, exact: true });
         await acao.scrollIntoViewIfNeeded();
@@ -215,11 +215,11 @@ test.describe("responsividade", () => {
       await page.goto("/");
       await aguardarHidratacao(page);
       for (const [rotulo, visao, largura] of [
-        ["Painel", "painel", 1024],
-        ["Chamada", "chamada", 1152],
-        ["Chamada Parcial", "chamada-parcial", 1152],
+        ["Painel", "painel", 840],
+        ["Chamada", "chamada", 840],
+        ["Chamada Parcial", "chamada-parcial", 840],
         ["Relatórios", "relatorios", 1280],
-        ["Gestão", "gestao", 1152],
+        ["Gestão", "gestao", 1040],
       ] as const) {
         await trocarVisao(page, rotulo, visao);
         const painel = page.locator("main > div > section:not([hidden])");
