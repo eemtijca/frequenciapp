@@ -456,7 +456,7 @@ test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou m
   await expect(page.getByRole("option", { name: "Todos os alunos", exact: true })).toBeVisible();
   for (const aluno of doTeste)
     await expect(page.getByRole("option", { name: aluno.nome, exact: true })).toBeVisible();
-  const busca = page.getByRole("textbox", { name: "Filtrar opções", exact: true });
+  const busca = seletor;
   if (isMobile) await busca.tap();
   else await busca.click();
   await expect(busca).toBeFocused();
@@ -483,7 +483,7 @@ test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou m
   await busca.press("Enter");
   await expect(busca).toBeVisible();
   await busca.press("Escape");
-  await expect(busca).toHaveCount(0);
+  await expect(page.getByRole("listbox")).toHaveCount(0);
   await expect(seletor).toBeFocused();
   await expect(grupoBruno).toBeVisible();
   await seletor.press("ArrowDown");

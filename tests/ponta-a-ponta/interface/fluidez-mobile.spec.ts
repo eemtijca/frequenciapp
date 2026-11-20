@@ -143,10 +143,7 @@ test("buscar sem acento e limpar conserva a ordem do cadastro e permite editar",
   });
   await expect(dialogo.getByRole("textbox", { name: "Nome", exact: true })).toHaveValue(alvaro);
   await dialogo.getByRole("combobox", { name: "Turma atual", exact: true }).click();
-  const filtro = page.getByRole("textbox", {
-    name: "Filtrar opções",
-    exact: true,
-  });
+  const filtro = dialogo.getByRole("combobox", { name: "Turma atual", exact: true });
   await filtro.pressSequentially("e2e fluidez");
   await expect(
     page.getByRole("listbox", { name: "Opções", exact: true }).getByRole("option"),
