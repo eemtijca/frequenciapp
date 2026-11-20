@@ -239,7 +239,7 @@ test.describe("diretores de turma na Gestão", () => {
         }
       }
     }
-    await expect(diretor.locator("main")).toHaveAttribute("data-visao", "diretor");
+    await expect(diretor.locator('[data-visao="diretor"]')).toBeVisible();
     await expect(diretor.getByText("E2E Ano A").first()).toBeVisible();
     // No primeiro dia do mês, um domingo consulta a chamada do mês anterior.
     if (dia.slice(0, 7) !== diaCorrente().slice(0, 7)) {

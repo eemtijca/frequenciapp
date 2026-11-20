@@ -3,7 +3,20 @@
 // Minhas turmas: estatísticas só de leitura da turma de origem do diretor,
 // por mês, com números em destaque, gráficos e a mesma informação em tabela.
 import { useEffect, useState } from "react";
-import { ChartColumn, ChevronLeft, ChevronRight, LoaderCircle, Table2 } from "lucide-react";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Stack from "@mui/material/Stack";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
+import BarChartRoundedIcon from "@mui/icons-material/BarChartRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
 import { diasDoMes, mesSeguinte, rotuloDataCurta, rotuloMes } from "@/domain/frequencia";
 import type {
   ContextoDiretor,
@@ -12,12 +25,18 @@ import type {
 } from "@/domain/estatisticas-diretor";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { estadoDeErro } from "@/lib/estado-http";
-import { cn } from "@/lib/utils";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import { Button } from "@/components/ui/button";
+import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { GradeCartoes } from "@/components/layout/grade-cartoes";
+import { SecaoConteudo } from "@/components/layout/secao-conteudo";
+import { TabelaPadrao } from "@/components/layout/tabela-padrao";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { Cartao } from "@/components/ui/mui/cartao";
+import { Selo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { Selo } from "@/components/ui/selo";
 import { GraficoAlunos, GraficoSemanas } from "@/components/graficos/graficos-sob-demanda";
+import { numeraisTabulares } from "@/theme/tipografia";
 
 interface Props {
   contexto: ContextoDiretor;
@@ -26,22 +45,47 @@ interface Props {
 }
 
 type Exibicao = "grafico" | "tabela";
+type TomDestaque = "neutro" | "falta";
 
 const percentual = new Intl.NumberFormat("pt-BR", {
   style: "percent",
   maximumFractionDigits: 1,
 });
 
+const ALVO_ACAO = { minHeight: 48 } as const;
+
 function dataPorExtenso(dia: string): string {
   return dia.split("-").reverse().join("/");
 }
 
-function Destaque({ valor, rotulo, tom }: { valor: string; rotulo: string; tom?: string }) {
+function Destaque({
+  valor,
+  rotulo,
+  tom = "neutro",
+}: {
+  valor: string;
+  rotulo: string;
+  tom?: TomDestaque;
+}) {
   return (
-    <div className="superficie flex min-h-20 flex-col items-center justify-center gap-1 px-3 py-3">
-      <span className={`numerais-tabulares text-2xl font-semibold ${tom ?? ""}`}>{valor}</span>
-      <span className="text-muted-foreground text-center text-xs font-medium">{rotulo}</span>
-    </div>
+    <Cartao sx={{ height: "100%" }}>
+      <Stack spacing={0.5} sx={{ alignItems: "center", textAlign: "center" }}>
+        <Typography
+          component="p"
+          variant="h5"
+          sx={(tema) => ({
+            ...numeraisTabulares,
+            fontWeight: 600,
+            ...(tom === "falta" ? { color: tema.vars.palette.falta.texto } : {}),
+          })}
+        >
+          {valor}
+        </Typography>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+          {rotulo}
+        </Typography>
+      </Stack>
+    </Cartao>
   );
 }
 
@@ -49,68 +93,73 @@ function TabelaAlunos({ estatisticas }: { estatisticas: EstatisticasTurma }) {
   const verJustificadas = estatisticas.categorias.includes("justificativas");
   const verSaidas = estatisticas.categorias.includes("saidas");
   return (
-    <div className="superficie overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
-        <caption className="sr-only">Ausência por aluno no período</caption>
-        <thead>
-          <tr className="text-muted-foreground border-b text-left text-xs">
-            <th scope="col" className="px-3 py-2 font-medium">
+    <Stack spacing={1.5}>
+      <Typography component="h2" variant="h6">
+        Ausência por aluno
+      </Typography>
+      <TabelaPadrao caption="Ausência por aluno no período" primeiraColunaFixa>
+        <TableHead>
+          <TableRow>
+            <TableCell component="th" scope="col">
               Aluno
-            </th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">
+            </TableCell>
+            <TableCell component="th" scope="col" align="right">
               Ausências
-            </th>
-            {verJustificadas && (
+            </TableCell>
+            {verJustificadas ? (
               <>
-                <th scope="col" className="px-3 py-2 text-right font-medium">
+                <TableCell component="th" scope="col" align="right">
                   Faltas
-                </th>
-                <th scope="col" className="px-3 py-2 text-right font-medium">
+                </TableCell>
+                <TableCell component="th" scope="col" align="right">
                   Justificadas
-                </th>
+                </TableCell>
               </>
-            )}
-            {verSaidas && (
-              <th scope="col" className="px-3 py-2 text-right font-medium">
+            ) : null}
+            {verSaidas ? (
+              <TableCell component="th" scope="col" align="right">
                 Saídas
-              </th>
-            )}
-            <th scope="col" className="px-3 py-2 text-right font-medium">
+              </TableCell>
+            ) : null}
+            <TableCell component="th" scope="col" align="right">
               Dias com chamada
-            </th>
-            <th scope="col" className="px-3 py-2 text-right font-medium">
+            </TableCell>
+            <TableCell component="th" scope="col" align="right">
               Ausência
-            </th>
-          </tr>
-        </thead>
-        <tbody>
+            </TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
           {estatisticas.alunos.map((aluno) => (
-            <tr key={aluno.alunoId} className="border-b last:border-b-0">
-              <th scope="row" className="px-3 py-2 text-left font-normal">
-                <span className="flex flex-wrap items-center gap-2">
-                  {aluno.nome}
-                  {aluno.emRisco && <Selo variante="atencao">em risco</Selo>}
-                </span>
-              </th>
-              <td className="numerais-tabulares px-3 py-2 text-right">{aluno.ausencias}</td>
-              {verJustificadas && (
+            <TableRow key={aluno.alunoId}>
+              <TableCell component="th" scope="row">
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  sx={{ alignItems: "center", flexWrap: "wrap" }}
+                >
+                  <Box component="span">{aluno.nome}</Box>
+                  {aluno.emRisco ? <Selo tom="atencao" rotulo="em risco" /> : null}
+                </Stack>
+              </TableCell>
+              <TableCell align="right">{aluno.ausencias}</TableCell>
+              {verJustificadas ? (
                 <>
-                  <td className="numerais-tabulares px-3 py-2 text-right">{aluno.faltas}</td>
-                  <td className="numerais-tabulares px-3 py-2 text-right">{aluno.justificadas}</td>
+                  <TableCell align="right">{aluno.faltas}</TableCell>
+                  <TableCell align="right">{aluno.justificadas}</TableCell>
                 </>
-              )}
-              {verSaidas && (
-                <td className="numerais-tabulares px-3 py-2 text-right">{aluno.saidas}</td>
-              )}
-              <td className="numerais-tabulares px-3 py-2 text-right">{aluno.diasComChamada}</td>
-              <td className="numerais-tabulares px-3 py-2 text-right font-medium">
+              ) : null}
+              {verSaidas ? <TableCell align="right">{aluno.saidas}</TableCell> : null}
+              <TableCell align="right">{aluno.diasComChamada}</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600 }}>
                 {aluno.diasComChamada > 0 ? percentual.format(aluno.taxa) : "sem chamada"}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </TabelaPadrao>
+    </Stack>
   );
 }
 
@@ -162,12 +211,14 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
 
   if (contexto.turmas.length === 0) {
     return (
-      <section aria-label="Minhas turmas" className="flex flex-col gap-4 pb-6">
-        <h1 className="text-xl font-semibold tracking-tight">Minhas turmas</h1>
-        <p className="superficie text-muted-foreground px-4 py-8 text-center text-sm">
-          Nenhuma turma vinculada a esta conta hoje. Procure a gestão da escola.
-        </p>
-      </section>
+      <Stack component="section" aria-label="Minhas turmas" spacing={2} sx={{ pb: 3 }}>
+        <CabecalhoPagina titulo="Minhas turmas" />
+        <EstadoVazio
+          icone={<GroupsRoundedIcon />}
+          titulo="Sem turmas hoje"
+          descricao="Nenhuma turma vinculada a esta conta hoje. Procure a gestão da escola."
+        />
+      </Stack>
     );
   }
 
@@ -175,53 +226,59 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
   const estatisticas = dados?.turmaId === turmaId ? dados.estatisticas : null;
   const periodo = dados?.turmaId === turmaId ? dados.periodo : null;
   const semChamada = estatisticas !== null && estatisticas.resumo.alunoDias === 0;
+  const descricaoTurma = turma
+    ? `${turma.turma}${
+        periodo ? ` · ${rotuloDataCurta(periodo.de)} a ${rotuloDataCurta(periodo.ate)}` : ""
+      }`
+    : undefined;
+  const inicioDoVinculo =
+    dados && periodo && periodo.de === dados.vinculo.inicio
+      ? ` Seu acompanhamento desta turma começou em ${dataPorExtenso(dados.vinculo.inicio)}.`
+      : "";
 
   return (
-    <section aria-label="Minhas turmas" className="flex flex-col gap-4 pb-6">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Minhas turmas</h1>
-        <p className="text-muted-foreground text-sm">
-          {turma?.turma}
-          {periodo && (
-            <span className="numerais-tabulares">
-              {" "}
-              · {rotuloDataCurta(periodo.de)} a {rotuloDataCurta(periodo.ate)}
-            </span>
-          )}
-        </p>
-      </div>
+    <Stack component="section" aria-label="Minhas turmas" spacing={2} sx={{ pb: 3 }}>
+      <CabecalhoPagina titulo="Minhas turmas" descricao={descricaoTurma} />
 
-      {contexto.turmas.length > 1 && (
-        <div role="group" aria-label="Turma" className="flex flex-wrap gap-2">
-          {contexto.turmas.map((item) => (
-            <button
-              key={item.turmaId}
-              type="button"
-              aria-pressed={item.turmaId === turmaId}
-              onClick={() => setTurmaId(item.turmaId)}
-              className={cn(
-                "controle pressionavel flex min-h-11 items-center px-4 text-sm font-medium transition-colors",
-                item.turmaId === turmaId && "selecionado",
-                item.turmaId !== turmaId && "controle",
-              )}
-            >
-              {item.turma}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="navegacao-dia flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Mês anterior"
-          onClick={() => setMes((atual) => mesSeguinte(atual, -1))}
+      {contexto.turmas.length > 1 ? (
+        <Stack
+          role="group"
+          aria-label="Turma"
+          direction="row"
+          useFlexGap
+          spacing={1}
+          sx={{ flexWrap: "wrap" }}
         >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="min-w-0 flex-1">
+          {contexto.turmas.map((item) => {
+            const ativo = item.turmaId === turmaId;
+            return (
+              <Botao
+                key={item.turmaId}
+                variante="contorno"
+                aria-pressed={ativo}
+                onClick={() => setTurmaId(item.turmaId)}
+                sx={{
+                  ...ALVO_ACAO,
+                  bgcolor: ativo ? "action.selected" : undefined,
+                  borderColor: ativo ? "primary.main" : undefined,
+                }}
+              >
+                {item.turma}
+              </Botao>
+            );
+          })}
+        </Stack>
+      ) : null}
+
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <BotaoIcone
+          rotulo="Mês anterior"
+          variante="contorno"
+          icone={<ChevronLeftRoundedIcon />}
+          onClick={() => setMes((atual) => mesSeguinte(atual, -1))}
+          sx={{ width: 48, height: 48, flexShrink: 0 }}
+        />
+        <Box sx={{ minWidth: 0, flex: 1 }}>
           <SeletorPeriodo
             id="mes-diretor"
             modo="mes"
@@ -231,122 +288,126 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
             rotulo={rotuloMes(mes)}
             onValor={setMes}
           />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Mês seguinte"
+        </Box>
+        <BotaoIcone
+          rotulo="Mês seguinte"
+          variante="contorno"
+          icone={<ChevronRightRoundedIcon />}
           disabled={mes >= mesCorrente}
           onClick={() => setMes((atual) => mesSeguinte(atual, 1))}
-        >
-          <ChevronRight size={18} />
-        </Button>
-      </div>
+          sx={{ width: 48, height: 48, flexShrink: 0 }}
+        />
+      </Stack>
 
-      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+      {erro ? <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" /> : null}
 
       {carregando && !estatisticas ? (
-        <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
-          <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-          Carregando estatísticas
-        </div>
+        <Stack
+          role="status"
+          aria-live="polite"
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: "center", justifyContent: "center", minHeight: 160 }}
+        >
+          <CircularProgress size={18} aria-hidden="true" />
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Carregando estatísticas
+          </Typography>
+        </Stack>
       ) : dados && dados.turmaId === turmaId && !periodo ? (
-        <p className="superficie text-muted-foreground px-4 py-8 text-center text-sm">
-          O vínculo com esta turma começou em {dataPorExtenso(dados.vinculo.inicio)}; não há dados
-          seus neste mês.
-        </p>
+        <EstadoVazio
+          icone={<EventBusyRoundedIcon />}
+          titulo="Sem dados neste mês"
+          descricao={`O vínculo com esta turma começou em ${dataPorExtenso(
+            dados.vinculo.inicio,
+          )}; não há dados seus neste mês.`}
+        />
       ) : estatisticas ? (
         <>
-          <div
-            className="grid grid-cols-3 gap-3"
-            aria-label="Resumo do período"
-            aria-busy={carregando}
-          >
-            <Destaque valor={String(estatisticas.resumo.alunos)} rotulo="Alunos acompanhados" />
-            <Destaque
-              valor={String(estatisticas.resumo.emRisco)}
-              rotulo={`Em risco (a partir de ${estatisticas.limiteRisco}%)`}
-              tom={estatisticas.resumo.emRisco > 0 ? "text-falta-texto" : ""}
-            />
-            <Destaque
-              valor={semChamada ? "sem chamada" : percentual.format(estatisticas.resumo.taxa)}
-              rotulo="Ausência da turma"
-            />
-          </div>
+          <Box role="group" aria-label="Resumo do período" aria-busy={carregando}>
+            <GradeCartoes spacing={2}>
+              <Destaque valor={String(estatisticas.resumo.alunos)} rotulo="Alunos acompanhados" />
+              <Destaque
+                valor={String(estatisticas.resumo.emRisco)}
+                rotulo={`Em risco (a partir de ${estatisticas.limiteRisco}%)`}
+                tom={estatisticas.resumo.emRisco > 0 ? "falta" : "neutro"}
+              />
+              <Destaque
+                valor={semChamada ? "sem chamada" : percentual.format(estatisticas.resumo.taxa)}
+                rotulo="Ausência da turma"
+              />
+            </GradeCartoes>
+          </Box>
 
           {semChamada ? (
-            <p className="superficie text-muted-foreground px-4 py-8 text-center text-sm">
-              Nenhuma chamada registrada neste período.
-              {periodo && dados && periodo.de === dados.vinculo.inicio
-                ? ` Seu acompanhamento desta turma começou em ${dataPorExtenso(dados.vinculo.inicio)}.`
-                : ""}
-            </p>
+            <EstadoVazio
+              icone={<EventBusyRoundedIcon />}
+              titulo="Sem chamada no período"
+              descricao={`Nenhuma chamada registrada neste período.${inicioDoVinculo}`}
+            />
           ) : (
             <>
-              <div className="flex justify-end">
-                <div
-                  role="group"
-                  aria-label="Forma de exibição"
-                  className="superficie flex gap-1 p-1"
-                >
-                  <button
-                    type="button"
+              <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+                <Stack role="group" aria-label="Forma de exibição" direction="row" spacing={1}>
+                  <Botao
+                    variante="contorno"
+                    tamanho="pequeno"
                     aria-pressed={exibicao === "grafico"}
+                    icone={<BarChartRoundedIcon fontSize="small" />}
                     onClick={() => setExibicao("grafico")}
-                    className={cn(
-                      "pressionavel flex min-h-11 items-center gap-1.5 rounded-2xl px-3 text-sm font-medium",
-                      exibicao === "grafico" ? "selecionado" : "controle text-secondary-foreground",
-                    )}
+                    sx={{
+                      ...ALVO_ACAO,
+                      bgcolor: exibicao === "grafico" ? "action.selected" : undefined,
+                      borderColor: exibicao === "grafico" ? "primary.main" : undefined,
+                    }}
                   >
-                    <ChartColumn size={16} aria-hidden="true" />
                     Gráficos
-                  </button>
-                  <button
-                    type="button"
+                  </Botao>
+                  <Botao
+                    variante="contorno"
+                    tamanho="pequeno"
                     aria-pressed={exibicao === "tabela"}
+                    icone={<TableChartRoundedIcon fontSize="small" />}
                     onClick={() => setExibicao("tabela")}
-                    className={cn(
-                      "pressionavel flex min-h-11 items-center gap-1.5 rounded-2xl px-3 text-sm font-medium",
-                      exibicao === "tabela" ? "selecionado" : "controle text-secondary-foreground",
-                    )}
+                    sx={{
+                      ...ALVO_ACAO,
+                      bgcolor: exibicao === "tabela" ? "action.selected" : undefined,
+                      borderColor: exibicao === "tabela" ? "primary.main" : undefined,
+                    }}
                   >
-                    <Table2 size={16} aria-hidden="true" />
                     Tabela
-                  </button>
-                </div>
-              </div>
+                  </Botao>
+                </Stack>
+              </Stack>
 
               {exibicao === "grafico" ? (
-                <>
-                  <div className="superficie flex flex-col gap-3 p-4">
-                    <h2 className="text-sm font-semibold">Ausência por aluno</h2>
+                <Stack spacing={2}>
+                  <SecaoConteudo titulo="Ausência por aluno">
                     <GraficoAlunos
                       alunos={estatisticas.alunos}
                       limiteRisco={estatisticas.limiteRisco}
                     />
-                  </div>
-                  <div className="superficie flex flex-col gap-3 p-4">
-                    <h2 className="text-sm font-semibold">Ausência da turma por semana</h2>
+                  </SecaoConteudo>
+                  <SecaoConteudo titulo="Ausência da turma por semana">
                     <GraficoSemanas
                       semanas={estatisticas.semanas}
                       limiteRisco={estatisticas.limiteRisco}
                       separarJustificadas={estatisticas.categorias.includes("justificativas")}
                     />
-                  </div>
-                </>
+                  </SecaoConteudo>
+                </Stack>
               ) : (
                 <TabelaAlunos estatisticas={estatisticas} />
               )}
             </>
           )}
 
-          <p className="text-muted-foreground text-xs">
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             Ausência conta faltas e faltas justificadas sobre os dias em que a turma de cada aluno
             teve chamada registrada. Alunos da turma de origem, ativos hoje.
-          </p>
+          </Typography>
         </>
       ) : null}
-    </section>
+    </Stack>
   );
 }
