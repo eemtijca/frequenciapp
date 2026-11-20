@@ -419,13 +419,10 @@ test("buscar e percorrer horários com teclado rola apenas o painel de opções"
     elemento.scrollTop = Math.max(1, elemento.scrollTop);
   });
   await aluno.click();
-  const busca = page.getByRole("textbox", {
-    name: "Filtrar opções",
-    exact: true,
-  });
+  const busca = aluno;
   await busca.fill("E2E Fluidez Lista");
   await expect(busca).toBeFocused();
-  const lista = page.getByRole("listbox", { name: "Opções", exact: true });
+  const lista = page.getByRole("listbox");
   await expect(lista.getByRole("option")).toHaveCount(32);
   const posicaoBusca = await posicaoDaTela(page);
   expect(posicaoBusca.painel).toBeGreaterThan(0);
