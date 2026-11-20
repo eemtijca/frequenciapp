@@ -1157,6 +1157,8 @@ export default function Aplicacao({
             aria-label="Navegação do aplicativo"
             sx={{
               display: { xs: "none", md: "block" },
+              visibility: { xs: "hidden", md: "visible" },
+              pointerEvents: { xs: "none", md: "auto" },
               width: TOKENS_LAYOUT.gaveta,
               flexShrink: 0,
             }}

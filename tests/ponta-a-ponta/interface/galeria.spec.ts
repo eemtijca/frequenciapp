@@ -237,11 +237,15 @@ async function prepararEntradas(page: Page): Promise<void> {
   ).toBeVisible();
 }
 
+async function selecionarAba(page: Page, aba: string): Promise<void> {
+  const tab = page.getByRole("tab", { name: aba, exact: true });
+  if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
+  await expect(tab).toHaveAttribute("aria-selected", "true");
+}
+
 async function prepararRelatorios(page: Page, aba: string): Promise<void> {
   await trocarVisao(page, "Relatórios", "relatorios");
-  const tab = page.getByRole("tab", { name: aba, exact: true });
-  await tab.click();
-  await expect(tab).toHaveAttribute("aria-selected", "true");
+  await selecionarAba(page, aba);
 }
 
 async function prepararAlunos(page: Page, agrupamento?: "Turma atual" | "Turma de origem") {
@@ -258,9 +262,7 @@ async function prepararAlunos(page: Page, agrupamento?: "Turma atual" | "Turma d
 
 async function prepararGestao(page: Page, aba: string): Promise<void> {
   await trocarVisao(page, "Gestão", "gestao");
-  const tab = page.getByRole("tab", { name: aba, exact: true });
-  await tab.click();
-  await expect(tab).toHaveAttribute("aria-selected", "true");
+  await selecionarAba(page, aba);
 }
 
 async function prepararConfiguracoes(page: Page, categoria: string): Promise<void> {
