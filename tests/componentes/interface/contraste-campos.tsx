@@ -1,4 +1,4 @@
-// Os componentes de produção são montados sobre as duas superfícies do tema claro.
+// Os componentes de produção são montados sobre as duas superfícies do tema.
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
 import Box from "@mui/material/Box";
@@ -20,10 +20,17 @@ function Campos({ superficie }: { superficie: string }) {
   const [simples, setSimples] = useState("");
   const [busca, setBusca] = useState("");
   const [texto, setTexto] = useState("");
+  const [curto, setCurto] = useState("");
   const [senha, setSenha] = useState("senha-teste");
   return (
     <Stack spacing={2} sx={{ p: 2 }} data-superficie={superficie}>
       <CampoTexto ariaLabel={`Texto ${superficie}`} valor={texto} onValor={setTexto} />
+      <CampoTexto
+        ariaLabel={`Pequeno ${superficie}`}
+        valor={curto}
+        onValor={setCurto}
+        tamanho="pequeno"
+      />
       <Selecionar
         ariaLabel={`Seletor ${superficie}`}
         valor={simples}
@@ -52,6 +59,7 @@ function Campos({ superficie }: { superficie: string }) {
       <OutlinedInput
         aria-label={`Inválido ${superficie}`}
         aria-invalid="true"
+        error
         defaultValue="Inválido"
       />
       <OutlinedInput aria-label={`Desabilitado ${superficie}`} disabled defaultValue="Bloqueado" />
