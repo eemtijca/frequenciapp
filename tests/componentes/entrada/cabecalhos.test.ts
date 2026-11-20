@@ -236,12 +236,15 @@ it.each(combinacoes)(
         const menu = page.getByRole("button", { name: "Mais ações do FrequenciBI" });
         await verificarDiscreto(menu);
         await menu.press("Enter");
-        expect(await page.getByRole("button", { name: /Tema:.*Alterar tema/ }).isVisible()).toBe(
-          true,
-        );
+        const botaoTema = page.getByRole("button", { name: /Tema:.*Alterar tema/ });
+        await botaoTema.waitFor();
         await page.keyboard.press("Escape");
-        await verificarDiscreto(page.getByRole("button", { name: "Mais ações da análise" }));
-        await page.getByRole("button", { name: "Mais ações da análise" }).press("Enter");
+        // O painel devolve o foco ao seu botão após terminar de fechar.
+        await botaoTema.waitFor({ state: "hidden" });
+        await expect.poll(() => menu.evaluate((el) => el === document.activeElement)).toBe(true);
+        const analise = page.getByRole("button", { name: "Mais ações da análise" });
+        await verificarDiscreto(analise);
+        await analise.press("Enter");
         expect(await page.getByRole("button", { name: "Apresentar" }).isVisible()).toBe(true);
         await page.getByRole("button", { name: "Apresentar", exact: true }).click();
       }

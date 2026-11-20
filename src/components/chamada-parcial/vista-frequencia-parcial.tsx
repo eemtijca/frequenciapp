@@ -542,13 +542,10 @@ export default function VistaFrequenciaParcial({
     <section
       aria-label="Chamada Parcial"
       data-testid="chamada-parcial"
-      className="flex flex-col gap-4"
+      className="@container flex flex-col gap-4"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Chamada parcial</h1>
-          <p className="text-muted-foreground text-sm">Ajustes por aluno e conferência na Seduc.</p>
-        </div>
+        <h1 className="text-xl font-semibold tracking-tight">Chamada parcial</h1>
         <Button
           type="button"
           variant="outline"
@@ -560,77 +557,95 @@ export default function VistaFrequenciaParcial({
           Enviar para a planilha
         </Button>
       </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="parcial-turma">Turma</Label>
-        <Selecionar
-          id="parcial-turma"
-          value={turmaId}
-          onValueChange={setTurmaId}
-          opcoes={opcoesTurma}
-          disabled={ocupado || editorAberto}
-          placeholder="Selecione a turma"
-        />
-      </div>
-      <div className="navegacao-dia flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label="Dia anterior da chamada parcial"
-          onClick={() => nav.anterior()}
-          disabled={ocupado || editorAberto}
-          className="size-11 shrink-0"
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <SeletorPeriodo
-            id="dia-chamada-parcial"
-            modo="dia"
-            valor={nav.resumo ? (nav.domingo ?? "") : dia}
-            max={limite}
-            atual={diaInicial}
-            calendarioSemanal
-            mostrarSelo={!nav.resumo}
-            rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : dia.split("-").reverse().join("/")}
-            detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
-            rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da chamada parcial"}
-            onValor={(proximo) => nav.escolherDia(proximo)}
-            aoHoje={() => nav.voltarParaHoje()}
-            hojeAtivo={nav.hojeAtivo}
-            onAbertoChange={setCalendarioAberto}
-            disabled={ocupado || editorAberto}
-          />
+      <div className="superficie flex flex-col gap-2 p-3 sm:p-4">
+        <div className="grid items-end gap-3 @min-[36rem]:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor="parcial-turma">Turma</Label>
+            <Selecionar
+              id="parcial-turma"
+              value={turmaId}
+              onValueChange={setTurmaId}
+              opcoes={opcoesTurma}
+              disabled={ocupado || editorAberto}
+              placeholder="Selecione a turma"
+            />
+          </div>
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <Label htmlFor="dia-chamada-parcial">Data</Label>
+            <div className="navegacao-dia flex min-w-0 items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Dia anterior da chamada parcial"
+                onClick={() => nav.anterior()}
+                disabled={ocupado || editorAberto}
+              >
+                <ChevronLeft size={18} />
+              </Button>
+              <div className="min-w-0 flex-1">
+                <SeletorPeriodo
+                  id="dia-chamada-parcial"
+                  modo="dia"
+                  valor={nav.resumo ? (nav.domingo ?? "") : dia}
+                  max={limite}
+                  atual={diaInicial}
+                  calendarioSemanal
+                  mostrarSelo={!nav.resumo}
+                  rotulo={
+                    nav.resumo ? (nav.rotuloResumo ?? "") : dia.split("-").reverse().join("/")
+                  }
+                  detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
+                  rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da chamada parcial"}
+                  onValor={(proximo) => nav.escolherDia(proximo)}
+                  aoHoje={() => nav.voltarParaHoje()}
+                  hojeAtivo={nav.hojeAtivo}
+                  onAbertoChange={setCalendarioAberto}
+                  disabled={ocupado || editorAberto}
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Dia seguinte da chamada parcial"
+                onClick={() => nav.seguinte()}
+                disabled={ocupado || editorAberto || nav.seguinteDesabilitado}
+              >
+                <ChevronRight size={18} />
+              </Button>
+            </div>
+          </div>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="icon"
-          aria-label="Dia seguinte da chamada parcial"
-          onClick={() => nav.seguinte()}
-          disabled={ocupado || editorAberto || nav.seguinteDesabilitado}
-          className="size-11 shrink-0"
-        >
-          <ChevronRight size={18} />
-        </Button>
+        {(!nav.resumo || nav.mostrarVoltar) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {nav.mostrarVoltar && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-primary"
+                disabled={ocupado || editorAberto || sujo}
+                onClick={() => nav.voltarParaHoje()}
+              >
+                Voltar para hoje
+              </Button>
+            )}
+            {!nav.resumo && (
+              <AtualizadoDaVisao fuso={fuso} className="ml-auto min-w-0 whitespace-normal" />
+            )}
+          </div>
+        )}
       </div>
-      {!nav.resumo && (
-        <div className="flex justify-end">
-          <AtualizadoDaVisao fuso={fuso} />
+      {!nav.semana && feriado && (
+        <div
+          role="status"
+          className="superficie text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
+        >
+          <CalendarOff size={18} aria-hidden="true" className="shrink-0" />
+          <span className="min-w-0 break-words">Feriado · {feriado.nome}</span>
         </div>
       )}
-      {nav.mostrarVoltar && (
-        <Button
-          type="button"
-          variant="secondary"
-          disabled={ocupado || editorAberto || sujo}
-          onClick={() => nav.voltarParaHoje()}
-          className="self-start"
-        >
-          Voltar para hoje
-        </Button>
-      )}
-      {nav.resumo && nav.semana ? (
+      {nav.semana ? (
         <VistaResumoParcial
           turma={turma ?? null}
           alunos={alunos}
@@ -646,41 +661,31 @@ export default function VistaFrequenciaParcial({
           onAbrirChamada={(dia) => onAbrirChamada?.(dia, turmaId)}
         />
       ) : (
-        <>
-          {feriado && (
-            <div
-              role="status"
-              className="superficie text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
-            >
-              <CalendarOff size={18} aria-hidden="true" className="shrink-0" />
-              <span className="min-w-0 break-words">Feriado · {feriado.nome}</span>
-            </div>
-          )}
-          <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="superficie @container overflow-hidden">
+          <div className="grid items-center gap-2 px-3 pt-3 sm:px-4 @min-[34rem]:grid-cols-[minmax(0,1fr)_13rem]">
             <BarraBusca
               id="parcial-busca"
               valor={busca}
               onValor={setBusca}
               placeholder="Buscar aluno"
-              className="min-w-0 flex-1"
+              className="min-w-0"
             />
-            <div className="sm:w-48">
-              <Selecionar
-                id="parcial-filtro"
-                ariaLabel="Situação da frequência parcial"
-                value={filtro}
-                onValueChange={setFiltro}
-                opcoes={[
-                  { valor: "todos", rotulo: "Todos os alunos" },
-                  { valor: "sem-registro", rotulo: "Sem registro" },
-                  { valor: "pendentes", rotulo: "Pendentes na Seduc" },
-                  { valor: "registrados", rotulo: "Registrados na Seduc" },
-                ]}
-              />
-            </div>
+            <Selecionar
+              id="parcial-filtro"
+              ariaLabel="Situação da frequência parcial"
+              value={filtro}
+              onValueChange={setFiltro}
+              opcoes={[
+                { valor: "todos", rotulo: "Todos os alunos" },
+                { valor: "sem-registro", rotulo: "Sem registro" },
+                { valor: "pendentes", rotulo: "Pendentes na Seduc" },
+                { valor: "registrados", rotulo: "Registrados na Seduc" },
+              ]}
+            />
           </div>
           {erro ? (
             <AvisoCompacto
+              className="m-3"
               variante={carga.variante}
               titulo="Chamada parcial indisponível"
               descricao={erro}
@@ -698,9 +703,9 @@ export default function VistaFrequenciaParcial({
               Carregando chamada parcial...
             </p>
           ) : (
-            <div className="superficie @container overflow-hidden">
-              <div className="text-muted-foreground flex items-center justify-between gap-2 px-4 py-2 text-xs">
-                <span className="numerais-tabulares">
+            <>
+              <div className="text-muted-foreground flex min-h-9 items-center justify-between gap-2 px-3 text-xs sm:px-4">
+                <span role="status" className="numerais-tabulares">
                   {alunosFiltrados.length} {alunosFiltrados.length === 1 ? "aluno" : "alunos"}
                 </span>
                 {(filtro !== "todos" || busca !== "") && (
@@ -742,14 +747,14 @@ export default function VistaFrequenciaParcial({
                       return (
                         <li
                           key={aluno.id}
-                          className="bg-card px-4 py-3"
+                          className="px-4 py-3"
                           data-testid={`parcial-aluno-${aluno.id}`}
                         >
                           {/* No celular: nome e situação à esquerda, ações à direita e a
                               Seduc embaixo, só quando existe. No desktop, uma coluna para cada. */}
-                          <div className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-center gap-x-3 gap-y-1 @min-[48rem]:grid-cols-[minmax(0,1fr)_11rem_9rem_13rem]">
+                          <div className="grid grid-cols-[minmax(0,2fr)_minmax(min-content,3fr)] items-center gap-x-3 gap-y-1 @min-[48rem]:grid-cols-[minmax(0,1fr)_11rem_9rem_13rem]">
                             <div className="col-start-1 row-start-1 min-w-0">
-                              <h2 className="text-sm font-medium break-words">{aluno.nome}</h2>
+                              <h2 className="text-sm font-semibold break-words">{aluno.nome}</h2>
                               {aluno.desistente && (
                                 <span className="text-muted-foreground text-xs">Desistente</span>
                               )}
@@ -852,9 +857,9 @@ export default function VistaFrequenciaParcial({
                   </ul>
                 </div>
               )}
-            </div>
+            </>
           )}
-        </>
+        </div>
       )}
       <DialogoFrequenciaParcial
         aberto={ativa && editorAberto}
