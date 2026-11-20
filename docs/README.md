@@ -95,3 +95,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-077](adr/077-canais-de-atualizacao.md): canais `release` e `main`, estado, downgrade, backup e readoção do controlador.
 - [ADR-078](adr/078-reconfiguracao-restrita-das-rotinas.md): seletores explícitos, cron reconhecido e reconfiguração recuperável sem mover a trava.
 - [ADR-079](adr/079-observabilidade-com-prometheus.md): coleta Prometheus autenticada, rede interna, painel no loopback e alertas sem notificação externa.
+- [ADR-080](adr/080-horario-de-provas-bimestrais.md): horário temporário de provas por turma e data, cadastrado na Gestão e mostrado em Horários até o fim do período.

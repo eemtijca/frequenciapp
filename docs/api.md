@@ -249,6 +249,27 @@ Permissão: administração, com origem confiável e auditoria (`ordem-almoco.de
 
 Excluir uma turma a retira da ordem de todos os dias. A cópia JSON inclui a ordem; na restauração, um dia vazio recebe a ordem da cópia e um dia já definido não é sobrescrito.
 
+### GET /api/provas-bimestrais
+
+Permissão: qualquer sessão da equipe. Devolve `{"provas": [{"id", "turmaId", "dia", "inicio", "fim", "disciplina"}]}` com as provas de hoje em diante, de todas as turmas, em ordem de data, início e disciplina. Datas passadas não aparecem. Ver [ADR-080](adr/080-horario-de-provas-bimestrais.md).
+
+### POST /api/provas-bimestrais
+
+Permissão: administração, com origem confiável e auditoria (`prova-bimestral.adicionar`, alvo `dia:<data>:turmas:<n>`). Corpo `{"turmaIds": uuid[], "dia": "YYYY-MM-DD", "inicio": "HH:MM", "fim": "HH:MM", "disciplina": string}`, de 1 a 60 turmas sem repetição; grava uma prova para cada turma. A data vale de hoje em diante e fora do domingo, o fim vem depois do início e a disciplina tem de 1 a 80 caracteres. Na mesma transação, apaga as provas de datas passadas.
+
+- 201 `{"provas": ProvaBimestral[]}`, uma por turma.
+- 400 corpo inválido, campo extra, data passada ou no domingo, horário inválido ou disciplina vazia; 403 sem ser administração ou com origem inválida; 404 turma inexistente; 409 quando alguma turma já tem prova em janela que se cruza com a nova no mesmo dia. Uma prova pode começar no minuto em que a outra termina.
+
+### DELETE /api/provas-bimestrais/{id}
+
+Permissão: administração, com origem confiável e auditoria (`prova-bimestral.remover`). Remove a prova de uma turma. 200 `{"ok": true}`; 404 quando a prova não existe.
+
+### POST /api/provas-bimestrais/encerrar
+
+Permissão: administração, com origem confiável e auditoria (`prova-bimestral.encerrar`). Corpo `{"confirmar": true}`. Encerra o período de provas apagando o horário de provas de todas as turmas. 200 `{"removidas": number}`; 400 sem a confirmação.
+
+Excluir uma turma remove as provas dela. As provas são temporárias e não entram na cópia JSON.
+
 ## Alunos
 
 ### GET /api/alunos

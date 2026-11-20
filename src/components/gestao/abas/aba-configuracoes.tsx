@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Archive,
   Bell,
+  CalendarClock,
   CalendarDays,
   ChartNoAxesCombined,
   ClipboardList,
@@ -69,6 +70,7 @@ import SecaoCalendarioLetivo from "@/components/gestao/configuracoes/secao-calen
 import SecaoBeneficiosFrequencia from "@/components/gestao/configuracoes/secao-beneficios-frequencia";
 import SecaoInfrequencia from "@/components/gestao/configuracoes/secao-infrequencia";
 import VistaHorarios from "@/components/horarios/vista-horarios";
+import SecaoProvasBimestrais from "@/components/horarios/secao-provas-bimestrais";
 import SecaoOrdemAlmoco from "@/components/gestao/configuracoes/secao-ordem-almoco";
 import {
   ProvedorRascunhoConfiguracoes,
@@ -1373,6 +1375,12 @@ function ConteudoConfiguracoes({
                       }}
                     />
                   ),
+                },
+                {
+                  valor: "provas",
+                  rotulo: "Provas",
+                  icone: CalendarClock,
+                  conteudo: <SecaoProvasBimestrais turmas={turmas} diaCorrente={diaCorrente} />,
                 },
               ]}
             />

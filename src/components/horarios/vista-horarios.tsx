@@ -23,11 +23,14 @@ import {
 import { ordemDoDia, type OrdemAlmocoDoDia } from "@/domain/ordem-almoco";
 import { corpoAlteracao, pedir } from "@/lib/api-cliente";
 import { ouvirOrdemAlmocoMudou } from "@/lib/eventos-ordem-almoco";
+import { ouvirProvasBimestraisMudaram } from "@/lib/eventos-provas-bimestrais";
+import type { ProvaBimestral } from "@/domain/provas-bimestrais";
 import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import DialogoAulas from "@/components/gestao/cadastros/dialogo-aulas";
 import { EditorAula, type RascunhoAula } from "@/components/horarios/editor-aula";
+import CartaoProvasBimestrais from "@/components/horarios/cartao-provas-bimestrais";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -240,10 +243,27 @@ export default function VistaHorarios({
   // Ordem do almoço: lida ao montar e de novo quando a Gestão a altera; falha só omite o cartão.
   const [ordemAlmoco, setOrdemAlmoco] = useState<OrdemAlmocoDoDia[]>([]);
   const [versaoOrdem, setVersaoOrdem] = useState(0);
+  // Provas bimestrais: só na consulta, relidas com a ordem do almoço; falha só omite o cartão.
+  const [provas, setProvas] = useState<ProvaBimestral[]>([]);
   useAtualizacaoTela("horarios", async () => {
     await onMudanca();
     setVersaoOrdem((versao) => versao + 1);
   });
+  useEffect(() => ouvirProvasBimestraisMudaram(() => setVersaoOrdem((versao) => versao + 1)), []);
+  useEffect(() => {
+    if (editavel) return;
+    let atual = true;
+    pedir<{ provas: ProvaBimestral[] }>("/api/provas-bimestrais")
+      .then((dados) => {
+        if (atual) setProvas(dados.provas);
+      })
+      .catch(() => {
+        if (atual) setProvas([]);
+      });
+    return () => {
+      atual = false;
+    };
+  }, [editavel, versaoOrdem]);
   useEffect(() => ouvirOrdemAlmocoMudou(() => setVersaoOrdem((versao) => versao + 1)), []);
   useEffect(() => {
     let atual = true;
@@ -472,6 +492,15 @@ export default function VistaHorarios({
           />
         </div>
       </div>
+
+      {!editavel ? (
+        <CartaoProvasBimestrais
+          provas={provas}
+          turmaId={turma?.id}
+          turmaRotulo={turma?.rotulo ?? "Turma"}
+          diaCorrente={diaCorrente}
+        />
+      ) : null}
 
       {editavel ? (
         <div className="flex">

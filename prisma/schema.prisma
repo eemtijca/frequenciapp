@@ -271,6 +271,7 @@ model Turma {
   vinculosDiretor     VinculoDiretor[]          @relation("VinculoDaTurma")
   configuracoesOrigem ConfiguracaoOrigemTurma[]
   ordensAlmoco        OrdemAlmoco[]
+  provasBimestrais    ProvaBimestral[]
 
   @@unique([serieId, nome])
   @@map("turmas")
@@ -593,6 +594,25 @@ model OrdemAlmoco {
   @@id([diaSemana, turmaId])
   @@unique([diaSemana, posicao])
   @@map("ordens_almoco")
+}
+
+// Prova bimestral de uma turma em uma data, com horário e disciplina. É temporária:
+// a administração cadastra durante o período de provas, a aba Horários mostra só as
+// datas de hoje em diante e encerrar o período apaga tudo. Excluir a turma remove as provas.
+model ProvaBimestral {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  turmaId      String   @map("turma_id") @db.Uuid
+  dia          DateTime @db.Date
+  inicio       String   @db.VarChar(5)
+  fim          String   @db.VarChar(5)
+  disciplina   String   @db.VarChar(80)
+  criadoEm     DateTime @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime @updatedAt @map("atualizado_em") @db.Timestamptz
+  turma        Turma    @relation(fields: [turmaId], references: [id], onDelete: Cascade)
+
+  @@index([dia])
+  @@index([turmaId, dia])
+  @@map("provas_bimestrais")
 }
 
 // Feriado escolar em uma data civil explícita, válido para todas as turmas.

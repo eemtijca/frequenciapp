@@ -120,6 +120,21 @@ Toda turma nasce com uma aula padrão (ordem 1, 00:00 às 23:59, de segunda a s�
 
 A administração define a ordem de cada dia em Gestão, Configurações, Horários, e a aba Horários mostra a ordem do dia consultado. Gravar um dia substitui a lista inteira, e os horários, quando informados, seguem a ordem das turmas. A cópia JSON inclui a ordem.
 
+## Prova bimestral (prova_bimestral)
+
+| Campo        | Tipo  | Observação                                          |
+| ------------ | ----- | --------------------------------------------------- |
+| id           | uuid  |                                                     |
+| turmaId      | uuid  | Turma. Excluir a turma remove as provas.            |
+| dia          | data  | Data da prova, de hoje em diante e fora do domingo. |
+| inicio       | texto | `HH:MM`.                                            |
+| fim          | texto | `HH:MM`, depois do início.                          |
+| disciplina   | texto | De 1 a 80 caracteres.                               |
+| criadoEm     | data  |                                                     |
+| atualizadoEm | data  |                                                     |
+
+O horário de provas é temporário. A administração cadastra a mesma prova para várias turmas de uma vez, e uma turma não pode ter duas provas em janelas que se cruzam no mesmo dia. A aba Horários mostra só as datas de hoje em diante; encerrar o período apaga todas as linhas, e as provas não entram na cópia JSON ([ADR-080](adr/080-horario-de-provas-bimestrais.md)).
+
 ## Frequência (frequencia)
 
 | Campo           | Tipo    | Observação                                        |
