@@ -289,7 +289,7 @@ async function entrarComoDiretor(page: Page): Promise<void> {
   await page.getByLabel(/E-mail ou identificador/).fill("diretor.1a");
   await page.getByLabel("Senha", { exact: true }).fill(senha);
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
-  await expect(page.locator('main[data-visao="diretor"]')).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('[data-visao="diretor"]')).toBeVisible({ timeout: 15_000 });
 }
 
 async function prepararMinhasTurmas(page: Page): Promise<void> {
