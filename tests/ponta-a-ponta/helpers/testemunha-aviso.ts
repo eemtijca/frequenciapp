@@ -7,7 +7,7 @@ export function registrarTestemunha(botao: HTMLElement, tipoEvento: string) {
     resultado.confiavel = evento.isTrusted;
     resultado.instante = Date.now();
     const aviso = [...document.querySelectorAll(".MuiSnackbar-root .MuiAlert-root")].find(
-      (elemento) => elemento.textContent?.includes("Configurações salvas."),
+      (elemento) => elemento.textContent?.trim() === "Configurações salvas.",
     );
     if (aviso) {
       const retangulos = [...aviso.getClientRects()];

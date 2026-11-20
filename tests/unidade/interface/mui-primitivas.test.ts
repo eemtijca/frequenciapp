@@ -472,8 +472,10 @@ describe("restrições estáticas das primitivas", () => {
     ]) {
       expect(() => readFileSync(arquivo, "utf8"), arquivo).toThrow();
     }
-    expect(readdirSync("src", { recursive: true }).filter((nome) => nome.endsWith(".css"))).toEqual(
-      [],
-    );
+    expect(
+      readdirSync("src", { recursive: true, encoding: "utf8" }).filter((nome) =>
+        nome.endsWith(".css"),
+      ),
+    ).toEqual([]);
   });
 });

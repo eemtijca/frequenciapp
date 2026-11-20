@@ -1,14 +1,20 @@
 // Verifica o instante de atualização apresentado com a data no fuso da escola.
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ThemeProvider } from "@mui/material/styles";
 import { describe, expect, it } from "vitest";
+import { tema } from "@/theme/tema";
 import { AtualizadoEm } from "@/components/ui/mui/atualizado-em";
 
 describe("rótulo de atualização", () => {
   it("preserva o estado sem leitura quando o instante é ausente ou inválido", () => {
     for (const instante of [undefined, "inválido"]) {
       const html = renderToStaticMarkup(
-        createElement(AtualizadoEm, { instante, fuso: "America/Fortaleza" }),
+        createElement(
+          ThemeProvider,
+          { theme: tema },
+          createElement(AtualizadoEm, { instante, fuso: "America/Fortaleza" }),
+        ),
       );
       expect(html).toContain("</svg>Ainda não atualizado</span>");
     }
@@ -16,10 +22,14 @@ describe("rótulo de atualização", () => {
 
   it("exibe data e hora da leitura no fuso da escola", () => {
     const html = renderToStaticMarkup(
-      createElement(AtualizadoEm, {
-        instante: "2026-01-01T01:30:00.000Z",
-        fuso: "America/Fortaleza",
-      }),
+      createElement(
+        ThemeProvider,
+        { theme: tema },
+        createElement(AtualizadoEm, {
+          instante: "2026-01-01T01:30:00.000Z",
+          fuso: "America/Fortaleza",
+        }),
+      ),
     );
     expect(html).toContain("</svg>Atualizado em 31/12/2025 às 22:30</span>");
   });

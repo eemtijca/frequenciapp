@@ -10,7 +10,7 @@ function montarTestemunha(
   const botao = new NoFalso();
   const aviso = Object.assign(new NoFalso(), {
     parentElement: null,
-    querySelector: () => ({ textContent: "Configurações salvas." }),
+    textContent: "Configurações salvas.",
     getClientRects: () => [retangulo],
   });
   Object.assign(botao, { contains: (elemento: unknown) => elemento === botao });
@@ -106,7 +106,7 @@ describe("testemunha do aviso", () => {
 
   it("exige o texto exato do aviso", () => {
     const teste = montarTestemunha({ left: 10, top: 10, right: 90, bottom: 90 });
-    teste.aviso.querySelector = () => ({ textContent: "Configurações salvas. Outro aviso" });
+    teste.aviso.textContent = "Configurações salvas. Outro aviso";
     teste.emitir();
     expect(teste.resultado.avisoVisivel).toBe(false);
   });
