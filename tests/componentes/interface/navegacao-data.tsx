@@ -4,6 +4,10 @@ import { useState } from "react";
 import Box from "@mui/material/Box";
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { ptBR } from "@mui/x-date-pickers/locales";
+import "dayjs/locale/pt-br";
 import VistaGrade from "@/components/grade/vista-grade";
 import VistaMovimentacoes from "@/components/relatorios/vista-movimentacoes";
 import VistaPainel from "@/components/painel/vista-painel";
@@ -180,8 +184,14 @@ createRoot(raiz).render(
     disableTransitionOnChange
   >
     <CssBaseline enableColorScheme />
-    <Box component="main" sx={{ p: 2 }}>
-      {telas[tela] ?? telas.painel}
-    </Box>
+    <LocalizationProvider
+      dateAdapter={AdapterDayjs}
+      adapterLocale="pt-br"
+      localeText={ptBR.components.MuiLocalizationProvider.defaultProps.localeText}
+    >
+      <Box component="main" sx={{ p: 2 }}>
+        {telas[tela] ?? telas.painel}
+      </Box>
+    </LocalizationProvider>
   </ThemeProvider>,
 );

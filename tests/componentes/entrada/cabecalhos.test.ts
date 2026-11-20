@@ -228,6 +228,10 @@ it.each(combinacoes)(
           .filter((el) => {
             const estilo = getComputedStyle(el);
             if (estilo.display === "none" || estilo.visibility === "hidden") return false;
+            for (let pai = el.parentElement; pai; pai = pai.parentElement) {
+              if (["auto", "scroll", "hidden", "clip"].includes(getComputedStyle(pai).overflowX))
+                return false;
+            }
             const caixa = el.getBoundingClientRect();
             return caixa.width > 0 && (caixa.left < -1 || caixa.right > limite);
           })

@@ -17,7 +17,7 @@ export function Cartao({ sx, ...props }: CartaoProps) {
       {...props}
       sx={[
         (theme) => ({
-          padding: TOKENS_LAYOUT.cartao.padding,
+          padding: `${TOKENS_LAYOUT.cartao.padding}px`,
           borderRadius: `${TOKENS_LAYOUT.cartao.raio}px`,
           boxShadow: "none",
           backgroundImage: "none",

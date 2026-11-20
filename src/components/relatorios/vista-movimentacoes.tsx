@@ -322,7 +322,7 @@ export default function VistaMovimentacoes({
       </Stack>
 
       <Cartao component="div">
-        <Grid container spacing={2}>
+        <Grid container spacing={2} sx={{ width: "100%" }}>
           {modo === "periodo" ? (
             <>
               <Grid size={{ xs: 12, sm: 6, lg: 4 }}>

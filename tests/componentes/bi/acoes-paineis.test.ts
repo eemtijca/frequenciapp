@@ -4,7 +4,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { contraste, type Rgb } from "../helpers/cor";
+import { contraste, type Rgb } from "../../helpers/cor";
 
 const requireVitest = createRequire(import.meta.url);
 const caminho = requireVitest.resolve("vite", {
