@@ -1,39 +1,37 @@
 "use client";
 
 // Horários da turma: janelas das aulas e disciplinas por dia, com preservação do histórico.
-import { useState } from "react";
-import { LoaderCircle, Pencil, Plus, Power, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
+import Box from "@mui/material/Box";
+import FormControl from "@mui/material/FormControl";
+import FormLabel from "@mui/material/FormLabel";
+import Grid from "@mui/material/Grid";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Stack from "@mui/material/Stack";
+import ToggleButton from "@mui/material/ToggleButton";
+import Typography from "@mui/material/Typography";
 import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type { Horario, Turma } from "@/domain/frequencia";
 import { DIAS_DA_SEMANA } from "@/domain/horarios-semanais";
-import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SeletorHorario } from "@/components/ui/seletor-horario";
-import { DialogoCopiarHorarios } from "@/components/gestao/cadastros/dialogo-copiar-horarios";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { corpoAlteracao, corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { Selo } from "@/components/ui/mui/selo";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { SeletorHorario } from "@/components/ui/mui/seletor-horario";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Formulario {
   id?: string;
@@ -53,6 +51,217 @@ interface Props {
   onMudanca: () => Promise<void>;
 }
 
+interface ConfirmacaoAula {
+  tipo: "ativar" | "excluir";
+  aula: Horario;
+}
+
+const ESTILO_BOTAO_ICONE = {
+  minWidth: TOKENS_LAYOUT.alvoToque,
+  width: TOKENS_LAYOUT.alvoToque,
+  height: TOKENS_LAYOUT.alvoToque,
+  padding: 0,
+  "&.MuiButton-root": {
+    minWidth: TOKENS_LAYOUT.alvoToque,
+    width: TOKENS_LAYOUT.alvoToque,
+    height: TOKENS_LAYOUT.alvoToque,
+    padding: 0,
+  },
+  "& .MuiButton-startIcon": { margin: 0 },
+} as const;
+
+interface CopiarGradeProps {
+  destino: Turma;
+  turmas: Turma[];
+  disabled: boolean;
+  onOcupado: (ocupado: boolean) => void;
+  onMudanca: () => Promise<void>;
+}
+
+function CopiarGrade({ destino, turmas, disabled, onOcupado, onMudanca }: CopiarGradeProps) {
+  const [aberto, setAberto] = useState(false);
+  const [origemId, setOrigemId] = useState("");
+  const [confirmando, setConfirmando] = useState(false);
+  const [erro, setErro] = useState("");
+  const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
+  const opcoes = useMemo(
+    () =>
+      turmas
+        .filter((turma) => turma.id !== destino.id)
+        .map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
+    [destino.id, turmas],
+  );
+  const origem = turmas.find((turma) => turma.id === origemId);
+  const aulas = useMemo(
+    () => [...(origem?.horarios ?? [])].sort((a, b) => a.ordem - b.ordem),
+    [origem],
+  );
+
+  const { executando, executar } = useAcaoUnica(async () => {
+    if (!origem || aulas.length === 0 || disabled) return;
+    setErro("");
+    onOcupado(true);
+    try {
+      await pedir<{ horarios: Horario[] }>(
+        "/api/horarios/copiar",
+        corpoJson({ turmaOrigemId: origem.id, turmaDestinoId: destino.id }),
+      );
+      setConfirmando(false);
+      setAberto(false);
+      setOrigemId("");
+      avisarSucesso("Grade copiada.");
+      try {
+        await onMudanca();
+      } catch {
+        avisarInfo(
+          "Grade copiada.",
+          "Recarregue a página para visualizar os horários atualizados.",
+        );
+      }
+    } catch (excecao) {
+      setConfirmando(false);
+      setErro(excecao instanceof ErroApi ? excecao.message : "Não foi possível copiar a grade.");
+      setErroVariante(estadoDeErro(excecao));
+      avisarErro(excecao, { contexto: "Não foi possível copiar a grade." });
+    } finally {
+      onOcupado(false);
+    }
+  });
+
+  if (!aberto) {
+    return (
+      <Botao
+        variante="contorno"
+        type="button"
+        disabled={disabled || opcoes.length === 0}
+        onClick={() => setAberto(true)}
+        icone={<ContentCopyRoundedIcon />}
+      >
+        Copiar de outra turma
+      </Botao>
+    );
+  }
+
+  return (
+    <Box
+      component="section"
+      aria-label="Copiar grade"
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        minWidth: 0,
+        padding: 2,
+        border: 1,
+        borderColor: "divider",
+        borderRadius: 2,
+      }}
+    >
+      <Campo id="horarios-turma-origem" rotulo="Turma de origem">
+        <Selecionar
+          valor={origemId}
+          onValor={(valor) => {
+            setOrigemId(valor);
+            setErro("");
+          }}
+          opcoes={opcoes}
+          buscavel
+          placeholder="Selecionar turma"
+          disabled={disabled || executando}
+        />
+      </Campo>
+      <Typography variant="body2">
+        Destino:{" "}
+        <Box component="span" sx={{ fontWeight: 500 }}>
+          {destino.rotulo}
+        </Box>
+      </Typography>
+      {origem ? (
+        aulas.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            A turma de origem não tem horários.
+          </Typography>
+        ) : (
+          <Stack spacing={1}>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {aulas.length} {aulas.length === 1 ? "aula" : "aulas"} de {origem.rotulo}
+            </Typography>
+            <List
+              aria-label="Prévia da grade"
+              sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}
+            >
+              {aulas.map((aula) => (
+                <ListItem key={aula.id} divider sx={{ display: "block", px: 2, py: 1 }}>
+                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                    <Box component="span" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                      Aula {aula.ordem}: {aula.inicio} às {aula.fim}
+                    </Box>
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ display: "block", color: "text.secondary", overflowWrap: "anywhere" }}
+                  >
+                    {aula.diasSemana
+                      .map((dia) => {
+                        const rotulo =
+                          DIAS_DA_SEMANA.find((opcao) => opcao.valor === dia)?.abreviacao ?? dia;
+                        return `${rotulo}: ${aula.disciplinas?.[String(dia)] || "sem disciplina"}`;
+                      })
+                      .join(" · ")}
+                  </Typography>
+                  {!aula.ativo ? <Selo rotulo="Desativada" /> : null}
+                </ListItem>
+              ))}
+            </List>
+          </Stack>
+        )
+      ) : null}
+      {erro ? <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" /> : null}
+      <Stack
+        direction={{ xs: "column-reverse", sm: "row" }}
+        spacing={2}
+        sx={{ justifyContent: "flex-end" }}
+      >
+        <Botao
+          variante="contorno"
+          type="button"
+          disabled={disabled || executando}
+          onClick={() => {
+            setAberto(false);
+            setErro("");
+          }}
+        >
+          Cancelar cópia
+        </Botao>
+        <Botao
+          variante="secundario"
+          type="button"
+          disabled={!origem || aulas.length === 0 || disabled || executando}
+          onClick={() => setConfirmando(true)}
+        >
+          Copiar grade
+        </Botao>
+      </Stack>
+      <DialogoConfirmacao
+        aberto={confirmando}
+        titulo="Copiar grade?"
+        descricao={
+          origem
+            ? `Copia ${aulas.length} ${aulas.length === 1 ? "aula" : "aulas"} de ${origem.rotulo} para ${destino.rotulo}, incluindo ordem, horários, dias, disciplinas e estado de ativação. Aulas existentes e faltas são preservadas. Ordens repetidas impedem a cópia inteira.`
+            : ""
+        }
+        rotuloConfirmar="Confirmar cópia"
+        rotuloCancelar="Cancelar"
+        operacaoEmAndamento={executando}
+        onCancelar={() => {
+          if (!executando) setConfirmando(false);
+        }}
+        onConfirmar={() => void executar()}
+      />
+    </Box>
+  );
+}
+
 export default function DialogoAulas(props: Props) {
   return (
     <ConteudoDialogoAulas key={`${props.turma?.id ?? "nenhuma"}-${props.aberto}`} {...props} />
@@ -65,6 +274,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
+  const [confirmacao, setConfirmacao] = useState<ConfirmacaoAula | null>(null);
 
   const aulas = turma?.horarios ?? [];
 
@@ -166,9 +376,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
           corpoAlteracao("PATCH", { ativo: !aula.ativo }),
         );
       } catch (excecao) {
-        const mensagem =
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a aula.";
-        toast.error(mensagem);
+        avisarErro(excecao, { contexto: "Não foi possível alterar a aula." });
         return;
       }
       avisarSucesso(
@@ -187,206 +395,206 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
       try {
         await pedir<{ ok: boolean }>(`/api/horarios/${aula.id}`, corpoAlteracao("DELETE"));
       } catch (excecao) {
-        const mensagem =
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a aula.";
-        toast.error(mensagem);
+        avisarErro(excecao, { contexto: "Não foi possível excluir a aula." });
         return;
       }
-      toast.success("Aula excluída.");
+      avisarSucesso("Aula excluída.");
       await atualizarGradeAposGravacao();
     });
   }
 
-  return (
-    <Dialog
-      open={aberto}
-      onOpenChange={(valor) => {
-        if (!ocupado) onAbrir(valor);
-      }}
-    >
-      <DialogContent
-        className="max-w-lg"
-        aria-describedby={undefined}
-        showCloseButton={!ocupado}
-        onEscapeKeyDown={(evento) => {
-          if (ocupado) evento.preventDefault();
-        }}
-        onInteractOutside={(evento) => {
-          if (ocupado) evento.preventDefault();
-        }}
-      >
-        <DialogHeader>
-          <DialogTitle>Horários de {turma?.rotulo ?? "turma"}</DialogTitle>
-        </DialogHeader>
+  function confirmarAcao() {
+    const alvo = confirmacao;
+    setConfirmacao(null);
+    if (!alvo) return;
+    if (alvo.tipo === "excluir") void excluir(alvo.aula);
+    else void alternarAtiva(alvo.aula);
+  }
 
+  return (
+    <Dialogo
+      aberto={aberto}
+      onFechar={() => {
+        if (!ocupado) onAbrir(false);
+      }}
+      titulo={`Horários de ${turma?.rotulo ?? "turma"}`}
+      tamanho="grande"
+    >
+      <Stack spacing={2} sx={{ minWidth: 0 }}>
         {aulas.length === 0 ? (
-          <div className="text-muted-foreground rounded-lg border border-dashed px-4 py-6 text-center text-sm">
-            Nenhum horário configurado.
-          </div>
+          <Box
+            sx={{
+              px: 2,
+              py: 3,
+              textAlign: "center",
+              border: 1,
+              borderStyle: "dashed",
+              borderColor: "divider",
+              borderRadius: 2,
+            }}
+          >
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Nenhum horário configurado.
+            </Typography>
+          </Box>
         ) : (
-          <ul className="superficie divide-y overflow-hidden">
-            {[...aulas]
-              .sort((a, b) => a.ordem - b.ordem)
-              .map((aula) => (
-                <li
-                  key={aula.id}
-                  className={`flex items-center gap-2 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${aula.ativo ? "" : "opacity-60"}`}
-                >
-                  <span className="numerais-tabulares text-muted-foreground w-6 shrink-0 text-sm">
-                    {String(aula.ordem).padStart(2, "0")}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="numerais-tabulares truncate text-sm font-medium">
-                      {aula.inicio} às {aula.fim}
-                    </p>
-                    <p className="text-muted-foreground truncate text-xs">
-                      {aula.diasSemana
-                        .filter((dia) => dia !== 7)
-                        .map(
-                          (dia) =>
-                            DIAS_DA_SEMANA.find((opcao) => opcao.valor === dia)?.abreviacao ?? dia,
-                        )
-                        .join(" ")}
-                      {aula.ativo ? "" : " · desativada"}
-                    </p>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-11"
-                    aria-label={`Editar aula ${aula.ordem}`}
-                    onClick={() => abrirEdicao(aula)}
-                    disabled={ocupado}
+          <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, overflow: "hidden" }}>
+            <List disablePadding>
+              {[...aulas]
+                .sort((a, b) => a.ordem - b.ordem)
+                .map((aula) => (
+                  <ListItem
+                    key={aula.id}
+                    divider
+                    sx={{ gap: 1, px: 2, py: 1, opacity: aula.ativo ? 1 : 0.6 }}
                   >
-                    <Pencil size={16} />
-                  </Button>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-11"
-                        aria-label={
-                          aula.ativo ? `Desativar aula ${aula.ordem}` : `Ativar aula ${aula.ordem}`
-                        }
-                        disabled={ocupado}
+                    <Typography
+                      variant="body2"
+                      sx={{
+                        width: 24,
+                        flexShrink: 0,
+                        color: "text.secondary",
+                        fontVariantNumeric: "tabular-nums",
+                      }}
+                    >
+                      {String(aula.ordem).padStart(2, "0")}
+                    </Typography>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography
+                        variant="body2"
+                        noWrap
+                        sx={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
                       >
-                        <Power size={16} />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          {aula.ativo ? "Desativar" : "Ativar"} a aula {aula.ordem}?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          {aula.ativo
-                            ? "A aula deixa de aparecer na grade da turma. Faltas já registradas continuam guardadas."
-                            : "A aula volta a aparecer na grade da turma. Faltas já registradas continuam guardadas."}
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel disabled={ocupado}>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => alternarAtiva(aula)} disabled={ocupado}>
-                          {aula.ativo ? "Desativar" : "Ativar"}
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-falta-texto size-11"
-                        aria-label={`Excluir aula ${aula.ordem}`}
-                        disabled={ocupado}
-                      >
-                        <Trash2 size={16} />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>
-                          Excluir a aula {aula.ordem} das {aula.inicio}?
-                        </AlertDialogTitle>
-                        <AlertDialogDescription>
-                          A exclusão só é possível quando não há faltas registradas nesta aula. Com
-                          histórico, o caminho é desativar.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction
-                          variant="destructive"
-                          onClick={() => excluir(aula)}
-                          disabled={ocupado}
-                        >
-                          Excluir
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </li>
-              ))}
-          </ul>
+                        {aula.inicio} às {aula.fim}
+                      </Typography>
+                      <Typography variant="caption" noWrap sx={{ color: "text.secondary" }}>
+                        {aula.diasSemana
+                          .filter((dia) => dia !== 7)
+                          .map(
+                            (dia) =>
+                              DIAS_DA_SEMANA.find((opcao) => opcao.valor === dia)?.abreviacao ??
+                              dia,
+                          )
+                          .join(" ")}
+                        {aula.ativo ? "" : " · desativada"}
+                      </Typography>
+                    </Box>
+                    <Botao
+                      variante="texto"
+                      type="button"
+                      aria-label={`Editar aula ${aula.ordem}`}
+                      onClick={() => abrirEdicao(aula)}
+                      disabled={ocupado}
+                      icone={<EditRoundedIcon />}
+                      sx={ESTILO_BOTAO_ICONE}
+                    />
+                    <Botao
+                      variante="texto"
+                      type="button"
+                      aria-label={
+                        aula.ativo ? `Desativar aula ${aula.ordem}` : `Ativar aula ${aula.ordem}`
+                      }
+                      disabled={ocupado}
+                      icone={<PowerSettingsNewRoundedIcon />}
+                      onClick={() => setConfirmacao({ tipo: "ativar", aula })}
+                      sx={ESTILO_BOTAO_ICONE}
+                    />
+                    <Botao
+                      variante="texto"
+                      type="button"
+                      aria-label={`Excluir aula ${aula.ordem}`}
+                      disabled={ocupado}
+                      icone={<DeleteOutlineRoundedIcon />}
+                      onClick={() => setConfirmacao({ tipo: "excluir", aula })}
+                      sx={{
+                        ...ESTILO_BOTAO_ICONE,
+                        color: "var(--falta-texto)",
+                        "&.MuiButton-root": {
+                          ...ESTILO_BOTAO_ICONE["&.MuiButton-root"],
+                          color: "var(--falta-texto)",
+                        },
+                      }}
+                    />
+                  </ListItem>
+                ))}
+            </List>
+          </Box>
         )}
 
         {!formulario ? (
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="outline"
+          <Stack spacing={2}>
+            <Botao
+              variante="secundario"
+              type="button"
               onClick={abrirNova}
               disabled={aulas.length >= 99 || ocupado}
-              className="min-h-11"
+              icone={<AddRoundedIcon />}
+              sx={{
+                alignSelf: "flex-start",
+                minHeight: TOKENS_LAYOUT.alvoToque,
+                height: TOKENS_LAYOUT.alvoToque,
+                border: "1px solid currentColor",
+                "&.MuiButton-root": {
+                  minHeight: TOKENS_LAYOUT.alvoToque,
+                  height: TOKENS_LAYOUT.alvoToque,
+                  border: "1px solid currentColor",
+                  "&:focus-visible": { outline: "3px solid currentColor", outlineOffset: 2 },
+                },
+                "&:focus-visible": { outline: "3px solid currentColor", outlineOffset: 2 },
+              }}
             >
-              <Plus size={16} />
               Nova aula
-            </Button>
-            {turma && (
-              <DialogoCopiarHorarios
+            </Botao>
+            {turma ? (
+              <CopiarGrade
                 destino={turma}
                 turmas={turmas}
                 disabled={ocupado}
                 onOcupado={setCopiando}
                 onMudanca={onMudanca}
               />
-            )}
-          </div>
+            ) : null}
+          </Stack>
         ) : (
-          <form
-            className="superficie flex flex-col gap-3 p-3"
+          <Box
+            component="form"
             aria-busy={ocupado}
             onSubmit={(evento) => {
               evento.preventDefault();
               void submeter();
             }}
             noValidate
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              minWidth: 0,
+              padding: 2,
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+            }}
           >
-            <p className="text-sm font-medium">{formulario.id ? "Editar aula" : "Nova aula"}</p>
-            <fieldset disabled={ocupado} className="flex min-w-0 flex-col gap-3">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                <div className="col-span-2 flex flex-col gap-1.5 sm:col-span-1">
-                  <Label htmlFor="aula-ordem">Ordem</Label>
-                  <Input
-                    id="aula-ordem"
-                    type="number"
-                    min={1}
-                    max={99}
-                    inputMode="numeric"
-                    value={formulario.ordem}
-                    onChange={(evento) =>
-                      setFormulario((atual) =>
-                        atual ? { ...atual, ordem: evento.target.value } : atual,
-                      )
+            <Typography variant="subtitle2">
+              {formulario.id ? "Editar aula" : "Nova aula"}
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={12}>
+                <Campo id="aula-ordem" rotulo="Ordem">
+                  <CampoTexto
+                    valor={formulario.ordem}
+                    onValor={(valor) =>
+                      setFormulario((atual) => (atual ? { ...atual, ordem: valor } : atual))
                     }
-                    className="numerais-tabulares h-11"
+                    maxLength={2}
+                    inputMode="numeric"
+                    disabled={ocupado}
                   />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="aula-inicio">Início</Label>
+                </Campo>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Campo id="aula-inicio" rotulo="Início">
                   <SeletorHorario
-                    id="aula-inicio"
                     valor={formulario.inicio}
                     disabled={ocupado}
                     rotuloAcessivel="Início da aula"
@@ -394,11 +602,11 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                       setFormulario((atual) => (atual ? { ...atual, inicio: valor } : atual))
                     }
                   />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="aula-fim">Fim</Label>
+                </Campo>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6 }}>
+                <Campo id="aula-fim" rotulo="Fim">
                   <SeletorHorario
-                    id="aula-fim"
                     valor={formulario.fim}
                     disabled={ocupado}
                     rotuloAcessivel="Fim da aula"
@@ -406,91 +614,122 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                       setFormulario((atual) => (atual ? { ...atual, fim: valor } : atual))
                     }
                   />
-                </div>
-              </div>
-              <fieldset className="flex flex-col gap-1.5">
-                <legend className="text-sm font-medium">Dias da semana</legend>
-                <div className="flex flex-wrap gap-1.5">
-                  {DIAS_DA_SEMANA.filter((dia) => dia.valor !== 7).map((dia) => {
-                    const marcado = formulario.diasSemana.includes(dia.valor);
-                    return (
-                      <button
-                        key={dia.valor}
-                        type="button"
-                        aria-pressed={marcado}
-                        aria-label={dia.rotulo}
-                        onClick={() => alternarDia(dia.valor)}
-                        className="controle pressionavel h-11 px-3 text-xs font-medium transition-colors"
-                      >
-                        {dia.abreviacao}
-                      </button>
-                    );
-                  })}
-                </div>
-              </fieldset>
-              {formulario.diasSemana.length > 0 && (
-                <fieldset className="flex flex-col gap-2">
-                  <legend className="mb-2 text-sm font-medium">Disciplinas</legend>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {DIAS_DA_SEMANA.filter((dia) => formulario.diasSemana.includes(dia.valor)).map(
-                      (dia) => (
-                        <div key={dia.valor} className="flex min-w-0 flex-col gap-1.5">
-                          <Label htmlFor={`disciplina-dia-${dia.valor}`}>
-                            <span aria-hidden="true">
-                              {dia.rotulo.charAt(0).toUpperCase() + dia.rotulo.slice(1)}
-                            </span>
-                            <span className="sr-only">Disciplina de {dia.rotulo}</span>
-                          </Label>
-                          <Input
-                            id={`disciplina-dia-${dia.valor}`}
-                            value={formulario.disciplinas[String(dia.valor)] ?? ""}
-                            maxLength={80}
-                            autoComplete="off"
-                            placeholder="Disciplina"
-                            className="h-11"
-                            onChange={(evento) =>
+                </Campo>
+              </Grid>
+            </Grid>
+            <FormControl component="fieldset" disabled={ocupado} sx={{ minWidth: 0 }}>
+              <FormLabel component="legend">Dias da semana</FormLabel>
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", mt: 1 }}>
+                {DIAS_DA_SEMANA.filter((dia) => dia.valor !== 7).map((dia) => {
+                  const marcado = formulario.diasSemana.includes(dia.valor);
+                  return (
+                    <ToggleButton
+                      key={dia.valor}
+                      value={String(dia.valor)}
+                      selected={marcado}
+                      aria-label={dia.rotulo}
+                      disabled={ocupado}
+                      onChange={() => alternarDia(dia.valor)}
+                      sx={{ minWidth: TOKENS_LAYOUT.alvoToque, minHeight: TOKENS_LAYOUT.alvoToque }}
+                    >
+                      {dia.abreviacao}
+                    </ToggleButton>
+                  );
+                })}
+              </Stack>
+            </FormControl>
+            {formulario.diasSemana.length > 0 ? (
+              <FormControl component="fieldset" disabled={ocupado} sx={{ minWidth: 0 }}>
+                <FormLabel component="legend">Disciplinas</FormLabel>
+                <Grid container spacing={2} sx={{ mt: 0 }}>
+                  {DIAS_DA_SEMANA.filter((dia) => formulario.diasSemana.includes(dia.valor)).map(
+                    (dia) => (
+                      <Grid key={dia.valor} size={{ xs: 12, sm: 6 }}>
+                        <Campo
+                          id={`disciplina-dia-${dia.valor}`}
+                          rotulo={dia.rotulo.charAt(0).toUpperCase() + dia.rotulo.slice(1)}
+                        >
+                          <CampoTexto
+                            valor={formulario.disciplinas[String(dia.valor)] ?? ""}
+                            onValor={(valor) =>
                               setFormulario((atual) =>
                                 atual
                                   ? {
                                       ...atual,
                                       disciplinas: {
                                         ...atual.disciplinas,
-                                        [String(dia.valor)]: evento.target.value,
+                                        [String(dia.valor)]: valor,
                                       },
                                     }
                                   : atual,
                               )
                             }
+                            ariaLabel={`Disciplina de ${dia.rotulo}`}
+                            maxLength={80}
+                            autoComplete="off"
+                            placeholder="Disciplina"
+                            disabled={ocupado}
                           />
-                        </div>
-                      ),
-                    )}
-                  </div>
-                </fieldset>
-              )}
-            </fieldset>
-            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-            <DialogFooter>
-              <Button
+                        </Campo>
+                      </Grid>
+                    ),
+                  )}
+                </Grid>
+              </FormControl>
+            ) : null}
+            {erro ? (
+              <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+            ) : null}
+            <Stack
+              direction={{ xs: "column-reverse", sm: "row" }}
+              spacing={2}
+              sx={{ justifyContent: "flex-end" }}
+            >
+              <Botao
+                variante="contorno"
                 type="button"
-                variant="outline"
                 onClick={() => setFormulario(null)}
                 disabled={ocupado}
-                className="min-h-11"
               >
                 Cancelar
-              </Button>
-              <Button type="submit" disabled={ocupado} className="min-h-11">
-                {enviando && <LoaderCircle size={16} className="animate-spin" />}
+              </Botao>
+              <Botao variante="secundario" type="submit" carregando={enviando} disabled={ocupado}>
                 {formulario.id ? "Salvar" : "Criar"}
-              </Button>
-            </DialogFooter>
-          </form>
+              </Botao>
+            </Stack>
+          </Box>
         )}
-        {erro && !formulario && (
-          <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
-        )}
-      </DialogContent>
-    </Dialog>
+        {erro && !formulario ? (
+          <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+        ) : null}
+      </Stack>
+      <DialogoConfirmacao
+        aberto={confirmacao !== null}
+        titulo={
+          confirmacao?.tipo === "excluir"
+            ? `Excluir a aula ${confirmacao.aula.ordem} das ${confirmacao.aula.inicio}?`
+            : `${confirmacao?.aula.ativo ? "Desativar" : "Ativar"} a aula ${confirmacao?.aula.ordem ?? ""}?`
+        }
+        descricao={
+          confirmacao?.tipo === "excluir"
+            ? "A exclusão só é possível quando não há faltas registradas nesta aula. Com histórico, o caminho é desativar."
+            : confirmacao?.aula.ativo
+              ? "A aula deixa de aparecer na grade da turma. Faltas já registradas continuam guardadas."
+              : "A aula volta a aparecer na grade da turma. Faltas já registradas continuam guardadas."
+        }
+        rotuloConfirmar={
+          confirmacao?.tipo === "excluir"
+            ? "Excluir"
+            : confirmacao?.aula.ativo
+              ? "Desativar"
+              : "Ativar"
+        }
+        rotuloCancelar="Cancelar"
+        destrutivo={confirmacao?.tipo === "excluir"}
+        operacaoEmAndamento={confirmacao !== null && chaveAtiva === confirmacao.aula.id}
+        onCancelar={() => setConfirmacao(null)}
+        onConfirmar={confirmarAcao}
+      />
+    </Dialogo>
   );
 }

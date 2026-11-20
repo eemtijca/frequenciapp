@@ -73,7 +73,9 @@ async function abrirGestaoDaTurma(page: Page): Promise<Locator> {
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
   await page.getByRole("button", { name: `Horários de ${rotulo}`, exact: true }).click();
-  return page.getByRole("dialog", { name: `Horários de ${rotulo}`, exact: true });
+  return page.getByRole("dialog", {
+    name: new RegExp(`^Horários de ${rotulo}(?: Fechar)?$`),
+  });
 }
 
 test("no celular, a consulta termina com folga abaixo do último cartão", async ({ page }) => {

@@ -1,8 +1,16 @@
 // Monta a aba real, com rede interceptada pelo teste e dados exclusivamente fictícios.
 import { createRoot } from "react-dom/client";
+import { ThemeProvider } from "@mui/material/styles";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { ptBR } from "@mui/x-date-pickers/locales";
+import "dayjs/locale/pt-br";
 import AbaConfiguracoes from "../../../src/components/gestao/abas/aba-configuracoes";
 import { CONFIGURACOES_PADRAO, type Turma } from "../../../src/domain/frequencia";
+import { tema } from "../../../src/theme/tema";
 import "../../../src/app/globals.css";
+
+document.documentElement.setAttribute("data-mui-color-scheme", "light");
 
 const turmas: Turma[] = ["A", "B", "C"].map((nome, i) => ({
   id: `turma-${i}`,
@@ -15,19 +23,27 @@ const turmas: Turma[] = ["A", "B", "C"].map((nome, i) => ({
 const root = document.getElementById("root");
 if (!root) throw new Error("Elemento raiz ausente");
 createRoot(root).render(
-  <main className="p-4">
-    <AbaConfiguracoes
-      configuracoes={CONFIGURACOES_PADRAO}
-      justificativas={[]}
-      liberadores={[]}
-      series={[{ id: "serie-1", nome: "1º ano", ordem: 1 }]}
-      turmas={turmas}
-      diaCorrente="2026-03-10"
-      fuso="America/Sao_Paulo"
-      onMudanca={() => {}}
-      onJustificativasMudaram={async () => {}}
-      onLiberadoresMudaram={async () => {}}
-      onHorariosMudaram={() => {}}
-    />
-  </main>,
+  <ThemeProvider theme={tema}>
+    <LocalizationProvider
+      dateAdapter={AdapterDayjs}
+      adapterLocale="pt-br"
+      localeText={ptBR.components.MuiLocalizationProvider.defaultProps.localeText}
+    >
+      <main className="p-4">
+        <AbaConfiguracoes
+          configuracoes={CONFIGURACOES_PADRAO}
+          justificativas={[]}
+          liberadores={[]}
+          series={[{ id: "serie-1", nome: "1º ano", ordem: 1 }]}
+          turmas={turmas}
+          diaCorrente="2026-03-10"
+          fuso="America/Sao_Paulo"
+          onMudanca={() => {}}
+          onJustificativasMudaram={async () => {}}
+          onLiberadoresMudaram={async () => {}}
+          onHorariosMudaram={() => {}}
+        />
+      </main>
+    </LocalizationProvider>
+  </ThemeProvider>,
 );
