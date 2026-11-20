@@ -1,4 +1,6 @@
 /* Paleta, tipografia e utilitários globais da interface. */
+/* Ordem das camadas durante a coexistência: MUI fica antes das utilities do Tailwind. */
+@layer theme, base, mui, components, utilities;
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "./superficies.css";

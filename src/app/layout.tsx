@@ -1,11 +1,12 @@
-// Layout raiz com a tipografia dos seletores, tema e avisos compartilhados.
+// Layout raiz com as tipografias, os temas em coexistência e os avisos compartilhados.
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
+import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import { Toaster } from "@/components/ui/sonner";
 import { ModalidadeFoco } from "@/components/ui/modalidade-foco";
-import CorDoTema from "@/components/pwa/cor-do-tema";
+import { ProvedorTema } from "@/theme/provedor-tema";
 import "./globals.css";
 
 const fonteInterface = Plus_Jakarta_Sans({
@@ -16,6 +17,12 @@ const fonteInterface = Plus_Jakarta_Sans({
 const fonteNumeros = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+});
+
+const fonteMaterial = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -71,26 +78,33 @@ export default async function LayoutRaiz({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body
-        className={`${fonteInterface.variable} ${fonteNumeros.variable} bg-background text-foreground font-sans antialiased`}
+        className={`${fonteInterface.variable} ${fonteNumeros.variable} ${fonteMaterial.variable} bg-background text-foreground font-sans antialiased`}
       >
-        <ModalidadeFoco />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
+        <InitColorSchemeScript
+          attribute="data-mui-color-scheme"
+          defaultMode="system"
+          modeStorageKey="theme"
           nonce={nonce}
-        >
-          {children}
-          <CorDoTema />
-          <Toaster
-            position="bottom-right"
-            offset={20}
-            mobileOffset={84}
-            richColors
-            closeButton={false}
-          />
-        </ThemeProvider>
+        />
+        <ModalidadeFoco />
+        <ProvedorTema nonce={nonce}>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            nonce={nonce}
+          >
+            {children}
+            <Toaster
+              position="bottom-right"
+              offset={20}
+              mobileOffset={84}
+              richColors
+              closeButton={false}
+            />
+          </ThemeProvider>
+        </ProvedorTema>
       </body>
     </html>
   );

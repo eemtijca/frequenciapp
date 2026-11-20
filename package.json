@@ -58,7 +58,15 @@
     "postinstall": "prisma generate && node scripts/assets/copiar-swagger-ui.mjs"
   },
   "dependencies": {
+    "@emotion/cache": "^11.14.0",
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@hookform/resolvers": "^7.0.6",
+    "@mui/icons-material": "9.5.0",
+    "@mui/material": "9.5.0",
+    "@mui/material-nextjs": "9.5.0",
+    "@mui/x-charts": "9.18.1",
+    "@mui/x-date-pickers": "9.18.0",
     "@prisma/adapter-pg": "^7.10.1",
     "@prisma/client": "^7.10.1",
     "@prometheus-io/client": "^0.16.1",
@@ -77,6 +85,7 @@
     "@zip.js/zip.js": "^2.25.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dayjs": "1.11.23",
     "dotenv": "^18.0.10",
     "lucide-react": "^1.74.0",
     "motion": "^14.14.0",
