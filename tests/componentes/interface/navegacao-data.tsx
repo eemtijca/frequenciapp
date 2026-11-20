@@ -167,11 +167,18 @@ const telas = {
     />
   ),
 };
-const tela = new URLSearchParams(location.search).get("tela") as keyof typeof telas;
+const parametros = new URLSearchParams(location.search);
+const tela = parametros.get("tela") as keyof typeof telas;
+const temaInicial = parametros.get("tema") === "dark" ? "dark" : "light";
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Raiz ausente");
 createRoot(raiz).render(
-  <ThemeProvider theme={tema}>
+  <ThemeProvider
+    theme={tema}
+    defaultMode={temaInicial}
+    modeStorageKey="theme"
+    disableTransitionOnChange
+  >
     <CssBaseline enableColorScheme />
     <Box component="main" sx={{ p: 2 }}>
       {telas[tela] ?? telas.painel}

@@ -2,9 +2,9 @@
 import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser } from "@playwright/test";
+import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { conferirSuperficieAcao } from "../superficie-acao";
+import { contraste, type Rgb } from "../helpers/cor";
 
 const requireVitest = createRequire(import.meta.url);
 const caminho = requireVitest.resolve("vite", {
@@ -33,6 +33,52 @@ afterAll(async () => {
   await servidor?.close();
 });
 
+async function aguardarEsquema(page: Page, tema: "light" | "dark") {
+  await expect
+    .poll(() => page.locator("html").getAttribute("data-mui-color-scheme"), { timeout: 15000 })
+    .toBe(tema);
+}
+
+/** Botões preenchidos do MUI não têm fio próprio: o contraste exigido é o do texto. */
+async function conferirAcaoPreenchida(botao: Locator) {
+  await botao.waitFor({ state: "visible" });
+  expect(await botao.isEnabled()).toBe(true);
+  const estilo = await botao.evaluate((el) => {
+    const caixa = el.getBoundingClientRect();
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) throw new Error("Canvas indisponível");
+    const canais = (valor: string) => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = valor;
+      ctx.fillRect(0, 0, 1, 1);
+      return Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
+    };
+    const css = getComputedStyle(el);
+    return {
+      fundo: css.backgroundColor,
+      largura: caixa.width,
+      altura: caixa.height,
+      texto: canais(css.color),
+      superficie: canais(css.backgroundColor),
+    };
+  });
+  expect(estilo.largura).toBeGreaterThanOrEqual(43.99);
+  expect(estilo.altura).toBeGreaterThanOrEqual(43.99);
+  expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
+  const rgb = (canais: number[]) => canais.map((n) => n / 255) as Rgb;
+  expect(contraste(rgb(estilo.texto), rgb(estilo.superficie))).toBeGreaterThanOrEqual(4.5);
+  await botao.page().keyboard.press("Tab");
+  await botao.focus();
+  expect(await botao.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
+  expect(
+    await botao.evaluate((el) => {
+      const css = getComputedStyle(el);
+      return css.outlineStyle !== "none" || css.boxShadow !== "none";
+    }),
+  ).toBe(true);
+  await botao.evaluate((el: HTMLElement) => el.blur());
+}
+
 it.each([
   ["light", 390],
   ["dark", 390],
@@ -44,14 +90,9 @@ it.each([
     reducedMotion: "reduce",
   });
   try {
-    await page.goto(url);
+    await page.goto(`${url}?tema=${tema}`);
     await page.getByRole("button", { name: "Mover Primeiro" }).waitFor();
-    await page.evaluate((esquema) => {
-      document.documentElement.setAttribute("data-mui-color-scheme", esquema);
-    }, tema);
-    expect(
-      await page.evaluate(() => document.documentElement.getAttribute("data-mui-color-scheme")),
-    ).toBe(tema);
+    await aguardarEsquema(page, tema);
     await page.mouse.move(0, 0);
     const cartao = page.locator("article[data-grafico-id]").first();
     await cartao.getByRole("button", { name: "Mover Primeiro" }).waitFor();
@@ -66,7 +107,7 @@ it.each([
     }
     for (const nome of ["Editar", "Excluir Primeiro", "Tabela", "Exportar CSV de Primeiro"]) {
       const botao = cartao.getByRole("button", { name: nome, exact: true });
-      await conferirSuperficieAcao(page, botao, tema);
+      await conferirAcaoPreenchida(botao);
     }
     await cartao.getByRole("button", { name: "Exportar CSV de Primeiro" }).press("Enter");
     expect(await page.getByTestId("confirmacoes").textContent()).toBe("1");

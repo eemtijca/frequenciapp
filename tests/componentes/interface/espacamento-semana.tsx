@@ -104,8 +104,14 @@ function Exemplo() {
 }
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Elemento raiz ausente");
+const temaInicial = new URLSearchParams(location.search).get("tema") === "dark" ? "dark" : "light";
 createRoot(raiz).render(
-  <ThemeProvider theme={tema}>
+  <ThemeProvider
+    theme={tema}
+    defaultMode={temaInicial}
+    modeStorageKey="theme"
+    disableTransitionOnChange
+  >
     <CssBaseline enableColorScheme />
     <Exemplo />
   </ThemeProvider>,

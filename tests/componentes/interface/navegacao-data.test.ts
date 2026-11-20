@@ -4,8 +4,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Page } from "@playwright/test";
+import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import { TOKENS_LAYOUT } from "../../../src/theme/layout";
 
 const requireVitest = createRequire(import.meta.url);
 const caminho = requireVitest.resolve("vite", {
@@ -71,7 +72,114 @@ async function aguardarTema(page: Page, tema: "light" | "dark") {
   }, tema);
 }
 
-it("no painel claro o resumo usa fundo suave e fio sutil", async () => {
+interface MedidaControle {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  alvoLargura: number;
+  alvoAltura: number;
+  raio: string;
+  bordas: string[];
+  corBorda: string;
+  fundo: string;
+}
+
+/** Mede a caixa visível e o alvo de toque real, que o MUI expande com ::after. */
+async function medirControle(botao: Locator): Promise<MedidaControle> {
+  return botao.evaluate((el) => {
+    const caixa = el.getBoundingClientRect();
+    const estilo = getComputedStyle(el);
+    const alvo = getComputedStyle(el, "::after");
+    const larguraAlvo = Number.parseFloat(alvo.width);
+    const alturaAlvo = Number.parseFloat(alvo.height);
+    return {
+      x: caixa.x,
+      y: caixa.y,
+      width: caixa.width,
+      height: caixa.height,
+      alvoLargura: Math.max(caixa.width, Number.isFinite(larguraAlvo) ? larguraAlvo : 0),
+      alvoAltura: Math.max(caixa.height, Number.isFinite(alturaAlvo) ? alturaAlvo : 0),
+      raio: estilo.borderTopLeftRadius,
+      bordas: [
+        estilo.borderTopWidth,
+        estilo.borderRightWidth,
+        estilo.borderBottomWidth,
+        estilo.borderLeftWidth,
+      ],
+      corBorda: estilo.borderTopColor,
+      fundo: estilo.backgroundColor,
+    };
+  });
+}
+
+/**
+ * Confere o desenho MUI atual: alvo de 48 dp quando o MUI o expande com ::after,
+ * raio de 8 px e fio de 1 px. O gatilho do seletor de período é um campo e fica
+ * com a altura visível do próprio controle.
+ */
+function conferirMedidaControle(medida: MedidaControle) {
+  const alvoExpandido =
+    medida.alvoLargura > medida.width + 0.01 || medida.alvoAltura > medida.height + 0.01;
+  if (alvoExpandido) {
+    expect(medida.alvoLargura).toBeGreaterThanOrEqual(TOKENS_LAYOUT.alvoToque - 0.01);
+    expect(medida.alvoAltura).toBeGreaterThanOrEqual(TOKENS_LAYOUT.alvoToque - 0.01);
+  }
+  expect(medida.width).toBeGreaterThanOrEqual(TOKENS_LAYOUT.botao.pequeno - 0.01);
+  expect(medida.height).toBeGreaterThanOrEqual(TOKENS_LAYOUT.botao.pequeno - 0.01);
+  expect(medida.raio).toBe(`${TOKENS_LAYOUT.campo.raio}px`);
+  for (const borda of medida.bordas) expect(borda).toBe("1px");
+  expect(medida.corBorda).not.toBe("rgba(0, 0, 0, 0)");
+}
+
+async function conferirDesenhoControle(botao: Locator) {
+  await botao.waitFor({ state: "visible" });
+  conferirMedidaControle(await medirControle(botao));
+}
+
+/** Mantém o texto e os ícones do gatilho com contraste AA contra a superfície efetiva. */
+async function conferirContrasteDoControle(controle: Locator) {
+  const contrastes = await controle.evaluate((el) => {
+    const ctx = document.createElement("canvas").getContext("2d");
+    if (!ctx) throw new Error("Canvas indisponível");
+    const rgb = (cor: string) => {
+      ctx.clearRect(0, 0, 1, 1);
+      ctx.fillStyle = cor;
+      ctx.fillRect(0, 0, 1, 1);
+      return Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
+    };
+    const lum = (cor: number[]) =>
+      cor
+        .map((v) => v / 255)
+        .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+        .reduce((s, v, i) => s + v * ([0.2126, 0.7152, 0.0722][i] ?? 0), 0);
+    const fundoDe = (no: Element) => {
+      for (let atual: Element | null = no; atual; atual = atual.parentElement) {
+        const fundo = getComputedStyle(atual).backgroundColor;
+        if (fundo !== "rgba(0, 0, 0, 0)") return fundo;
+      }
+      return (
+        getComputedStyle(document.documentElement)
+          .getPropertyValue("--template-palette-background-default")
+          .trim() ||
+        (document.documentElement.getAttribute("data-mui-color-scheme") === "dark"
+          ? "hsl(220, 35%, 3%)"
+          : "hsl(0, 0%, 99%)")
+      );
+    };
+    return Array.from(el.querySelectorAll("span, svg"))
+      .filter((no) => getComputedStyle(no).display !== "none")
+      .map((no) => {
+        const l = lum(rgb(fundoDe(no)));
+        const c = lum(rgb(getComputedStyle(no).color));
+        return (Math.max(c, l) + 0.05) / (Math.min(c, l) + 0.05);
+      });
+  });
+  expect(contrastes.length).toBeGreaterThan(0);
+  expect(Math.min(...contrastes)).toBeGreaterThanOrEqual(4.5);
+}
+
+it("no painel claro a navegação usa o desenho MUI com fio sutil", async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   try {
     await page.route("**/api/**", (route) =>
@@ -86,16 +194,13 @@ it("no painel claro o resumo usa fundo suave e fio sutil", async () => {
         },
       }),
     );
-    await page.goto(`${url}?tela=painel`);
+    await page.goto(`${url}?tela=painel&tema=light`);
+    await aguardarTema(page, "light");
     const anterior = page.getByRole("button", { name: "Dia anterior", exact: true });
     const periodo = page.getByRole("button", { name: /^Resumo da semana:/ });
     const seguinte = page.getByRole("button", { name: "Dia seguinte", exact: true });
-    for (const botao of [anterior, periodo, seguinte]) {
-      expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
-        "rgba(0, 0, 0, 0)",
-      );
-      expect(await botao.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("1px");
-    }
+    for (const botao of [anterior, periodo, seguinte]) await conferirDesenhoControle(botao);
+    await conferirContrasteDoControle(periodo);
   } finally {
     await page.close();
   }
@@ -103,7 +208,7 @@ it("no painel claro o resumo usa fundo suave e fio sutil", async () => {
 
 // As demais visões usam o mesmo padrão, mas cada uma monta a sua própria navegação.
 it.each(["chamada", "parcial", "entradas", "saidas"])(
-  "aplica a superfície com fio sutil à navegação da tela %s",
+  "aplica o desenho MUI com fio sutil à navegação da tela %s",
   async (tela) => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     try {
@@ -119,16 +224,13 @@ it.each(["chamada", "parcial", "entradas", "saidas"])(
           },
         }),
       );
-      await page.goto(`${url}?tela=${tela}`);
+      await page.goto(`${url}?tela=${tela}&tema=light`);
+      await aguardarTema(page, "light");
       const anterior = page.getByRole("button", { name: /^Dia anterior/ }).first();
       const periodo = page.getByRole("button", { name: /^Resumo da semana:/ });
       const seguinte = page.getByRole("button", { name: /^Dia seguinte/ }).first();
-      for (const botao of [anterior, periodo, seguinte]) {
-        expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
-          "rgba(0, 0, 0, 0)",
-        );
-        expect(await botao.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("1px");
-      }
+      for (const botao of [anterior, periodo, seguinte]) await conferirDesenhoControle(botao);
+      await conferirContrasteDoControle(periodo);
     } finally {
       await page.close();
     }
@@ -150,7 +252,8 @@ it("foco de teclado no seletor claro tem contorno com contraste contra a superf�
         },
       }),
     );
-    await page.goto(`${url}?tela=painel`);
+    await page.goto(`${url}?tela=painel&tema=light`);
+    await aguardarTema(page, "light");
     const botao = page.getByRole("button", { name: "Dia anterior", exact: true });
     await page.keyboard.press("Tab");
     await botao.focus();
@@ -181,7 +284,7 @@ it("foco de teclado no seletor claro tem contorno com contraste contra a superf�
     });
     expect(foco.visible).toBe(true);
     expect(foco.style).toBe("solid");
-    expect(foco.width).toBeGreaterThanOrEqual(2);
+    expect(foco.width).toBe(TOKENS_LAYOUT.campo.foco);
     expect(foco.contrast).toBeGreaterThanOrEqual(3);
   } finally {
     await page.close();
@@ -212,10 +315,7 @@ for (const largura of [320, 390, 1280]) {
               },
             }),
           );
-          await page.goto(`${url}?tela=${tela}`);
-          await page.evaluate((valor) => {
-            document.documentElement.setAttribute("data-mui-color-scheme", valor);
-          }, tema);
+          await page.goto(`${url}?tela=${tela}&tema=${tema}`);
           await aguardarTema(page, tema);
           const anterior = page.getByRole("button", { name: /^Dia anterior/ }).first();
           const periodo = page.getByRole("button", { name: /^Resumo da semana:/ });
@@ -223,69 +323,22 @@ for (const largura of [320, 390, 1280]) {
           await anterior.waitFor();
           await periodo.waitFor();
           expect(await seguinte.isDisabled()).toBe(tela !== "parcial");
-          const caixas = await Promise.all(
-            [anterior, periodo, seguinte].map((el) => el.boundingBox()),
+          const medidas = await Promise.all(
+            [anterior, periodo, seguinte].map((el) => medirControle(el)),
           );
-          for (const caixa of caixas) {
-            if (!caixa) throw new Error("Controle sem dimensões");
-            expect(caixa.width).toBeGreaterThanOrEqual(43.99);
-            expect(caixa.height).toBeGreaterThanOrEqual(43.99);
-            expect(caixa.x).toBeGreaterThanOrEqual(0);
-            expect(caixa.x + caixa.width).toBeLessThanOrEqual(largura + 0.01);
+          for (const medida of medidas) {
+            conferirMedidaControle(medida);
+            expect(medida.x).toBeGreaterThanOrEqual(0);
+            expect(medida.x + medida.width).toBeLessThanOrEqual(largura + 0.01);
           }
-          const [a, b, c] = caixas;
+          const [a, b, c] = medidas;
           if (!a || !b || !c) throw new Error("Navegação sem dimensões");
           expect(Math.abs(a.y + a.height / 2 - (b.y + b.height / 2))).toBeLessThan(1);
           expect(Math.abs(c.y + c.height / 2 - (b.y + b.height / 2))).toBeLessThan(1);
           expect(a.x + a.width).toBeLessThanOrEqual(b.x);
           expect(b.x + b.width).toBeLessThanOrEqual(c.x);
-          for (const botao of [anterior, periodo, seguinte]) {
-            const cor = await botao.evaluate((el) => ({
-              bg: getComputedStyle(el).backgroundColor,
-              bordaPx: getComputedStyle(el).borderTopWidth,
-            }));
-            expect(cor.bg).not.toBe("rgba(0, 0, 0, 0)");
-            expect(cor.bordaPx).toBe("1px");
-          }
           // Texto, legenda e ícones ativos contra sua superfície efetiva; desabilitados são isentos.
-          const contraste = await periodo.evaluate((el) => {
-            const ctx = document.createElement("canvas").getContext("2d");
-            if (!ctx) throw new Error("Canvas indisponível");
-            const rgb = (cor: string) => {
-              ctx.clearRect(0, 0, 1, 1);
-              ctx.fillStyle = cor;
-              ctx.fillRect(0, 0, 1, 1);
-              return Array.from(ctx.getImageData(0, 0, 1, 1).data).slice(0, 3);
-            };
-            const lum = (cor: number[]) =>
-              cor
-                .map((v) => v / 255)
-                .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
-                .reduce((s, v, i) => s + v * ([0.2126, 0.7152, 0.0722][i] ?? 0), 0);
-            const fundoDe = (no: Element) => {
-              for (let atual: Element | null = no; atual; atual = atual.parentElement) {
-                const fundo = getComputedStyle(atual).backgroundColor;
-                if (fundo !== "rgba(0, 0, 0, 0)") return fundo;
-              }
-              return (
-                getComputedStyle(document.documentElement)
-                  .getPropertyValue("--template-palette-background-default")
-                  .trim() ||
-                (document.documentElement.getAttribute("data-mui-color-scheme") === "dark"
-                  ? "hsl(220, 35%, 3%)"
-                  : "hsl(0, 0%, 99%)")
-              );
-            };
-            return Array.from(el.querySelectorAll("span, svg"))
-              .filter((n) => getComputedStyle(n).display !== "none")
-              .map((n) => {
-                const l = lum(rgb(fundoDe(n)));
-                const c = lum(rgb(getComputedStyle(n).color));
-                return (Math.max(c, l) + 0.05) / (Math.min(c, l) + 0.05);
-              });
-          });
-          expect(contraste.length).toBeGreaterThan(0);
-          expect(Math.min(...contraste)).toBeGreaterThanOrEqual(4.5);
+          await conferirContrasteDoControle(periodo);
           if (tela === "painel" || tela === "chamada") {
             await page
               .locator('section[aria-label="Resumo da semana"][aria-busy="false"]')
@@ -343,11 +396,10 @@ for (const largura of [320, 390, 1280]) {
 it("outros controles mantêm suas superfícies e o seletor mensal usa fio sutil", async () => {
   const page = await browser.newPage();
   try {
-    await page.goto(`${url}?tela=outros`);
+    await page.goto(`${url}?tela=outros&tema=light`);
+    await aguardarTema(page, "light");
     const mensal = page.getByRole("button", { name: "Mês do relatório: Outubro" });
-    expect(await mensal.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
-      "rgba(0, 0, 0, 0)",
-    );
+    await conferirDesenhoControle(mensal);
     for (const nome of ["Filtro selecionado", "Outro controle"]) {
       const botao = page.getByRole("button", { name: nome });
       expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
@@ -380,7 +432,8 @@ it("o controle desabilitado é ignorado pelo teclado e as cores forçadas mantê
         },
       }),
     );
-    await page.goto(`${url}?tela=painel`);
+    await page.goto(`${url}?tela=painel&tema=light`);
+    await aguardarTema(page, "light");
     const periodo = page.getByRole("button", { name: /^Resumo da semana:/ });
     const seguinte = page.getByRole("button", { name: "Dia seguinte", exact: true });
     expect(await seguinte.isDisabled()).toBe(true);
@@ -418,10 +471,7 @@ it.each(["relatorio", "grade"])(
           reducedMotion: "reduce",
         });
         try {
-          await page.goto(`${url}?tela=${tela}`);
-          await page.evaluate((valor) => {
-            document.documentElement.setAttribute("data-mui-color-scheme", valor);
-          }, tema);
+          await page.goto(`${url}?tela=${tela}&tema=${tema}`);
           await aguardarTema(page, tema);
           const anterior = page.getByRole("button", {
             name: tela === "grade" ? "Mês anterior" : "Dia anterior do relatório",
@@ -435,27 +485,18 @@ it.each(["relatorio", "grade"])(
             exact: true,
           });
           const botoes = [anterior, periodo, seguinte];
-          const caixas = await Promise.all(botoes.map((b) => b.boundingBox()));
-          const [a, b, c] = caixas;
+          const medidas = await Promise.all(botoes.map((b) => medirControle(b)));
+          const [a, b, c] = medidas;
           if (!a || !b || !c) throw new Error("Controles não montados");
-          for (const box of [a, b, c]) {
-            expect(box.width).toBeGreaterThanOrEqual(43.99);
-            expect(box.height).toBeGreaterThanOrEqual(43.99);
-            expect(box.x).toBeGreaterThanOrEqual(0);
-            expect(box.x + box.width).toBeLessThanOrEqual(largura + 0.01);
+          for (const medida of medidas) {
+            conferirMedidaControle(medida);
+            expect(medida.x).toBeGreaterThanOrEqual(0);
+            expect(medida.x + medida.width).toBeLessThanOrEqual(largura + 0.01);
           }
           expect(Math.abs(a.y + a.height / 2 - (b.y + b.height / 2))).toBeLessThan(1);
           expect(Math.abs(c.y + c.height / 2 - (b.y + b.height / 2))).toBeLessThan(1);
           expect(a.x + a.width).toBeLessThanOrEqual(b.x);
           expect(b.x + b.width).toBeLessThanOrEqual(c.x);
-          for (const botao of botoes) {
-            const cor = await botao.evaluate((el) => ({
-              fundo: getComputedStyle(el).backgroundColor,
-              bordaPx: getComputedStyle(el).borderTopWidth,
-            }));
-            expect(cor.fundo).not.toBe("rgba(0, 0, 0, 0)");
-            expect(cor.bordaPx).toBe("1px");
-          }
           expect(await seguinte.isDisabled()).toBe(true);
           if (process.env.CAPTURA_DATA)
             await page.screenshot({
@@ -539,12 +580,13 @@ async function simularEstatisticasDiretor(page: Page) {
 
 // Componentes de produção com navegação mensal.
 it.each(["por-aluno", "resumo", "historico", "diretor"])(
-  "trio mensal de %s usa contorno transparente no tema claro",
+  "trio mensal de %s usa superfície com fio sutil no tema claro",
   async (tela) => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     try {
       await simularEstatisticasDiretor(page);
-      await page.goto(`${url}?tela=${tela}`);
+      await page.goto(`${url}?tela=${tela}&tema=light`);
+      await aguardarTema(page, "light");
       const nomes =
         tela === "resumo"
           ? [/^Mês anterior do resumo$/, /^Mês do resumo:/, /^Mês seguinte do resumo$/]
@@ -558,14 +600,7 @@ it.each(["por-aluno", "resumo", "historico", "diretor"])(
               /^Mês seguinte$/,
             ];
       for (const nome of nomes) {
-        const botao = page.getByRole("button", { name: nome });
-        await botao.waitFor();
-        const estilo = await botao.evaluate((el) => ({
-          fundo: getComputedStyle(el).backgroundColor,
-          largura: getComputedStyle(el).borderTopWidth,
-        }));
-        expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
-        expect(estilo.largura).toBe("1px");
+        await conferirDesenhoControle(page.getByRole("button", { name: nome }));
       }
     } finally {
       await page.close();
@@ -583,10 +618,7 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
         });
         try {
           await simularEstatisticasDiretor(page);
-          await page.goto(`${url}?tela=${tela}`);
-          await page.evaluate((tema) => {
-            document.documentElement.setAttribute("data-mui-color-scheme", tema);
-          }, tema);
+          await page.goto(`${url}?tela=${tela}&tema=${tema}`);
           await aguardarTema(page, tema);
           const anterior = page.getByRole("button", {
             name: tela === "resumo" ? "Mês anterior do resumo" : "Mês anterior",
@@ -608,14 +640,13 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
           });
           await anterior.waitFor();
           const botoes = [anterior, periodo, seguinte];
-          const caixas = await Promise.all(botoes.map((b) => b.boundingBox()));
-          const [a, b, c] = caixas;
+          const medidasControle = await Promise.all(botoes.map((b) => medirControle(b)));
+          const [a, b, c] = medidasControle;
           if (!a || !b || !c) throw new Error("Trio não renderizado");
-          for (const caixa of [a, b, c]) {
-            expect(caixa.width).toBeGreaterThanOrEqual(43.99);
-            expect(caixa.height).toBeGreaterThanOrEqual(43.99);
-            expect(caixa.x).toBeGreaterThanOrEqual(0);
-            expect(caixa.x + caixa.width).toBeLessThanOrEqual(largura + 0.01);
+          for (const medida of medidasControle) {
+            conferirMedidaControle(medida);
+            expect(medida.x).toBeGreaterThanOrEqual(0);
+            expect(medida.x + medida.width).toBeLessThanOrEqual(largura + 0.01);
           }
           expect(Math.abs(a.y + a.height / 2 - (b.y + b.height / 2))).toBeLessThan(1);
           expect(Math.abs(c.y + c.height / 2 - (b.y + b.height / 2))).toBeLessThan(1);
@@ -671,14 +702,7 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
             medida.contraste,
             JSON.stringify({ tela, tema, largura, medida }),
           ).toBeGreaterThanOrEqual(4.5);
-          for (const botao of botoes) {
-            const estilo = await botao.evaluate((el) => ({
-              fundo: getComputedStyle(el).backgroundColor,
-              largura: getComputedStyle(el).borderTopWidth,
-            }));
-            expect(estilo.fundo).not.toBe("rgba(0, 0, 0, 0)");
-            expect(estilo.largura).toBe("1px");
-          }
+
           if (process.env.CAPTURA_DATA)
             await page.screenshot({
               path: `${process.env.CAPTURA_DATA}/${tela}-${tema}-${largura}.png`,
@@ -701,7 +725,9 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
           expect(await seguinte.isEnabled()).toBe(true);
           if (tela === "historico") {
             const reset = page.getByRole("button", { name: "Voltar para este mês" });
-            expect(await reset.evaluate((el) => el.closest(".navegacao-dia"))).toBe(null);
+            expect(
+              await reset.evaluate((el) => Boolean(el.closest('[aria-haspopup="dialog"]'))),
+            ).toBe(false);
             await reset.click();
             expect(await periodo.getAttribute("aria-label")).toBe(antes);
             await anterior.press("Space");
@@ -727,7 +753,8 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
 it("resumo bloqueado mantém os três controles desabilitados", async () => {
   const page = await browser.newPage();
   try {
-    await page.goto(`${url}?tela=resumo&bloqueado`);
+    await page.goto(`${url}?tela=resumo&bloqueado&tema=light`);
+    await aguardarTema(page, "light");
     for (const nome of [
       /^Mês anterior do resumo$/,
       /^Mês do resumo:/,
@@ -735,9 +762,7 @@ it("resumo bloqueado mantém os três controles desabilitados", async () => {
     ]) {
       const botao = page.getByRole("button", { name: nome });
       expect(await botao.isDisabled()).toBe(true);
-      expect(await botao.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
-        "rgba(0, 0, 0, 0)",
-      );
+      await conferirDesenhoControle(botao);
     }
   } finally {
     await page.close();

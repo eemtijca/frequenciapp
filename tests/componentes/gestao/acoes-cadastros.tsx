@@ -48,9 +48,16 @@ const alunos: Aluno[] = [
 ];
 const root = document.getElementById("root");
 if (!root) throw new Error("Elemento raiz ausente");
-const aba = new URLSearchParams(location.search).get("aba");
+const parametros = new URLSearchParams(location.search);
+const aba = parametros.get("aba");
+const temaInicial = parametros.get("tema") === "dark" ? "dark" : "light";
 createRoot(root).render(
-  <ThemeProvider theme={tema}>
+  <ThemeProvider
+    theme={tema}
+    defaultMode={temaInicial}
+    modeStorageKey="theme"
+    disableTransitionOnChange
+  >
     <CssBaseline enableColorScheme />
     <main style={{ padding: 16 }}>
       {aba === "alunos" ? (

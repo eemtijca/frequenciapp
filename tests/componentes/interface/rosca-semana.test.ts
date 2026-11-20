@@ -98,10 +98,9 @@ for (const [dispositivo, width] of [
       await abrir(page);
       const resumo = page.getByRole("region", { name: "Resumo da semana" });
       const grafico = resumo.getByRole("img", {
-        name: "Faltas, justificadas e presentes de 1º ano A",
-        exact: true,
+        name: /^Faltas, justificadas e presentes de 1º ano A:/,
       });
-      await grafico.scrollIntoViewIfNeeded({ timeout: 90000 });
+      await grafico.scrollIntoViewIfNeeded({ timeout: 15000 });
       expect(await grafico.getAttribute("aria-label")).toBe(
         "Faltas, justificadas e presentes de 1º ano A: 100 registros (F + FJ + P)",
       );
@@ -143,16 +142,14 @@ it("mantém a mensagem semanal vazia e os padrões das roscas de faltas", async 
     ).toBe("faltas");
     expect(await antiga.getByRole("img", { name: "1 falta", exact: true }).count()).toBe(1);
     expect(await antiga.getByRole("img", { name: "2 faltas", exact: true }).count()).toBe(1);
-    await apontarParaFatia(
-      page,
-      antiga.getByRole("img", { name: "Faltas por turma", exact: true }),
-      240,
-    );
+    const graficoAntigo = antiga.getByRole("img", { name: "Faltas por turma", exact: true });
+    await graficoAntigo.scrollIntoViewIfNeeded({ timeout: 15000 });
+    await apontarParaFatia(page, graficoAntigo, 240);
     const dica = antiga.locator(".MuiChartsTooltip-root");
     await expect
-      .poll(async () => ((await dica.isVisible()) ? dica.innerText() : ""))
+      .poll(async () => ((await dica.isVisible()) ? dica.innerText() : ""), { timeout: 5000 })
       .toContain("Turma B");
-    expect(await antiga.getByText("2 faltas", { exact: true }).isVisible()).toBe(true);
+    expect(await antiga.getByRole("img", { name: "2 faltas", exact: true }).isVisible()).toBe(true);
   } finally {
     await page.close();
   }
@@ -164,10 +161,9 @@ it("usa o singular no total e na fatia semanal", async () => {
     await abrir(page, "singular");
     const resumo = page.getByRole("region", { name: "Resumo da semana" });
     const grafico = resumo.getByRole("img", {
-      name: "Faltas, justificadas e presentes de 1º ano A",
-      exact: true,
+      name: /^Faltas, justificadas e presentes de 1º ano A:/,
     });
-    await grafico.scrollIntoViewIfNeeded({ timeout: 90000 });
+    await grafico.scrollIntoViewIfNeeded({ timeout: 15000 });
     expect(await grafico.getAttribute("aria-label")).toBe(
       "Faltas, justificadas e presentes de 1º ano A: 1 registro (F + FJ + P)",
     );

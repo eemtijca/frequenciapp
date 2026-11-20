@@ -220,9 +220,21 @@ it.each(combinacoes)(
         .toBeGreaterThan(0);
       await page.mouse.move(0, 0);
       await aguardarTema(page, tema);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-        true,
-      );
+      // O BI rola dentro da área de conteúdo; mede a caixa dos elementos, não o documento.
+      const excessos = await page.evaluate(() => {
+        const limite = document.documentElement.clientWidth + 1;
+        return Array.from(document.querySelectorAll("main *"))
+          .filter((el): el is HTMLElement => el instanceof HTMLElement)
+          .filter((el) => {
+            const estilo = getComputedStyle(el);
+            if (estilo.display === "none" || estilo.visibility === "hidden") return false;
+            const caixa = el.getBoundingClientRect();
+            return caixa.width > 0 && (caixa.left < -1 || caixa.right > limite);
+          })
+          .slice(0, 8)
+          .map((el) => `${el.tagName.toLowerCase()}.${el.className}`);
+      });
+      expect(excessos).toEqual([]);
       expect(await fundo(page.getByRole("button", { name: "Aplicar período" }))).not.toBe(
         "rgba(0, 0, 0, 0)",
       );

@@ -10,8 +10,6 @@ import { graficoBi } from "@/domain/bi-painel";
 import type { PainelBi } from "@/domain/bi-personalizacao";
 import { tema } from "../../../src/theme/tema";
 
-document.documentElement.setAttribute("data-mui-color-scheme", "light");
-
 const filtros = esquemaFiltrosBi.parse({});
 const inicial: PainelBi = {
   id: "teste",
@@ -59,9 +57,15 @@ function Fixture() {
 }
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Elemento raiz ausente");
+const temaInicial = new URLSearchParams(location.search).get("tema") === "dark" ? "dark" : "light";
 createRoot(raiz).render(
-  <ThemeProvider theme={tema}>
-    <CssBaseline />
+  <ThemeProvider
+    theme={tema}
+    defaultMode={temaInicial}
+    modeStorageKey="theme"
+    disableTransitionOnChange
+  >
+    <CssBaseline enableColorScheme />
     <Box sx={{ p: 2 }}>
       <Fixture />
     </Box>
