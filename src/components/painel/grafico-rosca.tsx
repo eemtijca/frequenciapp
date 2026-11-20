@@ -107,6 +107,7 @@ export default function GraficoRosca({
     >
       <Box
         role="img"
+        tabIndex={0}
         aria-label={titulo}
         aria-describedby={descricaoId}
         data-grafico={titulo}

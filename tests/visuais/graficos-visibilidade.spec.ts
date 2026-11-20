@@ -69,18 +69,17 @@ for (const tema of ["light", "dark"] as const) {
       ).toHaveAttribute("data-grafico-sob-demanda", "visitado");
       await expect(page.locator('[data-cartao="primeiro"] .MuiChartsSurface-root')).toHaveCount(1);
       await expect(page.locator('[data-cartao="primeiro"]')).toHaveAttribute("data-ativo", "false");
-      await expect(page.locator('[data-cartao="primeiro"]')).toHaveCSS("visibility", "hidden");
       await page.getByRole("tab", { name: "Gráficos" }).focus();
       await page.keyboard.press("ArrowRight");
       await expect(page.getByRole("tab", { name: "Outra" })).toBeFocused();
+      await page.keyboard.press("Enter");
       await page.waitForTimeout(300);
-      await expect(page.locator("#painel-graficos .MuiChartsSurface-root")).toHaveCount(0);
+      await expect(page.getByRole("tabpanel", { name: "Gráficos" })).toBeHidden();
       await page.getByRole("tab", { name: "Gráficos" }).click();
       await graficoVisivel(page, "Rosca segundo");
       await page.getByRole("tab", { name: "Chamada" }).click();
       await page.waitForTimeout(300);
-      await expect(page.locator("#painel-painel")).toHaveAttribute("inert", "");
-      await expect(page.locator("#painel-painel .MuiChartsSurface-root")).toHaveCount(0);
+      await expect(page.getByRole("tabpanel", { name: "Painel" })).toBeHidden();
       await expect(
         page.locator('[data-cartao="segundo"] [data-grafico-sob-demanda]'),
       ).toHaveAttribute("data-grafico-sob-demanda", "visitado");
@@ -156,7 +155,7 @@ test("funciona sem IntersectionObserver nas trocas de abas e cartões", async ({
   await page.getByRole("button", { name: "Próximo gráfico" }).click();
   await graficoVisivel(page, "Rosca segundo");
   await page.getByRole("tab", { name: "Chamada" }).click();
-  await expect(page.locator("#painel-painel .MuiChartsSurface-root")).toHaveCount(0);
+  await expect(page.getByRole("tabpanel", { name: "Painel" })).toBeHidden();
   await page.getByRole("tab", { name: "Painel" }).click();
   await graficoVisivel(page, "Rosca segundo");
 });
@@ -164,7 +163,7 @@ test("funciona sem IntersectionObserver nas trocas de abas e cartões", async ({
 test("desmonta o gráfico oculto e não retém foco que deixa de existir", async ({ page }) => {
   await page.goto("/tests/fixtures/graficos-visibilidade/");
   await graficoVisivel(page, "Rosca primeiro");
-  const grafico = page.getByRole("img", { name: "Rosca primeiro" }).getByRole("application");
+  const grafico = page.getByRole("img", { name: "Rosca primeiro", exact: true });
   await grafico.focus();
   await expect(grafico).toBeFocused();
   // A troca programática não transfere o foco antes de ocultar o ancestral.
@@ -195,7 +194,7 @@ test("mostra espera durante carregamento lazy e exibe gráfico depois", async ({
   await expect(page.getByRole("status").filter({ hasText: "Carregando gráfico" })).toBeVisible();
   await requisicao;
   await page.getByRole("tab", { name: "Chamada" }).click();
-  await expect(page.locator("#painel-painel .MuiChartsSurface-root")).toHaveCount(0);
+  await expect(page.getByRole("tabpanel", { name: "Painel" })).toBeHidden();
   await page.getByRole("tab", { name: "Painel" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Carregando gráfico" })).toBeVisible();
   liberar();

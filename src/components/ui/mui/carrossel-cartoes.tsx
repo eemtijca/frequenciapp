@@ -128,7 +128,10 @@ export function CarrosselCartoes({
       sx={[
         (theme) => ({
           position: "relative",
+          width: "100%",
+          maxWidth: "100%",
           minWidth: 0,
+          overflowX: "hidden",
           "&:focus-visible": {
             outline: `${TOKENS_LAYOUT.campo.foco}px solid ${theme.vars.palette.primary.main}`,
             outlineOffset: 2,
@@ -146,6 +149,8 @@ export function CarrosselCartoes({
         sx={{
           display: "flex",
           gap: `${TOKENS_LAYOUT.cartao.padding}px`,
+          width: "100%",
+          maxWidth: "100%",
           minWidth: 0,
           overflowX: "auto",
           overflowY: "hidden",
@@ -168,6 +173,8 @@ export function CarrosselCartoes({
               ref={visivel ? cartaoAtivo : undefined}
               data-cartao={item.id}
               data-ativo={visivel ? "true" : "false"}
+              inert={!visivel}
+              aria-hidden={!visivel}
               role="article"
               aria-roledescription="cartão"
               aria-label={`${posicao + 1} de ${itens.length}: ${item.rotulo}`}
