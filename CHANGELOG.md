@@ -10,7 +10,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
-- O cabeçalho da Chamada Parcial fica mais compacto, com título e botão Enviar para a planilha. Em telas estreitas, o botão passa para a linha seguinte.
+- A Chamada Parcial usa um cabeçalho sem subtítulo, reúne turma e data em um painel e integra a busca e o filtro de situação à lista de alunos. Os controles se empilham quando há pouco espaço.
 
 - As massas dos testes de chamada alinham o cadastro das turmas e dos alunos ao dia de referência, evitando conflitos históricos artificiais no domingo. Uma regressão usa domingo fixo na geração da massa e salva o sábado pela API real, sem alterar o relógio do aplicativo nem dispensar a confirmação histórica quando necessária.
 
