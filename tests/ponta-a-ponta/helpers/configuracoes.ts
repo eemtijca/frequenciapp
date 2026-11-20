@@ -101,6 +101,7 @@ export async function selecionarAcaoConfiguracoes(
     | "Cadastros"
     | "Aulas"
     | "Almoço"
+    | "Provas"
     | "Diretores"
     | "Notificações"
     | "FrequenciBI",
