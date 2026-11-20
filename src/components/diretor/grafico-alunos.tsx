@@ -80,7 +80,13 @@ export default function GraficoAlunos({ alunos, limiteRisco }: Props) {
       })),
     [alunos],
   );
-  const slotTooltip = useMemo(() => () => <TooltipAluno dados={dados} />, [dados]);
+  const slotTooltip = useMemo(
+    () =>
+      function TooltipDoAluno() {
+        return <TooltipAluno dados={dados} />;
+      },
+    [dados],
+  );
   const escala = escalaPercentual(
     Math.max(limiteRisco + 5, ...dados.map((item) => item.valor), 10),
   );
