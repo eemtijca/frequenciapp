@@ -70,31 +70,31 @@ export function Dialogo({
         },
       }}
     >
-      <DialogTitle
-        id={tituloId}
-        sx={{
-          display: "flex",
-          alignItems: "flex-start",
-          gap: 2,
-          padding,
-          paddingBottom: 0,
-        }}
-      >
-        <Box component="span" sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ position: "relative" }}>
+        <DialogTitle
+          id={tituloId}
+          sx={{
+            padding,
+            paddingBottom: 0,
+            paddingRight: `calc(${padding} + ${TOKENS_LAYOUT.alvoToque}px)`,
+          }}
+        >
           {titulo}
-        </Box>
+        </DialogTitle>
         <IconButton
           aria-label="Fechar"
           onClick={onFechar}
           sx={{
-            flexShrink: 0,
+            position: "absolute",
+            top: padding,
+            right: padding,
             minWidth: TOKENS_LAYOUT.alvoToque,
             minHeight: TOKENS_LAYOUT.alvoToque,
           }}
         >
           <CloseRoundedIcon />
         </IconButton>
-      </DialogTitle>
+      </Box>
       <DialogContent
         sx={{
           display: "flex",
