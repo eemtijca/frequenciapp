@@ -84,7 +84,9 @@ export async function aguardarTema(page: Page, tema: TemaCaptura): Promise<void>
       const raiz = document.documentElement;
       const atribuido = raiz.getAttribute("data-mui-color-scheme");
       const sistema = matchMedia("(prefers-color-scheme: dark)").matches ? "escuro" : "claro";
-      if (atribuido && atribuido !== "system") return atribuido === esperado;
+      if (atribuido === "light" || atribuido === "dark") {
+        return atribuido === (esperado === "claro" ? "light" : "dark");
+      }
       if (atribuido === "system") return sistema === esperado;
       return sistema === esperado;
     }, tema);
