@@ -182,7 +182,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await expect(botaoMuitas).toBeVisible();
   await expect(botaoUma).toBeVisible();
   await botaoMuitas.click();
-  const painel = page.locator('[data-slot="popover-content"][data-state="open"]');
+  const painel = page.locator(".MuiPopover-paper:visible").first();
   const detalhe = painel
     .locator("[data-aviso-beneficio]")
     .filter({ hasText: "Frequência estimada" })
@@ -224,7 +224,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
     await expect
       .poll(async () => {
         const { caixa, area } = await texto.evaluate((elemento) => {
-          const painel = elemento.closest<HTMLElement>('[data-slot="popover-content"]');
+          const painel = elemento.closest<HTMLElement>(".MuiPopover-paper");
           if (!painel) throw new Error("Conteúdo fora do popover");
           const r = elemento.getBoundingClientRect();
           const p = painel.getBoundingClientRect();

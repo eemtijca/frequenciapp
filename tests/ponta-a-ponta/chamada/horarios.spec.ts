@@ -94,7 +94,7 @@ test("no celular, a consulta termina com folga abaixo do último cartão", async
   await aguardarHidratacao(page);
   const vista = await abrirHorarios(page);
   await escolherDia(page, vista, "Segunda-feira");
-  const pagina = vista.locator("xpath=ancestor::section[contains(@class,'pagina-painel')]");
+  const pagina = vista.locator("xpath=ancestor::section[@role='group'][1]");
   await pagina.evaluate((elemento) => elemento.scrollTo(0, elemento.scrollHeight));
   const cartao = vista.getByRole("region", { name: "Aulas de Segunda-feira · Manhã", exact: true });
   await expect(cartao).toBeInViewport({ ratio: 1 });

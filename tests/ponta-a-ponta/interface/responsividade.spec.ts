@@ -59,7 +59,7 @@ test.describe("responsividade", () => {
 
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("button", { name: "Nova série" }).click();
-    const caixa = await page.locator('[data-slot="dialog-content"]').boundingBox();
+    const caixa = await page.locator(".MuiDialog-paper:visible").first().boundingBox();
     expect(caixa).not.toBeNull();
     // O formulário fica centralizado na tela, como no desktop.
     const centro = (caixa?.y ?? 0) + (caixa?.height ?? 0) / 2;
