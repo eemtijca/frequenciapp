@@ -291,7 +291,7 @@ test("preserva a linha histórica após transferência e desativação do aluno"
   );
   const secao = await abrirParcial(page);
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
-  await expect(linha.getByRole("heading")).toHaveText("E2E Parcial Um");
+  await expect(linha.getByText("E2E Parcial Um", { exact: true })).toBeVisible();
   await expect(
     linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }),
   ).toBeEnabled();

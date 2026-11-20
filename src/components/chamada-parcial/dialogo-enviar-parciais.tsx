@@ -1,30 +1,42 @@
 "use client";
 
 // Conferência do período e das novas linhas antes do envio à terceira planilha.
+// A prévia usa tabelas MUI com cabeçalhos de linha e legenda acessível.
 import { Fragment, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import Box from "@mui/material/Box";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
 import type { Turma } from "@/domain/frequencia";
 import type { planejarParciais } from "@/domain/planilha-parcial";
 import { CABECALHO_PARCIAL } from "@/domain/planilha-parcial";
 import { pedir, corpoJson } from "@/lib/api-cliente";
 import { avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Selecionar } from "@/components/ui/selecionar";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { Interruptor } from "@/components/ui/mui/interruptor";
+import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { Switch } from "@/components/ui/switch";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
 
 type Previa = ReturnType<typeof planejarParciais> & { novas: number; atualizacoes: number };
+
+const TEXTO_OCULTO = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
 
 function valorDaLinha(
   linha: { celulas: { coluna: number; valor: string }[]; anteriores: string[] },
@@ -39,6 +51,10 @@ function valorDaLinha(
 
 function valorParaConferencia(valor: string): string {
   return valor || "Vazio";
+}
+
+function dataCurta(dia: string): string {
+  return dia.split("-").reverse().join("/");
 }
 
 interface Props {
@@ -114,55 +130,96 @@ export function DialogoEnviarParciais({
   });
   const ocupado = conferindo || enviando;
 
+  function fechar() {
+    if (!ocupado) onFechar();
+  }
+
+  const acoes = (
+    <>
+      <Botao type="button" variante="contorno" onClick={fechar} disabled={ocupado}>
+        Cancelar
+      </Botao>
+      {previa ? (
+        <Botao
+          type="button"
+          variante="secundario"
+          onClick={() => void enviar()}
+          disabled={
+            ocupado ||
+            previa.bloqueado ||
+            previa.novas + previa.atualizacoes === 0 ||
+            resultadoIncerto
+          }
+          carregando={enviando}
+        >
+          Confirmar envio
+        </Botao>
+      ) : (
+        <Botao
+          type="button"
+          variante="secundario"
+          onClick={() => void conferir()}
+          disabled={ocupado || de > ate}
+          carregando={conferindo}
+        >
+          Conferir envio
+        </Botao>
+      )}
+    </>
+  );
+
   return (
-    <Dialog open={aberto} onOpenChange={(valor) => !valor && !ocupado && onFechar()}>
-      <DialogContent folha showCloseButton={!ocupado}>
-        <DialogHeader>
-          <DialogTitle>Enviar chamada parcial</DialogTitle>
-          <DialogDescription>
-            {planilhaNome ?? "Planilha Google"} · aba Chamada Parcial
-          </DialogDescription>
-        </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="flex flex-col gap-1.5">
-            <Label>De</Label>
-            <SeletorPeriodo
-              id="parcial-envio-de"
-              modo="dia"
-              valor={de}
-              max={diaCorrente}
-              rotulo={de.split("-").reverse().join("/")}
-              rotuloAcessivel="Início do envio parcial"
-              disabled={ocupado}
-              onValor={(valor) => {
-                setDe(valor);
-                invalidarPrevia();
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label>Até</Label>
-            <SeletorPeriodo
-              id="parcial-envio-ate"
-              modo="dia"
-              valor={ate}
-              max={diaCorrente}
-              rotulo={ate.split("-").reverse().join("/")}
-              rotuloAcessivel="Fim do envio parcial"
-              disabled={ocupado}
-              onValor={(valor) => {
-                setAte(valor);
-                invalidarPrevia();
-              }}
-            />
-          </div>
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <Label htmlFor="parcial-envio-turma">Turma</Label>
+    <Dialogo
+      aberto={aberto}
+      onFechar={fechar}
+      titulo="Enviar chamada parcial"
+      descricao={`${planilhaNome ?? "Planilha Google"} · aba Chamada Parcial`}
+      acoes={acoes}
+      tamanho="grande"
+    >
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))" },
+          gap: 2,
+        }}
+      >
+        <Campo id="parcial-envio-de" rotulo="De">
+          <SeletorPeriodo
+            id="parcial-envio-de"
+            modo="dia"
+            valor={de}
+            max={diaCorrente}
+            rotulo={dataCurta(de)}
+            rotuloAcessivel="Início do envio parcial"
+            disabled={ocupado}
+            onValor={(valor) => {
+              setDe(valor);
+              invalidarPrevia();
+            }}
+          />
+        </Campo>
+        <Campo id="parcial-envio-ate" rotulo="Até">
+          <SeletorPeriodo
+            id="parcial-envio-ate"
+            modo="dia"
+            valor={ate}
+            max={diaCorrente}
+            rotulo={dataCurta(ate)}
+            rotuloAcessivel="Fim do envio parcial"
+            disabled={ocupado}
+            onValor={(valor) => {
+              setAte(valor);
+              invalidarPrevia();
+            }}
+          />
+        </Campo>
+        <Box sx={{ gridColumn: { xs: "auto", sm: "1 / -1" } }}>
+          <Campo id="parcial-envio-turma" rotulo="Turma">
             <Selecionar
-              id="parcial-envio-turma"
-              value={turmaId || "todas"}
+              valor={turmaId || "todas"}
               disabled={ocupado}
-              onValueChange={(valor) => {
+              onValor={(valor) => {
                 setTurmaId(valor === "todas" ? "" : valor);
                 invalidarPrevia();
               }}
@@ -171,195 +228,189 @@ export function DialogoEnviarParciais({
                 ...turmas.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
               ]}
             />
-          </div>
-        </div>
-        <div className="superficie flex items-center justify-between gap-3 p-3">
-          <div>
-            <Label htmlFor="parcial-envio-atualizar">Atualizar registros já enviados</Label>
-            <p className="text-muted-foreground mt-1 text-xs">
-              Atualiza as linhas criadas pelo aplicativo e preserva os registros manuais.
-            </p>
-          </div>
-          <Switch
-            id="parcial-envio-atualizar"
-            checked={atualizarExistentes}
-            disabled={ocupado}
-            onCheckedChange={(valor) => {
-              setAtualizarExistentes(valor);
-              invalidarPrevia();
-            }}
-          />
-        </div>
-        {de > ate && (
-          <p role="alert" className="text-falta-texto text-sm">
-            O início deve ser anterior ou igual ao fim do período.
-          </p>
-        )}
-        {erro && (
-          <AvisoCompacto
-            variante="indisponivel"
-            titulo="Envio não confirmado"
-            descricao={erro}
-            tamanho="linha"
-          />
-        )}
-        {resultadoIncerto && (
-          <p className="text-muted-foreground text-sm">
-            Confira o resultado na planilha e gere outra prévia.
-          </p>
-        )}
-        {previa && (
-          <div className="superficie flex flex-col gap-3 p-3">
-            <p className="text-sm font-medium">
-              {previa.novas} novos · {previa.atualizacoes} atualizações · {previa.existentes} já
-              enviados
-            </p>
-            {previa.novas + previa.atualizacoes === 0 && !previa.bloqueado && (
-              <p className="text-muted-foreground text-sm">
-                Nenhuma alteração para enviar neste período.
-              </p>
-            )}
-            {previa.criar.length + previa.atualizar.length > 0 && (
-              <div
-                role="region"
-                tabIndex={0}
-                aria-label="Prévia da chamada parcial"
-                className="max-h-56 overflow-auto rounded-lg border"
-              >
-                <table className="w-full text-sm">
-                  <caption className="sr-only">Alterações da chamada parcial</caption>
-                  <thead className="bg-secondary">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Aluno</th>
-                      <th className="px-3 py-2 text-left">Data</th>
-                      <th className="px-3 py-2 text-left">Presença</th>
-                      <th className="px-3 py-2 text-left">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[
-                      ...previa.criar.map((linha) => ({
-                        ...linha,
-                        acao: "Novo",
-                        anteriores: [] as string[],
-                      })),
-                      ...previa.atualizar.map((linha) => ({ ...linha, acao: "Atualizar" })),
-                    ].map((linha) => (
-                      <Fragment key={linha.linha}>
-                        <tr className="border-t">
-                          <td className="px-3 py-2">{linha.nome}</td>
-                          <td className="px-3 py-2 whitespace-nowrap">{valorDaLinha(linha, 1)}</td>
-                          <td className="px-3 py-2">{valorDaLinha(linha, 4)}</td>
-                          <td className="px-3 py-2">{linha.acao}</td>
-                        </tr>
-                        <tr>
-                          <td colSpan={4} className="px-3 pb-3">
-                            <table className="w-full table-fixed text-xs">
-                              <caption className="sr-only">
-                                {linha.acao === "Novo"
-                                  ? "Valores do novo registro"
-                                  : "Campos alterados"}{" "}
-                                de {linha.nome}
-                              </caption>
-                              <thead className="bg-secondary/50">
-                                <tr>
-                                  <th className="w-1/3 px-2 py-1.5 text-left">Campo</th>
-                                  {linha.acao === "Atualizar" && (
-                                    <th className="w-1/3 px-2 py-1.5 text-left">Anterior</th>
-                                  )}
-                                  <th className="px-2 py-1.5 text-left">Novo valor</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {linha.celulas
-                                  .filter((celula) => celula.coluna <= 7)
-                                  .map((celula) => (
-                                    <tr key={celula.coluna} className="border-t">
-                                      <th
-                                        scope="row"
-                                        className="px-2 py-1.5 text-left font-medium break-words"
-                                      >
-                                        {CABECALHO_PARCIAL[celula.coluna - 1] ??
-                                          `Coluna ${celula.coluna}`}
-                                      </th>
-                                      {linha.acao === "Atualizar" && (
-                                        <td className="px-2 py-1.5 break-words">
-                                          {valorParaConferencia(
-                                            linha.anteriores[celula.coluna - 1] ?? "",
-                                          )}
-                                        </td>
-                                      )}
-                                      <td className="px-2 py-1.5 break-words">
-                                        {valorParaConferencia(celula.valor)}
-                                      </td>
-                                    </tr>
-                                  ))}
-                              </tbody>
-                            </table>
-                          </td>
-                        </tr>
-                      </Fragment>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            {previa.novas + previa.atualizacoes > previa.criar.length + previa.atualizar.length && (
-              <p className="text-muted-foreground text-xs">
-                Exibindo até 20 registros de cada ação.
-              </p>
-            )}
-            {previa.avisos.map((aviso) => (
-              <p key={aviso} className="text-muted-foreground text-sm">
-                {aviso}
-              </p>
-            ))}
-            {previa.bloqueado && (
-              <p role="alert" className="text-falta-texto text-sm">
-                Envio bloqueado. Confira as pendências na planilha.
-              </p>
-            )}
-          </div>
-        )}
-        <p className="text-muted-foreground text-xs">
-          O envio à planilha mantém a confirmação na Seduc como uma marcação manual.
-        </p>
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onFechar}
-            disabled={ocupado}
-            className="h-11"
-          >
-            Cancelar
-          </Button>
-          {previa ? (
-            <Button
-              type="button"
-              onClick={() => void enviar()}
-              disabled={
-                ocupado ||
-                previa.bloqueado ||
-                previa.novas + previa.atualizacoes === 0 ||
-                resultadoIncerto
-              }
-              className="h-11"
+          </Campo>
+        </Box>
+      </Box>
+
+      <Box sx={{ border: 1, borderColor: "divider", borderRadius: 1, p: 1.5 }}>
+        <Interruptor
+          id="parcial-envio-atualizar"
+          rotulo="Atualizar registros já enviados"
+          descricao="Atualiza as linhas criadas pelo aplicativo e preserva os registros manuais."
+          checked={atualizarExistentes}
+          disabled={ocupado}
+          onChange={(valor) => {
+            setAtualizarExistentes(valor);
+            invalidarPrevia();
+          }}
+        />
+      </Box>
+
+      {de > ate ? (
+        <AlertaCompacto
+          variante="dados_invalidos"
+          descricao="O início deve ser anterior ou igual ao fim do período."
+          tamanho="linha"
+        />
+      ) : null}
+      {erro ? (
+        <AlertaCompacto
+          variante="indisponivel"
+          titulo="Envio não confirmado"
+          descricao={erro}
+          tamanho="linha"
+        />
+      ) : null}
+      {resultadoIncerto ? (
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          Confira o resultado na planilha e gere outra prévia.
+        </Typography>
+      ) : null}
+
+      {previa ? (
+        <Box
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 1.5,
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 1,
+            p: 1.5,
+          }}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            {previa.novas} novos · {previa.atualizacoes} atualizações · {previa.existentes} já
+            enviados
+          </Typography>
+          {previa.novas + previa.atualizacoes === 0 && !previa.bloqueado ? (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Nenhuma alteração para enviar neste período.
+            </Typography>
+          ) : null}
+          {previa.criar.length + previa.atualizar.length > 0 ? (
+            <Box
+              role="region"
+              tabIndex={0}
+              aria-label="Prévia da chamada parcial"
+              sx={{
+                maxHeight: 224,
+                overflow: "auto",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 1,
+              }}
             >
-              {enviando && <LoaderCircle size={16} className="animate-spin" />}Confirmar envio
-            </Button>
-          ) : (
-            <Button
-              type="button"
-              onClick={() => void conferir()}
-              disabled={ocupado || de > ate}
-              className="h-11"
-            >
-              {conferindo && <LoaderCircle size={16} className="animate-spin" />}Conferir envio
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              <Table size="small">
+                <Typography component="caption" sx={TEXTO_OCULTO}>
+                  Alterações da chamada parcial
+                </Typography>
+                <TableHead>
+                  <TableRow>
+                    <TableCell scope="col">Aluno</TableCell>
+                    <TableCell scope="col">Data</TableCell>
+                    <TableCell scope="col">Presença</TableCell>
+                    <TableCell scope="col">Ação</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {[
+                    ...previa.criar.map((linha) => ({
+                      ...linha,
+                      acao: "Novo",
+                      anteriores: [] as string[],
+                    })),
+                    ...previa.atualizar.map((linha) => ({ ...linha, acao: "Atualizar" })),
+                  ].map((linha) => (
+                    <Fragment key={linha.linha}>
+                      <TableRow>
+                        <TableCell sx={{ overflowWrap: "anywhere" }}>{linha.nome}</TableCell>
+                        <TableCell sx={{ whiteSpace: "nowrap" }}>
+                          {valorDaLinha(linha, 1)}
+                        </TableCell>
+                        <TableCell>{valorDaLinha(linha, 4)}</TableCell>
+                        <TableCell>{linha.acao}</TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell colSpan={4} sx={{ p: 0 }}>
+                          <Table size="small" sx={{ tableLayout: "fixed" }}>
+                            <Typography component="caption" sx={TEXTO_OCULTO}>
+                              {linha.acao === "Novo"
+                                ? "Valores do novo registro"
+                                : "Campos alterados"}{" "}
+                              de {linha.nome}
+                            </Typography>
+                            <TableHead>
+                              <TableRow>
+                                <TableCell scope="col" sx={{ width: "33.33%" }}>
+                                  Campo
+                                </TableCell>
+                                {linha.acao === "Atualizar" ? (
+                                  <TableCell scope="col" sx={{ width: "33.33%" }}>
+                                    Anterior
+                                  </TableCell>
+                                ) : null}
+                                <TableCell scope="col">Novo valor</TableCell>
+                              </TableRow>
+                            </TableHead>
+                            <TableBody>
+                              {linha.celulas
+                                .filter((celula) => celula.coluna <= 7)
+                                .map((celula) => (
+                                  <TableRow key={celula.coluna}>
+                                    <TableCell
+                                      component="th"
+                                      scope="row"
+                                      sx={{ fontWeight: 500, overflowWrap: "anywhere" }}
+                                    >
+                                      {CABECALHO_PARCIAL[celula.coluna - 1] ??
+                                        `Coluna ${celula.coluna}`}
+                                    </TableCell>
+                                    {linha.acao === "Atualizar" ? (
+                                      <TableCell sx={{ overflowWrap: "anywhere" }}>
+                                        {valorParaConferencia(
+                                          linha.anteriores[celula.coluna - 1] ?? "",
+                                        )}
+                                      </TableCell>
+                                    ) : null}
+                                    <TableCell sx={{ overflowWrap: "anywhere" }}>
+                                      {valorParaConferencia(celula.valor)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                            </TableBody>
+                          </Table>
+                        </TableCell>
+                      </TableRow>
+                    </Fragment>
+                  ))}
+                </TableBody>
+              </Table>
+            </Box>
+          ) : null}
+          {previa.novas + previa.atualizacoes > previa.criar.length + previa.atualizar.length ? (
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              Exibindo até 20 registros de cada ação.
+            </Typography>
+          ) : null}
+          {previa.avisos.map((aviso) => (
+            <Typography key={aviso} variant="body2" sx={{ color: "text.secondary" }}>
+              {aviso}
+            </Typography>
+          ))}
+          {previa.bloqueado ? (
+            <AlertaCompacto
+              variante="conflito"
+              descricao="Envio bloqueado. Confira as pendências na planilha."
+              tamanho="linha"
+            />
+          ) : null}
+        </Box>
+      ) : null}
+
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        O envio à planilha mantém a confirmação na Seduc como uma marcação manual.
+      </Typography>
+    </Dialogo>
   );
 }

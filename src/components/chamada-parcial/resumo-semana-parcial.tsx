@@ -1,25 +1,35 @@
 "use client";
 
 // Resumo semanal da Chamada Parcial, com os registros efetivos da tela.
+// As seções recolhíveis e os cartões de dia vêm da base compartilhada em MUI.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  CalendarDays,
-  CheckCircle2,
-  ClipboardList,
-  Clock3,
-  LoaderCircle,
-  TriangleAlert,
-  Users,
-} from "lucide-react";
+import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import Box from "@mui/material/Box";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Paper from "@mui/material/Paper";
+import Skeleton from "@mui/material/Skeleton";
+import Stack from "@mui/material/Stack";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
 import type { Feriado } from "@/domain/calendario-letivo";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { rotuloData, rotuloDataCurta, rotuloDiaSemana } from "@/domain/frequencia";
 import type { RegistroPersonalizado } from "@/domain/frequencia-personalizada";
 import { resumirSemanaParcial, type ResumoSemanaParcial } from "@/domain/resumo-semana-parcial";
 import { pedir } from "@/lib/api-cliente";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
-import { Button } from "@/components/ui/button";
-import { Selo } from "@/components/ui/selo";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Selo } from "@/components/ui/mui/selo";
 import {
   CabecalhoResumo,
   CartaoDia,
@@ -51,57 +61,98 @@ interface DadosParciais {
 
 const LIMITE_ALUNOS = 5;
 
+const VISUALMENTE_OCULTO = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
+
 function RankingParcial({ resumo }: { resumo: ResumoSemanaParcial }) {
   const [completa, setCompleta] = useState(false);
   if (resumo.alunos.length === 0) return <ResumoVazio texto="Nenhum ajuste nesta semana." />;
   const visiveis = completa ? resumo.alunos : resumo.alunos.slice(0, LIMITE_ALUNOS);
   return (
-    <div className="flex flex-col gap-3">
-      <table className="w-full table-fixed text-left text-sm">
-        <caption className="sr-only">Alunos com ajustes na Chamada Parcial</caption>
-        <thead>
-          <tr className="text-muted-foreground border-b text-xs">
-            <th scope="col">Aluno</th>
-            <th scope="col" className="w-14 text-right">
+    <Stack spacing={1.5}>
+      <Table size="small" sx={{ tableLayout: "fixed" }}>
+        <Typography component="caption" sx={VISUALMENTE_OCULTO}>
+          Alunos com ajustes na Chamada Parcial
+        </Typography>
+        <TableHead>
+          <TableRow>
+            <TableCell scope="col" sx={{ py: 1, fontWeight: 500, color: "text.secondary" }}>
+              Aluno
+            </TableCell>
+            <TableCell
+              scope="col"
+              align="right"
+              sx={{ width: 64, py: 1, fontWeight: 500, color: "text.secondary" }}
+            >
               Ajustes
-            </th>
-            <th scope="col" className="w-16 text-right">
+            </TableCell>
+            <TableCell
+              scope="col"
+              align="right"
+              sx={{ width: 72, py: 1, fontWeight: 500, color: "text.secondary" }}
+            >
               Pendentes
-            </th>
-            <th scope="col" className="w-16 text-right">
+            </TableCell>
+            <TableCell
+              scope="col"
+              align="right"
+              sx={{ width: 72, py: 1, fontWeight: 500, color: "text.secondary" }}
+            >
               Registrados
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
+            </TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
           {visiveis.map((aluno) => (
-            <tr key={aluno.alunoId}>
-              <th scope="row" className="min-w-0 py-2 font-normal break-words">
+            <TableRow key={aluno.alunoId}>
+              <TableCell
+                component="th"
+                scope="row"
+                sx={{ py: 1, fontWeight: 400, overflowWrap: "anywhere" }}
+              >
                 {aluno.nome}
-              </th>
-              <td className="numerais-tabulares py-2 text-right">{aluno.ajustes}</td>
-              <td className="text-alerta-texto numerais-tabulares py-2 text-right">
+              </TableCell>
+              <TableCell align="right" sx={{ py: 1, fontVariantNumeric: "tabular-nums" }}>
+                {aluno.ajustes}
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{ py: 1, color: "alerta.texto", fontVariantNumeric: "tabular-nums" }}
+              >
                 {aluno.pendentes}
-              </td>
-              <td className="text-primary numerais-tabulares py-2 text-right">
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{ py: 1, color: "primary.main", fontVariantNumeric: "tabular-nums" }}
+              >
                 {aluno.registrados}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
+        </TableBody>
+      </Table>
       {resumo.alunos.length > LIMITE_ALUNOS ? (
-        <Button
+        <Botao
           type="button"
-          variant="link"
-          className="min-h-11 self-start px-0"
+          variante="texto"
+          tamanho="pequeno"
           aria-expanded={completa}
           onClick={() => setCompleta((valor) => !valor)}
+          sx={{ alignSelf: "flex-start", px: 0 }}
         >
           {completa ? "Mostrar menos" : "Ver a lista completa"}
-        </Button>
+        </Botao>
       ) : null}
-    </div>
+    </Stack>
   );
 }
 
@@ -196,10 +247,13 @@ export function VistaResumoParcial({
   }
 
   return (
-    <section
+    <Paper
+      component="section"
       aria-label="Resumo da semana"
       aria-busy={!carga.dados}
-      className="superficie flex flex-col"
+      variant="outlined"
+      elevation={0}
+      sx={{ display: "flex", flexDirection: "column", overflow: "hidden" }}
     >
       <CabecalhoResumo
         dias={dias}
@@ -209,11 +263,11 @@ export function VistaResumoParcial({
         descricao="Registros efetivos da Chamada Parcial da turma selecionada."
       />
       <CorpoResumo>
-        <p className="sr-only" role="status" aria-live="polite">
+        <Typography component="p" role="status" aria-live="polite" sx={VISUALMENTE_OCULTO}>
           {carga.anuncio}
-        </p>
+        </Typography>
         {carga.erro && carga.dados ? (
-          <AvisoCompacto
+          <AlertaCompacto
             variante="indisponivel"
             descricao={carga.erro}
             tamanho="linha"
@@ -221,16 +275,21 @@ export function VistaResumoParcial({
           />
         ) : null}
         {!carga.dados && !carga.erro ? (
-          <p
-            role="status"
-            className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-sm"
-          >
-            <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-            Carregando resumo da semana...
-          </p>
+          <Stack spacing={1} sx={{ py: 4 }}>
+            <Typography
+              component="p"
+              role="status"
+              variant="body2"
+              sx={{ color: "text.secondary", textAlign: "center" }}
+            >
+              Carregando resumo da semana...
+            </Typography>
+            <Skeleton variant="rounded" height={96} />
+            <Skeleton variant="rounded" height={160} />
+          </Stack>
         ) : null}
         {!carga.dados && carga.erro ? (
-          <AvisoCompacto
+          <AlertaCompacto
             variante="indisponivel"
             descricao={carga.erro}
             tamanho="linha"
@@ -240,82 +299,144 @@ export function VistaResumoParcial({
         {!turma ? <ResumoVazio texto="Nenhuma turma selecionada." /> : null}
 
         {resumo ? (
-          <article
+          <Box
+            component="article"
             aria-labelledby={`resumo-parcial-${resumo.turmaId}`}
-            className="flex flex-col gap-3"
+            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
           >
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 id={`resumo-parcial-${resumo.turmaId}`} className="font-semibold">
-                {resumo.rotulo}
-              </h3>
-              <span
-                className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                  resumo.totais.pendentes === 0
-                    ? "border-primary/30 bg-primary/10 text-primary"
-                    : "border-alerta/40 bg-alerta-fraca text-alerta-texto"
-                }`}
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}
+            >
+              <Typography
+                id={`resumo-parcial-${resumo.turmaId}`}
+                component="h3"
+                variant="subtitle1"
+                sx={{ fontWeight: 600 }}
               >
-                {resumo.totais.pendentes === 0 ? (
-                  <CheckCircle2 size={12} aria-hidden="true" />
-                ) : (
-                  <TriangleAlert size={12} aria-hidden="true" />
-                )}
-                {resumo.totais.pendentes === 0
-                  ? "Sem pendências"
-                  : `${resumo.totais.pendentes} ${resumo.totais.pendentes === 1 ? "pendência" : "pendências"}`}
-              </span>
-            </div>
+                {resumo.rotulo}
+              </Typography>
+              <Selo
+                component="span"
+                tom={resumo.totais.pendentes === 0 ? "sucesso" : "atencao"}
+                tamanho="pequeno"
+                rotulo={
+                  <Box
+                    component="span"
+                    sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+                  >
+                    {resumo.totais.pendentes === 0 ? (
+                      <CheckCircleRoundedIcon aria-hidden="true" sx={{ fontSize: 14 }} />
+                    ) : (
+                      <WarningAmberRoundedIcon aria-hidden="true" sx={{ fontSize: 14 }} />
+                    )}
+                    <span>
+                      {resumo.totais.pendentes === 0
+                        ? "Sem pendências"
+                        : `${resumo.totais.pendentes} ${resumo.totais.pendentes === 1 ? "pendência" : "pendências"}`}
+                    </span>
+                  </Box>
+                }
+              />
+            </Stack>
 
             <SecaoResumo
               id="parcial-visao"
               titulo="Visão geral"
               descricao="Situação na Seduc, tipos de registro e dias da semana."
-              icone={CalendarDays}
+              icone={CalendarMonthRoundedIcon}
               aberto={aberta("visao")}
               onAbertoChange={(valor) => alternar("visao", valor)}
               resumo={
                 <>
-                  <Selo>{resumo.totais.ajustes} ajustes</Selo>
-                  <Selo>{resumo.totais.pendentes} pendentes</Selo>
+                  <Selo rotulo={`${resumo.totais.ajustes} ajustes`} tom="neutro" component="span" />
+                  <Selo
+                    rotulo={`${resumo.totais.pendentes} pendentes`}
+                    tom="neutro"
+                    component="span"
+                  />
                 </>
               }
             >
-              <div className="grid gap-3 lg:grid-cols-2">
-                <div className="bg-card rounded-[14px] border p-3">
-                  <p className="text-muted-foreground text-xs font-medium">Situação na Seduc</p>
-                  <dl className="mt-2 grid grid-cols-3 divide-x">
+              <Box
+                sx={{
+                  display: "grid",
+                  gap: 2,
+                  gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "repeat(2, minmax(0, 1fr))" },
+                }}
+              >
+                <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 2 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                    Situação na Seduc
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      mt: 1,
+                      "& > *:not(:first-of-type)": { borderLeft: 1, borderColor: "divider" },
+                    }}
+                  >
                     {[
                       ["Ajustes", resumo.totais.ajustes],
                       ["Pendentes", resumo.totais.pendentes],
                       ["Registrados", resumo.totais.registrados],
                     ].map(([rotulo, valor]) => (
-                      <div key={rotulo} className="flex flex-col items-center gap-0.5 px-2">
-                        <dt className="text-muted-foreground text-xs">{rotulo}</dt>
-                        <dd className="numerais-tabulares text-xl font-semibold">{valor}</dd>
-                      </div>
+                      <Stack key={rotulo} spacing={0.25} sx={{ alignItems: "center", px: 1 }}>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          {rotulo}
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+                        >
+                          {valor}
+                        </Typography>
+                      </Stack>
                     ))}
-                  </dl>
-                </div>
-                <div className="bg-card rounded-[14px] border p-3">
-                  <p className="text-muted-foreground text-xs font-medium">Tipos de registro</p>
-                  <dl className="mt-2 grid grid-cols-3 divide-x">
+                  </Box>
+                </Box>
+                <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 2 }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 600 }}>
+                    Tipos de registro
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      mt: 1,
+                      "& > *:not(:first-of-type)": { borderLeft: 1, borderColor: "divider" },
+                    }}
+                  >
                     {[
                       ["Parciais", resumo.totais.presencasParciais],
                       ["Justificativas", resumo.totais.justificadas],
                       ["Saídas", resumo.totais.saidas],
                     ].map(([rotulo, valor]) => (
-                      <div key={rotulo} className="flex flex-col items-center gap-0.5 px-2">
-                        <dt className="text-muted-foreground text-center text-xs">{rotulo}</dt>
-                        <dd className="numerais-tabulares text-xl font-semibold">{valor}</dd>
-                      </div>
+                      <Stack key={rotulo} spacing={0.25} sx={{ alignItems: "center", px: 1 }}>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary", textAlign: "center" }}
+                        >
+                          {rotulo}
+                        </Typography>
+                        <Typography
+                          variant="h6"
+                          sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+                        >
+                          {valor}
+                        </Typography>
+                      </Stack>
                     ))}
-                  </dl>
-                </div>
-              </div>
-              <p className="text-muted-foreground text-xs">
+                  </Box>
+                </Box>
+              </Box>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Ajustes incluem chamadas com saída parcial ou justificativa, saídas e
                 personalizações.
-              </p>
+              </Typography>
               <GraficoRosca
                 titulo="Situação dos ajustes na Seduc"
                 fatias={[
@@ -327,7 +448,17 @@ export function VistaResumoParcial({
                 unidadePlural="ajustes"
                 vazio="Nenhum ajuste nesta semana"
               />
-              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+              <Box
+                component="ul"
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 7rem), 1fr))",
+                  gap: 1,
+                  listStyle: "none",
+                  m: 0,
+                  p: 0,
+                }}
+              >
                 {resumo.dias.map((dia) => {
                   const situacao = cartaoParcial(dia);
                   return (
@@ -346,25 +477,43 @@ export function VistaResumoParcial({
                       }
                       contagens={
                         dia.registros > 0 ? (
-                          <div className="flex w-full flex-col gap-1.5">
-                            <span className="text-muted-foreground text-xs">
+                          <Box
+                            sx={{
+                              display: "flex",
+                              width: "100%",
+                              flexDirection: "column",
+                              gap: 0.75,
+                            }}
+                          >
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
                               {dia.registros} {dia.registros === 1 ? "registro" : "registros"}
-                            </span>
-                            <div aria-hidden="true" className="flex w-full gap-0.5">
+                            </Typography>
+                            <Box
+                              aria-hidden="true"
+                              sx={{ display: "flex", width: "100%", gap: 0.5 }}
+                            >
                               {dia.ajustes > 0 ? (
-                                <span
-                                  className="bg-primary h-1 rounded-full"
-                                  style={{ flexGrow: dia.ajustes }}
+                                <Box
+                                  sx={{
+                                    height: 4,
+                                    flexGrow: dia.ajustes,
+                                    borderRadius: "999px",
+                                    backgroundColor: "primary.main",
+                                  }}
                                 />
                               ) : null}
                               {dia.pendentes > 0 ? (
-                                <span
-                                  className="bg-alerta h-1 rounded-full"
-                                  style={{ flexGrow: dia.pendentes }}
+                                <Box
+                                  sx={{
+                                    height: 4,
+                                    flexGrow: dia.pendentes,
+                                    borderRadius: "999px",
+                                    backgroundColor: "alerta.main",
+                                  }}
                                 />
                               ) : null}
-                            </div>
-                          </div>
+                            </Box>
+                          </Box>
                         ) : undefined
                       }
                       detalhe={
@@ -375,45 +524,64 @@ export function VistaResumoParcial({
                     />
                   );
                 })}
-              </ul>
+              </Box>
             </SecaoResumo>
 
             <SecaoResumo
               id="parcial-pendencias"
               titulo="Pendentes na Seduc"
               descricao="Registros que exigem conferência e ainda não foram confirmados."
-              icone={ClipboardList}
+              icone={AssignmentRoundedIcon}
               aberto={aberta("pendencias")}
               onAbertoChange={(valor) => alternar("pendencias", valor)}
-              resumo={<Selo>{resumo.pendenciasSeduc.length} pendentes</Selo>}
+              resumo={
+                <Selo
+                  rotulo={`${resumo.pendenciasSeduc.length} pendentes`}
+                  tom="neutro"
+                  component="span"
+                />
+              }
             >
               {resumo.pendenciasSeduc.length === 0 ? (
                 <ResumoVazio texto="Nenhuma pendência na Seduc nesta semana." />
               ) : (
-                <ul className="divide-y">
+                <List disablePadding>
                   {resumo.pendenciasSeduc.map((item) => (
-                    <li
+                    <ListItem
                       key={item.id}
-                      className="flex flex-wrap items-center justify-between gap-2 py-2"
+                      divider
+                      sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 1,
+                        px: 0,
+                        py: 1,
+                      }}
                     >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium break-words">{item.alunoNome}</p>
-                        <p className="text-muted-foreground text-xs">
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, overflowWrap: "anywhere" }}
+                        >
+                          {item.alunoNome}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
                           {rotuloData(item.dia)} · {item.tipo}
-                        </p>
-                      </div>
-                      <Button
+                        </Typography>
+                      </Box>
+                      <Botao
                         type="button"
-                        variant="outline"
-                        size="sm"
-                        className="min-h-11"
+                        variante="contorno"
+                        tamanho="pequeno"
                         onClick={() => onAbrirDia(item.dia)}
                       >
                         Abrir {rotuloDataCurta(item.dia)}
-                      </Button>
-                    </li>
+                      </Botao>
+                    </ListItem>
                   ))}
-                </ul>
+                </List>
               )}
             </SecaoResumo>
 
@@ -421,41 +589,55 @@ export function VistaResumoParcial({
               id="parcial-sem-chamada"
               titulo="Dias sem chamada"
               descricao="Dias letivos sem a chamada regular salva."
-              icone={TriangleAlert}
+              icone={WarningAmberRoundedIcon}
               aberto={aberta("sem-chamada")}
               onAbertoChange={(valor) => alternar("sem-chamada", valor)}
-              resumo={<Selo>{resumo.diasSemChamada.length} dias</Selo>}
+              resumo={
+                <Selo
+                  rotulo={`${resumo.diasSemChamada.length} dias`}
+                  tom="neutro"
+                  component="span"
+                />
+              }
             >
               {resumo.diasSemChamada.length === 0 ? (
                 <ResumoVazio texto="Nenhum dia letivo sem chamada nesta semana." />
               ) : (
-                <ul className="divide-y">
+                <List disablePadding>
                   {resumo.diasSemChamada.map((dia) => (
-                    <li
+                    <ListItem
                       key={dia}
-                      className="flex flex-wrap items-center justify-between gap-2 py-2"
+                      divider
+                      sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 1,
+                        px: 0,
+                        py: 1,
+                      }}
                     >
-                      <span className="text-sm">
+                      <Typography variant="body2">
                         {rotuloDiaSemana(dia).replace("-feira", "")}, {rotuloData(dia)}
-                      </span>
+                      </Typography>
                       {onAbrirChamada ? (
-                        <Button
+                        <Botao
                           type="button"
-                          variant="outline"
-                          size="sm"
-                          className="min-h-11"
+                          variante="contorno"
+                          tamanho="pequeno"
                           onClick={() => onAbrirChamada(dia)}
                         >
                           Abrir na Chamada
-                        </Button>
+                        </Botao>
                       ) : (
-                        <span className="text-muted-foreground text-xs">
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
                           A chamada regular é registrada na tela Chamada.
-                        </span>
+                        </Typography>
                       )}
-                    </li>
+                    </ListItem>
                   ))}
-                </ul>
+                </List>
               )}
             </SecaoResumo>
 
@@ -463,10 +645,12 @@ export function VistaResumoParcial({
               id="parcial-alunos"
               titulo="Alunos"
               descricao="Ajustes, pendentes e registrados por aluno."
-              icone={Users}
+              icone={GroupsRoundedIcon}
               aberto={aberta("alunos")}
               onAbertoChange={(valor) => alternar("alunos", valor)}
-              resumo={<Selo>{resumo.alunos.length} alunos</Selo>}
+              resumo={
+                <Selo rotulo={`${resumo.alunos.length} alunos`} tom="neutro" component="span" />
+              }
             >
               <RankingParcial resumo={resumo} />
             </SecaoResumo>
@@ -476,30 +660,34 @@ export function VistaResumoParcial({
                 id="parcial-saidas"
                 titulo="Saídas"
                 descricao="Saídas antecipadas da semana."
-                icone={Clock3}
+                icone={ScheduleRoundedIcon}
                 aberto={aberta("saidas")}
                 onAbertoChange={(valor) => alternar("saidas", valor)}
-                resumo={<Selo>{saidas.length} saídas</Selo>}
+                resumo={<Selo rotulo={`${saidas.length} saídas`} tom="neutro" component="span" />}
               >
                 {saidas.length === 0 ? (
                   <ResumoVazio texto="Nenhuma saída antecipada nesta semana." />
                 ) : (
-                  <ul className="divide-y">
+                  <List disablePadding>
                     {saidas.map((saida) => (
-                      <li key={saida.id} className="py-2 text-sm">
-                        <span className="font-medium">{saida.alunoNome}</span>
-                        <span className="text-muted-foreground">
-                          {` · ${rotuloData(saida.dia)} · ${saida.horario ?? ""}`}
-                        </span>
-                      </li>
+                      <ListItem key={saida.id} divider sx={{ px: 0, py: 1 }}>
+                        <Typography variant="body2">
+                          <Box component="span" sx={{ fontWeight: 500 }}>
+                            {saida.alunoNome}
+                          </Box>
+                          <Box component="span" sx={{ color: "text.secondary" }}>
+                            {` · ${rotuloData(saida.dia)} · ${saida.horario ?? ""}`}
+                          </Box>
+                        </Typography>
+                      </ListItem>
                     ))}
-                  </ul>
+                  </List>
                 )}
               </SecaoResumo>
             ) : null}
-          </article>
+          </Box>
         ) : null}
       </CorpoResumo>
-    </section>
+    </Paper>
   );
 }
