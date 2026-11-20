@@ -174,6 +174,7 @@ O contrato completo do token, do arquivo de adoção, da autoridade e da retenç
 | `BACKUP_RESTAURACAO_URL_VALIDACAO` | vazio                                 | Banco descartável no modo URL      |
 | `RESTAURAR_MANTER_ANTERIOR`        | `true`                                | Preserva o banco anterior          |
 | `BACKUP_ESPACO_MINIMO_MB`          | `512`                                 | Espaço mínimo antes do dump        |
+| `BACKUP_TIMEOUT_DUMP_SEGUNDOS`     | `3600`                                | Prazo de dump e cifra              |
 | `BACKUP_CRIPTOGRAFIA`              | `gpg`                                 | `gpg` ou `age`                     |
 | `BACKUP_GPG_DESTINATARIO`          | vazio                                 | Fingerprint completo               |
 | `BACKUP_GPG_CHAVE_PUBLICA`         | vazio                                 | Chave pública GPG                  |

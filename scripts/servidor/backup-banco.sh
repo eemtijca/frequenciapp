@@ -53,6 +53,11 @@ BACKUP_VERIFICAR_REMOTO="${BACKUP_VERIFICAR_REMOTO:-true}"
 BACKUP_RETER_REMOTO="${BACKUP_RETER_REMOTO:-false}"
 BACKUP_CATALOGO_PERSISTENTE="${BACKUP_CATALOGO_PERSISTENTE:-true}"
 BACKUP_EXIGIR_REMOTO="${BACKUP_EXIGIR_REMOTO:-false}"
+BACKUP_TIMEOUT_DUMP_SEGUNDOS="${BACKUP_TIMEOUT_DUMP_SEGUNDOS:-3600}"
+[[ "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" =~ ^[1-9][0-9]{0,4}$ ]] &&
+  [ "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" -le 86400 ] ||
+  erro "BACKUP_TIMEOUT_DUMP_SEGUNDOS deve estar entre 1 e 86400."
+export BACKUP_TIMEOUT_DUMP_SEGUNDOS
 case "$BACKUP_EXIGIR_REMOTO" in true | false) ;; *) erro "BACKUP_EXIGIR_REMOTO exige true ou false." ;; esac
 if [ "$BACKUP_EXIGIR_REMOTO" = true ]; then
   [ -n "${BACKUP_REMOTO:-}" ] || erro "O backup exige destino remoto efetivo."
@@ -158,12 +163,12 @@ cifrar_fluxo() {
   local destino="$1"
   case "$BACKUP_CRIPTOGRAFIA" in
     gpg)
-      gpg --batch --yes --trust-model always \
+      timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" gpg --batch --yes --trust-model always \
         --recipient "${BACKUP_DESTINATARIO_VERIFICADO}!" \
         --output "$destino" --encrypt
       ;;
     age)
-      age --recipients-file "$BACKUP_AGE_DESTINATARIOS" \
+      timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" age --recipients-file "$BACKUP_AGE_DESTINATARIOS" \
         --output "$destino"
       ;;
   esac
@@ -380,7 +385,10 @@ try {
     env = { PATH: process.env.PATH, HOME: process.env.HOME, PGSERVICEFILE: arquivo, PGSERVICE: 'backup' };
     if (senha !== undefined) env.PGPASSWORD = senha;
   }
-  const r = spawnSync(comando, args, { env, stdio: ['ignore', 'inherit', 'pipe'] });
+  const prazo = comando === 'pg_dump'
+    ? { timeout: Number(process.env.BACKUP_TIMEOUT_DUMP_SEGUNDOS) * 1000, killSignal: 'SIGKILL' }
+    : {};
+  const r = spawnSync(comando, args, { env, stdio: ['ignore', 'inherit', 'pipe'], ...prazo });
   if (r.error || r.signal || r.status !== 0) throw new Error();
 } catch {
   console.error('[banco] Não foi possível executar o cliente PostgreSQL com a conexão configurada.');
@@ -466,25 +474,29 @@ gerar_dump_cifrado() {
 
   (
     exec 8>&-
+    status=0
     if [ "$BACKUP_MODO" = "compose" ]; then
-      compose exec -T "$SERVIDOR_SERVICO_DB" pg_restore -l
+      timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" "${COMPOSE[@]}" exec -T "$SERVIDOR_SERVICO_DB" pg_restore -l || status=$?
     else
-      pg_restore -l
+      timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" pg_restore -l || status=$?
     fi
+    # A listagem termina no catálogo. Continue lendo até EOF, mesmo se ela falhar.
+    cat || exit 1
+    exit "$status"
   ) <"$fifo" >/dev/null &
   pid=$!
 
   if [ "$BACKUP_MODO" = "compose" ]; then
-    if compose exec -T "$SERVIDOR_SERVICO_DB" pg_dump \
+    if timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" "${COMPOSE[@]}" exec -T "$SERVIDOR_SERVICO_DB" pg_dump \
       -U "${POSTGRES_USER:-frequencia}" \
       -d "${POSTGRES_DB:-frequencia}" \
-      "${argumentos_dump[@]}" | tee "$fifo" | cifrar_fluxo "$destino"; then
+      "${argumentos_dump[@]}" 8>&- | timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" tee "$fifo" 8>&- | cifrar_fluxo "$destino" 8>&-; then
       status_pipeline=0
     else
       status_pipeline=$?
     fi
   else
-    if executar_postgres_url pg_dump "${argumentos_dump[@]}" | tee "$fifo" | cifrar_fluxo "$destino"; then
+    if executar_postgres_url pg_dump "${argumentos_dump[@]}" 8>&- | timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" tee "$fifo" 8>&- | cifrar_fluxo "$destino" 8>&-; then
       status_pipeline=0
     else
       status_pipeline=$?

@@ -10,6 +10,9 @@ export RESTAURAR_PERMITIR_MIGRACOES_DIVERGENTES=true
 iniciar_compose_teste
 preparar_banco_sintetico
 
+# O conteúdo do dump precisa ultrapassar a capacidade do FIFO.
+executar_sql "$POSTGRES_DB" 'create table prova_fluxo as select i, md5(i::text) as valor from generate_series(1, 25000) i' >/dev/null
+
 # Cópias antigas para exercitar o mínimo de retenção.
 for i in 1 2 3 4 5; do
   nome="frequenciapp-20200101T00000${i}Z-abc${i}.dump.gpg"
@@ -18,7 +21,7 @@ for i in 1 2 3 4 5; do
   touch -d '10 days ago' "$BACKUP_BANCO_DIR/$nome" "$BACKUP_BANCO_DIR/$nome.sha256"
 done
 
-"$RAIZ/scripts/servidor/backup-banco.sh"
+timeout -k 5 60 "$RAIZ/scripts/servidor/backup-banco.sh"
 
 dump=$(ultimo_arquivo_backup)
 [ -n "$dump" ] || falhar "o backup não gerou um arquivo cifrado."
@@ -70,8 +73,11 @@ fi
 
 # A remoção do registro prova que a restauração recupera os dados.
 executar_sql "$POSTGRES_DB" 'delete from alunos' >/dev/null
+executar_sql "$POSTGRES_DB" 'delete from prova_fluxo' >/dev/null
 "$RAIZ/scripts/servidor/restaurar.sh" --arquivo "$dump" --confirmar --sem-copia
 
+[ "$(executar_sql "$POSTGRES_DB" 'select count(*) from prova_fluxo where valor = md5(i::text)')" = "25000" ] ||
+  falhar "o conteúdo que excede o FIFO não voltou integralmente na restauração."
 [ "$(executar_sql "$POSTGRES_DB" 'select count(*) from alunos')" = "1" ] ||
   falhar "o aluno sintético não voltou na restauração."
 [ "$(executar_sql "$POSTGRES_DB" 'select count(*) from _prisma_migrations')" = "1" ] ||
