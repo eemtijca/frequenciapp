@@ -254,7 +254,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   // Registra os dois temas na largura de cada projeto, sem incluir dados reais.
   for (const tema of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: tema });
-    await expect(page.locator("html")).toHaveClass(tema === "dark" ? /dark/ : /light/);
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
     await testInfo.attach(`Seletores com barras ${tema}`, {
       body: await grupo.screenshot({ animations: "disabled" }),
       contentType: "image/png",

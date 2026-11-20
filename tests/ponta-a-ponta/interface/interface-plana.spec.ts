@@ -34,13 +34,11 @@ async function conferirFonte(page: Page, elementos: Locator[]): Promise<void> {
       corpo: getComputedStyle(document.body).fontFamily,
       carregada: Array.from(document.fonts).some(
         (face) =>
-          /jakarta/i.test(face.family) &&
-          !/fallback/i.test(face.family) &&
-          face.status === "loaded",
+          /inter/i.test(face.family) && !/fallback/i.test(face.family) && face.status === "loaded",
       ),
     };
   });
-  expect(fonte.corpo).toMatch(/jakarta/i);
+  expect(fonte.corpo).toMatch(/inter/i);
   expect(fonte.carregada).toBe(true);
   for (const elemento of elementos) {
     await expect(elemento).toBeVisible();
@@ -137,7 +135,7 @@ test.describe("interface compartilhada", () => {
       await page.addInitScript(() => localStorage.setItem("theme", "system"));
       await page.goto("/");
       await aguardarHidratacao(page);
-      await expect(page.locator("html")).toHaveClass(new RegExp(tema));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
 
       for (const [rotulo, visao] of [
         ["Painel", "painel"],

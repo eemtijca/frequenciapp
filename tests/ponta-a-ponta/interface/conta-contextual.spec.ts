@@ -23,7 +23,7 @@ for (const tema of ["light", "dark"] as const) {
     await page.addInitScript(() => localStorage.setItem("theme", "system"));
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.locator("html")).toHaveClass(new RegExp(tema));
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
     await abrirNavegacao(page);
     const gaveta = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
     const gatilho = gaveta.getByRole("button", { name: /^Conta de / });

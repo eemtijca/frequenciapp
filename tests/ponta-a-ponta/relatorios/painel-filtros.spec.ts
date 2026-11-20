@@ -489,7 +489,7 @@ test.describe("infrequência do dia", () => {
       contentType: "image/png",
     });
     await page.emulateMedia({ colorScheme: "dark" });
-    await expect(page.locator("html")).toHaveClass(/dark/);
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", "dark");
     await testInfo.attach("Legenda compacta escura", {
       body: await escola.screenshot(),
       contentType: "image/png",

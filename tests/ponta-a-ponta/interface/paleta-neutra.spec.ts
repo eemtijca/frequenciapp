@@ -19,7 +19,7 @@ for (const rota of ["/", "/bi"]) {
       // As telas públicas não precisam de nenhuma API ou sessão para este ensaio.
       await page.route("**/api/**", (route) => route.abort());
       await page.goto(rota);
-      await expect(page.locator("html")).toHaveClass(new RegExp(tema));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
       const cartao = page.locator(".superficie").filter({ visible: true }).first();
       await expect(cartao).toBeVisible();
       const esperados =

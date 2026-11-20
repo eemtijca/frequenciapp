@@ -53,8 +53,8 @@ async function fonteReal(page: Page, alvo: Locator, placeholder = false) {
       carregada: document.fonts.check(consulta, texto),
     };
   }, placeholder);
-  // A fallback gerada pelo Next também contém Jakarta no nome; não aceitá-la.
-  expect(resultado.primeira, JSON.stringify(resultado)).toMatch(/jakarta/i);
+  // A fallback gerada pelo Next também contém Inter no nome; não aceitá-la.
+  expect(resultado.primeira, JSON.stringify(resultado)).toMatch(/inter/i);
   expect(resultado.primeira, JSON.stringify(resultado)).not.toMatch(/fallback/i);
   expect(resultado.texto.trim(), JSON.stringify(resultado)).not.toBe("");
   expect(resultado.carregada, JSON.stringify(resultado)).toBe(true);

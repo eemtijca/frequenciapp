@@ -250,7 +250,7 @@ test("a liberação não alcança outra turma ou data e o rascunho recupera o s�
     }
     for (const tema of ["light", "dark"] as const) {
       await page.emulateMedia({ colorScheme: tema });
-      await expect(page.locator("html")).toHaveClass(tema === "dark" ? /dark/ : /light/);
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
       await info.attach(`Sábado letivo ${largura}px ${tema}`, {
         body: await resumo.locator("..").screenshot(),
         contentType: "image/png",

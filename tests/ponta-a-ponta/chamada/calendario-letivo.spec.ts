@@ -246,7 +246,7 @@ test("cadastra feriado no ano escolhido, recarrega e remove somente após confir
     );
     for (const tema of ["light", "dark"] as const) {
       await page.emulateMedia({ colorScheme: tema });
-      await expect(page.locator("html")).toHaveClass(tema === "dark" ? /dark/ : /light/);
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
       await info.attach(`Calendário ${largura}px ${tema}`, {
         body: await secao.screenshot(),
         contentType: "image/png",
