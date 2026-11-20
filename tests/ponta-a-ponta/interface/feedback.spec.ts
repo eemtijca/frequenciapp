@@ -51,11 +51,7 @@ test.describe("toasts e toque duplo", () => {
       .locator(".MuiSnackbar-root .MuiAlert-root")
       .filter({ hasText: "Série criada." });
     await expect(avisos).toHaveCount(1);
-    await expect(
-      page
-        .locator('section[aria-label="Gestão da escola"] ul.divide-y > li')
-        .filter({ hasText: "E2E Feedback" }),
-    ).toHaveCount(1);
+    await expect(page.getByRole("row").filter({ hasText: "E2E Feedback" })).toHaveCount(1);
   });
 
   test("a exportação CSV avisa com um toast", async ({ page }) => {

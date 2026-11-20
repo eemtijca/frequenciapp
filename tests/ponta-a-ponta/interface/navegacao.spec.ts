@@ -9,7 +9,7 @@ test.describe("navegação", () => {
     await aguardarHidratacao(page);
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
     await trocarVisao(page, "Chamada", "chamada");
-    await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Fazer chamada", exact: true })).toBeVisible();
     await trocarVisao(page, "Horários", "horarios");
     await expect(
       page.getByRole("region", { name: "Horários semanais", exact: true }),
@@ -27,7 +27,7 @@ test.describe("navegação", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Chamada", "chamada");
-    await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Fazer chamada", exact: true })).toBeVisible();
     await trocarVisao(page, "Painel", "painel");
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
   });
@@ -38,7 +38,7 @@ test.describe("navegação", () => {
     await aguardarHidratacao(page);
     await page.getByRole("button", { name: "Chamada", exact: true }).click();
     await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
-    await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Fazer chamada", exact: true })).toBeVisible();
   });
 
   test("alterna o tema pelo menu de três opções", async ({ page }, info) => {

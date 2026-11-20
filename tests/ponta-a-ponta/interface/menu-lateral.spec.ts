@@ -191,7 +191,7 @@ test.describe("menu lateral", () => {
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
     await expect(page.locator("main")).toBeFocused();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(page.locator('aside[aria-label="Navegação do aplicativo"]:visible')).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
