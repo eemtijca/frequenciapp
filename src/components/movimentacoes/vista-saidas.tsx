@@ -5,19 +5,22 @@
 // remover, e só o botão Desbloquear a libera. Separado da chamada. O relatório
 // por aluno fica em Relatórios, Saídas e entradas.
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  LoaderCircle,
-  LockKeyhole,
-  LockKeyholeOpen,
-  Trash2,
-} from "lucide-react";
-import { toast } from "sonner";
-import { avisarSucesso } from "@/lib/avisos";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import type {
   Aluno,
   JustificativaConfigurada,
@@ -38,21 +41,12 @@ import {
 } from "@/domain/frequencia";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { useContextoAtualizacao } from "@/components/atualizacao/contexto-atualizacao";
-import { Button } from "@/components/ui/button";
-import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
-import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { CamposMovimentacao } from "@/components/movimentacoes/campos-movimentacao";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
@@ -79,6 +73,39 @@ interface Props {
 }
 
 type FormaJustificativa = "texto" | "catalogo";
+
+const ESTILO_LEITOR = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
+
+const ESTILO_NAVEGACAO = {
+  width: 44,
+  height: "auto",
+  minHeight: 44,
+  flexShrink: 0,
+} as const;
+
+function IndicadorCarregando({ texto }: { texto: string }) {
+  return (
+    <Stack
+      direction="row"
+      spacing={1}
+      role="status"
+      sx={{ alignItems: "center", color: "text.secondary" }}
+    >
+      <CircularProgress size={16} aria-hidden="true" />
+      <Typography variant="body2">{texto}</Typography>
+    </Stack>
+  );
+}
 
 export default function VistaSaidas({
   diaCorrente,
@@ -357,7 +384,9 @@ export default function VistaSaidas({
         excecao instanceof ErroApi ? excecao.message : "Não foi possível registrar a saída.";
       setErro(mensagem);
       setErroVariante(estadoDeErro(excecao));
-      if (!(excecao instanceof ErroApi && excecao.status === 401)) toast.error(mensagem);
+      if (!(excecao instanceof ErroApi && excecao.status === 401)) {
+        avisarErro(excecao, { contexto: "Não foi possível registrar a saída." });
+      }
     } finally {
       setEnviando(false);
     }
@@ -374,7 +403,7 @@ export default function VistaSaidas({
     void executarRemocao(saida.id, async () => {
       try {
         await pedir<{ ok: boolean }>(`/api/saidas/${saida.id}`, { method: "DELETE" });
-        toast.success("Saída removida.");
+        avisarSucesso("Saída removida.");
         if (compartilhado) {
           await onSaidasMudaram(dia.slice(0, 7));
         } else {
@@ -382,12 +411,33 @@ export default function VistaSaidas({
         }
       } catch (excecao) {
         if (!(excecao instanceof ErroApi && excecao.status === 401)) {
-          toast.error(
-            excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a saída.",
-          );
+          avisarErro(excecao, { contexto: "Não foi possível remover a saída." });
         }
       }
     });
+  }
+
+  function confirmarSaidaHistorica() {
+    const motivo = motivoHistorico.trim();
+    if (motivo.length < 3 || motivo.length > 200) {
+      setErroHistorico(
+        motivo.length < 3
+          ? "Informe um motivo com pelo menos 3 caracteres."
+          : "O motivo deve ter no máximo 200 caracteres.",
+      );
+      return;
+    }
+    confirmacaoHistoricaRef.current = { confirmar: true, motivo };
+    setConfirmacaoHistoricaAberta(false);
+    setErroHistorico("");
+    void registrar();
+  }
+
+  function cancelarSaidaHistorica() {
+    confirmacaoHistoricaRef.current = { confirmar: false, motivo: "" };
+    setMotivoHistorico("");
+    setErroHistorico("");
+    setConfirmacaoHistoricaAberta(false);
   }
 
   const rotuloDia = dia.split("-").reverse().join("/");
@@ -407,23 +457,27 @@ export default function VistaSaidas({
     liberadores.find((item) => item.codigo === responsavelCodigo)?.rotulo ?? "";
 
   return (
-    <section aria-label="Saídas antecipadas" className="flex flex-col gap-4 pb-6">
-      <h1 className="sr-only">Saiu mais cedo</h1>
+    <Box
+      component="section"
+      aria-label="Saídas antecipadas"
+      sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 3 }}
+    >
+      <Typography component="h1" sx={ESTILO_LEITOR}>
+        Saiu mais cedo
+      </Typography>
 
-      <div className="navegacao-dia flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Dia anterior"
+      <Stack direction="row" spacing={1} sx={{ alignItems: "stretch" }}>
+        <BotaoIcone
+          rotulo="Dia anterior"
+          variante="contorno"
+          icone={<ChevronLeftRoundedIcon />}
+          sx={ESTILO_NAVEGACAO}
           onClick={() => {
             setVerDomingo(false);
             nav.anterior();
           }}
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="min-w-0 flex-1">
+        />
+        <Box sx={{ minWidth: 0, flex: 1, display: "flex", "& > button": { flex: 1 } }}>
           <SeletorPeriodo
             id="dia-saidas"
             modo="dia"
@@ -440,25 +494,23 @@ export default function VistaSaidas({
               nav.escolherDia(proximo);
             }}
           />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Dia seguinte"
+        </Box>
+        <BotaoIcone
+          rotulo="Dia seguinte"
+          variante="contorno"
+          icone={<ChevronRightRoundedIcon />}
+          sx={ESTILO_NAVEGACAO}
           disabled={nav.seguinteDesabilitado}
           onClick={() => {
             setVerDomingo(false);
             nav.seguinte();
           }}
-        >
-          <ChevronRight size={18} />
-        </Button>
-      </div>
+        />
+      </Stack>
       {!nav.resumo && (
-        <div className="flex justify-end">
+        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
           <AtualizadoDaVisao fuso={fuso} />
-        </div>
+        </Box>
       )}
 
       {nav.resumo && nav.semana ? (
@@ -489,211 +541,261 @@ export default function VistaSaidas({
       ) : null}
 
       {nav.resumo && verDomingo && nav.domingo ? (
-        <section className="superficie flex flex-col gap-3 p-4" aria-label="Registros do domingo">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-semibold">Saídas de {rotuloData(nav.domingo)}</h2>
-            <div className="flex flex-wrap items-center gap-1">
-              <Button
-                type="button"
-                variant="outline"
-                className="min-h-11 px-4"
-                aria-label={`${domingoBloqueado ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloData(nav.domingo)}`}
-                disabled={removendoId !== null}
-                onClick={() => setDiaLiberado(domingoBloqueado ? nav.domingo : null)}
-              >
-                {domingoBloqueado ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
-                {domingoBloqueado ? "Desbloquear" : "Bloquear"}
-              </Button>
-              <Button
-                type="button"
-                variant="link"
-                className="min-h-11 px-0"
-                onClick={() => setVerDomingo(false)}
-              >
-                Voltar ao resumo
-              </Button>
-            </div>
-          </div>
-          {carregandoDomingo ? (
-            <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
-              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-              Carregando saídas...
-            </p>
-          ) : registrosDomingo.length === 0 ? (
-            <p className="text-muted-foreground text-sm">Nenhuma saída registrada neste domingo.</p>
-          ) : (
-            <ul className="divide-y">
-              {registrosDomingo.map((saida) => {
-                const aluno = alunosPorId.get(saida.alunoId);
-                return (
-                  <li key={saida.id} className="flex items-start justify-between gap-3 py-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium break-words">{aluno?.nome ?? "Aluno"}</p>
-                      <CaixasDeInfo
-                        partes={partesDaSaida(
-                          saida,
-                          saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
-                        )}
-                        className="mt-1"
-                      />
-                    </div>
-                    {!domingoBloqueado && (
-                      <Button
-                        variant="secondary"
-                        size="icon"
-                        className="text-falta-texto"
-                        aria-label={`Remover saída de ${aluno?.nome ?? "aluno"}`}
-                        disabled={removendoId === saida.id}
-                        onClick={() => setSaidaRemover(saida)}
-                      >
-                        <Trash2 size={18} />
-                      </Button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+        <Paper
+          component="section"
+          variant="outlined"
+          aria-label="Registros do domingo"
+          sx={{ p: 2, boxShadow: "none" }}
+        >
+          <Stack spacing={2}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              spacing={1}
+              sx={{
+                alignItems: { xs: "stretch", sm: "center" },
+                justifyContent: "space-between",
+              }}
+            >
+              <Typography component="h2" variant="h6" sx={{ fontWeight: 600 }}>
+                Saídas de {rotuloData(nav.domingo)}
+              </Typography>
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+                <Botao
+                  variante="contorno"
+                  icone={domingoBloqueado ? <LockOpenRoundedIcon /> : <LockRoundedIcon />}
+                  aria-label={`${domingoBloqueado ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloData(nav.domingo)}`}
+                  disabled={removendoId !== null}
+                  onClick={() => setDiaLiberado(domingoBloqueado ? nav.domingo : null)}
+                >
+                  {domingoBloqueado ? "Desbloquear" : "Bloquear"}
+                </Botao>
+                <Botao variante="texto" onClick={() => setVerDomingo(false)}>
+                  Voltar ao resumo
+                </Botao>
+              </Stack>
+            </Stack>
+            {carregandoDomingo ? (
+              <IndicadorCarregando texto="Carregando saídas..." />
+            ) : registrosDomingo.length === 0 ? (
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Nenhuma saída registrada neste domingo.
+              </Typography>
+            ) : (
+              <List aria-label={`Saídas de ${rotuloData(nav.domingo)}`} disablePadding>
+                {registrosDomingo.map((saida) => {
+                  const aluno = alunosPorId.get(saida.alunoId);
+                  const nome = aluno?.nome ?? "Aluno";
+                  return (
+                    <ListItem
+                      key={saida.id}
+                      divider
+                      sx={{ alignItems: "flex-start", gap: 2, px: 0 }}
+                    >
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
+                        >
+                          {nome}
+                        </Typography>
+                        <CaixasDeInfo
+                          itens={partesDaSaida(
+                            saida,
+                            saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
+                          )}
+                          sx={{ mt: 1 }}
+                        />
+                      </Box>
+                      {!domingoBloqueado && (
+                        <BotaoIcone
+                          rotulo={`Remover saída de ${nome}`}
+                          variante="texto"
+                          icone={<DeleteOutlineRoundedIcon />}
+                          sx={{ color: "falta.texto" }}
+                          disabled={removendoId === saida.id}
+                          onClick={() => setSaidaRemover(saida)}
+                        />
+                      )}
+                    </ListItem>
+                  );
+                })}
+              </List>
+            )}
+          </Stack>
+        </Paper>
       ) : null}
 
       {!nav.resumo && (
         <>
-          <form
-            className="superficie flex flex-col gap-4 p-4"
+          <Paper
+            component="form"
+            variant="outlined"
             onSubmit={abrirConfirmacao}
             noValidate
+            sx={{ p: 2, boxShadow: "none" }}
           >
-            <h2 className="font-medium">Registrar saída</h2>
-            <CamposMovimentacao
-              tipo="saida"
-              turma={turmaFiltro}
-              alunoId={alunoId}
-              momento={momento}
-              horario={horarioEfetivo}
-              responsavel={responsavelCodigo}
-              forma={formaJustificativa}
-              texto={texto}
-              justificativa={justificativa}
-              observacao={observacao}
-              opcoesTurma={opcoesTurma}
-              opcoesAluno={opcoesAluno}
-              opcoesMomento={MOMENTOS_SAIDA.map((item) => ({
-                valor: item.codigo,
-                rotulo: item.rotulo,
-              }))}
-              opcoesJustificativa={opcoesJustificativa}
-              opcoesResponsavel={opcoesLiberador}
-              fuso={fuso}
-              enviando={enviando}
-              mostrarTextoCatalogo={duranteAula}
-              mostrarObservacao={!duranteAula && justificativa === JUSTIFICATIVA_OUTROS}
-              catalogoEmDuasColunas
-              descricaoResponsavel={
-                opcoesLiberador.length === 0
-                  ? "Nenhum respons�vel cadastrado. Cadastre em Gest�o, Configura��es."
-                  : undefined
-              }
-              onTurma={(valor) => {
-                setTurmaFiltro(valor);
-                setAlunoId("");
-              }}
-              onAluno={setAlunoId}
-              onMomento={setMomento}
-              onHorario={setHorario}
-              onResponsavel={setResponsavelCodigo}
-              onForma={(valor) => {
-                setFormaJustificativa(valor);
-                if (valor === "texto") {
-                  setJustificativa("");
-                  setObservacao("");
-                  return;
-                }
-                setTexto("");
-              }}
-              onTexto={setTexto}
-              onJustificativa={setJustificativa}
-              onObservacao={setObservacao}
-            />{" "}
-            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-            <div className="flex justify-end">
-              <Button
-                type="submit"
-                size="lg"
-                className="h-11 w-full px-6 sm:w-auto"
-                disabled={enviando || opcoesLiberador.length === 0}
-              >
-                {enviando && <LoaderCircle size={16} className="animate-spin" />}
+            <Stack spacing={2}>
+              <Typography component="h2" variant="h6" sx={{ fontWeight: 600 }}>
                 Registrar saída
-              </Button>
-            </div>
-          </form>
+              </Typography>
+              <CamposMovimentacao
+                tipo="saida"
+                turma={turmaFiltro}
+                alunoId={alunoId}
+                momento={momento}
+                horario={horarioEfetivo}
+                responsavel={responsavelCodigo}
+                forma={formaJustificativa}
+                texto={texto}
+                justificativa={justificativa}
+                observacao={observacao}
+                opcoesTurma={opcoesTurma}
+                opcoesAluno={opcoesAluno}
+                opcoesMomento={MOMENTOS_SAIDA.map((item) => ({
+                  valor: item.codigo,
+                  rotulo: item.rotulo,
+                }))}
+                opcoesJustificativa={opcoesJustificativa}
+                opcoesResponsavel={opcoesLiberador}
+                fuso={fuso}
+                enviando={enviando}
+                mostrarTextoCatalogo={duranteAula}
+                mostrarObservacao={!duranteAula && justificativa === JUSTIFICATIVA_OUTROS}
+                catalogoEmDuasColunas
+                descricaoResponsavel={
+                  opcoesLiberador.length === 0
+                    ? "Nenhum responsável cadastrado. Cadastre em Gestão, Configurações."
+                    : undefined
+                }
+                onTurma={(valor) => {
+                  setTurmaFiltro(valor);
+                  setAlunoId("");
+                }}
+                onAluno={setAlunoId}
+                onMomento={setMomento}
+                onHorario={setHorario}
+                onResponsavel={setResponsavelCodigo}
+                onForma={(valor) => {
+                  setFormaJustificativa(valor);
+                  if (valor === "texto") {
+                    setJustificativa("");
+                    setObservacao("");
+                    return;
+                  }
+                  setTexto("");
+                }}
+                onTexto={setTexto}
+                onJustificativa={setJustificativa}
+                onObservacao={setObservacao}
+              />
+              {erro && <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                <Botao
+                  type="submit"
+                  variante="secundario"
+                  carregando={enviando}
+                  disabled={opcoesLiberador.length === 0}
+                  sx={{ width: { xs: "100%", sm: "auto" } }}
+                >
+                  Registrar saída
+                </Botao>
+              </Box>
+            </Stack>
+          </Paper>
 
           {carregandoDia ? (
-            <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
-              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-              Carregando saídas...
-            </p>
+            <IndicadorCarregando texto="Carregando saídas..." />
           ) : (
             saidasDoDia.length > 0 && (
-              <>
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="font-medium">Saídas de {rotuloDia}</h2>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="px-4"
+              <Box>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  sx={{
+                    alignItems: { xs: "stretch", sm: "center" },
+                    justifyContent: "space-between",
+                    mb: 1.5,
+                  }}
+                >
+                  <Typography component="h2" variant="h6" sx={{ fontWeight: 600 }}>
+                    Saídas de {rotuloDia}
+                  </Typography>
+                  <Botao
+                    variante="contorno"
+                    icone={listaBloqueada ? <LockOpenRoundedIcon /> : <LockRoundedIcon />}
                     aria-label={`${listaBloqueada ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloDia}`}
                     disabled={removendoId !== null}
                     onClick={() => setDiaLiberado(listaBloqueada ? dia : null)}
                   >
-                    {listaBloqueada ? <LockKeyholeOpen size={16} /> : <LockKeyhole size={16} />}
                     {listaBloqueada ? "Desbloquear" : "Bloquear"}
-                  </Button>
-                </div>
-                <ul aria-label={`Saídas de ${rotuloDia}`} className="flex flex-col gap-3">
+                  </Botao>
+                </Stack>
+                <List
+                  aria-label={`Saídas de ${rotuloDia}`}
+                  sx={{ display: "flex", flexDirection: "column", gap: 1.5, p: 0 }}
+                >
                   {saidasDoDia.map((saida) => {
                     const aluno = alunosPorId.get(saida.alunoId);
                     const nome = aluno?.nome ?? "Aluno";
                     const dataRegistro = dataNoFuso(saida.criadoEm, fuso);
                     const horaRegistro = horaNoFuso(saida.criadoEm, fuso);
                     return (
-                      <li key={saida.id} className="superficie p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="font-semibold break-words">{nome}</p>
+                      <ListItem
+                        key={saida.id}
+                        sx={{
+                          p: 2,
+                          border: "1px solid",
+                          borderColor: "divider",
+                          borderRadius: 2,
+                          bgcolor: "background.paper",
+                        }}
+                      >
+                        <Stack
+                          direction="row"
+                          spacing={2}
+                          sx={{ width: "100%", alignItems: "flex-start" }}
+                        >
+                          <Box sx={{ minWidth: 0, flex: 1 }}>
+                            <Typography
+                              variant="body1"
+                              sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
+                            >
+                              {nome}
+                            </Typography>
                             <CaixasDeInfo
-                              partes={partesDaSaida(
+                              itens={partesDaSaida(
                                 saida,
                                 saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
                               )}
-                              className="mt-1"
+                              sx={{ mt: 1 }}
                             />
-                            <p className="text-muted-foreground mt-1 text-xs">
+                            <Typography
+                              variant="caption"
+                              component="p"
+                              sx={{ mt: 1, color: "text.secondary" }}
+                            >
                               Liberado por {saida.liberadoPorNome ?? "registro anterior"}
                               {dataRegistro && horaRegistro
                                 ? ` em ${dataRegistro} às ${horaRegistro}`
                                 : ""}
-                            </p>
-                          </div>
+                            </Typography>
+                          </Box>
                           {!listaBloqueada && (
-                            <Button
-                              variant="secondary"
-                              size="icon"
-                              className="text-falta-texto"
-                              aria-label={`Remover saída de ${nome}`}
+                            <BotaoIcone
+                              rotulo={`Remover saída de ${nome}`}
+                              variante="texto"
+                              icone={<DeleteOutlineRoundedIcon />}
+                              sx={{ color: "falta.texto" }}
                               disabled={removendoId === saida.id}
                               onClick={() => remover(saida)}
-                            >
-                              <Trash2 size={18} />
-                            </Button>
+                            />
                           )}
-                        </div>
-                      </li>
+                        </Stack>
+                      </ListItem>
                     );
                   })}
-                </ul>
-              </>
+                </List>
+              </Box>
             )
           )}
         </>
@@ -724,89 +826,49 @@ export default function VistaSaidas({
           { rotulo: "Responsável", valor: responsavelConfirmacao },
         ]}
       />
-      <AlertDialog
-        open={saidaRemover !== null}
-        onOpenChange={(aberto) => !aberto && setSaidaRemover(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover esta saída?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A saída de {alunosPorId.get(saidaRemover?.alunoId ?? "")?.nome ?? "aluno"} em{" "}
-              {saidaRemover?.dia.split("-").reverse().join("/") ?? ""} sai da lista do dia e dos
-              relatórios.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={confirmarRemocao}
-              disabled={saidaRemover !== null && removendoId === saidaRemover.id}
-            >
-              Remover
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DialogoConfirmacao
+        aberto={saidaRemover !== null}
+        titulo="Remover esta saída?"
+        descricao={`A saída de ${
+          alunosPorId.get(saidaRemover?.alunoId ?? "")?.nome ?? "aluno"
+        } em ${saidaRemover?.dia.split("-").reverse().join("/") ?? ""} sai da lista do dia e dos relatórios.`}
+        onConfirmar={confirmarRemocao}
+        onCancelar={() => setSaidaRemover(null)}
+        rotuloConfirmar="Remover"
+        destrutivo
+        operacaoEmAndamento={saidaRemover !== null && removendoId === saidaRemover.id}
+      />
 
-      <AlertDialog open={confirmacaoHistoricaAberta} onOpenChange={setConfirmacaoHistoricaAberta}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar saída histórica?</AlertDialogTitle>
-            <AlertDialogDescription>
+      <DialogoConfirmacao
+        aberto={confirmacaoHistoricaAberta}
+        titulo="Confirmar saída histórica?"
+        descricao={
+          <Stack spacing={2}>
+            <Typography component="p" variant="body2">
               A referência da turma e das aulas nesta data não pôde ser comprovada. Confirme o
               lançamento e informe o motivo. A confirmação fica registrada na auditoria.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="motivo-saida-historica">Motivo</Label>
-            <Input
-              id="motivo-saida-historica"
-              value={motivoHistorico}
-              onChange={(evento) => setMotivoHistorico(evento.target.value)}
-              maxLength={200}
-              placeholder="Ex.: saída do diário de papel"
-            />
-            {erroHistorico && (
-              <p role="alert" className="text-falta-texto text-sm">
+            </Typography>
+            <Campo id="motivo-saida-historica" rotulo="Motivo">
+              <CampoTexto
+                id="motivo-saida-historica"
+                valor={motivoHistorico}
+                onValor={setMotivoHistorico}
+                maxLength={200}
+                placeholder="Ex.: saída do diário de papel"
+              />
+            </Campo>
+            {erroHistorico ? (
+              <Typography role="alert" variant="body2" sx={{ color: "falta.texto" }}>
                 {erroHistorico}
-              </p>
-            )}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel
-              onClick={() => {
-                confirmacaoHistoricaRef.current = { confirmar: false, motivo: "" };
-                setMotivoHistorico("");
-                setErroHistorico("");
-              }}
-            >
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(evento) => {
-                const motivo = motivoHistorico.trim();
-                if (motivo.length < 3 || motivo.length > 200) {
-                  evento.preventDefault();
-                  setErroHistorico(
-                    motivo.length < 3
-                      ? "Informe um motivo com pelo menos 3 caracteres."
-                      : "O motivo deve ter no máximo 200 caracteres.",
-                  );
-                  return;
-                }
-                confirmacaoHistoricaRef.current = { confirmar: true, motivo };
-                setConfirmacaoHistoricaAberta(false);
-                setErroHistorico("");
-                void registrar();
-              }}
-            >
-              Confirmar e registrar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </section>
+              </Typography>
+            ) : null}
+          </Stack>
+        }
+        onConfirmar={confirmarSaidaHistorica}
+        onCancelar={cancelarSaidaHistorica}
+        rotuloConfirmar="Confirmar e registrar"
+        operacaoEmAndamento={enviando}
+      />
+    </Box>
   );
 }

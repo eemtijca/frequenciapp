@@ -1,16 +1,10 @@
 "use client";
 
 // Confirmação explícita de um registro de saída ou entrada antes de gravar.
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 
 interface Item {
   rotulo: string;
@@ -36,33 +30,53 @@ export function DialogoConfirmarMovimentacao({
   itens,
   onConfirmar,
 }: Props) {
+  const visiveis = itens.filter((item) => item.valor);
+
   return (
-    <AlertDialog open={aberto} onOpenChange={onAbrir}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{titulo}</AlertDialogTitle>
-          <AlertDialogDescription>{descricao}</AlertDialogDescription>
-        </AlertDialogHeader>
-        <dl className="flex flex-col gap-2 text-sm">
-          {itens
-            .filter((item) => item.valor)
-            .map((item) => (
-              <div
-                key={item.rotulo}
-                className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-2"
-              >
-                <dt className="text-muted-foreground">{item.rotulo}</dt>
-                <dd className="min-w-0 break-words">{item.valor}</dd>
-              </div>
-            ))}
-        </dl>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Revisar</AlertDialogCancel>
-          <AlertDialogAction className="min-h-11" onClick={onConfirmar}>
-            {rotuloConfirmar}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DialogoConfirmacao
+      aberto={aberto}
+      titulo={titulo}
+      descricao={
+        <Stack spacing={2}>
+          <Typography component="p" variant="body2">
+            {descricao}
+          </Typography>
+          {visiveis.length > 0 ? (
+            <Box component="dl" sx={{ m: 0 }}>
+              <Stack spacing={1}>
+                {visiveis.map((item) => (
+                  <Stack
+                    key={item.rotulo}
+                    component="div"
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: "flex-start" }}
+                  >
+                    <Typography
+                      component="dt"
+                      variant="body2"
+                      sx={{ width: 112, flexShrink: 0, color: "text.secondary" }}
+                    >
+                      {item.rotulo}
+                    </Typography>
+                    <Typography
+                      component="dd"
+                      variant="body2"
+                      sx={{ m: 0, minWidth: 0, color: "text.primary", overflowWrap: "anywhere" }}
+                    >
+                      {item.valor}
+                    </Typography>
+                  </Stack>
+                ))}
+              </Stack>
+            </Box>
+          ) : null}
+        </Stack>
+      }
+      onConfirmar={onConfirmar}
+      onCancelar={() => onAbrir(false)}
+      rotuloCancelar="Revisar"
+      rotuloConfirmar={rotuloConfirmar}
+    />
   );
 }

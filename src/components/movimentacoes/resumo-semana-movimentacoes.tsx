@@ -1,24 +1,37 @@
 "use client";
 
 // Resumo semanal de uma aba de Saídas e Entradas, com todas as turmas da área.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, Clock3, LoaderCircle, Users } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import PeopleRoundedIcon from "@mui/icons-material/PeopleRounded";
+import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import Accordion from "@mui/material/Accordion";
+import AccordionDetails from "@mui/material/AccordionDetails";
+import AccordionSummary from "@mui/material/AccordionSummary";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Divider from "@mui/material/Divider";
+import Grid from "@mui/material/Grid";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
 import type { EntradaAtrasada } from "@/domain/entradas";
 import type { Aluno, SaidaAntecipada, Turma } from "@/domain/frequencia";
-import { rotuloData, rotuloDiaSemana } from "@/domain/frequencia";
+import { rotuloData, rotuloDataCurta, rotuloDiaSemana } from "@/domain/frequencia";
 import { resumirMovimentacoes } from "@/domain/resumo-semana-movimentacoes";
 import { pedir } from "@/lib/api-cliente";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
-import { Button } from "@/components/ui/button";
-import { Selo } from "@/components/ui/selo";
-import {
-  BarrasDia,
-  CabecalhoResumo,
-  CartaoDia,
-  CorpoResumo,
-  ResumoVazio,
-  SecaoResumo,
-} from "@/components/resumo-semanal/base";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { AtualizadoEm } from "@/components/ui/mui/atualizado-em";
+import { Botao } from "@/components/ui/mui/botao";
+import { Selo } from "@/components/ui/mui/selo";
 import { useResumoSemanal } from "@/components/resumo-semanal/use-resumo-semanal";
 
 interface Props {
@@ -41,6 +54,175 @@ interface DadosMovimentacao {
 }
 
 const LIMITE_ALUNOS = 5;
+
+const ESTILO_LEITOR = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
+
+function BarrasDia({
+  dias,
+  unidade,
+  titulo,
+}: {
+  dias: { dia: string; rotulo: string; valor: number }[];
+  unidade: [singular: string, plural: string];
+  titulo: string;
+}) {
+  const maior = Math.max(1, ...dias.map((item) => item.valor));
+  const total = dias.reduce((soma, item) => soma + item.valor, 0);
+  const resumo = dias
+    .map((item) => `${item.rotulo}: ${item.valor} ${item.valor === 1 ? unidade[0] : unidade[1]}`)
+    .join("; ");
+
+  return (
+    <Box component="figure" sx={{ m: 0, display: "flex", flexDirection: "column", gap: 1 }}>
+      <Typography component="figcaption" variant="caption" sx={{ color: "text.secondary" }}>
+        {titulo}: {total} {total === 1 ? unidade[0] : unidade[1]} na semana
+      </Typography>
+      <Box
+        role="img"
+        aria-label={`${titulo}. ${resumo}.`}
+        sx={{ display: "flex", gap: 1, alignItems: "flex-end" }}
+      >
+        {dias.map((item) => (
+          <Box
+            key={item.dia}
+            sx={{
+              minWidth: 0,
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 0.5,
+            }}
+          >
+            <Box
+              sx={{
+                width: "100%",
+                height: 96,
+                display: "flex",
+                alignItems: "flex-end",
+                overflow: "hidden",
+                borderRadius: 1,
+                backgroundColor: "action.hover",
+              }}
+            >
+              <Box
+                aria-hidden="true"
+                sx={{
+                  width: "100%",
+                  height: `${Math.max(4, (item.valor / maior) * 100)}%`,
+                  borderTopLeftRadius: 8,
+                  borderTopRightRadius: 8,
+                  backgroundColor: "primary.main",
+                }}
+              />
+            </Box>
+            <Typography component="span" variant="caption" sx={{ color: "text.secondary" }}>
+              {item.rotulo}
+            </Typography>
+            <Typography
+              component="span"
+              variant="caption"
+              sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+            >
+              {item.valor}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+}
+
+function SecaoResumo({
+  id,
+  titulo,
+  descricao,
+  icone,
+  resumo,
+  aberto,
+  onAbertoChange,
+  children,
+}: {
+  id: string;
+  titulo: string;
+  descricao: string;
+  icone: ReactNode;
+  resumo: ReactNode;
+  aberto: boolean;
+  onAbertoChange: (aberto: boolean) => void;
+  children: ReactNode;
+}) {
+  return (
+    <Accordion
+      expanded={aberto}
+      onChange={(_evento, expandido) => onAbertoChange(expandido)}
+      data-secao={`resumo-movimentacoes-${id}`}
+      data-state={aberto ? "open" : "closed"}
+      sx={{ "&:before": { display: "none" } }}
+    >
+      <AccordionSummary
+        expandIcon={<ExpandMoreRoundedIcon />}
+        id={`resumo-movimentacoes-${id}-cabecalho`}
+        aria-controls={`resumo-movimentacoes-${id}-conteudo`}
+      >
+        <Stack
+          direction="row"
+          spacing={1.5}
+          sx={{ alignItems: "flex-start", minWidth: 0, flex: 1 }}
+        >
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 1,
+              backgroundColor: "action.hover",
+              color: "text.secondary",
+            }}
+          >
+            {icone}
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography component="span" sx={{ display: "block", fontWeight: 600 }}>
+              {titulo}
+            </Typography>
+            <Typography
+              component="span"
+              variant="body2"
+              sx={{ display: "block", color: "text.secondary" }}
+            >
+              {descricao}
+            </Typography>
+            <Stack
+              direction="row"
+              spacing={0.5}
+              useFlexGap
+              sx={{ display: "flex", flexWrap: "wrap", mt: 1 }}
+            >
+              {resumo}
+            </Stack>
+          </Box>
+        </Stack>
+      </AccordionSummary>
+      <AccordionDetails id={`resumo-movimentacoes-${id}-conteudo`} sx={{ px: 2, pb: 2, pt: 0 }}>
+        {children}
+      </AccordionDetails>
+    </Accordion>
+  );
+}
 
 export function VistaResumoMovimentacoes({
   tipo,
@@ -154,217 +336,426 @@ export function VistaResumoMovimentacoes({
   const titulo = tipo === "saida" ? "Saídas da semana" : "Entradas da semana";
 
   return (
-    <section
+    <Paper
+      component="section"
+      variant="outlined"
       aria-label="Resumo da semana"
       aria-busy={!carga.dados}
-      className="superficie flex flex-col"
+      sx={{
+        boxShadow: "none",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
     >
-      <CabecalhoResumo
-        dias={dias}
-        domingo={domingo}
-        atualizadoEm={carga.atualizadoEm}
-        fuso={fuso}
-        descricao={`${titulo} de todas as turmas da área.`}
-      />
-      <CorpoResumo>
-        <p className="sr-only" role="status" aria-live="polite">
-          {carga.anuncio}
-        </p>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-muted-foreground inline-flex items-center gap-1 text-xs">
-            <CalendarDays size={14} aria-hidden="true" />
-            Resumo de todas as turmas.
-          </p>
-          {domingo && onVerDomingo && temDomingo ? (
-            <Button type="button" variant="link" className="min-h-11 px-0" onClick={onVerDomingo}>
-              Ver registros do domingo
-            </Button>
-          ) : null}
-        </div>
-        {carga.erro && carga.dados ? (
-          <AvisoCompacto
-            variante="indisponivel"
-            descricao={carga.erro}
-            tamanho="linha"
-            acao={{ rotulo: "Tentar novamente", onClick: carga.tentarNovamente }}
-          />
-        ) : null}
-        {!carga.dados && !carga.erro ? (
-          <p
-            role="status"
-            className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-sm"
+      <Box
+        component="header"
+        sx={{
+          p: 2,
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 2,
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+        }}
+      >
+        <Stack
+          direction="row"
+          spacing={1.5}
+          sx={{ alignItems: "flex-start", minWidth: 0, flex: 1 }}
+        >
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 1,
+              backgroundColor: "action.hover",
+              color: "text.secondary",
+            }}
           >
-            <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-            Carregando resumo da semana...
-          </p>
-        ) : null}
-        {!carga.dados && carga.erro ? (
-          <AvisoCompacto
-            variante="indisponivel"
-            descricao={carga.erro}
-            tamanho="linha"
-            acao={{ rotulo: "Tentar novamente", onClick: carga.tentarNovamente }}
-          />
-        ) : null}
-
-        {resumo ? (
-          <>
-            <SecaoResumo
-              id="movimentacoes-visao"
-              titulo="Visão geral"
-              descricao="Totais e distribuição diária."
-              icone={Clock3}
-              aberto={aberta("visao")}
-              onAbertoChange={(valor) => alternar("visao", valor)}
-              resumo={
-                <>
-                  <Selo>
-                    {resumo.total} {resumo.total === 1 ? singular : plural}
-                  </Selo>
-                  <Selo>{resumo.totalAlunos} alunos</Selo>
-                  <Selo>
-                    {resumo.totalTurmas} {tipo === "saida" ? "turmas conhecidas" : "turmas"}
-                  </Selo>
-                </>
-              }
+            <CalendarMonthRoundedIcon fontSize="small" aria-hidden="true" />
+          </Box>
+          <Box sx={{ minWidth: 0 }}>
+            <Typography component="h2" variant="h6">
+              {titulo}
+            </Typography>
+            <Typography variant="body2" sx={{ mt: 0.5, color: "text.secondary" }}>
+              {de && ate ? `${rotuloDataCurta(de)} a ${rotuloDataCurta(ate)}` : ""}
+              {domingo ? `, encerrada em ${rotuloData(domingo)}` : ""}
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {titulo} de todas as turmas da área.
+            </Typography>
+          </Box>
+        </Stack>
+        <Stack
+          spacing={0.5}
+          sx={{ flexShrink: 0, alignItems: { xs: "flex-start", sm: "flex-end" } }}
+        >
+          <Selo rotulo="Somente leitura" />
+          <AtualizadoEm instante={carga.atualizadoEm ?? undefined} fuso={fuso} />
+        </Stack>
+      </Box>
+      <Box sx={{ borderTop: 1, borderColor: "divider", p: 2 }}>
+        <Stack spacing={2}>
+          <Typography component="p" role="status" aria-live="polite" sx={ESTILO_LEITOR}>
+            {carga.anuncio}
+          </Typography>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{
+              alignItems: { xs: "flex-start", sm: "center" },
+              justifyContent: "space-between",
+            }}
+          >
+            <Stack
+              direction="row"
+              spacing={0.5}
+              sx={{ alignItems: "center", color: "text.secondary" }}
             >
-              <dl className="bg-card grid grid-cols-3 divide-x rounded-[14px] border">
-                {[
-                  [tipo === "saida" ? "Saídas" : "Entradas", resumo.total],
-                  ["Alunos", resumo.totalAlunos],
-                  [tipo === "saida" ? "Turmas conhecidas" : "Turmas", resumo.totalTurmas],
-                ].map(([rotulo, valor]) => (
-                  <div key={rotulo} className="flex flex-col items-center gap-0.5 px-2 py-3">
-                    <dt className="text-muted-foreground text-xs font-medium">{rotulo}</dt>
-                    <dd className="numerais-tabulares text-xl font-semibold">{valor}</dd>
-                  </div>
-                ))}
-              </dl>
-              <BarrasDia
-                dias={resumo.dias.map((dia) => ({
-                  dia: dia.dia,
-                  rotulo: rotuloDiaSemana(dia.dia).replace("-feira", "").slice(0, 3),
-                  valor: dia.total,
-                }))}
-                unidade={[singular, plural]}
-                titulo={tipo === "saida" ? "Saídas" : "Entradas"}
-              />
-              <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-                {resumo.dias.map((dia) => (
-                  <CartaoDia
-                    key={dia.dia}
-                    dia={dia.dia}
-                    rotulo={rotuloDiaSemana(dia.dia).replace("-feira", "").slice(0, 3)}
-                    status={dia.total > 0 ? "Com registro" : "Sem registro"}
-                    tom={dia.total > 0 ? "salva" : "neutro"}
-                    abrir
-                    onAbrir={() => onAbrirDia(dia.dia)}
-                    ariaLabel={`Abrir ${rotuloDiaSemana(dia.dia)}, ${rotuloData(dia.dia)}, ${dia.total} ${dia.total === 1 ? singular : plural}`}
-                    contagens={
-                      <span className="numerais-tabulares text-sm font-semibold">{dia.total}</span>
-                    }
-                  />
-                ))}
-              </ul>
-            </SecaoResumo>
-
-            <SecaoResumo
-              id="movimentacoes-turmas"
-              titulo="Turmas"
-              descricao={
-                tipo === "saida"
-                  ? "Total por referência histórica; turma desconhecida separada."
-                  : "Total por turma na semana."
-              }
-              icone={CalendarDays}
-              aberto={aberta("turmas")}
-              onAbertoChange={(valor) => alternar("turmas", valor)}
-              resumo={
-                <Selo>
-                  {resumo.totalTurmas} {tipo === "saida" ? "turmas conhecidas" : "turmas"}
-                </Selo>
-              }
+              <CalendarMonthRoundedIcon fontSize="small" aria-hidden="true" />
+              <Typography variant="caption">Resumo de todas as turmas.</Typography>
+            </Stack>
+            {domingo && onVerDomingo && temDomingo ? (
+              <Botao type="button" variante="texto" onClick={onVerDomingo}>
+                Ver registros do domingo
+              </Botao>
+            ) : null}
+          </Stack>
+          {carga.erro && carga.dados ? (
+            <AlertaCompacto
+              variante="indisponivel"
+              descricao={carga.erro}
+              tamanho="linha"
+              acao={{ rotulo: "Tentar novamente", onClick: carga.tentarNovamente }}
+            />
+          ) : null}
+          {!carga.dados && !carga.erro ? (
+            <Stack
+              direction="row"
+              spacing={1}
+              role="status"
+              sx={{ alignItems: "center", justifyContent: "center", py: 4 }}
             >
-              {resumo.turmas.length === 0 ? (
-                <ResumoVazio texto="Nenhuma movimentação nesta semana." />
-              ) : (
-                <ul className="divide-y">
-                  {resumo.turmas.map((turma) => (
-                    <li
-                      key={
-                        tipo === "saida"
-                          ? JSON.stringify([turma.turmaId, turma.rotulo])
-                          : turma.turmaId
-                      }
-                      className="flex items-center justify-between gap-3 py-2"
-                    >
-                      <span className="min-w-0 text-sm break-words">{turma.rotulo}</span>
-                      <span className="numerais-tabulares shrink-0 text-sm font-semibold">
-                        {turma.total}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </SecaoResumo>
+              <CircularProgress size={18} aria-hidden="true" />
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Carregando resumo da semana...
+              </Typography>
+            </Stack>
+          ) : null}
+          {!carga.dados && carga.erro ? (
+            <AlertaCompacto
+              variante="indisponivel"
+              descricao={carga.erro}
+              tamanho="linha"
+              acao={{ rotulo: "Tentar novamente", onClick: carga.tentarNovamente }}
+            />
+          ) : null}
 
-            <SecaoResumo
-              id="movimentacoes-alunos"
-              titulo="Alunos"
-              descricao="Alunos com mais registros na semana."
-              icone={Users}
-              aberto={aberta("alunos")}
-              onAbertoChange={(valor) => alternar("alunos", valor)}
-              resumo={<Selo>{resumo.alunos.length} alunos</Selo>}
-            >
-              {resumo.alunos.length === 0 ? (
-                <ResumoVazio texto="Nenhuma movimentação nesta semana." />
-              ) : (
-                <div className="flex flex-col gap-3">
-                  <table className="w-full table-fixed text-left text-sm">
-                    <caption className="sr-only">Alunos com mais registros na semana</caption>
-                    <thead>
-                      <tr className="text-muted-foreground border-b text-xs">
-                        <th scope="col">Aluno</th>
-                        <th scope="col" className="w-24 text-right">
-                          {tipo === "saida" ? "Saídas" : "Entradas"}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y">
-                      {(alunosExpandidos
-                        ? resumo.alunos
-                        : resumo.alunos.slice(0, LIMITE_ALUNOS)
-                      ).map((aluno) => (
-                        <tr key={aluno.alunoId}>
-                          <th scope="row" className="min-w-0 py-2 font-normal break-words">
-                            {aluno.nome}
-                            <span className="text-muted-foreground block text-[11px]">
-                              {aluno.turma}
-                            </span>
-                          </th>
-                          <td className="numerais-tabulares py-2 text-right">{aluno.total}</td>
-                        </tr>
+          {resumo ? (
+            <>
+              <SecaoResumo
+                id="visao"
+                titulo="Visão geral"
+                descricao="Totais e distribuição diária."
+                icone={<ScheduleRoundedIcon fontSize="small" aria-hidden="true" />}
+                aberto={aberta("visao")}
+                onAbertoChange={(valor) => alternar("visao", valor)}
+                resumo={
+                  <>
+                    <Selo rotulo={`${resumo.total} ${resumo.total === 1 ? singular : plural}`} />
+                    <Selo rotulo={`${resumo.totalAlunos} alunos`} />
+                    <Selo
+                      rotulo={`${resumo.totalTurmas} ${
+                        tipo === "saida" ? "turmas conhecidas" : "turmas"
+                      }`}
+                    />
+                  </>
+                }
+              >
+                <Stack spacing={2}>
+                  <Box
+                    sx={{
+                      border: 1,
+                      borderColor: "divider",
+                      borderRadius: 2,
+                      overflow: "hidden",
+                    }}
+                  >
+                    <Grid container>
+                      {[
+                        [tipo === "saida" ? "Saídas" : "Entradas", resumo.total],
+                        ["Alunos", resumo.totalAlunos],
+                        [tipo === "saida" ? "Turmas conhecidas" : "Turmas", resumo.totalTurmas],
+                      ].map(([rotulo, valor], indice) => (
+                        <Grid
+                          key={rotulo}
+                          size={4}
+                          sx={{
+                            px: 1,
+                            py: 1.5,
+                            textAlign: "center",
+                            borderLeft: indice === 0 ? 0 : 1,
+                            borderColor: "divider",
+                          }}
+                        >
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{ display: "block", color: "text.secondary" }}
+                          >
+                            {rotulo}
+                          </Typography>
+                          <Typography
+                            component="span"
+                            sx={{
+                              display: "block",
+                              fontWeight: 600,
+                              fontSize: "1.25rem",
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {valor}
+                          </Typography>
+                        </Grid>
                       ))}
-                    </tbody>
-                  </table>
-                  {resumo.alunos.length > LIMITE_ALUNOS ? (
-                    <Button
-                      type="button"
-                      variant="link"
-                      className="min-h-11 self-start px-0"
-                      aria-expanded={alunosExpandidos}
-                      onClick={() => setAlunosExpandidos((valor) => !valor)}
-                    >
-                      {alunosExpandidos ? "Mostrar menos" : "Ver a lista completa"}
-                    </Button>
-                  ) : null}
-                </div>
-              )}
-            </SecaoResumo>
-          </>
-        ) : null}
-      </CorpoResumo>
-    </section>
+                    </Grid>
+                  </Box>
+                  <BarrasDia
+                    dias={resumo.dias.map((dia) => ({
+                      dia: dia.dia,
+                      rotulo: rotuloDiaSemana(dia.dia).replace("-feira", "").slice(0, 3),
+                      valor: dia.total,
+                    }))}
+                    unidade={[singular, plural]}
+                    titulo={tipo === "saida" ? "Saídas" : "Entradas"}
+                  />
+                  <Grid container spacing={1}>
+                    {resumo.dias.map((dia) => (
+                      <Grid key={dia.dia} size={{ xs: 6, sm: 4, xl: 2 }}>
+                        <Box
+                          component="button"
+                          type="button"
+                          data-dia={dia.dia}
+                          aria-label={`Abrir ${rotuloDiaSemana(dia.dia)}, ${rotuloData(dia.dia)}, ${dia.total} ${
+                            dia.total === 1 ? singular : plural
+                          }`}
+                          onClick={() => onAbrirDia(dia.dia)}
+                          sx={(tema) => ({
+                            width: "100%",
+                            minHeight: 128,
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "stretch",
+                            justifyContent: "flex-start",
+                            gap: 1,
+                            p: 1.5,
+                            textAlign: "left",
+                            font: "inherit",
+                            color: "inherit",
+                            border: "1px solid",
+                            borderColor: "divider",
+                            borderRadius: 2,
+                            backgroundColor: "action.hover",
+                            cursor: "pointer",
+                            transition: tema.transitions.create(["background-color"], {
+                              duration: 100,
+                            }),
+                            "&:hover": { backgroundColor: "action.selected" },
+                            "&:focus-visible": {
+                              outline: `3px solid ${tema.vars.palette.primary.main}`,
+                              outlineOffset: 2,
+                            },
+                          })}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "flex-start",
+                              justifyContent: "space-between",
+                              gap: 1,
+                            }}
+                          >
+                            <Box sx={{ minWidth: 0 }}>
+                              <Typography
+                                component="span"
+                                variant="caption"
+                                sx={{
+                                  display: "block",
+                                  fontWeight: 600,
+                                  textTransform: "uppercase",
+                                }}
+                              >
+                                {rotuloDiaSemana(dia.dia).replace("-feira", "").slice(0, 3)}
+                              </Typography>
+                              <Typography
+                                component="span"
+                                variant="caption"
+                                sx={{ display: "block", color: "text.secondary" }}
+                              >
+                                {rotuloDataCurta(dia.dia)}
+                              </Typography>
+                            </Box>
+                            <ChevronRightRoundedIcon
+                              fontSize="small"
+                              aria-hidden="true"
+                              sx={{ color: "text.secondary", flexShrink: 0 }}
+                            />
+                          </Box>
+                          <Box>
+                            <Selo
+                              rotulo={dia.total > 0 ? "Com registro" : "Sem registro"}
+                              tom={dia.total > 0 ? "sucesso" : "neutro"}
+                            />
+                          </Box>
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{ mt: "auto", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+                          >
+                            {dia.total}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Stack>
+              </SecaoResumo>
+
+              <SecaoResumo
+                id="turmas"
+                titulo="Turmas"
+                descricao={
+                  tipo === "saida"
+                    ? "Total por referência histórica; turma desconhecida separada."
+                    : "Total por turma na semana."
+                }
+                icone={<CalendarMonthRoundedIcon fontSize="small" aria-hidden="true" />}
+                aberto={aberta("turmas")}
+                onAbertoChange={(valor) => alternar("turmas", valor)}
+                resumo={
+                  <Selo
+                    rotulo={`${resumo.totalTurmas} ${
+                      tipo === "saida" ? "turmas conhecidas" : "turmas"
+                    }`}
+                  />
+                }
+              >
+                {resumo.turmas.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    Nenhuma movimentação nesta semana.
+                  </Typography>
+                ) : (
+                  <Stack divider={<Divider flexItem />}>
+                    {resumo.turmas.map((turma) => (
+                      <Stack
+                        key={
+                          tipo === "saida"
+                            ? JSON.stringify([turma.turmaId, turma.rotulo])
+                            : turma.turmaId
+                        }
+                        direction="row"
+                        spacing={2}
+                        sx={{ alignItems: "center", justifyContent: "space-between", py: 1 }}
+                      >
+                        <Typography variant="body2" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                          {turma.rotulo}
+                        </Typography>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            flexShrink: 0,
+                            fontWeight: 600,
+                            fontVariantNumeric: "tabular-nums",
+                          }}
+                        >
+                          {turma.total}
+                        </Typography>
+                      </Stack>
+                    ))}
+                  </Stack>
+                )}
+              </SecaoResumo>
+
+              <SecaoResumo
+                id="alunos"
+                titulo="Alunos"
+                descricao="Alunos com mais registros na semana."
+                icone={<PeopleRoundedIcon fontSize="small" aria-hidden="true" />}
+                aberto={aberta("alunos")}
+                onAbertoChange={(valor) => alternar("alunos", valor)}
+                resumo={<Selo rotulo={`${resumo.alunos.length} alunos`} />}
+              >
+                {resumo.alunos.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    Nenhuma movimentação nesta semana.
+                  </Typography>
+                ) : (
+                  <Stack spacing={1.5}>
+                    <TableContainer>
+                      <Table size="small" aria-label="Alunos com mais registros na semana">
+                        <Box component="caption" sx={ESTILO_LEITOR}>
+                          Alunos com mais registros na semana
+                        </Box>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell>Aluno</TableCell>
+                            <TableCell align="right" sx={{ width: 96 }}>
+                              {tipo === "saida" ? "Saídas" : "Entradas"}
+                            </TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {(alunosExpandidos
+                            ? resumo.alunos
+                            : resumo.alunos.slice(0, LIMITE_ALUNOS)
+                          ).map((aluno) => (
+                            <TableRow key={aluno.alunoId}>
+                              <TableCell
+                                component="th"
+                                scope="row"
+                                sx={{ fontWeight: 400, overflowWrap: "anywhere" }}
+                              >
+                                {aluno.nome}
+                                <Typography
+                                  component="span"
+                                  variant="caption"
+                                  sx={{ display: "block", color: "text.secondary" }}
+                                >
+                                  {aluno.turma}
+                                </Typography>
+                              </TableCell>
+                              <TableCell align="right" sx={{ fontVariantNumeric: "tabular-nums" }}>
+                                {aluno.total}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                    {resumo.alunos.length > LIMITE_ALUNOS ? (
+                      <Botao
+                        type="button"
+                        variante="texto"
+                        aria-expanded={alunosExpandidos}
+                        onClick={() => setAlunosExpandidos((valor) => !valor)}
+                        sx={{ alignSelf: "flex-start" }}
+                      >
+                        {alunosExpandidos ? "Mostrar menos" : "Ver a lista completa"}
+                      </Botao>
+                    ) : null}
+                  </Stack>
+                )}
+              </SecaoResumo>
+            </>
+          ) : null}
+        </Stack>
+      </Box>
+    </Paper>
   );
 }

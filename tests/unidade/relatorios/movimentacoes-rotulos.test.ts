@@ -1,6 +1,6 @@
 // Renderiza os consumidores reais com carga sintética e seções abertas, sem rede ou navegador.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ThemeProvider } from "@mui/material/styles";
 import { tema } from "@/theme/tema";
@@ -103,11 +103,13 @@ function blocos(html: string, tag: string): string[] {
     texto(item[1] ?? ""),
   );
 }
+function comTema(elemento: ReactElement): ReactElement {
+  return createElement(ThemeProvider, { theme: tema }, elemento);
+}
+
 function renderizarResumo(tipo: "saida" | "entrada" = "saida"): string {
   return renderToStaticMarkup(
-    createElement(
-      ThemeProvider,
-      { theme: tema },
+    comTema(
       createElement(VistaResumoMovimentacoes, {
         tipo,
         turmas,
@@ -141,12 +143,14 @@ describe("rótulos renderizados das movimentações", () => {
       variante: "indisponivel",
     };
     const html = renderToStaticMarkup(
-      createElement(VistaMovimentacoes, {
-        hoje: "2026-10-19",
-        turmas,
-        alunos,
-        ativa: true,
-      }),
+      comTema(
+        createElement(VistaMovimentacoes, {
+          hoje: "2026-10-19",
+          turmas,
+          alunos,
+          ativa: true,
+        }),
+      ),
     );
     expect(dubl.cargaInjetada).toBe(true);
     expect(blocos(html, "p")).toContain(
