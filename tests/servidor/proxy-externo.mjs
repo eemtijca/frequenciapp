@@ -23,7 +23,7 @@ const redePublica = `frequenciapp-externo-publica-${sufixo}`;
 const imagemCaddy =
   "caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9";
 const imagemNode =
-  "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68";
+  "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1";
 const imagemBlackbox =
   "prom/blackbox-exporter:v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13";
 const token = "token-sintetico-de-ensaio-com-32-caracteres";

@@ -7,8 +7,8 @@ set -Eeuo pipefail
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 IMAGEM_PLAYWRIGHT="mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe"
-IMAGEM_QUALIDADE="${EXECUTOR_IMAGEM_QUALIDADE:-frequenciapp-dev-qualidade:26.13.0-git-openssl}"
-IMAGEM_FERRAMENTAS="${EXECUTOR_IMAGEM_FERRAMENTAS:-frequenciapp-dev-ferramentas:26.13.0-docker27.5.1-compose2.32.4}"
+IMAGEM_QUALIDADE="${EXECUTOR_IMAGEM_QUALIDADE:-frequenciapp-dev-qualidade:26.13.1-git-openssl}"
+IMAGEM_FERRAMENTAS="${EXECUTOR_IMAGEM_FERRAMENTAS:-frequenciapp-dev-ferramentas:26.13.1-docker27.5.1-compose2.32.4}"
 
 TAREFA="${EXECUTOR_TAREFA:-local}"
 MANTER="${EXECUTOR_MANTER:-0}"
@@ -98,7 +98,7 @@ Ambiente:
                              Compose.
 
 Imagens fixas:
-  Node:       node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
+  Node:       node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
   Playwright: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe
 
 O executor não usa WSL e não executa pnpm, npx, vitest ou playwright no host.

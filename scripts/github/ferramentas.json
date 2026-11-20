@@ -2,9 +2,9 @@
   "descricao": "Inventário dos pins de ferramentas, actions e scripts de instalação. O scanner confere os consumidores sem baixar imagens nem provisionar recursos.",
   "ferramentas": {
     "node": {
-      "versao": "26.13.0",
+      "versao": "26.13.1",
       "serie": "26",
-      "imagem": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "imagem": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado",
       "fontes": ["https://hub.docker.com/_/node", "https://github.com/nodejs/docker-node"]
     },
@@ -148,7 +148,7 @@
   "usos": [
     {
       "arquivo": "Dockerfile",
-      "trecho": "FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68 AS base",
+      "trecho": "FROM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1 AS base",
       "estado": "pinado"
     },
     {
@@ -178,7 +178,7 @@
     },
     {
       "arquivo": ".github/workflows/servidor.yml",
-      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "trecho": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado"
     },
     {
@@ -203,7 +203,7 @@
     },
     {
       "arquivo": "tests/servidor/caddy-integracao.mjs",
-      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "trecho": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado"
     },
     {
@@ -248,37 +248,42 @@
     },
     {
       "arquivo": "tests/servidor/controlador/Dockerfile",
-      "trecho": "FROM node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "trecho": "FROM node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado"
     },
     {
       "arquivo": "compose.ci-local.yml",
-      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "trecho": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado"
     },
     {
       "arquivo": "scripts/dev/executar-container.sh",
-      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "trecho": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado"
     },
     {
       "arquivo": "scripts/dev/img/quality.Dockerfile",
-      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "trecho": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado"
     },
     {
       "arquivo": "scripts/dev/img/ferramentas.Dockerfile",
-      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "trecho": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado"
     },
     {
       "arquivo": "tests/kubernetes/validar.sh",
-      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "trecho": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado"
     },
     {
       "arquivo": "tests/servidor/contexto-docker.test.mjs",
-      "trecho": "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68",
+      "trecho": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/proxy-externo.mjs",
+      "trecho": "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1",
       "estado": "pinado"
     },
     {

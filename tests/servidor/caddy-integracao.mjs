@@ -20,7 +20,7 @@ const label = "br.org.frequenciapp.teste-caddy";
 const imagemCaddy =
   "caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9";
 const imagemNode =
-  "node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68";
+  "node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1";
 const ip = "203.0.113.10";
 const email = "admin@example.invalid";
 const ca = "https://acme.example.invalid/directory";
