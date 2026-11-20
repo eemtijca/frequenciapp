@@ -3,7 +3,6 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -18,7 +17,6 @@ let url: string;
 beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { port: 0, hmr: false, watch: { ignored: ["**/*"] } },

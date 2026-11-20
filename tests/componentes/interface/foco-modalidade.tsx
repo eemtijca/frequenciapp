@@ -1,78 +1,65 @@
 // Monta controles reais para verificar foco sem banco ou autenticação.
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { createRoot } from "react-dom/client";
+import Box from "@mui/material/Box";
+import CssBaseline from "@mui/material/CssBaseline";
+import OutlinedInput from "@mui/material/OutlinedInput";
 import { ThemeProvider } from "@mui/material/styles";
-import { Button } from "../../../src/components/ui/button";
-import { Input } from "../../../src/components/ui/input";
-import { BarraBusca } from "../../../src/components/ui/barra-busca";
-import { ModalidadeFoco } from "../../../src/components/ui/modalidade-foco";
-import { SeletorTurmaChamada } from "../../../src/components/chamada/seletor-turma-chamada";
-import { Selecionar } from "../../../src/components/ui/selecionar";
-import { SelecionarBuscavel } from "../../../src/components/ui/selecionar-buscavel";
-import { Switch } from "../../../src/components/ui/switch";
-import { tema } from "../../../src/theme/tema";
-import { Popover, PopoverContent, PopoverTrigger } from "../../../src/components/ui/popover";
-import {
-  Dialog,
-  DialogTrigger,
-  DialogContent,
-  DialogTitle,
-  DialogDescription,
-  DialogClose,
-} from "../../../src/components/ui/dialog";
-import "../../../src/app/globals.css";
+import { SeletorTurmaChamada } from "@/components/chamada/seletor-turma-chamada";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { Botao } from "@/components/ui/mui/botao";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { Interruptor } from "@/components/ui/mui/interruptor";
+import { Popover } from "@/components/ui/mui/popover";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { tema } from "@/theme/tema";
 
 function MenuPopover() {
-  const conteudoRef = useRef<HTMLDivElement>(null);
+  const [ancora, setAncora] = useState<HTMLElement | null>(null);
   return (
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button type="button" variant="outline">
-          Abrir menu de teste
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        onOpenAutoFocus={(evento) => {
-          evento.preventDefault();
-          conteudoRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
-        }}
+    <>
+      <Botao type="button" onClick={(evento) => setAncora(evento.currentTarget)}>
+        Abrir menu de teste
+      </Botao>
+      <Popover
+        aberto={ancora !== null}
+        ancora={ancora}
+        onFechar={() => setAncora(null)}
+        rotuloAcessivel="Menu de teste"
       >
-        <div
-          ref={conteudoRef}
-          role="menu"
-          aria-label="Menu de teste"
-          className="flex flex-col gap-1"
-        >
-          <Button type="button" role="menuitem" variant="ghost" className="justify-start">
+        <Box role="menu" aria-label="Menu de teste">
+          <Botao type="button" role="menuitem" variante="texto">
             Primeiro item
-          </Button>
-          <Button type="button" role="menuitem" variant="ghost" className="justify-start">
+          </Botao>
+          <Botao type="button" role="menuitem" variante="texto">
             Segundo item
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+          </Botao>
+        </Box>
+      </Popover>
+    </>
   );
 }
 
 function Aplicacao() {
   const [busca, setBusca] = useState("");
+  const [nome, setNome] = useState("");
   const [escolha, setEscolha] = useState("");
+  const [interruptor, setInterruptor] = useState(false);
+  const [dialogo, setDialogo] = useState(false);
+  const [campoDialogo, setCampoDialogo] = useState("");
   return (
-    <main data-pronto="sim">
-      {new URLSearchParams(window.location.search).has("sem-modalidade") ? null : (
-        <ModalidadeFoco />
-      )}
-      <Button type="button">Primeira ação</Button>
-      <Input aria-label="Nome" />
+    <Box component="main" data-pronto="sim" sx={{ p: 2 }}>
+      <Botao type="button">Primeira ação</Botao>
+      <CampoTexto ariaLabel="Nome" valor={nome} onValor={setNome} />
       <BarraBusca id="busca-teste" valor={busca} onValor={setBusca} placeholder="Buscar" />
-      <Input aria-label="Inválido" aria-invalid="true" />
-      <Button variant="outline" type="button" aria-pressed="true">
+      <OutlinedInput aria-label="Inválido" aria-invalid="true" />
+      <Botao variante="contorno" type="button" aria-pressed="true">
         Selecionado
-      </Button>
+      </Botao>
       <Selecionar
-        value={escolha}
-        onValueChange={setEscolha}
+        valor={escolha}
+        onValor={setEscolha}
         ariaLabel="Seleção simples"
         opcoes={[
           { valor: "a", rotulo: "Alfa" },
@@ -80,71 +67,53 @@ function Aplicacao() {
         ]}
       />
       <MenuPopover />
-      <Switch aria-label="Interruptor de teste" />
+      <Interruptor rotulo="Interruptor de teste" checked={interruptor} onChange={setInterruptor} />
       <details>
         <summary>Resumo de teste</summary>
         <p>Conteúdo do resumo</p>
       </details>
-      <div role="button" tabIndex={0} aria-label="Cartão focável" className="controle p-3">
+      <Box role="button" tabIndex={0} aria-label="Cartão focável" sx={{ p: 2 }}>
         Cartão focável
-      </div>
-      <div
+      </Box>
+      <Box
         contentEditable
         suppressContentEditableWarning
         role="textbox"
         tabIndex={0}
         aria-label="Anotação editável"
-        className="campo p-3"
+        sx={{ p: 2 }}
       >
         Anotação
-      </div>
-      <a
-        href="#resumo-teste"
-        className="discreto inline-flex min-h-11 items-center px-3"
-        onClick={(evento) => evento.preventDefault()}
-      >
+      </Box>
+      <a href="#resumo-teste" onClick={(evento) => evento.preventDefault()}>
         Link de teste
       </a>
-      <Dialog>
-        <DialogTrigger asChild>
-          <Button type="button">Abrir diálogo</Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogTitle>Diálogo de teste</DialogTitle>
-          <DialogDescription>Conteúdo de teste</DialogDescription>
-          <Input aria-label="Campo do diálogo" />
-          <DialogClose asChild>
-            <Button type="button">Concluir</Button>
-          </DialogClose>
-        </DialogContent>
-      </Dialog>
-      <Button
-        variant="outline"
-        className="after:absolute focus-visible:ring-2 focus-visible:after:ring-2"
-        type="button"
+      <Botao type="button" onClick={() => setDialogo(true)}>
+        Abrir diálogo
+      </Botao>
+      <Dialogo
+        aberto={dialogo}
+        onFechar={() => setDialogo(false)}
+        titulo="Diálogo de teste"
+        descricao="Conteúdo de teste"
+        acoes={
+          <Botao type="button" onClick={() => setDialogo(false)}>
+            Concluir
+          </Botao>
+        }
       >
+        <CampoTexto ariaLabel="Campo do diálogo" valor={campoDialogo} onValor={setCampoDialogo} />
+      </Dialogo>
+      <Botao variante="contorno" type="button">
         Superfície controle
-      </Button>
-      <Button
-        variant="ghost"
-        className="after:absolute focus-visible:ring-2 focus-visible:after:ring-2"
-        type="button"
-      >
+      </Botao>
+      <Botao variante="texto" type="button">
         Superfície discreto
-      </Button>
-      <Button
-        className="after:absolute focus-visible:ring-2 focus-visible:after:ring-2"
-        type="button"
-      >
-        Superfície primário
-      </Button>
-      <Button
-        variant="destructive"
-        className="after:absolute focus-visible:ring-2 focus-visible:after:ring-2"
-        type="button"
-      >
+      </Botao>
+      <Botao type="button">Superfície primário</Botao>
+      <Botao variante="destrutivo" type="button">
         Superfície destrutivo
-      </Button>
+      </Botao>
       <SeletorTurmaChamada
         turmas={[
           {
@@ -166,18 +135,19 @@ function Aplicacao() {
         travado={false}
         onEscolher={() => {}}
       />
-      <textarea className="campo" aria-label="Observações" />
-      <SelecionarBuscavel
-        value=""
-        onValueChange={() => {}}
+      <textarea aria-label="Observações" />
+      <Selecionar
+        valor=""
+        onValor={() => {}}
         ariaLabel="Escolha"
         placeholder="Escolha"
+        buscavel
         opcoes={[
           { valor: "a", rotulo: "Alfa" },
           { valor: "b", rotulo: "Beta" },
         ]}
       />
-    </main>
+    </Box>
   );
 }
 
@@ -185,6 +155,7 @@ const raiz = document.getElementById("root");
 if (raiz)
   createRoot(raiz).render(
     <ThemeProvider theme={tema}>
+      <CssBaseline enableColorScheme />
       <Aplicacao />
     </ThemeProvider>,
   );

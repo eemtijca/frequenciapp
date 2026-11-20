@@ -1,14 +1,18 @@
+// Fixture do botão de atualização com avisos MUI e rede desligada sob controle.
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Toaster } from "sonner";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ThemeProvider } from "@mui/material/styles";
 import {
   ProvedorAtualizacao,
   useAtualizacaoTela,
 } from "@/components/atualizacao/contexto-atualizacao";
-import { BotaoAtualizar } from "@/components/ui/botao-atualizar";
+import { ProvedorAvisos } from "@/components/ui/mui/avisos";
+import { BotaoAtualizar } from "@/components/ui/mui/botao-atualizar";
+import { tema } from "@/theme/tema";
 
 // Dados sintéticos. O callback é um spy controlado: não faz I/O e só conclui
-// quando o teste libera sua Promise; o provider, o botão e o toast são reais.
+// quando o teste libera sua Promise; o provider, o botão e o aviso são reais.
 function Tela() {
   const [chamadas, setChamadas] = useState(0);
   const [dados, setDados] = useState("Dados sintéticos preservados");
@@ -35,7 +39,6 @@ function Tela() {
       <button type="button" onClick={() => liberar.current?.()}>
         Concluir callback sintético
       </button>
-      <Toaster position="bottom-right" />
     </main>
   );
 }
@@ -43,7 +46,11 @@ function Tela() {
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Raiz da fixture ausente");
 createRoot(raiz).render(
-  <ProvedorAtualizacao ativo="painel">
-    <Tela />
-  </ProvedorAtualizacao>,
+  <ThemeProvider theme={tema}>
+    <CssBaseline enableColorScheme />
+    <ProvedorAtualizacao ativo="painel">
+      <Tela />
+      <ProvedorAvisos />
+    </ProvedorAtualizacao>
+  </ThemeProvider>,
 );

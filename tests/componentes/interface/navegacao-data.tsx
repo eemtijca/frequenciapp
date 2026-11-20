@@ -1,6 +1,8 @@
 // Visões reais, com dados sintéticos e rede controlada pelo teste.
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
+import Box from "@mui/material/Box";
+import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import VistaGrade from "@/components/grade/vista-grade";
 import VistaMovimentacoes from "@/components/relatorios/vista-movimentacoes";
@@ -16,7 +18,6 @@ import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
 import { CONFIGURACOES_PADRAO } from "@/domain/frequencia";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { tema } from "@/theme/tema";
-import "@/app/globals.css";
 
 const data = "2026-11-01"; // Domingo: resumo da semana.
 const comum = { diaCorrente: data, fuso: "America/Sao_Paulo", turmas: [], alunos: [] };
@@ -102,12 +103,10 @@ const telas = {
         rotulo="Outubro"
         onValor={() => {}}
       />
-      <button type="button" className="controle" aria-pressed="true">
+      <button type="button" aria-pressed="true">
         Filtro selecionado
       </button>
-      <button type="button" className="controle">
-        Outro controle
-      </button>
+      <button type="button">Outro controle</button>
     </div>
   ),
   painel: (
@@ -173,6 +172,9 @@ const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Raiz ausente");
 createRoot(raiz).render(
   <ThemeProvider theme={tema}>
-    <main className="p-4">{telas[tela] ?? telas.painel}</main>
+    <CssBaseline enableColorScheme />
+    <Box component="main" sx={{ p: 2 }}>
+      {telas[tela] ?? telas.painel}
+    </Box>
   </ThemeProvider>,
 );

@@ -1,5 +1,5 @@
 // Primitivas restantes da Fase 2: busca, atualização, carrossel, opções e rodapé.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -47,6 +47,14 @@ function criar<P extends object>(
 
 function fonte(nome: string): string {
   return readFileSync(path.join(DIRETORIO, nome), "utf8");
+}
+
+function arquivosDe(diretorio: string, extensoes: string[]): string[] {
+  return readdirSync(diretorio, { withFileTypes: true }).flatMap((entrada) => {
+    const caminho = path.join(diretorio, entrada.name);
+    if (entrada.isDirectory()) return arquivosDe(caminho, extensoes);
+    return extensoes.some((extensao) => entrada.name.endsWith(extensao)) ? [caminho] : [];
+  });
 }
 
 function renderizarBusca(props: BarraBuscaProps): string {
@@ -341,5 +349,61 @@ describe("restrições estáticas das primitivas restantes", () => {
       expect(conteudo, `${arquivo} deve usar theme.vars`).toContain("theme.vars");
     }
     expect(TOKENS_LAYOUT.alvoToque).toBe(48);
+  });
+});
+
+describe("limpeza do stack visual", () => {
+  const proibidos = [
+    "tailwindcss",
+    "@tailwindcss/postcss",
+    "tw-animate-css",
+    "prettier-plugin-tailwindcss",
+    "tailwind-merge",
+    "class-variance-authority",
+    "clsx",
+    "lucide-react",
+    "sonner",
+    "next-themes",
+    "motion",
+  ];
+
+  it("não carrega as dependências antigas no package.json", () => {
+    const pacote = JSON.parse(readFileSync("package.json", "utf8")) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const nomes = [
+      ...Object.keys(pacote.dependencies ?? {}),
+      ...Object.keys(pacote.devDependencies ?? {}),
+    ];
+    for (const proibido of proibidos) expect(nomes).not.toContain(proibido);
+    expect(nomes.some((nome) => nome.startsWith("@radix-ui/"))).toBe(false);
+  });
+
+  it("não importa o stack antigo e mantém Recharts apenas no BI", () => {
+    for (const arquivo of arquivosDe("src", [".ts", ".tsx"])) {
+      const texto = readFileSync(arquivo, "utf8");
+      for (const proibido of proibidos) {
+        expect(texto, `${arquivo} importa ${proibido}`).not.toContain(`from "${proibido}`);
+      }
+      expect(texto, arquivo).not.toContain("@radix-ui/");
+      expect(texto, arquivo).not.toContain("@/app/globals.css");
+      expect(texto, arquivo).not.toContain("@/lib/utils");
+      if (!arquivo.replaceAll("\\", "/").startsWith("src/components/bi/")) {
+        expect(texto, arquivo).not.toContain('from "recharts"');
+      }
+    }
+  });
+
+  it("não mantém classes utilitárias do Tailwind no produto", () => {
+    const utilitaria =
+      /(?:^|\s)(?:flex|grid|hidden|w-\S+|h-\S+|p[trblxy]?-\S+|m[trblxy]?-\S+|gap-\S+|text-\S+|bg-\S+|rounded\S*|shadow\S*|items-\S+|justify-\S+)(?:\s|$)/;
+    for (const arquivo of arquivosDe("src", [".tsx"])) {
+      const texto = readFileSync(arquivo, "utf8");
+      for (const achado of texto.matchAll(/className=(?:"([^"]*)"|`([^`]*)`)/g)) {
+        const valor = achado[1] ?? achado[2] ?? "";
+        expect(utilitaria.test(valor), `${arquivo}: ${valor}`).toBe(false);
+      }
+    }
   });
 });

@@ -47,7 +47,9 @@ test.describe("toasts e toque duplo", () => {
     await page.getByLabel("Nome").fill("E2E Feedback");
     await page.getByLabel("Ordem de exibição").fill("42");
     await page.getByRole("button", { name: "Criar" }).click({ clickCount: 2, delay: 30 });
-    const avisos = page.locator("[data-sonner-toast]").filter({ hasText: "Série criada." });
+    const avisos = page
+      .locator(".MuiSnackbar-root .MuiAlert-root")
+      .filter({ hasText: "Série criada." });
     await expect(avisos).toHaveCount(1);
     await expect(
       page

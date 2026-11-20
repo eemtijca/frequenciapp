@@ -93,6 +93,3 @@ export const tipografia: TypographyVariantsOptions = {
 export const numeraisTabulares: CSSProperties = {
   fontVariantNumeric: "tabular-nums",
 };
-
-/** Classe global equivalente, também usada pelo CSS antigo durante a transição. */
-export const CLASSE_NUMERAIS_TABULARES = "numerais-tabulares";

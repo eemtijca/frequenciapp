@@ -2,6 +2,7 @@
 
 // Isola falhas no download de gráficos para preservar os controles e registros da tela.
 import { Component, type ReactNode } from "react";
+import Box from "@mui/material/Box";
 
 export default class LimiteErroGrafico extends Component<
   { children: ReactNode },
@@ -14,12 +15,23 @@ export default class LimiteErroGrafico extends Component<
   render() {
     if (this.state.falhou)
       return (
-        <p
+        <Box
+          component="p"
           role="alert"
-          className="text-muted-foreground rounded-2xl border border-dashed p-6 text-center text-sm"
+          sx={{
+            m: 0,
+            border: 1,
+            borderStyle: "dashed",
+            borderColor: "divider",
+            borderRadius: 2,
+            p: 3,
+            textAlign: "center",
+            typography: "body2",
+            color: "text.secondary",
+          }}
         >
           Não foi possível carregar o gráfico. Confira a conexão.
-        </p>
+        </Box>
       );
     return this.props.children;
   }

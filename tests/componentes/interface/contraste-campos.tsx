@@ -1,11 +1,16 @@
 // Os componentes de produção são montados sobre as duas superfícies do tema claro.
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
-import { Input } from "../../../src/components/ui/input";
-import { BarraBusca } from "../../../src/components/ui/barra-busca";
-import { Selecionar } from "../../../src/components/ui/selecionar";
-import { CampoSenha } from "../../../src/components/ui/campo-senha";
-import "../../../src/app/globals.css";
+import Box from "@mui/material/Box";
+import CssBaseline from "@mui/material/CssBaseline";
+import OutlinedInput from "@mui/material/OutlinedInput";
+import Stack from "@mui/material/Stack";
+import { ThemeProvider } from "@mui/material/styles";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { tema } from "@/theme/tema";
 
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Elemento raiz ausente");
@@ -14,13 +19,15 @@ function Campos({ superficie }: { superficie: string }) {
   const [valor, setValor] = useState("um");
   const [simples, setSimples] = useState("");
   const [busca, setBusca] = useState("");
+  const [texto, setTexto] = useState("");
+  const [senha, setSenha] = useState("senha-teste");
   return (
-    <div data-superficie={superficie} className="grid gap-4 p-4">
-      <Input aria-label={`Texto ${superficie}`} />
+    <Stack spacing={2} sx={{ p: 2 }} data-superficie={superficie}>
+      <CampoTexto ariaLabel={`Texto ${superficie}`} valor={texto} onValor={setTexto} />
       <Selecionar
         ariaLabel={`Seletor ${superficie}`}
-        value={simples}
-        onValueChange={setSimples}
+        valor={simples}
+        onValor={setSimples}
         opcoes={[
           { valor: "um", rotulo: "Um" },
           { valor: "dois", rotulo: "Dois" },
@@ -34,26 +41,33 @@ function Campos({ superficie }: { superficie: string }) {
       />
       <Selecionar
         ariaLabel={`Buscável ${superficie}`}
-        value={valor}
-        onValueChange={setValor}
+        valor={valor}
+        onValor={setValor}
         opcoes={[
           { valor: "um", rotulo: "Um" },
           { valor: "dois", rotulo: "Dois" },
         ]}
         buscavel
       />
-      <Input aria-label={`Inválido ${superficie}`} aria-invalid="true" defaultValue="Inválido" />
-      <Input aria-label={`Desabilitado ${superficie}`} disabled defaultValue="Bloqueado" />
-      <CampoSenha aria-label={`Senha ${superficie}`} defaultValue="senha-teste" />
-    </div>
+      <OutlinedInput
+        aria-label={`Inválido ${superficie}`}
+        aria-invalid="true"
+        defaultValue="Inválido"
+      />
+      <OutlinedInput aria-label={`Desabilitado ${superficie}`} disabled defaultValue="Bloqueado" />
+      <CampoSenha id={`senha-${superficie}`} valor={senha} onValor={setSenha} autoComplete="off" />
+    </Stack>
   );
 }
 
 createRoot(raiz).render(
-  <main className="grid gap-4 p-4">
-    <Campos superficie="pagina" />
-    <div className="superficie">
-      <Campos superficie="cartao" />
-    </div>
-  </main>,
+  <ThemeProvider theme={tema}>
+    <CssBaseline enableColorScheme />
+    <Box component="main" sx={{ p: 2 }}>
+      <Campos superficie="pagina" />
+      <Box sx={{ bgcolor: "background.paper", borderRadius: 2, p: 1 }}>
+        <Campos superficie="cartao" />
+      </Box>
+    </Box>
+  </ThemeProvider>,
 );

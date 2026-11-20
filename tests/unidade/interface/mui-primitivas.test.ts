@@ -461,4 +461,19 @@ describe("restrições estáticas das primitivas", () => {
       expect(ler(arquivo), `${arquivo} deve usar theme.vars`).toContain("theme.vars");
     }
   });
+
+  it("não depende de CSS global, CSS Modules ou PostCSS do stack antigo", () => {
+    for (const arquivo of [
+      "src/app/globals.css",
+      "src/app/superficies.css",
+      "postcss.config.mjs",
+      "components.json",
+      "src/lib/utils.ts",
+    ]) {
+      expect(() => readFileSync(arquivo, "utf8"), arquivo).toThrow();
+    }
+    expect(readdirSync("src", { recursive: true }).filter((nome) => nome.endsWith(".css"))).toEqual(
+      [],
+    );
+  });
 });

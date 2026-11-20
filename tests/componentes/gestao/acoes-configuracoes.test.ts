@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -60,7 +59,6 @@ beforeAll(async () => {
     configFile: false,
     cacheDir: path.join(tmpdir(), "vite-acoes-configuracoes"),
     define: { "process.env": "{}" },
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { host: "127.0.0.1", port: 0, hmr: false, watch: { ignored: ["**/*"] } },
@@ -85,7 +83,14 @@ async function abrir(page: Page, tema: "light" | "dark") {
       : route.fulfill({ status: 503, json: { erro: "Indisponível no teste" } });
   });
   await page.goto(url);
-  await page.evaluate((t) => document.documentElement.classList.toggle("dark", t === "dark"), tema);
+  await page.evaluate(
+    (t) =>
+      document.documentElement.setAttribute(
+        "data-mui-color-scheme",
+        t === "dark" ? "dark" : "light",
+      ),
+    tema,
+  );
   await page
     .getByRole("tablist", { name: "Ações da escola" })
     .getByRole("tab", { name: "Cadastros" })

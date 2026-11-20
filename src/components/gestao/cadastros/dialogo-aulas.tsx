@@ -508,10 +508,10 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                       onClick={() => setConfirmacao({ tipo: "excluir", aula })}
                       sx={{
                         ...ESTILO_BOTAO_ICONE,
-                        color: "var(--falta-texto)",
+                        color: "falta.texto",
                         "&.MuiButton-root": {
                           ...ESTILO_BOTAO_ICONE["&.MuiButton-root"],
-                          color: "var(--falta-texto)",
+                          color: "falta.texto",
                         },
                       }}
                     />

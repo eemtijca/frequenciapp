@@ -46,13 +46,12 @@ it.each([
   try {
     await page.goto(url);
     await page.getByRole("button", { name: "Mover Primeiro" }).waitFor();
-    await page.evaluate((classe) => {
-      document.documentElement.className = classe;
-      document.documentElement.setAttribute("data-mui-color-scheme", classe);
+    await page.evaluate((esquema) => {
+      document.documentElement.setAttribute("data-mui-color-scheme", esquema);
     }, tema);
-    expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(
-      tema === "dark",
-    );
+    expect(
+      await page.evaluate(() => document.documentElement.getAttribute("data-mui-color-scheme")),
+    ).toBe(tema);
     await page.mouse.move(0, 0);
     const cartao = page.locator("article[data-grafico-id]").first();
     await cartao.getByRole("button", { name: "Mover Primeiro" }).waitFor();

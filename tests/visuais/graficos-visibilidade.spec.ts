@@ -1,3 +1,4 @@
+// Garante que os gráficos continuam visíveis ao trocar abas, cartões e temas.
 import { expect, test, type Page } from "@playwright/test";
 
 const diagnosticos = new WeakMap<Page, { erros: string[]; avisos: string[] }>();
@@ -55,7 +56,6 @@ for (const tema of ["light", "dark"] as const) {
       await page.setViewportSize({ width: largura, height: 850 });
       await page.goto("/tests/fixtures/graficos-visibilidade/");
       await page.evaluate((escuro) => {
-        document.documentElement.classList.toggle("dark", escuro);
         document.documentElement.setAttribute("data-mui-color-scheme", escuro ? "dark" : "light");
       }, tema === "dark");
       await graficoVisivel(page, "Rosca primeiro");

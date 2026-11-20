@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, webkit, type Browser, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 // O foco pode demorar a voltar no WebKit sob carga; a espera padrão é curta.
@@ -23,7 +22,6 @@ beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
     cacheDir: cache,
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     resolve: { alias: { "@": path.resolve("src") } },

@@ -75,8 +75,7 @@ export async function limparFoco(page: Page): Promise<void> {
 }
 
 /**
- * Aplica a preferência de cor e espera o esquema resolvido. O atributo do MUI
- * é a fonte principal; a classe do next-themes cobre a fase de coexistência.
+ * Aplica a preferência de cor e espera o esquema resolvido no atributo do MUI.
  */
 export async function aguardarTema(page: Page, tema: TemaCaptura): Promise<void> {
   await page.emulateMedia({ colorScheme: tema });
@@ -87,7 +86,6 @@ export async function aguardarTema(page: Page, tema: TemaCaptura): Promise<void>
       const sistema = matchMedia("(prefers-color-scheme: dark)").matches ? "escuro" : "claro";
       if (atribuido && atribuido !== "system") return atribuido === esperado;
       if (atribuido === "system") return sistema === esperado;
-      if (raiz.classList.contains("dark")) return esperado === "escuro";
       return sistema === esperado;
     }, tema);
   } catch (erro) {

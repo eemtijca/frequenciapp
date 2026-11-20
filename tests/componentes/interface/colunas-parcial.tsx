@@ -6,7 +6,6 @@ import { ThemeProvider } from "@mui/material/styles";
 import VistaFrequenciaParcial from "../../../src/components/chamada-parcial/vista-frequencia-parcial";
 import type { Aluno, Serie, Turma } from "../../../src/domain/frequencia";
 import { tema } from "../../../src/theme/tema";
-import "../../../src/app/globals.css";
 
 const serie: Serie = { id: "serie", nome: "1º ano", ordem: 1 };
 const turma: Turma = {

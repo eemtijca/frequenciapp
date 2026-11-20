@@ -1,25 +1,10 @@
-// Layout raiz com as tipografias, os temas em coexistência e os avisos compartilhados.
+// Layout raiz com a tipografia Inter, o tema Material UI e os avisos compartilhados.
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Inter, Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
-import { ThemeProvider } from "next-themes";
+import { Inter } from "next/font/google";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
-import { Toaster } from "@/components/ui/sonner";
-import { ModalidadeFoco } from "@/components/ui/modalidade-foco";
 import { ProvedorAvisos } from "@/components/ui/mui/avisos";
-import { SincronizarTema } from "@/components/ui/mui/sincronizar-tema";
 import { ProvedorTema } from "@/theme/provedor-tema";
-import "./globals.css";
-
-const fonteInterface = Plus_Jakarta_Sans({
-  variable: "--font-jakarta",
-  subsets: ["latin"],
-});
-
-const fonteNumeros = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-});
 
 const fonteMaterial = Inter({
   variable: "--font-inter",
@@ -79,35 +64,16 @@ export default async function LayoutRaiz({
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body
-        className={`${fonteInterface.variable} ${fonteNumeros.variable} ${fonteMaterial.variable} bg-background text-foreground font-sans antialiased`}
-      >
+      <body className={fonteMaterial.variable}>
         <InitColorSchemeScript
           attribute="data-mui-color-scheme"
           defaultMode="system"
           modeStorageKey="theme"
           nonce={nonce}
         />
-        <ModalidadeFoco />
         <ProvedorTema nonce={nonce}>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-            nonce={nonce}
-          >
-            <SincronizarTema />
-            {children}
-            <ProvedorAvisos />
-            <Toaster
-              position="bottom-right"
-              offset={20}
-              mobileOffset={84}
-              richColors
-              closeButton={false}
-            />
-          </ThemeProvider>
+          {children}
+          <ProvedorAvisos />
         </ProvedorTema>
       </body>
     </html>

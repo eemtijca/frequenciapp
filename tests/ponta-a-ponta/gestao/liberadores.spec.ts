@@ -50,7 +50,7 @@ test.describe("quem libera as saídas", () => {
     await secao.getByRole("button", { name: "Adicionar" }).click();
     await expect(secao.getByText("E2E Porteiro")).toBeVisible();
     // O aviso flutua sobre o rodapé e pausa a própria saída enquanto o ponteiro o cobre.
-    await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0, { timeout: 15_000 });
     await salvarConfiguracoes(page);
 
     await trocarVisao(page, "Saídas e Entradas", "saidas");

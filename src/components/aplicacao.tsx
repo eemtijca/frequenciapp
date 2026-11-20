@@ -1276,8 +1276,20 @@ export default function Aplicacao({
                     inert={!ativo}
                     data-distante={distante ? "true" : undefined}
                     hidden={!ativo}
-                    className="pagina-painel"
-                    sx={{ height: "100%", width: "100%", overflowY: "auto" }}
+                    sx={{
+                      height: "100%",
+                      width: "100%",
+                      overflowY: "auto",
+                      overscrollBehavior: "contain",
+                      "@media (min-width:1024px)": { scrollbarGutter: "stable both-edges" },
+                      ...(distante
+                        ? {
+                            contentVisibility: "auto",
+                            contain: "layout paint style",
+                            containIntrinsicSize: "auto 800px",
+                          }
+                        : {}),
+                    }}
                   >
                     <ProvedorVisibilidadeGraficos visivel={ativo}>
                       <LayoutConteudo largura={larguraDaVisao(item.visao)}>

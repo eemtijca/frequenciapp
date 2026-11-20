@@ -1,6 +1,6 @@
 "use client";
 
-// Seletor de tema: preferência no next-themes e atributo de cor no Material UI.
+// Seletor de tema com as três opções do Material UI e hidratação segura.
 import { useId, useState, useSyncExternalStore } from "react";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
@@ -12,9 +12,9 @@ import ListItemText from "@mui/material/ListItemText";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import { useColorScheme } from "@mui/material/styles";
-import { useTheme } from "next-themes";
 import { TOKENS_LAYOUT } from "@/theme/layout";
-import { normalizarModoTema, type ModoTema } from "./sincronizar-tema";
+
+type ModoTema = "light" | "dark" | "system";
 
 interface OpcaoTema {
   valor: ModoTema;
@@ -51,19 +51,20 @@ const assinarMontagem = () => () => undefined;
 const obterMontado = () => true;
 const obterNaoMontado = () => false;
 
-/** Menu de três opções de tema, com o next-themes como fonte da preferência. */
+function normalizarModo(valor: string | undefined): ModoTema {
+  return valor === "light" || valor === "dark" || valor === "system" ? valor : "system";
+}
+
+/** Menu de três opções de tema, com o modo de cor do Material UI como fonte única. */
 export function SeletorTema() {
-  const { theme, setTheme } = useTheme();
-  const { mode } = useColorScheme();
+  const { mode, setMode } = useColorScheme();
   const [ancora, setAncora] = useState<HTMLElement | null>(null);
   const idGatilho = useId();
   const idMenu = useId();
   const aberto = ancora !== null;
   // O tema só é conhecido depois da montagem: evita divergência de hidratação.
   const montado = useSyncExternalStore(assinarMontagem, obterMontado, obterNaoMontado);
-  const preferencia = montado
-    ? (normalizarModoTema(theme) ?? normalizarModoTema(mode) ?? "system")
-    : "system";
+  const preferencia = montado ? normalizarModo(mode) : "system";
   const atual = OPCOES.find((opcao) => opcao.valor === preferencia) ?? OPCAO_SISTEMA;
   const IconeAtual = atual.Icone;
 
@@ -105,7 +106,7 @@ export function SeletorTema() {
               aria-checked={ativo}
               selected={ativo}
               onClick={() => {
-                setTheme(valor);
+                setMode(valor);
                 setAncora(null);
               }}
               sx={{ minHeight: TOKENS_LAYOUT.lista.umaLinha }}

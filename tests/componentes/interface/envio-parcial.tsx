@@ -5,7 +5,6 @@ import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import VistaFrequenciaParcial from "../../../src/components/chamada-parcial/vista-frequencia-parcial";
 import { tema } from "../../../src/theme/tema";
-import "../../../src/app/globals.css";
 
 function Cena() {
   const [ativa, setAtiva] = useState(true);

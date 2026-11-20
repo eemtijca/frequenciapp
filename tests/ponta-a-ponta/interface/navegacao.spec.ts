@@ -47,7 +47,9 @@ test.describe("navegação", () => {
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
     // O seletor fica no cabeçalho no celular e no cartão da barra lateral no desktop.
     await aguardarHidratacao(page, 'button[aria-label*="tema" i]');
-    const inicioEscuro = await page.locator("html").evaluate((el) => el.classList.contains("dark"));
+    const inicioEscuro = await page
+      .locator("html")
+      .evaluate((el) => el.getAttribute("data-mui-color-scheme") === "dark");
     const alvo = inicioEscuro ? "Claro" : "Escuro";
     const botaoTema = page.getByRole("banner").getByRole("button", { name: /tema/i });
     await expect(botaoTema).toBeVisible();
@@ -56,7 +58,10 @@ test.describe("navegação", () => {
     await expect(temas).toBeVisible();
     await expect(temas.getByRole("radio")).toHaveCount(3);
     await temas.getByRole("radio", { name: alvo, exact: true }).click();
-    await expect(page.locator("html")).toHaveClass(new RegExp(inicioEscuro ? "light" : "dark"));
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-mui-color-scheme",
+      inicioEscuro ? "light" : "dark",
+    );
     await page.keyboard.press("Escape");
     await expect(temas).toBeHidden();
     await info.attach(`menu-tema-${alvo.toLocaleLowerCase("pt-BR")}`, {

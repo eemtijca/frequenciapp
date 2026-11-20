@@ -2,7 +2,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { AtualizadoEm } from "@/components/ui/atualizado-em";
+import { AtualizadoEm } from "@/components/ui/mui/atualizado-em";
 
 describe("rótulo de atualização", () => {
   it("preserva o estado sem leitura quando o instante é ausente ou inválido", () => {

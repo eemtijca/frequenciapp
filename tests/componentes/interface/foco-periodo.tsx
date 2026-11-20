@@ -1,9 +1,10 @@
+// Monta o seletor de período com dados sintéticos para verificar foco e calendário.
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { tema } from "@/theme/tema";
-import "@/app/globals.css";
 
 function Fixture() {
   const [dia, setDia] = useState("2026-10-15");
@@ -20,7 +21,7 @@ function Fixture() {
     };
   }, []);
   return (
-    <main ref={fixture} className="p-4 pt-20">
+    <main ref={fixture} style={{ padding: 16, paddingTop: 80 }}>
       <SeletorPeriodo
         id="dia"
         modo="dia"
@@ -43,7 +44,7 @@ function Fixture() {
         onValor={setMes}
       />
       <button
-        className="fixed top-4 right-4"
+        style={{ position: "fixed", top: 16, right: 16 }}
         type="button"
         onClick={() => setCliques((valor) => valor + 1)}
       >
@@ -58,6 +59,7 @@ const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Raiz ausente");
 createRoot(raiz).render(
   <ThemeProvider theme={tema}>
+    <CssBaseline enableColorScheme />
     <Fixture />
   </ThemeProvider>,
 );

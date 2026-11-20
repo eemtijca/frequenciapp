@@ -1,10 +1,12 @@
 // Monta os cadastros reais com dados fictícios, sem aplicativo ou banco.
 import { createRoot } from "react-dom/client";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ThemeProvider } from "@mui/material/styles";
 import AbaSeries from "../../../src/components/gestao/abas/aba-series";
 import AbaAlunos from "../../../src/components/gestao/abas/aba-alunos";
 import AbaDiretores from "../../../src/components/gestao/abas/aba-diretores";
 import type { Aluno, Serie, Turma } from "../../../src/domain/frequencia";
-import "../../../src/app/globals.css";
+import { tema } from "../../../src/theme/tema";
 
 const series: Serie[] = [{ id: "serie-1", nome: "1º ano", ordem: 1 }];
 const turmas: Turma[] = [
@@ -48,13 +50,16 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Elemento raiz ausente");
 const aba = new URLSearchParams(location.search).get("aba");
 createRoot(root).render(
-  <main className="p-4">
-    {aba === "alunos" ? (
-      <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={async () => {}} />
-    ) : aba === "diretores" ? (
-      <AbaDiretores turmas={turmas} diaCorrente="2026-03-10" />
-    ) : (
-      <AbaSeries series={series} onMudanca={async () => {}} />
-    )}
-  </main>,
+  <ThemeProvider theme={tema}>
+    <CssBaseline enableColorScheme />
+    <main style={{ padding: 16 }}>
+      {aba === "alunos" ? (
+        <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={async () => {}} />
+      ) : aba === "diretores" ? (
+        <AbaDiretores turmas={turmas} diaCorrente="2026-03-10" />
+      ) : (
+        <AbaSeries series={series} onMudanca={async () => {}} />
+      )}
+    </main>
+  </ThemeProvider>,
 );

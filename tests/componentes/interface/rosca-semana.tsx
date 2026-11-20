@@ -1,11 +1,11 @@
 // Monta o resumo real e uma rosca de faltas para testes em navegador.
 import { createRoot } from "react-dom/client";
+import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import { VistaResumoSemana } from "../../../src/components/chamada/resumo-semana";
 import GraficoRosca from "../../../src/components/painel/grafico-rosca";
 import { CONFIGURACOES_PADRAO, type Aluno, type Turma } from "../../../src/domain/frequencia";
 import { tema } from "../../../src/theme/tema";
-import "../../../src/app/globals.css";
 
 const turma: Turma = {
   id: "turma-a",
@@ -36,7 +36,8 @@ const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Elemento raiz ausente");
 createRoot(raiz).render(
   <ThemeProvider theme={tema}>
-    <main className="p-4">
+    <CssBaseline enableColorScheme />
+    <main style={{ padding: 16 }}>
       <VistaResumoSemana
         turmas={[turma]}
         alunos={alunos}

@@ -1,11 +1,11 @@
 // Monta o seletor de turmas com dados sintéticos para testar recolhimento e foco.
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
+import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import { SeletorTurmaChamada } from "../../../src/components/chamada/seletor-turma-chamada";
 import type { Turma } from "../../../src/domain/frequencia";
 import { tema } from "../../../src/theme/tema";
-import "../../../src/app/globals.css";
 
 const turmas: Turma[] = ["A", "B", "C"].map((letra, ordem) => ({
   id: `turma-${letra}`,
@@ -43,6 +43,7 @@ if (!root) throw new Error("Elemento raiz ausente");
 createRoot(root).render(
   <StrictMode>
     <ThemeProvider theme={tema}>
+      <CssBaseline enableColorScheme />
       <Cena />
     </ThemeProvider>
   </StrictMode>,

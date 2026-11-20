@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -21,7 +20,6 @@ beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
     cacheDir: cache,
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     plugins: process.env.TESTAR_SEM_CONTORNO
@@ -54,13 +52,13 @@ afterAll(async () => {
   rmSync(cache, { recursive: true, force: true });
 });
 
-/** Espera a classe e a pintura real do body antes de medir contrastes. */
+/** Espera o esquema do MUI e a pintura real do body antes de medir contrastes. */
 async function aguardarTema(page: Page, tema: "light" | "dark") {
   await page.waitForFunction((valor) => {
     const raiz = document.documentElement;
-    if (!raiz.classList.contains(valor)) return false;
-    const token = getComputedStyle(raiz).getPropertyValue("--background").trim();
-    if (valor === "dark" ? token !== "oklch(0.19 0.004 90)" : token !== "#f6f6f6") return false;
+    if (raiz.getAttribute("data-mui-color-scheme") !== valor) return false;
+    if (!getComputedStyle(raiz).getPropertyValue("--template-palette-background-default").trim())
+      return false;
     const corpo = getComputedStyle(document.body).backgroundColor;
     if (corpo === "rgba(0, 0, 0, 0)") return false;
     const contexto = document.createElement("canvas").getContext("2d");
@@ -216,7 +214,7 @@ for (const largura of [320, 390, 1280]) {
           );
           await page.goto(`${url}?tela=${tela}`);
           await page.evaluate((valor) => {
-            document.documentElement.className = valor;
+            document.documentElement.setAttribute("data-mui-color-scheme", valor);
           }, tema);
           await aguardarTema(page, tema);
           const anterior = page.getByRole("button", { name: /^Dia anterior/ }).first();
@@ -271,9 +269,11 @@ for (const largura of [320, 390, 1280]) {
               }
               return (
                 getComputedStyle(document.documentElement)
-                  .getPropertyValue("--background")
+                  .getPropertyValue("--template-palette-background-default")
                   .trim() ||
-                (document.documentElement.classList.contains("dark") ? "#1c1b19" : "#f6f6f6")
+                (document.documentElement.getAttribute("data-mui-color-scheme") === "dark"
+                  ? "hsl(220, 35%, 3%)"
+                  : "hsl(0, 0%, 99%)")
               );
             };
             return Array.from(el.querySelectorAll("span, svg"))
@@ -420,7 +420,7 @@ it.each(["relatorio", "grade"])(
         try {
           await page.goto(`${url}?tela=${tela}`);
           await page.evaluate((valor) => {
-            document.documentElement.className = valor;
+            document.documentElement.setAttribute("data-mui-color-scheme", valor);
           }, tema);
           await aguardarTema(page, tema);
           const anterior = page.getByRole("button", {
@@ -585,7 +585,7 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
           await simularEstatisticasDiretor(page);
           await page.goto(`${url}?tela=${tela}`);
           await page.evaluate((tema) => {
-            document.documentElement.className = tema;
+            document.documentElement.setAttribute("data-mui-color-scheme", tema);
           }, tema);
           await aguardarTema(page, tema);
           const anterior = page.getByRole("button", {
@@ -644,20 +644,24 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
             if (fundo === "rgba(0, 0, 0, 0)")
               fundo =
                 getComputedStyle(document.documentElement)
-                  .getPropertyValue("--background")
+                  .getPropertyValue("--template-palette-background-default")
                   .trim() ||
-                (document.documentElement.classList.contains("dark") ? "#1c1b19" : "#f6f6f6");
+                (document.documentElement.getAttribute("data-mui-color-scheme") === "dark"
+                  ? "hsl(220, 35%, 3%)"
+                  : "hsl(0, 0%, 99%)");
             const a = luminancia(estilo.color);
             const b = luminancia(fundo);
             return {
               contraste: (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05),
               cor: estilo.color,
               fundo,
-              classe: document.documentElement.className,
+              esquema: document.documentElement.getAttribute("data-mui-color-scheme"),
               htmlVar: getComputedStyle(document.documentElement)
-                .getPropertyValue("--background")
+                .getPropertyValue("--template-palette-background-default")
                 .trim(),
-              bodyVar: getComputedStyle(document.body).getPropertyValue("--background").trim(),
+              bodyVar: getComputedStyle(document.body)
+                .getPropertyValue("--template-palette-background-default")
+                .trim(),
               body: getComputedStyle(document.body).backgroundColor,
               bodyClasse: document.body.className,
               bodyEstilo: document.body.getAttribute("style"),

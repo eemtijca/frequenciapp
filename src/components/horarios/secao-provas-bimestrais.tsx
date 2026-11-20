@@ -532,7 +532,7 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
                         aria-label={`Remover a prova de ${grupo.disciplina} de ${rotuloDataCurta(grupoDoDia.dia)}`}
                         icone={<DeleteOutlineRoundedIcon />}
                         onClick={() => setRemovendo({ dia: grupoDoDia.dia, grupo })}
-                        sx={{ ...ESTILO_BOTAO_ICONE, color: "var(--falta-texto)" }}
+                        sx={{ ...ESTILO_BOTAO_ICONE, color: "falta.texto" }}
                       />
                     </ListItem>
                   ))}
@@ -548,7 +548,7 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
           type="button"
           icone={<EventBusyRoundedIcon />}
           onClick={() => setEncerrando(true)}
-          sx={{ alignSelf: "flex-start", color: "var(--falta-texto)" }}
+          sx={{ alignSelf: "flex-start", color: "falta.texto" }}
         >
           Encerrar período de provas
         </Botao>

@@ -1,5 +1,4 @@
-// Seletor de tema MUI: opções, leitura acessível, hidratação e sincronização
-// com a preferência do next-themes.
+// Seletor de tema MUI: opções, leitura acessível, hidratação e fonte única do modo.
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { createElement } from "react";
@@ -8,7 +7,6 @@ import { ThemeProvider } from "@mui/material/styles";
 import { describe, expect, it } from "vitest";
 import { tema } from "@/theme/tema";
 import { SeletorTema } from "@/components/ui/mui/seletor-tema";
-import { normalizarModoTema } from "@/components/ui/mui/sincronizar-tema";
 
 function ler(arquivo: string): string {
   return readFileSync(path.resolve(process.cwd(), arquivo), "utf8");
@@ -20,21 +18,6 @@ function comCabecalho(fonte: string): boolean {
   while (linhas[inicio]?.trim() === "") inicio += 1;
   return linhas[inicio]?.trim().startsWith("//") === true;
 }
-
-describe("normalizarModoTema", () => {
-  it("aceita apenas claro, escuro e sistema", () => {
-    expect(normalizarModoTema("light")).toBe("light");
-    expect(normalizarModoTema("dark")).toBe("dark");
-    expect(normalizarModoTema("system")).toBe("system");
-  });
-
-  it("descarta o modo indefinido e valores desconhecidos", () => {
-    expect(normalizarModoTema(undefined)).toBeUndefined();
-    expect(normalizarModoTema(null)).toBeUndefined();
-    expect(normalizarModoTema("")).toBeUndefined();
-    expect(normalizarModoTema("claro")).toBeUndefined();
-  });
-});
 
 describe("SeletorTema", () => {
   it("renderiza o gatilho sem depender do tema antes da montagem", () => {
@@ -58,15 +41,16 @@ describe("SeletorTema", () => {
     }
   });
 
-  it("usa Menu, IconButton, next-themes e o modo do Material UI", () => {
+  it("usa Menu, IconButton e apenas o modo do Material UI", () => {
     const fonte = ler("src/components/ui/mui/seletor-tema.tsx");
     expect(fonte).toContain('from "@mui/material/IconButton"');
     expect(fonte).toContain('from "@mui/material/Menu"');
     expect(fonte).toContain('from "@mui/material/MenuItem"');
-    expect(fonte).toContain('from "next-themes"');
-    expect(fonte).toContain("setTheme(valor)");
+    expect(fonte).toContain('from "@mui/material/styles"');
     expect(fonte).toContain("useColorScheme");
-    expect(fonte).toContain("normalizarModoTema");
+    expect(fonte).toContain("setMode(valor)");
+    expect(fonte).not.toContain("next-themes");
+    expect(fonte).not.toContain("setTheme");
   });
 
   it("expõe opções como rádio e evita divergência de hidratação", () => {
@@ -90,37 +74,42 @@ describe("SeletorTema", () => {
   });
 });
 
-describe("SincronizarTema", () => {
-  it("leva a preferência do next-themes ao modo de cor do MUI", () => {
-    const fonte = ler("src/components/ui/mui/sincronizar-tema.tsx");
-    expect(comCabecalho(fonte)).toBe(true);
-    expect(fonte).toContain('from "next-themes"');
-    expect(fonte).toContain("useColorScheme");
-    expect(fonte).toContain("useEffect");
-    expect(fonte).toContain("preferencia === mode");
-    expect(fonte).toContain("setMode(preferencia)");
-    expect(fonte).toContain("return null");
-  });
-});
-
 describe("layout da raiz", () => {
   const layout = ler("src/app/layout.tsx");
 
-  it("monta o provedor de avisos e a sincronização dentro do tema", () => {
-    const inicioTema = layout.indexOf("<ThemeProvider");
-    const fimTema = layout.indexOf("</ThemeProvider>");
-    const sincronizar = layout.indexOf("<SincronizarTema />");
+  it("monta o provedor de avisos dentro do provedor de tema", () => {
+    const inicioTema = layout.indexOf("<ProvedorTema");
+    const fimTema = layout.indexOf("</ProvedorTema>");
     const avisos = layout.indexOf("<ProvedorAvisos />");
     expect(inicioTema).toBeGreaterThan(-1);
     expect(fimTema).toBeGreaterThan(inicioTema);
-    expect(sincronizar).toBeGreaterThan(inicioTema);
-    expect(sincronizar).toBeLessThan(fimTema);
     expect(avisos).toBeGreaterThan(inicioTema);
     expect(avisos).toBeLessThan(fimTema);
   });
 
-  it("preserva o Toaster do Sonner durante a coexistência", () => {
-    expect(layout).toContain('from "@/components/ui/sonner"');
-    expect(layout).toContain("<Toaster");
+  it("mantém o script de cor e remove o stack visual antigo", () => {
+    expect(layout).toContain("<InitColorSchemeScript");
+    expect(layout).toContain('attribute="data-mui-color-scheme"');
+    for (const proibido of [
+      "next-themes",
+      "SincronizarTema",
+      "@/components/ui/sonner",
+      "Toaster",
+      "ModalidadeFoco",
+      'from "./globals.css"',
+      "bg-background",
+      "text-foreground",
+      "font-sans",
+    ]) {
+      expect(layout, proibido).not.toContain(proibido);
+    }
+  });
+
+  it("mantém apenas a variável da fonte do tema no corpo", () => {
+    expect(layout).toContain("className={fonteMaterial.variable}");
+    expect(layout).not.toContain("fonteInterface");
+    expect(layout).not.toContain("fonteNumeros");
+    expect(layout).not.toContain("Plus_Jakarta_Sans");
+    expect(layout).not.toContain("JetBrains_Mono");
   });
 });

@@ -7,7 +7,6 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requerer = createRequire(import.meta.url);
@@ -23,7 +22,6 @@ beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
     cacheDir: cache,
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     resolve: {
@@ -48,7 +46,6 @@ afterAll(async () => {
 });
 
 async function aguardarTema(page: Page, tema: string) {
-  await expect.poll(() => page.locator("html").getAttribute("class")).toContain(tema);
   await expect.poll(() => page.locator("html").getAttribute("data-mui-color-scheme")).toBe(tema);
 }
 it.each([

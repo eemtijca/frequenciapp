@@ -98,7 +98,7 @@ const estilosGlobais = (temaAtual: Theme) => ({
 
 export function ProvedorTema({ children, nonce }: { children: ReactNode; nonce?: string }) {
   return (
-    <AppRouterCacheProvider options={{ nonce, enableCssLayer: true }}>
+    <AppRouterCacheProvider options={{ nonce }}>
       <ThemeProvider
         theme={tema}
         defaultMode="system"

@@ -4,7 +4,6 @@ import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { RECURSOS_BI } from "../../../src/domain/bi";
 
@@ -20,7 +19,6 @@ beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
     cacheDir: path.join(tmpdir(), "vite-cabecalhos"),
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     resolve: {
@@ -82,7 +80,6 @@ async function verificarDiscreto(no: Locator) {
   await verificarFoco(no);
 }
 async function aguardarTema(page: Page, tema: string) {
-  await expect.poll(() => page.locator("html").getAttribute("class")).toContain(tema);
   await expect.poll(() => page.locator("html").getAttribute("data-mui-color-scheme")).toBe(tema);
 }
 it.each(combinacoes)("entrada: ações auxiliares discretas em %s a %i px", async (tema, largura) => {
@@ -129,8 +126,8 @@ it.each(combinacoes)("entrada: ações auxiliares discretas em %s a %i px", asyn
     expect(await gruposTema.isVisible()).toBe(true);
     await page.getByRole("radio", { name: tema === "light" ? "Escuro" : "Claro" }).click();
     await expect
-      .poll(() => page.locator("html").getAttribute("class"))
-      .toContain(tema === "light" ? "dark" : "light");
+      .poll(() => page.locator("html").getAttribute("data-mui-color-scheme"))
+      .toBe(tema === "light" ? "dark" : "light");
   } finally {
     await page.close();
   }

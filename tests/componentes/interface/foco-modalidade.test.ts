@@ -3,7 +3,6 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -252,7 +251,6 @@ beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
     cacheDir: path.resolve("node_modules/.vite-foco-modalidade"),
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     resolve: { alias: { "@": path.resolve("src") } },
@@ -476,7 +474,8 @@ it.each(["claro", "escuro"] as const)(
       await pagina.goto(url);
       await pagina.locator('[data-pronto="sim"]').waitFor();
       await pagina.evaluate(
-        (escuro) => document.documentElement.classList.toggle("dark", escuro),
+        (escuro) =>
+          document.documentElement.setAttribute("data-mui-color-scheme", escuro ? "dark" : "light"),
         tema === "escuro",
       );
       const selecionado = pagina.getByRole("button", { name: "Selecionado", pressed: true });
@@ -687,12 +686,15 @@ it.each(["claro", "escuro"] as const)(
       await pagina.goto(url);
       await pagina.locator('[data-pronto="sim"]').waitFor();
       await pagina.evaluate(
-        (escuro) => document.documentElement.classList.toggle("dark", escuro),
+        (escuro) =>
+          document.documentElement.setAttribute("data-mui-color-scheme", escuro ? "dark" : "light"),
         tema === "escuro",
       );
-      expect(await pagina.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(
-        tema === "escuro",
-      );
+      expect(
+        await pagina.evaluate(
+          () => document.documentElement.getAttribute("data-mui-color-scheme") === "dark",
+        ),
+      ).toBe(tema === "escuro");
       const nome = pagina.getByRole("textbox", { name: "Nome" });
       const invalido = pagina.getByRole("textbox", { name: "Inválido" });
       const selecionado = pagina.getByRole("button", { name: "Selecionado" });
@@ -785,7 +787,8 @@ it.each(["claro", "escuro"] as const)(
       await pagina.goto(url);
       await pagina.locator('[data-pronto="sim"]').waitFor();
       await pagina.evaluate(
-        (escuro) => document.documentElement.classList.toggle("dark", escuro),
+        (escuro) =>
+          document.documentElement.setAttribute("data-mui-color-scheme", escuro ? "dark" : "light"),
         tema === "escuro",
       );
       const selecionado = pagina.getByRole("button", { name: "Selecionado", pressed: true });
@@ -1039,12 +1042,15 @@ it.each(["claro", "escuro"] as const)(
       await pagina.goto(url);
       await pagina.locator('[data-pronto="sim"]').waitFor();
       await pagina.evaluate(
-        (escuro) => document.documentElement.classList.toggle("dark", escuro),
+        (escuro) =>
+          document.documentElement.setAttribute("data-mui-color-scheme", escuro ? "dark" : "light"),
         tema === "escuro",
       );
-      expect(await pagina.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(
-        tema === "escuro",
-      );
+      expect(
+        await pagina.evaluate(
+          () => document.documentElement.getAttribute("data-mui-color-scheme") === "dark",
+        ),
+      ).toBe(tema === "escuro");
       const nome = pagina.getByRole("textbox", { name: "Nome" });
       const contorno = () => nome.evaluate((el) => getComputedStyle(el).outlineStyle);
       const antes = await contorno();

@@ -5,7 +5,6 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -23,7 +22,6 @@ beforeAll(async () => {
     configFile: false,
     cacheDir: cache,
     define: { "process.env": "{}" },
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { port: 0, hmr: false, watch: { ignored: ["**/*"] } },
@@ -47,7 +45,11 @@ it("mantém gráficos e cartões sem colisão em cada largura e tema", async () 
       const page = await browser.newPage({ viewport: { width, height: 900 } });
       try {
         await page.addInitScript(
-          (temaAtual) => document.documentElement.classList.toggle("dark", temaAtual === "dark"),
+          (temaAtual) =>
+            document.documentElement.setAttribute(
+              "data-mui-color-scheme",
+              temaAtual === "dark" ? "dark" : "light",
+            ),
           tema,
         );
         await page.route("**/api/frequencias?**", (route) =>
@@ -73,7 +75,11 @@ it("mantém gráficos e cartões sem colisão em cada largura e tema", async () 
         await page.goto(url);
         await page.getByRole("region", { name: "Resumo da semana" }).waitFor();
         await page.evaluate(
-          (temaAtual) => document.documentElement.classList.toggle("dark", temaAtual === "dark"),
+          (temaAtual) =>
+            document.documentElement.setAttribute(
+              "data-mui-color-scheme",
+              temaAtual === "dark" ? "dark" : "light",
+            ),
           tema,
         );
         const resumo = page.getByRole("region", { name: "Resumo da semana" });
@@ -138,7 +144,9 @@ it("mantém gráficos e cartões sem colisão em cada largura e tema", async () 
           return erros;
         });
         if (
-          (await page.locator("html").evaluate((el) => el.classList.contains("dark"))) !==
+          (await page
+            .locator("html")
+            .evaluate((el) => el.getAttribute("data-mui-color-scheme") === "dark")) !==
           (tema === "dark")
         )
           erros.push("tema não aplicado");

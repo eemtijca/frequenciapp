@@ -5,9 +5,11 @@ import { contraste, type Rgb } from "../helpers/cor";
 
 export async function conferirSuperficieAcao(page: Page, botao: Locator, tema: "light" | "dark") {
   await botao.waitFor({ state: "visible" });
-  expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(
-    tema === "dark",
-  );
+  expect(
+    await page.evaluate(
+      () => document.documentElement.getAttribute("data-mui-color-scheme") === "dark",
+    ),
+  ).toBe(tema === "dark");
   expect(await botao.isEnabled()).toBe(true);
   await expect
     .poll(() =>

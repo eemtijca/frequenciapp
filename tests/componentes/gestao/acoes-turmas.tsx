@@ -1,5 +1,6 @@
 // Monta a aba real de turmas com dados fictícios, sem aplicativo ou banco.
 import { createRoot } from "react-dom/client";
+import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
@@ -8,7 +9,6 @@ import "dayjs/locale/pt-br";
 import AbaTurmas from "../../../src/components/gestao/abas/aba-turmas";
 import type { Serie, Turma } from "../../../src/domain/frequencia";
 import { tema } from "../../../src/theme/tema";
-import "../../../src/app/globals.css";
 
 document.documentElement.setAttribute("data-mui-color-scheme", "light");
 
@@ -38,12 +38,13 @@ const root = document.getElementById("root");
 if (!root) throw new Error("Elemento raiz ausente");
 createRoot(root).render(
   <ThemeProvider theme={tema}>
+    <CssBaseline enableColorScheme />
     <LocalizationProvider
       dateAdapter={AdapterDayjs}
       adapterLocale="pt-br"
       localeText={ptBR.components.MuiLocalizationProvider.defaultProps.localeText}
     >
-      <main className="p-4">
+      <main style={{ padding: 16 }}>
         <AbaTurmas
           series={series}
           turmas={turmas}
