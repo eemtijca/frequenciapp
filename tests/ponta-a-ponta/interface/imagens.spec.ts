@@ -119,7 +119,8 @@ test.describe("Capturas do README", () => {
     await aguardarHidratacao(page);
 
     await trocarVisao(page, "Relatórios", "relatorios");
-    await page.getByRole("tab", { name: "Resumo" }).click();
+    const resumo = page.getByRole("tab", { name: "Resumo" });
+    if ((await resumo.getAttribute("aria-selected")) !== "true") await resumo.click();
     await page.waitForTimeout(900);
     await limparFoco(page);
     await page.screenshot({

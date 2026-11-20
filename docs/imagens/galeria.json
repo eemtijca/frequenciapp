@@ -1,4 +1,731 @@
 {
   "versao": 1,
-  "capturas": []
+  "capturas": [
+    {
+      "nome": "alunos-atual-desktop-claro.png",
+      "area": "Alunos",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "alunos-atual-desktop-escuro.png",
+      "area": "Alunos",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "alunos-atual-mobile-claro.png",
+      "area": "Alunos",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "alunos-atual-mobile-escuro.png",
+      "area": "Alunos",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "alunos-origem-desktop-claro.png",
+      "area": "Alunos",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "alunos-origem-desktop-escuro.png",
+      "area": "Alunos",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "alunos-origem-mobile-claro.png",
+      "area": "Alunos",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "alunos-origem-mobile-escuro.png",
+      "area": "Alunos",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "bi-painel-desktop-claro.png",
+      "area": "FrequenciBI",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/bi"
+    },
+    {
+      "nome": "bi-painel-desktop-escuro.png",
+      "area": "FrequenciBI",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/bi"
+    },
+    {
+      "nome": "bi-portao-desktop-claro.png",
+      "area": "FrequenciBI",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/bi"
+    },
+    {
+      "nome": "bi-portao-desktop-escuro.png",
+      "area": "FrequenciBI",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/bi"
+    },
+    {
+      "nome": "bi-portao-mobile-claro.png",
+      "area": "FrequenciBI",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/bi"
+    },
+    {
+      "nome": "chamada-desktop-claro.png",
+      "area": "Chamada",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "chamada-desktop-escuro.png",
+      "area": "Chamada",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "chamada-mobile-claro.png",
+      "area": "Chamada",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "chamada-mobile-escuro.png",
+      "area": "Chamada",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "chamada-parcial-desktop-claro.png",
+      "area": "Chamada Parcial",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "chamada-parcial-desktop-escuro.png",
+      "area": "Chamada Parcial",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "chamada-parcial-mobile-claro.png",
+      "area": "Chamada Parcial",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "chamada-parcial-mobile-escuro.png",
+      "area": "Chamada Parcial",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "configuracoes-acesso-desktop-claro.png",
+      "area": "Configurações",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "configuracoes-dados-desktop-claro.png",
+      "area": "Configurações",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "configuracoes-escola-desktop-claro.png",
+      "area": "Configurações",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "configuracoes-horarios-desktop-claro.png",
+      "area": "Configurações",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "configuracoes-planilhas-desktop-claro.png",
+      "area": "Configurações",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "entrada-desktop-claro.png",
+      "area": "Entrada",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "entrada-desktop-escuro.png",
+      "area": "Entrada",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "entrada-mobile-claro.png",
+      "area": "Entrada",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "entrada-mobile-escuro.png",
+      "area": "Entrada",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "entradas-desktop-claro.png",
+      "area": "Saídas e Entradas",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "entradas-desktop-escuro.png",
+      "area": "Saídas e Entradas",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "entradas-mobile-claro.png",
+      "area": "Saídas e Entradas",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "estados-404-desktop-claro.png",
+      "area": "Estados",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/pagina-inexistente"
+    },
+    {
+      "nome": "estados-404-desktop-escuro.png",
+      "area": "Estados",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/pagina-inexistente"
+    },
+    {
+      "nome": "estados-offline-desktop-claro.png",
+      "area": "Estados",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/offline.html"
+    },
+    {
+      "nome": "estados-offline-desktop-escuro.png",
+      "area": "Estados",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/offline.html"
+    },
+    {
+      "nome": "gestao-alunos-desktop-claro.png",
+      "area": "Gestão",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "gestao-configuracoes-desktop-claro.png",
+      "area": "Gestão",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "gestao-configuracoes-desktop-escuro.png",
+      "area": "Gestão",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "gestao-diretores-desktop-claro.png",
+      "area": "Gestão",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "gestao-equipe-desktop-claro.png",
+      "area": "Gestão",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "gestao-series-desktop-claro.png",
+      "area": "Gestão",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "gestao-turmas-desktop-claro.png",
+      "area": "Gestão",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "gestao-turmas-desktop-escuro.png",
+      "area": "Gestão",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "horarios-dia-mobile-claro.png",
+      "area": "Horários",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "horarios-semana-desktop-claro.png",
+      "area": "Horários",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "horarios-semana-desktop-escuro.png",
+      "area": "Horários",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "minhas-turmas-desktop-claro.png",
+      "area": "Minhas turmas",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "minhas-turmas-desktop-escuro.png",
+      "area": "Minhas turmas",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "minhas-turmas-mobile-claro.png",
+      "area": "Minhas turmas",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "minhas-turmas-mobile-escuro.png",
+      "area": "Minhas turmas",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "painel-desktop-claro.png",
+      "area": "Painel",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "painel-desktop-escuro.png",
+      "area": "Painel",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "painel-mobile-claro.png",
+      "area": "Painel",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "painel-mobile-escuro.png",
+      "area": "Painel",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "relatorios-grade-desktop-claro.png",
+      "area": "Relatórios",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "relatorios-grade-desktop-escuro.png",
+      "area": "Relatórios",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "relatorios-historico-desktop-claro.png",
+      "area": "Relatórios",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "relatorios-movimentacoes-desktop-claro.png",
+      "area": "Relatórios",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "relatorios-por-aluno-desktop-claro.png",
+      "area": "Relatórios",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "relatorios-resumo-desktop-claro.png",
+      "area": "Relatórios",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "relatorios-resumo-desktop-escuro.png",
+      "area": "Relatórios",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "saidas-desktop-claro.png",
+      "area": "Saídas e Entradas",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "claro",
+      "rota": "/"
+    },
+    {
+      "nome": "saidas-desktop-escuro.png",
+      "area": "Saídas e Entradas",
+      "viewport": {
+        "nome": "desktop",
+        "largura": 1440,
+        "altura": 900
+      },
+      "tema": "escuro",
+      "rota": "/"
+    },
+    {
+      "nome": "saidas-mobile-claro.png",
+      "area": "Saídas e Entradas",
+      "viewport": {
+        "nome": "mobile",
+        "largura": 390,
+        "altura": 844
+      },
+      "tema": "claro",
+      "rota": "/"
+    }
+  ]
 }
