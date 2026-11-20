@@ -78,7 +78,7 @@ export async function limparFoco(page: Page): Promise<void> {
  * Aplica a preferência de cor e espera o esquema resolvido no atributo do MUI.
  */
 export async function aguardarTema(page: Page, tema: TemaCaptura): Promise<void> {
-  await page.emulateMedia({ colorScheme: tema });
+  await page.emulateMedia({ colorScheme: tema === "claro" ? "light" : "dark" });
   try {
     await page.waitForFunction((esperado) => {
       const raiz = document.documentElement;
