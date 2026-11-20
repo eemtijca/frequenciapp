@@ -32,7 +32,7 @@
     "test:e2e:chromium": "playwright test --project=chromium",
     "test:e2e:install": "playwright install --with-deps chromium webkit",
     "capturas:readme": "CAPTURAS=1 playwright test tests/ponta-a-ponta/interface/imagens.spec.ts --project=chromium --project=mobile-chrome",
-    "capturas:galeria": "CAPTURAS=1 playwright test tests/ponta-a-ponta/interface/galeria.spec.ts --project=chromium --project=mobile-chrome",
+    "capturas:galeria": "CAPTURAS=1 playwright test tests/ponta-a-ponta/interface/galeria.spec.ts --project=chromium --project=mobile-chrome && node scripts/assets/gerar-galeria.mjs",
     "capturas:readme:docker": "CAPTURAS=1 bash tests/playwright-container.sh tests/ponta-a-ponta/interface/imagens.spec.ts --project=chromium --project=mobile-chrome",
     "test:e2e:docker": "bash tests/playwright-container.sh",
     "test:e2e:docker:chromium": "bash tests/playwright-container.sh --project=chromium",
