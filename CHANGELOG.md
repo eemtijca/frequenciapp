@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A interface migra para Material UI 9 com um tema próprio em CSS variables, componentes compartilhados em `src/components/ui/mui` e gráficos MUI X; o FrequenciBI mantém Recharts como exceção documentada. Tailwind, Radix, Lucide, Sonner, next-themes e Motion foram removidos, e a galeria visual passa a registrar as telas em claro e escuro.
+
 - A Chamada Parcial usa um cabeçalho sem subtítulo, reúne turma e data em um painel e integra a busca e o filtro de situação à lista de alunos. Os controles se empilham quando há pouco espaço.
 
 - As massas dos testes de chamada alinham o cadastro das turmas e dos alunos ao dia de referência, evitando conflitos históricos artificiais no domingo. Uma regressão usa domingo fixo na geração da massa e salva o sábado pela API real, sem alterar o relógio do aplicativo nem dispensar a confirmação histórica quando necessária.
