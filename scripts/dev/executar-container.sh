@@ -6,7 +6,7 @@ set -Eeuo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
-IMAGEM_PLAYWRIGHT="mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe"
+IMAGEM_PLAYWRIGHT="mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579"
 IMAGEM_QUALIDADE="${EXECUTOR_IMAGEM_QUALIDADE:-frequenciapp-dev-qualidade:26.13.1-git-openssl}"
 IMAGEM_FERRAMENTAS="${EXECUTOR_IMAGEM_FERRAMENTAS:-frequenciapp-dev-ferramentas:26.13.1-docker27.5.1-compose2.32.4}"
 
@@ -99,7 +99,7 @@ Ambiente:
 
 Imagens fixas:
   Node:       node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
-  Playwright: mcr.microsoft.com/playwright:v1.65.0-noble@sha256:9beb546099e11f52d62e505537914870e01a67e0e6b00ae41da4775324e73dbe
+  Playwright: mcr.microsoft.com/playwright:v1.65.1-noble@sha256:1507cbfc550a63a6b7396791ca4f00df17beb56342d2447b3f106c306f525579
 
 O executor não usa WSL e não executa pnpm, npx, vitest ou playwright no host.
 TEXTO
