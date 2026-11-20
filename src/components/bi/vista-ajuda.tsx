@@ -1,7 +1,12 @@
 // Guia e dicionário de métricas: fórmulas, limites históricos e proteção do retrato local.
+import Box from "@mui/material/Box";
+import Grid from "@mui/material/Grid";
+import Typography from "@mui/material/Typography";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { Botao } from "@/components/ui/mui/botao";
+import { SecaoConteudo } from "@/components/layout/secao-conteudo";
 import { ROTULOS_RECURSOS_BI, type RecursoBi } from "@/domain/bi";
 import type { DadosBi } from "@/domain/bi-analise";
-import { Button } from "@/components/ui/button";
 const METRICAS = [
   [
     "Alunos registrados",
@@ -59,75 +64,82 @@ export function VistaAjudaBi({
   onCarregar: (r: RecursoBi) => void;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <section className="superficie p-5">
-        <h2 className="mb-3 text-lg font-semibold">Usar o FrequenciBI</h2>
-        <ol className="list-decimal space-y-3 pl-5 text-sm">
-          <li>
-            Peça uma chave à Gestão. Ela permite consultar dados pessoais; use apenas em dispositivo
-            autorizado.
-          </li>
-          <li>
-            Aplique um período. Os conjuntos são baixados completos, por páginas, somente quando
-            necessários.
-          </li>
-          <li>
-            No Explorador, escolha a base, a dimensão, a medida e o gráfico. Salve uma visão ou
-            adicione ao painel.
-          </li>
-          <li>
-            Na tabela do gráfico, filtre uma série, turma ou aluno. Use Aprofundar para descer da
-            série à turma e ao aluno.
-          </li>
-          <li>
-            No painel, arraste o puxador para mover ou redimensionar. As setas do teclado e os
-            botões também funcionam.
-          </li>
-          <li>
-            Configurações exportadas incluem notas e preferências locais, mas nunca a chave ou as
-            bases baixadas.
-          </li>
-          <li>
-            Compartilhar copia só filtros; quem recebe precisa da própria chave. Apresentação e
-            impressão mantêm o recorte.
-          </li>
-        </ol>
-        <details className="mt-4">
-          <summary className="cursor-pointer font-medium">Offline e privacidade</summary>
-          <p className="text-muted-foreground mt-2 text-sm">
-            O cache permite consultar recortes já baixados, com a data do retrato visível. Sem rede,
-            não é possível conferir uma revogação recente. Ao reconectar, a chave é conferida; uma
-            recusa remove os dados ligados a ela. Limpar tudo remove chave, preferências e dados
-            locais. Exportações exigem guarda segura e confirmação.
-          </p>
-        </details>
-      </section>
-      <section className="superficie p-5">
-        <h2 className="mb-3 text-lg font-semibold">Dicionário de dados</h2>
-        <div className="space-y-2">
+    <Grid container spacing={2}>
+      <Grid size={{ xs: 12, lg: 6 }}>
+        <SecaoConteudo titulo="Usar o FrequenciBI">
+          <Box component="ol" sx={{ m: 0, pl: 3 }}>
+            <Typography component="li" variant="body2" sx={{ mb: 1.5 }}>
+              Peça uma chave à Gestão. Ela permite consultar dados pessoais; use apenas em
+              dispositivo autorizado.
+            </Typography>
+            <Typography component="li" variant="body2" sx={{ mb: 1.5 }}>
+              Aplique um período. Os conjuntos são baixados completos, por páginas, somente quando
+              necessários.
+            </Typography>
+            <Typography component="li" variant="body2" sx={{ mb: 1.5 }}>
+              No Explorador, escolha a base, a dimensão, a medida e o gráfico. Salve uma visão ou
+              adicione ao painel.
+            </Typography>
+            <Typography component="li" variant="body2" sx={{ mb: 1.5 }}>
+              Na tabela do gráfico, filtre uma série, turma ou aluno. Use Aprofundar para descer da
+              série à turma e ao aluno.
+            </Typography>
+            <Typography component="li" variant="body2" sx={{ mb: 1.5 }}>
+              No painel, arraste o puxador para mover ou redimensionar. As setas do teclado e os
+              botões também funcionam.
+            </Typography>
+            <Typography component="li" variant="body2" sx={{ mb: 1.5 }}>
+              Configurações exportadas incluem notas e preferências locais, mas nunca a chave ou as
+              bases baixadas.
+            </Typography>
+            <Typography component="li" variant="body2">
+              Compartilhar copia só filtros; quem recebe precisa da própria chave. Apresentação e
+              impressão mantêm o recorte.
+            </Typography>
+          </Box>
+          <Acordeao titulo="Offline e privacidade">
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              O cache permite consultar recortes já baixados, com a data do retrato visível. Sem
+              rede, não é possível conferir uma revogação recente. Ao reconectar, a chave é
+              conferida; uma recusa remove os dados ligados a ela. Limpar tudo remove chave,
+              preferências e dados locais. Exportações exigem guarda segura e confirmação.
+            </Typography>
+          </Acordeao>
+        </SecaoConteudo>
+      </Grid>
+      <Grid size={{ xs: 12, lg: 6 }}>
+        <SecaoConteudo titulo="Dicionário de dados">
           {METRICAS.map(([nome, descricao]) => (
-            <details key={nome} className="border-border border-b py-2">
-              <summary className="cursor-pointer text-sm font-medium">{nome}</summary>
-              <p className="text-muted-foreground mt-2 text-sm">{descricao}</p>
-            </details>
+            <Acordeao key={nome} titulo={nome} nivelTitulo="h3">
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                {descricao}
+              </Typography>
+            </Acordeao>
           ))}
-        </div>
-      </section>
-      <section className="superficie p-5 lg:col-span-2">
-        <h2 className="mb-3 text-lg font-semibold">Dados de apoio e cadastros</h2>
-        <p className="text-muted-foreground mb-3 text-sm">
-          Catálogos e cadastros refletem o estado atual; datas do filtro se aplicam aos eventos e
-          feriados.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {recursos.map((r) => (
-            <Button key={r} size="sm" variant="outline" onClick={() => onCarregar(r)}>
-              {ROTULOS_RECURSOS_BI[r]}
-              {dados[r] ? `: ${dados[r]?.length}` : ""}
-            </Button>
-          ))}
-        </div>
-      </section>
-    </div>
+        </SecaoConteudo>
+      </Grid>
+      <Grid size={12}>
+        <SecaoConteudo titulo="Dados de apoio e cadastros">
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Catálogos e cadastros refletem o estado atual; datas do filtro se aplicam aos eventos e
+            feriados.
+          </Typography>
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            {recursos.map((r) => (
+              <Botao
+                key={r}
+                variante="contorno"
+                tamanho="pequeno"
+                sx={{ height: 48 }}
+                onClick={() => onCarregar(r)}
+              >
+                {ROTULOS_RECURSOS_BI[r]}
+                {dados[r] ? `: ${dados[r]?.length}` : ""}
+              </Botao>
+            ))}
+          </Box>
+        </SecaoConteudo>
+      </Grid>
+    </Grid>
   );
 }

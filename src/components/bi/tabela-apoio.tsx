@@ -2,14 +2,35 @@
 
 // Consulta completa dos catálogos e do contexto, com busca, ordenação e exportação confirmada.
 import { useMemo, useState } from "react";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCaption from "@mui/material/TableCaption";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { Botao } from "@/components/ui/mui/botao";
+import { SecaoConteudo } from "@/components/layout/secao-conteudo";
 import type { LinhaBi, RecursoBi } from "@/domain/bi";
 import { ROTULOS_RECURSOS_BI } from "@/domain/bi";
 import { csvBi, textoBi } from "@/domain/bi-analise";
 import { baixarBi } from "@/lib/bi-exportacao";
 import { paginaTabelaBi } from "@/lib/bi-visualizacao";
 import type { ConfirmarExportacaoBi } from "./cartao-grafico";
+const APENAS_LEITOR = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
 export function TabelaApoioBi({
   recurso,
   linhas,
@@ -38,111 +59,161 @@ export function TabelaApoioBi({
   const colunas = useMemo(() => [...new Set(linhas.flatMap((l) => Object.keys(l)))], [linhas]);
   const atual = paginaTabelaBi(pagina, filtradas.length);
   return (
-    <section className="superficie mt-4 p-4">
-      <h2 className="mb-3 font-semibold">{ROTULOS_RECURSOS_BI[recurso]}</h2>
-      <div className="mb-3 flex flex-wrap gap-2 print:hidden">
-        <Input
-          aria-label="Buscar nos dados de apoio"
-          placeholder="Buscar"
-          value={busca}
-          onChange={(e) => {
-            setBusca(e.target.value);
-            setPagina(0);
-          }}
-          className="max-w-sm"
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-11"
-          onClick={() =>
-            confirmar(() =>
-              baixarBi(
-                new Blob([csvBi(filtradas)], { type: "text/csv;charset=utf-8" }),
-                "frequencibi-tabela.csv",
-              ),
-            )
-          }
+    <Box component="section" aria-label="Dados de apoio" sx={{ mt: 2 }}>
+      <SecaoConteudo titulo={ROTULOS_RECURSOS_BI[recurso]}>
+        <Stack
+          direction="row"
+          useFlexGap
+          spacing={1}
+          data-acoes-grafico
+          sx={{ flexWrap: "wrap", "@media print": { display: "none" } }}
         >
-          Exportar CSV
-        </Button>
-      </div>
-      {filtradas.length === 0 && (
-        <p role="status" className="text-muted-foreground p-4 text-sm">
-          Nenhum registro corresponde à busca.
-        </p>
-      )}
-      <div
-        className="max-h-96 overflow-auto print:max-h-none print:overflow-visible"
-        role="region"
-        aria-label={`Tabela de ${ROTULOS_RECURSOS_BI[recurso]}`}
-        tabIndex={0}
-      >
-        <table className="w-full text-left text-xs print:table-fixed">
-          <caption className="sr-only">Dados escolares de apoio</caption>
-          <thead>
-            <tr>
-              {colunas.map((c) => (
-                <th
-                  key={c}
-                  scope="col"
-                  aria-sort={ordem === c ? (desc ? "descending" : "ascending") : "none"}
-                  className="bg-background sticky top-0 p-2 print:static print:wrap-anywhere"
-                >
-                  <button
-                    className="min-h-11"
-                    onClick={() => {
-                      setOrdem(c);
-                      setDesc(ordem === c ? !desc : false);
+          <BarraBusca
+            id={`apoio-${recurso}-busca`}
+            valor={busca}
+            onValor={(valor) => {
+              setBusca(valor);
+              setPagina(0);
+            }}
+            placeholder="Buscar"
+            rotulo="Buscar nos dados de apoio"
+            sx={{ width: { xs: "100%", sm: 360 } }}
+          />
+          <Botao
+            variante="contorno"
+            tamanho="pequeno"
+            sx={{ height: 48 }}
+            onClick={() =>
+              confirmar(() =>
+                baixarBi(
+                  new Blob([csvBi(filtradas)], { type: "text/csv;charset=utf-8" }),
+                  "frequencibi-tabela.csv",
+                ),
+              )
+            }
+          >
+            Exportar CSV
+          </Botao>
+        </Stack>
+        {filtradas.length === 0 && (
+          <Typography role="status" variant="body2" sx={{ p: 2, color: "text.secondary" }}>
+            Nenhum registro corresponde à busca.
+          </Typography>
+        )}
+        <Box
+          role="region"
+          aria-label={`Tabela de ${ROTULOS_RECURSOS_BI[recurso]}`}
+          tabIndex={0}
+          sx={{
+            maxHeight: 384,
+            overflow: "auto",
+            "@media print": { maxHeight: "none", overflow: "visible" },
+          }}
+        >
+          <Table
+            size="small"
+            sx={{
+              width: "100%",
+              "& .MuiTableCell-root": { p: 1, fontSize: "0.75rem" },
+              "@media print": { tableLayout: "fixed" },
+            }}
+          >
+            <TableCaption sx={APENAS_LEITOR}>Dados escolares de apoio</TableCaption>
+            <TableHead>
+              <TableRow>
+                {colunas.map((c) => (
+                  <TableCell
+                    key={c}
+                    component="th"
+                    scope="col"
+                    aria-sort={ordem === c ? (desc ? "descending" : "ascending") : "none"}
+                    sx={{
+                      position: "sticky",
+                      top: 0,
+                      zIndex: 1,
+                      backgroundColor: "background.paper",
+                      "@media print": { position: "static" },
                     }}
                   >
-                    {c}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtradas.slice(atual * 50, (atual + 1) * 50).map((l) => (
-              <tr key={l.id} className="border-border border-b">
-                {colunas.map((c) => (
-                  <td key={c} className="max-w-80 p-2 break-words print:wrap-anywhere">
-                    {textoBi(l[c])}
-                  </td>
+                    <Botao
+                      variante="texto"
+                      tamanho="pequeno"
+                      aria-label={`Ordenar por ${c}`}
+                      onClick={() => {
+                        setOrdem(c);
+                        setDesc(ordem === c ? !desc : false);
+                      }}
+                      sx={{
+                        minHeight: 44,
+                        height: "auto",
+                        p: 0,
+                        justifyContent: "flex-start",
+                        fontWeight: 600,
+                        color: "text.primary",
+                      }}
+                    >
+                      {c}
+                    </Botao>
+                  </TableCell>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <p className="mt-2 hidden text-xs print:block">
-        Página {atual + 1} de {Math.max(1, Math.ceil(filtradas.length / 50))}. Exibidos{" "}
-        {Math.min(50, Math.max(0, filtradas.length - atual * 50))} de {filtradas.length} registros.
-        {filtradas.length > 50 && " O CSV inclui todos os registros filtrados."}
-      </p>
-      <div className="mt-2 flex items-center justify-between gap-2 print:hidden">
-        <Button
-          size="sm"
-          className="h-11"
-          variant="secondary"
-          disabled={!atual}
-          onClick={() => setPagina(atual - 1)}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {filtradas.slice(atual * 50, (atual + 1) * 50).map((l) => (
+                <TableRow key={l.id}>
+                  {colunas.map((c) => (
+                    <TableCell key={c} sx={{ maxWidth: 320, overflowWrap: "anywhere" }}>
+                      {textoBi(l[c])}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Box>
+        <Typography
+          variant="caption"
+          sx={{ display: "none", "@media print": { display: "block" } }}
         >
-          Anterior
-        </Button>
-        <p className="text-muted-foreground text-xs">
-          {filtradas.length} registros | {atual + 1}/{Math.max(1, Math.ceil(filtradas.length / 50))}
-        </p>
-        <Button
-          size="sm"
-          className="h-11"
-          variant="secondary"
-          disabled={(atual + 1) * 50 >= filtradas.length}
-          onClick={() => setPagina(atual + 1)}
+          Página {atual + 1} de {Math.max(1, Math.ceil(filtradas.length / 50))}. Exibidos{" "}
+          {Math.min(50, Math.max(0, filtradas.length - atual * 50))} de {filtradas.length}{" "}
+          registros.
+          {filtradas.length > 50 && " O CSV inclui todos os registros filtrados."}
+        </Typography>
+        <Stack
+          direction="row"
+          data-acoes-grafico
+          sx={{
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            "@media print": { display: "none" },
+          }}
         >
-          Próxima
-        </Button>
-      </div>
-    </section>
+          <Botao
+            variante="secundario"
+            tamanho="pequeno"
+            sx={{ height: 48 }}
+            disabled={!atual}
+            onClick={() => setPagina(atual - 1)}
+          >
+            Anterior
+          </Botao>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {filtradas.length} registros | {atual + 1}/
+            {Math.max(1, Math.ceil(filtradas.length / 50))}
+          </Typography>
+          <Botao
+            variante="secundario"
+            tamanho="pequeno"
+            sx={{ height: 48 }}
+            disabled={(atual + 1) * 50 >= filtradas.length}
+            onClick={() => setPagina(atual + 1)}
+          >
+            Próxima
+          </Botao>
+        </Stack>
+      </SecaoConteudo>
+    </Box>
   );
 }

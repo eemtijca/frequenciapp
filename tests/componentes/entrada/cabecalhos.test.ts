@@ -236,11 +236,11 @@ it.each(combinacoes)(
       await verificarDiscreto(page.getByRole("link", { name: "Voltar ao FrequenciApp" }));
       if (largura >= 640) {
         await verificarDiscreto(page.getByRole("button", { name: /Tema:.*Alterar tema/ }));
-        const nav = page.getByRole("navigation", { name: "Seções do FrequenciBI" });
-        expect(await fundo(nav.getByRole("button", { name: "Visão geral" }))).not.toBe(
+        const nav = page.getByRole("tablist", { name: "Seções do FrequenciBI" });
+        expect(await fundo(nav.getByRole("tab", { name: "Visão geral" }))).not.toBe(
           "rgba(0, 0, 0, 0)",
         );
-        const faltas = nav.getByRole("button", { name: "Faltas", exact: true });
+        const faltas = nav.getByRole("tab", { name: "Faltas", exact: true });
         await verificarDiscreto(faltas);
         await faltas.press("Enter");
         expect(await faltas.getAttribute("aria-current")).toBe("page");
@@ -250,7 +250,7 @@ it.each(combinacoes)(
         await page.getByRole("button", { name: "Apresentar", exact: true }).press("Enter");
       } else {
         const secao = page.getByRole("combobox", { name: "Seção do FrequenciBI" });
-        expect(await fundo(secao)).not.toBe("rgba(0, 0, 0, 0)");
+        expect(await fundo(secao.locator("xpath=.."))).not.toBe("rgba(0, 0, 0, 0)");
         await secao.click();
         await page.getByRole("option", { name: "Faltas", exact: true }).click();
         expect(await secao.textContent()).toContain("Faltas");

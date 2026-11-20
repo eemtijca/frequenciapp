@@ -3,7 +3,6 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { conferirSuperficieAcao } from "../superficie-acao";
 
@@ -18,7 +17,6 @@ let url: string;
 beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     resolve: { alias: { "@": path.resolve("src") } },
@@ -50,6 +48,7 @@ it.each([
     await page.getByRole("button", { name: "Mover Primeiro" }).waitFor();
     await page.evaluate((classe) => {
       document.documentElement.className = classe;
+      document.documentElement.setAttribute("data-mui-color-scheme", classe);
     }, tema);
     expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(
       tema === "dark",

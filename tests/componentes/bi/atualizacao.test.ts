@@ -3,7 +3,6 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { RECURSOS_BI } from "../../../src/domain/bi";
 
@@ -18,7 +17,6 @@ let url: string;
 beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     resolve: { alias: { "@": path.resolve("src") } },
@@ -349,8 +347,8 @@ it("ignora uma leitura atrasada após a troca de seção", async () => {
     await page.getByRole("button", { name: "Atualizar dados", exact: true }).click();
     await chamadaIniciada;
     await page
-      .getByRole("navigation", { name: "Seções do FrequenciBI" })
-      .getByRole("button", { name: "Faltas", exact: true })
+      .getByRole("tablist", { name: "Seções do FrequenciBI" })
+      .getByRole("tab", { name: "Faltas", exact: true })
       .click();
     await expect
       .poll(
@@ -616,12 +614,12 @@ it("não mostra uma atualização completa quando uma consulta retorna ao cache 
       })
       .toBe(1);
     await page
-      .getByRole("navigation", { name: "Seções do FrequenciBI" })
-      .getByRole("button", { name: "Faltas", exact: true })
+      .getByRole("tablist", { name: "Seções do FrequenciBI" })
+      .getByRole("tab", { name: "Faltas", exact: true })
       .click();
     await page
-      .getByRole("navigation", { name: "Seções do FrequenciBI" })
-      .getByRole("button", { name: "Visão geral", exact: true })
+      .getByRole("tablist", { name: "Seções do FrequenciBI" })
+      .getByRole("tab", { name: "Visão geral", exact: true })
       .click();
     await expect
       .poll(async () => page.getByText("Ainda não atualizado", { exact: true }).count())
