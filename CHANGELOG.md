@@ -119,6 +119,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- O backup drena todo o fluxo após listar o catálogo PostgreSQL, sem travar a cifra nem segurar indefinidamente a trava de operações em dumps grandes.
 - O primeiro backup do instalador passa a conferir o escopo a partir da identidade operacional e do banco efetivo, reutilizando a verificação oficial e preservando as recusas de artefatos, ponteiro, schema ou destino divergentes. A repetição confere novamente os arquivos e o remoto configurado sem gerar outro dump nem declarar a restauração exercitada.
 - A troca de canal e o comando de backup passam a conferir o conjunto pelo verificador oficial, com alvo, banco, schema e destino resolvidos pela operação e ambiente restrito ao allowlist. O planejamento de downgrade usa a conferência somente leitura, sem trava, diretórios ou temporários na instalação, e não gera outro dump. As recusas de artefatos, escopo e remoto indisponível preservam o conjunto e não avançam a instalação; a preferência de canal e tag segue o comportamento anterior de gravação antes do backup no caminho de aplicação.
 - O backup em modo URL consulta a identidade nativa do cluster antes de produzir ou conferir o recibo e recusa identidade indisponível e recibos legados sem esse vínculo. O adaptador privado preserva `+` literal e a equivalência de `ssl=true` da URI libpq. A retenção URL continua sem expurgo.
@@ -136,6 +137,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- O atualizador agendado da `main` aceita migrações novas apenas com autorização protegida, vinculada à revisão instalada, ao commit candidato, aos SHA-256 dos SQLs e a uma janela de uso único.
 - A aba Horários ganha o horário de provas bimestrais. Em Gestão, Configurações, Horários, a nova aba Provas cadastra a mesma prova para uma série inteira ou para turmas escolhidas, com data, início, fim e disciplina, recusa a turma que já tem prova na mesma janela do dia, remove provas e encerra o período, apagando o horário inteiro. Na consulta, o cartão Provas bimestrais mostra as provas da turma de hoje em diante, por data, e some quando a turma não tem prova. Novas rotas `GET` e `POST /api/provas-bimestrais`, `DELETE /api/provas-bimestrais/{id}` e `POST /api/provas-bimestrais/encerrar`, e a tabela `provas_bimestrais` ([ADR-080](docs/adr/080-horario-de-provas-bimestrais.md)).
 
 - A auto-hospedagem passa a oferecer observabilidade com Prometheus na rede interna. A aplicação expõe `/api/metricas` protegido por `METRICAS_TOKEN`, com métricas de requisições, latência, pool, consultas e fila de planilhas. O painel escuta apenas no loopback e é alcançado por túnel SSH, com retenção de 15 dias e 1 GB; Caddy e Nginx bloqueiam a rota pública. As cinco regras de alerta da fase 1 aparecem no painel, sem Alertmanager. O guia está em [observabilidade.md](docs/observabilidade.md) e a decisão na [ADR-079](docs/adr/079-observabilidade-com-prometheus.md).

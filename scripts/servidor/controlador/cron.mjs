@@ -48,7 +48,7 @@ export function gerarRotinas(p, e = lerAmbiente(p)) {
     "false",
     "ATUALIZAR_HORARIO",
     "30 4 * * *",
-    "atualizar",
+    "atualizar --agendado",
     "atualizacao",
   );
   if (e.PROXY_TIPO === "nginx" && (e.TLS_MODO ?? "acme") === "acme")
