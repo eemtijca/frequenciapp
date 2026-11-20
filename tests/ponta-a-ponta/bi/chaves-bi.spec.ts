@@ -86,7 +86,7 @@ test("validade usa data e hora próprias lado a lado e o escopo abre pelo botão
   const data = dialogo.locator("#bi-validade");
   const hora = dialogo.locator("#bi-validade-hora");
   await expect(data).toHaveAccessibleName(/Sem prazo$/);
-  await expect(hora).toHaveAccessibleName(/23:59$/);
+  await expect(hora).toHaveValue("23:59");
   const caixaData = await data.boundingBox();
   const caixaHora = await hora.boundingBox();
   expect(caixaData).not.toBeNull();
@@ -117,7 +117,7 @@ test("validade usa data e hora próprias lado a lado e o escopo abre pelo botão
     .getByRole("listbox", { name: "Minutos" })
     .getByRole("option", { name: "30", exact: true })
     .click();
-  await expect(hora).toHaveAccessibleName(/18:30$/);
+  await expect(hora).toHaveValue("18:30");
 
   const escopo = dialogo.getByRole("button", { name: /^Escopo/ });
   await expect(escopo).toHaveAttribute("aria-expanded", "false");

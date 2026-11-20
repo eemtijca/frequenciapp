@@ -97,7 +97,7 @@ test("processa só as turmas mapeadas, mostra falhas e não repete a gravação"
     exact: true,
   });
   await botao.click();
-  const dialogo = page.getByRole("alertdialog");
+  const dialogo = page.getByRole("dialog");
   await expect(dialogo.getByText(/Abas prontas: 2 de 3/)).toBeVisible();
   expect(leituras).toEqual(nomes);
   await expect(dialogo.getByText("QA Ano C: Não será alterada", { exact: true })).toBeVisible();
@@ -130,7 +130,7 @@ test("processa só as turmas mapeadas, mostra falhas e não repete a gravação"
   await dialogo.screenshot({
     path: `docs/imagens/locais/planilha-todas-pendencias-${contexto.project.name}.png`,
   });
-  await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Fechar", exact: true }).last().click();
   todasRecusadas = true;
   await botao.click();
   await expect(dialogo.getByText(/Abas prontas: 0 de 3/)).toBeVisible();

@@ -38,9 +38,9 @@ test.describe("abas da Gestão", () => {
         if (secao === retorno.secao) {
           await expect(
             cartao
-              .getByRole("navigation", { name: /^Ações da planilha/ })
-              .getByRole("button", { name: "Configurar", exact: true }),
-          ).toHaveAttribute("aria-pressed", "true");
+              .getByRole("tablist", { name: /^Ações da planilha/ })
+              .getByRole("tab", { name: "Configurar", exact: true }),
+          ).toHaveAttribute("aria-selected", "true");
         }
       }
     });

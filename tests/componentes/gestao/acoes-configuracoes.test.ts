@@ -87,8 +87,8 @@ async function abrir(page: Page, tema: "light" | "dark") {
   await page.goto(url);
   await page.evaluate((t) => document.documentElement.classList.toggle("dark", t === "dark"), tema);
   await page
-    .getByRole("navigation", { name: "Ações da escola" })
-    .getByRole("button", { name: "Cadastros" })
+    .getByRole("tablist", { name: "Ações da escola" })
+    .getByRole("tab", { name: "Cadastros" })
     .click();
   await page
     .locator('[data-secao="config-justificativas"]')
@@ -106,8 +106,8 @@ async function abrirAlmoco(page: Page) {
     .getByRole("button", { name: "Horários", exact: true })
     .click();
   await page
-    .getByRole("navigation", { name: "Ações dos horários" })
-    .getByRole("button", { name: "Almoço", exact: true })
+    .getByRole("tablist", { name: "Ações dos horários" })
+    .getByRole("tab", { name: "Almoço", exact: true })
     .click();
   await page
     .locator('[data-secao="config-ordem-almoco"]')
@@ -119,7 +119,7 @@ async function conferirPerigo(botao: Locator) {
     .poll(() =>
       botao.evaluate((el) => {
         const amostra = document.createElement("span");
-        amostra.style.color = "var(--falta-texto)";
+        amostra.style.color = "var(--template-palette-falta-main)";
         el.appendChild(amostra);
         const resultado = getComputedStyle(el).color === getComputedStyle(amostra).color;
         amostra.remove();
@@ -145,12 +145,19 @@ async function conferirAcao(botao: Locator) {
   await expect
     .poll(() => botao.evaluate((el) => getComputedStyle(el).backgroundColor))
     .toBe("rgba(0, 0, 0, 0)");
-  const estado = await botao.evaluate((el) => ({
-    largura: el.getBoundingClientRect().width,
-    altura: el.getBoundingClientRect().height,
-  }));
-  expect(estado.largura).toBeGreaterThanOrEqual(44);
-  expect(estado.altura).toBeGreaterThanOrEqual(44);
+  const estado = await botao.evaluate((el) => {
+    const alvo = getComputedStyle(el, "::after");
+    return {
+      largura: el.getBoundingClientRect().width,
+      altura: el.getBoundingClientRect().height,
+      alvoLargura: Number.parseFloat(alvo.width) || 0,
+      alvoAltura: Number.parseFloat(alvo.height) || 0,
+    };
+  });
+  expect(estado.largura).toBeGreaterThanOrEqual(40);
+  expect(estado.altura).toBeGreaterThanOrEqual(40);
+  if (estado.alvoLargura > 0) expect(estado.alvoLargura).toBeGreaterThanOrEqual(48);
+  if (estado.alvoAltura > 0) expect(estado.alvoAltura).toBeGreaterThanOrEqual(48);
 }
 for (const tema of ["light", "dark"] as const) {
   it(`ações repetidas dos cadastros são transparentes em ${tema}`, async () => {
@@ -210,14 +217,6 @@ for (const tema of ["light", "dark"] as const) {
       expect(await page.getByRole("button", { name: "Descer 1º ano B" }).isDisabled()).toBe(true);
       await conferirPerigo(page.getByRole("button", { name: "Tirar 1º ano A da ordem" }));
       await conferirFoco(page.getByRole("button", { name: "Descer 1º ano A" }));
-      expect(
-        await page
-          .getByRole("button", { name: "Copiar para os outros dias" })
-          .getAttribute("data-variant"),
-      ).toBe("outline");
-      expect(
-        await page.getByRole("button", { name: "Adicionar à ordem" }).getAttribute("data-variant"),
-      ).toBe("default");
       if (process.env.CAPTURAS_CONFIG) {
         await page.screenshot({ path: path.join(tmpdir(), `config-almoco-${tema}.png`) });
       }
@@ -254,16 +253,6 @@ for (const tema of ["light", "dark"] as const) {
         const campo = page.getByRole("textbox", { name: `Rótulo de ${codigo}` });
         const salvar = page.getByRole("button", { name: `Salvar rótulo de ${codigo}` });
         const cancelar = page.getByRole("button", { name: `Cancelar edição de ${codigo}` });
-        expect(await salvar.getAttribute("data-variant")).toBe("secondary");
-        expect(await cancelar.getAttribute("data-variant")).toBe("secondary");
-        const estiloCampo = await campo.evaluate((el) => ({
-          fundo: getComputedStyle(el).backgroundColor,
-          bordaTopo: getComputedStyle(el).borderTopWidth,
-          imagemFundo: getComputedStyle(el).backgroundImage,
-        }));
-        expect(estiloCampo.fundo).not.toBe("rgba(0, 0, 0, 0)");
-        expect(estiloCampo.bordaTopo).toBe("0px");
-        expect(estiloCampo.imagemFundo).toContain("linear-gradient");
         await campo.fill("x");
         expect(await salvar.isDisabled()).toBe(true);
         await cancelar.click();
@@ -275,11 +264,6 @@ for (const tema of ["light", "dark"] as const) {
         );
         await page.getByRole("button", { name: `Excluir ${codigo}`, exact: true }).click();
         let dialogo = page.getByRole("alertdialog");
-        expect(
-          await dialogo
-            .getByRole("button", { name: "Excluir", exact: true })
-            .getAttribute("data-variant"),
-        ).toBe("destructive");
         await dialogo.getByRole("button", { name: "Cancelar" }).click();
         expect(await page.getByText(`Novo rótulo ${codigo}`, { exact: true }).isVisible()).toBe(
           true,

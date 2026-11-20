@@ -114,9 +114,7 @@ async function abrir(page: Page, completo: boolean, toque = false) {
   if (toque) await turma.tap();
   else await turma.click();
   await expect(turma).toHaveAttribute("aria-expanded", "true");
-  const busca = page.getByRole("textbox", { name: "Filtrar opções", exact: true });
-  await expect(busca).toBeVisible();
-  await busca.fill("E2E Ano A");
+  await turma.fill("E2E Ano A");
   const opcao = page.getByRole("option", { name: "E2E Ano A", exact: true });
   if (toque) await opcao.tap();
   else await opcao.click();
@@ -227,12 +225,12 @@ test("navega por tarefa no celular e preserva a turma ao usar o teclado", async 
   await page.setViewportSize({ width: 360, height: 800 });
   const { editor, envios, previas } = await abrir(page, false);
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
-  const navegacao = cartao.getByRole("navigation", { name: "Ações da planilha de frequência" });
+  const navegacao = cartao.getByRole("tablist", { name: "Ações da planilha de frequência" });
   for (const acao of ["Enviar", "Organizar", "Configurar"] as const) {
-    const botao = navegacao.getByRole("button", { name: acao, exact: true });
+    const botao = navegacao.getByRole("tab", { name: acao, exact: true });
     await botao.focus();
     await page.keyboard.press("Enter");
-    await expect(botao).toHaveAttribute("aria-pressed", "true");
+    await expect(botao).toHaveAttribute("aria-selected", "true");
     await expect(editor).toBeHidden();
     const limites = await botao.boundingBox();
     expect(limites?.height).toBeGreaterThanOrEqual(44);
@@ -244,9 +242,9 @@ test("navega por tarefa no celular e preserva a turma ao usar o teclado", async 
     cartao.getByRole("button", { name: "Escolher planilha", exact: true }),
   ).toBeVisible();
   await selecionarAcaoPlanilha(cartao, "Editar");
-  await expect(
-    editor.getByRole("combobox", { name: "Turma da planilha para editar" }),
-  ).toContainText("E2E Ano A");
+  await expect(editor.getByRole("combobox", { name: "Turma da planilha para editar" })).toHaveValue(
+    "E2E Ano A",
+  );
   await expect(editor.getByRole("button", { name: "Adicionar alunos", exact: true })).toBeEnabled();
   expect(previas).toHaveLength(0);
   expect(envios).toHaveLength(0);

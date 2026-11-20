@@ -2,18 +2,20 @@
 
 // Conexão OAuth e seleção explícita da planilha pelo Google Picker.
 import { useEffect, useRef, useState } from "react";
-import {
-  ExternalLink,
-  FileSpreadsheet,
-  FolderOpen,
-  Link,
-  LoaderCircle,
-  RefreshCw,
-  UserRound,
-} from "lucide-react";
-import { toast } from "sonner";
+import AccountCircleRoundedIcon from "@mui/icons-material/AccountCircleRounded";
+import FolderOpenRoundedIcon from "@mui/icons-material/FolderOpenRounded";
+import GridOnRoundedIcon from "@mui/icons-material/GridOnRounded";
+import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import Box from "@mui/material/Box";
+import Link from "@mui/material/Link";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { Button } from "@/components/ui/button";
+import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { Botao } from "@/components/ui/mui/botao";
 
 interface DocumentoEscolhido {
   id?: string;
@@ -115,13 +117,22 @@ export function SeletorPlanilhaGoogle({
     url.searchParams.delete("google");
     url.searchParams.delete("googleFinalidade");
     window.history.replaceState(null, "", url);
-    if (estado === "conectado") toast.success("Conta Google conectada. Escolha a planilha.");
-    else if (estado === "reconectado") toast.success("Conta Google reconectada.");
+    if (estado === "conectado") avisarSucesso("Conta Google conectada. Escolha a planilha.");
+    else if (estado === "reconectado") avisarSucesso("Conta Google reconectada.");
     else if (estado === "erro_reconexao")
-      toast.error("Não foi possível reconectar. Confira a conta e o acesso à planilha.");
-    else if (estado === "cancelado") toast.info("Conexão Google cancelada.");
-    else if (estado === "sessao") toast.error("Entre novamente para conectar a conta Google.");
-    else toast.error("Não foi possível conectar a conta Google.");
+      avisarErro(new Error("Não foi possível reconectar."), {
+        contexto: "Não foi possível reconectar.",
+        descricao: "Confira a conta e o acesso à planilha.",
+      });
+    else if (estado === "cancelado") avisarInfo("Conexão Google cancelada.");
+    else if (estado === "sessao")
+      avisarErro(new Error("Sessão expirada."), {
+        contexto: "Entre novamente para conectar a conta Google.",
+      });
+    else
+      avisarErro(new Error("Falha na conexão Google."), {
+        contexto: "Não foi possível conectar a conta Google.",
+      });
   }, [finalidade]);
 
   async function conectar(reconectar = false) {
@@ -135,7 +146,9 @@ export function SeletorPlanilhaGoogle({
       );
       window.location.assign(dados.url);
     } catch (erro) {
-      toast.error(erro instanceof ErroApi ? erro.message : "Não foi possível conectar ao Google.");
+      avisarErro(erro, {
+        contexto: erro instanceof ErroApi ? erro.message : "Não foi possível conectar ao Google.",
+      });
       setOcupado(false);
       emAndamento.current = false;
     }
@@ -171,18 +184,21 @@ export function SeletorPlanilhaGoogle({
           if (!id) {
             setOcupado(false);
             emAndamento.current = false;
-            toast.error("Nenhuma planilha foi escolhida.");
+            avisarErro(new Error("Nenhuma planilha escolhida."), {
+              contexto: "Nenhuma planilha foi escolhida.",
+            });
             return;
           }
           void (async () => {
             try {
               await pedir("/api/planilha/google/selecionar", corpoJson({ id, finalidade }));
-              toast.success("Planilha escolhida. Confira a estrutura antes de enviar.");
+              avisarSucesso("Planilha escolhida. Confira a estrutura antes de enviar.");
               await onAtualizar();
             } catch (erro) {
-              toast.error(
-                erro instanceof ErroApi ? erro.message : "Não foi possível salvar a planilha.",
-              );
+              avisarErro(erro, {
+                contexto:
+                  erro instanceof ErroApi ? erro.message : "Não foi possível salvar a planilha.",
+              });
             } finally {
               setOcupado(false);
               emAndamento.current = false;
@@ -192,89 +208,119 @@ export function SeletorPlanilhaGoogle({
         .build();
       picker.setVisible(true);
     } catch (erro) {
-      toast.error(erro instanceof ErroApi ? erro.message : "Não foi possível abrir o seletor.");
+      avisarErro(erro, {
+        contexto: erro instanceof ErroApi ? erro.message : "Não foi possível abrir o seletor.",
+      });
       setOcupado(false);
       emAndamento.current = false;
     }
   }
 
   return (
-    <div className="superficie flex flex-col gap-3 p-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <FileSpreadsheet size={20} className="text-primary shrink-0" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium wrap-anywhere">
+    <Box
+      sx={(tema) => ({
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        padding: 2,
+        border: `1px solid ${tema.vars.palette.divider}`,
+        borderRadius: 2,
+        minWidth: 0,
+      })}
+    >
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
+        <GridOnRoundedIcon color="primary" aria-hidden="true" />
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
             {planilha ? (planilha.nome ?? "Planilha selecionada") : "Nenhuma planilha escolhida"}
-          </p>
-          <p className="text-muted-foreground text-xs">
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             {conectado ? "Conta Google conectada" : "Conecte a conta Google da escola."}
-          </p>
-        </div>
-        {planilha && (
-          <Button asChild variant="ghost" className="h-11 shrink-0">
-            <a
-              href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(planilha.id)}/edit`}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Abrir planilha no Google"
-            >
-              <ExternalLink size={16} aria-hidden="true" />
-              Abrir
-            </a>
-          </Button>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {conectado ? (
-          <Button type="button" className="h-11" onClick={() => void escolher()} disabled={ocupado}>
-            {ocupado ? (
-              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <FolderOpen size={16} aria-hidden="true" />
-            )}
-            Escolher planilha
-          </Button>
-        ) : (
-          <Button type="button" className="h-11" onClick={() => void conectar()} disabled={ocupado}>
-            {ocupado ? (
-              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <Link size={16} aria-hidden="true" />
-            )}
-            Conectar conta Google
-          </Button>
-        )}
-        {conectado && planilha && (
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11"
-            onClick={() => void conectar(true)}
-            disabled={ocupado}
+          </Typography>
+        </Box>
+        {planilha ? (
+          <Link
+            href={`https://docs.google.com/spreadsheets/d/${encodeURIComponent(planilha.id)}/edit`}
+            target="_blank"
+            rel="noopener noreferrer"
+            underline="hover"
+            aria-label="Abrir planilha no Google"
+            sx={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 0.5,
+              minHeight: 48,
+              flexShrink: 0,
+            }}
           >
-            <RefreshCw size={16} aria-hidden="true" />
-            Reconectar conta Google
-          </Button>
-        )}
-      </div>
-      <details className="text-muted-foreground text-xs">
-        <summary className="min-h-11 cursor-pointer content-center font-medium">
-          Conta e acesso
-        </summary>
-        <p className="mb-2">O acesso é limitado aos arquivos escolhidos.</p>
-        {conectado && (
-          <Button
+            <LaunchRoundedIcon fontSize="small" aria-hidden="true" />
+            Abrir
+          </Link>
+        ) : null}
+      </Stack>
+      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+        {conectado ? (
+          <Botao
             type="button"
-            variant="outline"
-            className="h-11"
+            variante="primario"
+            onClick={() => void escolher()}
+            disabled={ocupado}
+            carregando={ocupado}
+            icone={<FolderOpenRoundedIcon />}
+          >
+            Escolher planilha
+          </Botao>
+        ) : (
+          <Botao
+            type="button"
+            variante="primario"
             onClick={() => void conectar()}
             disabled={ocupado}
+            carregando={ocupado}
+            icone={<LinkRoundedIcon />}
           >
-            <UserRound size={16} aria-hidden="true" />
-            Trocar conta Google
-          </Button>
+            Conectar conta Google
+          </Botao>
         )}
-      </details>
-    </div>
+        {conectado && planilha ? (
+          <Botao
+            type="button"
+            variante="contorno"
+            onClick={() => void conectar(true)}
+            disabled={ocupado}
+            icone={<RefreshRoundedIcon />}
+          >
+            Reconectar conta Google
+          </Botao>
+        ) : null}
+      </Stack>
+      <Acordeao
+        titulo="Conta e acesso"
+        nivelTitulo="h4"
+        resumo={
+          <Typography component="span" variant="body2" sx={{ color: "text.secondary" }}>
+            O acesso é limitado aos arquivos escolhidos.
+          </Typography>
+        }
+      >
+        <Stack spacing={1}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            O acesso é limitado aos arquivos escolhidos.
+          </Typography>
+          {conectado ? (
+            <Botao
+              type="button"
+              variante="contorno"
+              onClick={() => void conectar()}
+              disabled={ocupado}
+              icone={<AccountCircleRoundedIcon />}
+              sx={{ alignSelf: "flex-start" }}
+            >
+              Trocar conta Google
+            </Botao>
+          ) : null}
+        </Stack>
+      </Acordeao>
+    </Box>
   );
 }

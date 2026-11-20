@@ -38,11 +38,11 @@ test("chamada parcial prepara somente após confirmar e abre a vista pelo painel
   await abrirPlanilhas(page);
   const cartao = page.locator('[data-secao="planilha-parcial"]');
   await cartao.getByRole("button", { name: /^Planilha de chamada parcial/ }).click();
-  const navegacao = cartao.getByRole("navigation", {
+  const navegacao = cartao.getByRole("tablist", {
     name: "Ações da planilha de chamada parcial",
   });
-  await expect(navegacao.getByRole("button", { name: "Configurar", exact: true })).toHaveAttribute(
-    "aria-pressed",
+  await expect(navegacao.getByRole("tab", { name: "Configurar", exact: true })).toHaveAttribute(
+    "aria-selected",
     "true",
   );
   await selecionarAcaoPlanilha(cartao, "Configurar");
@@ -114,11 +114,11 @@ test("saídas no celular preserva o formulário ao trocar de ação e recolhe o 
   await abrirPlanilhas(page);
   const cartao = page.locator('[data-secao="planilha-saidas"]');
   await cartao.getByRole("button", { name: /^Planilha de entradas e saídas/ }).click();
-  const navegacao = cartao.getByRole("navigation", {
+  const navegacao = cartao.getByRole("tablist", {
     name: "Ações da planilha de entradas e saídas",
   });
-  await expect(navegacao.getByRole("button", { name: "Enviar", exact: true })).toHaveAttribute(
-    "aria-pressed",
+  await expect(navegacao.getByRole("tab", { name: "Enviar", exact: true })).toHaveAttribute(
+    "aria-selected",
     "true",
   );
   const historico = cartao.getByText(/3 linhas criadas/);

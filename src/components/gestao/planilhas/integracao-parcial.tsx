@@ -2,34 +2,27 @@
 
 // Configuração do terceiro arquivo Google para chamadas parciais e conferência Seduc.
 import { useCallback, useEffect, useState } from "react";
-import {
-  ClipboardList,
-  LoaderCircle,
-  Plus,
-  RotateCcw,
-  Send,
-  Settings2,
-  Unplug,
-} from "lucide-react";
-import { toast } from "sonner";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import LinkOffRoundedIcon from "@mui/icons-material/LinkOffRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useRascunhoConfiguracoes } from "@/components/gestao/configuracoes/rascunho-configuracoes";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
-import { Selo } from "@/components/ui/selo";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Abas } from "@/components/ui/mui/abas";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { Interruptor } from "@/components/ui/mui/interruptor";
+import { Selo } from "@/components/ui/mui/selo";
 import { SeletorPlanilhaGoogle } from "./seletor-planilha-google";
-import { PainelAcoesPlanilha } from "./painel-acoes-planilha";
 
 interface IntegracaoParcialAdmin {
   ativa: boolean;
@@ -39,6 +32,8 @@ interface IntegracaoParcialAdmin {
   preparada: boolean;
   podeEnviar: boolean;
 }
+
+type PainelParcial = "envio" | "configuracao";
 
 export default function IntegracaoParcial({
   onAbrirParcial,
@@ -51,13 +46,18 @@ export default function IntegracaoParcial({
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);
   const [aberto, setAberto] = useState(abertoInicial);
-  const [painel, setPainel] = useState<string | null>(abertoInicial ? "configuracao" : null);
+  const [painel, setPainel] = useState<PainelParcial | null>(abertoInicial ? "configuracao" : null);
   const [confirmacao, setConfirmacao] = useState(false);
   const { chaveAtiva, executar } = useAcoesPorChave();
   const { base, rascunho, mutarPlanilha } = useRascunhoConfiguracoes();
   const ativaServidor = base?.planilhas.parcial.ativa ?? integracao?.ativa ?? false;
   const ativaRascunho = rascunho?.planilhas.parcial.ativa ?? ativaServidor;
   const ocupado = chaveAtiva !== null;
+  const painelAtivo =
+    painel ??
+    (integracao?.preparada && integracao.contaGoogle && integracao.googlePlanilha
+      ? "envio"
+      : "configuracao");
 
   const carregar = useCallback(async () => {
     try {
@@ -86,9 +86,7 @@ export default function IntegracaoParcial({
 
   function alternarAtiva(ativa: boolean) {
     mutarPlanilha("parcial", { ativa });
-    toast.success("Integração alterada no rascunho.", {
-      description: "Salve as configurações para aplicar.",
-    });
+    avisarSucesso("Integração alterada no rascunho.", "Salve as configurações para aplicar.");
   }
 
   async function preparar() {
@@ -100,13 +98,11 @@ export default function IntegracaoParcial({
         );
         setIntegracao(dados.integracao);
         setConfirmacao(false);
-        toast.success(
+        avisarSucesso(
           dados.criada ? "Aba Chamada Parcial criada." : "Aba Chamada Parcial conferida.",
         );
       } catch (excecao) {
-        toast.error(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível preparar a aba.",
-        );
+        avisarErro(excecao, { contexto: "Não foi possível preparar a aba." });
       }
     });
   }
@@ -118,172 +114,171 @@ export default function IntegracaoParcial({
           method: "DELETE",
         });
         setIntegracao(dados.integracao);
-        toast.success("Integração parcial desconectada.");
+        avisarSucesso("Integração parcial desconectada.");
       } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível desconectar.");
+        avisarErro(excecao, { contexto: "Não foi possível desconectar." });
       }
     });
   }
 
+  const conteudoEnvio = (
+    <Stack spacing={2}>
+      {onAbrirParcial ? (
+        <Botao
+          type="button"
+          variante="primario"
+          onClick={onAbrirParcial}
+          icone={<AssignmentRoundedIcon />}
+          sx={{ alignSelf: "flex-start" }}
+        >
+          Abrir Chamada Parcial
+        </Botao>
+      ) : null}
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        Confira a prévia e confirme o registro na Seduc pela Chamada Parcial.
+      </Typography>
+      {!integracao?.podeEnviar ? (
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          Configure e ative a planilha para enviar.
+        </Typography>
+      ) : null}
+    </Stack>
+  );
+
+  const conteudoConfiguracao = (
+    <Stack spacing={2}>
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        Use um arquivo separado da frequência e das saídas.
+      </Typography>
+      <SeletorPlanilhaGoogle
+        finalidade="PARCIAL"
+        conectado={integracao?.contaGoogle ?? false}
+        planilha={integracao?.googlePlanilha ?? null}
+        onAtualizar={carregar}
+      />
+      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+        <Botao
+          type="button"
+          variante="contorno"
+          disabled={ocupado || !integracao?.googlePlanilha}
+          onClick={() => setConfirmacao(true)}
+          icone={integracao?.preparada ? <RestartAltRoundedIcon /> : <AddRoundedIcon />}
+        >
+          {integracao?.preparada ? "Conferir aba parcial" : "Preparar aba parcial"}
+        </Botao>
+        {integracao?.googlePlanilha ? (
+          <Botao
+            type="button"
+            variante="texto"
+            disabled={ocupado}
+            onClick={() => void desconectar()}
+            icone={<LinkOffRoundedIcon />}
+          >
+            Desconectar
+          </Botao>
+        ) : null}
+      </Stack>
+    </Stack>
+  );
+
   return (
     <>
-      <SecaoRecolhivel
-        dataSecao="planilha-parcial"
-        titulo="Planilha de chamada parcial"
-        icone={ClipboardList}
-        aberto={aberto}
-        onAbertoChange={setAberto}
-        resumo={
-          <>
-            <Selo variante={ativaRascunho ? "sucesso" : "neutro"}>
-              {ativaRascunho ? "Ligada" : "Desligada"}
-            </Selo>
-            <Selo
-              variante={
-                integracao?.preparada && integracao.contaGoogle && integracao.googlePlanilha
-                  ? "sucesso"
-                  : "atencao"
-              }
-            >
-              {!integracao?.contaGoogle || !integracao.googlePlanilha
-                ? "Sem conexão"
-                : integracao.preparada
-                  ? "Configurada"
-                  : "Preparar aba"}
-            </Selo>
-          </>
-        }
-        acoes={
-          <Switch
-            checked={ativaRascunho}
-            disabled={ocupado || !integracao?.preparada}
-            onCheckedChange={(valor) => void alternarAtiva(valor)}
-            aria-label="Integração de chamada parcial ativa"
-          />
-        }
-      >
-        {carregando ? (
-          <p className="text-muted-foreground text-sm">Conferindo a integração...</p>
-        ) : (
-          <PainelAcoesPlanilha
-            rotulo="Ações da planilha de chamada parcial"
-            valor={
-              painel ??
-              (integracao?.preparada && integracao.contaGoogle && integracao.googlePlanilha
-                ? "envio"
-                : "configuracao")
-            }
-            onValor={setPainel}
-            itens={[
-              {
-                valor: "envio",
-                rotulo: "Enviar",
-                icone: Send,
-                conteudo: (
-                  <div className="flex flex-col gap-3">
-                    {onAbrirParcial && (
-                      <Button
-                        type="button"
-                        className="min-h-11 self-start"
-                        onClick={onAbrirParcial}
-                      >
-                        <ClipboardList size={18} aria-hidden="true" />
-                        Abrir Chamada Parcial
-                      </Button>
-                    )}
-                    <p className="text-muted-foreground text-xs">
-                      Confira a prévia e confirme o registro na Seduc pela Chamada Parcial.
-                    </p>
-                    {!integracao?.podeEnviar && (
-                      <p className="text-muted-foreground text-sm">
-                        Configure e ative a planilha para enviar.
-                      </p>
-                    )}
-                  </div>
-                ),
-              },
-              {
-                valor: "configuracao",
-                rotulo: "Configurar",
-                icone: Settings2,
-                conteudo: (
-                  <div className="flex flex-col gap-3">
-                    <p className="text-muted-foreground text-xs">
-                      Use um arquivo separado da frequência e das saídas.
-                    </p>
-                    <SeletorPlanilhaGoogle
-                      finalidade="PARCIAL"
-                      conectado={integracao?.contaGoogle ?? false}
-                      planilha={integracao?.googlePlanilha ?? null}
-                      onAtualizar={carregar}
-                    />
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="min-h-11"
-                        disabled={ocupado || !integracao?.googlePlanilha}
-                        onClick={() => setConfirmacao(true)}
-                      >
-                        {integracao?.preparada ? (
-                          <RotateCcw size={18} aria-hidden="true" />
-                        ) : (
-                          <Plus size={18} aria-hidden="true" />
-                        )}
-                        {integracao?.preparada ? "Conferir aba parcial" : "Preparar aba parcial"}
-                      </Button>
-                      {integracao?.googlePlanilha && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          className="min-h-11"
-                          disabled={ocupado}
-                          onClick={() => void desconectar()}
-                        >
-                          <Unplug size={18} aria-hidden="true" />
-                          Desconectar
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                ),
-              },
-            ]}
-          />
-        )}
-        {erro && <AvisoCompacto variante="indisponivel" descricao={erro} tamanho="linha" />}
-      </SecaoRecolhivel>
-      <Dialog
-        open={confirmacao}
-        onOpenChange={(valor) => {
-          if (!ocupado) setConfirmacao(valor);
+      <Box data-secao="planilha-parcial">
+        <Acordeao
+          titulo="Planilha de chamada parcial"
+          resumo={
+            <>
+              <Selo tom={ativaRascunho ? "sucesso" : "neutro"}>
+                {ativaRascunho ? "Ligada" : "Desligada"}
+              </Selo>
+              <Selo
+                tom={
+                  integracao?.preparada && integracao.contaGoogle && integracao.googlePlanilha
+                    ? "sucesso"
+                    : "atencao"
+                }
+              >
+                {!integracao?.contaGoogle || !integracao.googlePlanilha
+                  ? "Sem conexão"
+                  : integracao.preparada
+                    ? "Configurada"
+                    : "Preparar aba"}
+              </Selo>
+            </>
+          }
+          aberto={aberto}
+          onChange={setAberto}
+        >
+          <Stack spacing={2}>
+            <Interruptor
+              id="planilha-parcial-ativa"
+              rotulo="Integração de chamada parcial ativa"
+              checked={ativaRascunho}
+              disabled={ocupado || !integracao?.preparada}
+              onChange={(valor) => void alternarAtiva(valor)}
+            />
+            {carregando ? (
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Conferindo a integração...
+              </Typography>
+            ) : (
+              <Abas<PainelParcial>
+                itens={[
+                  {
+                    valor: "envio",
+                    rotulo: "Enviar",
+                    icone: <SendRoundedIcon />,
+                    conteudo: conteudoEnvio,
+                  },
+                  {
+                    valor: "configuracao",
+                    rotulo: "Configurar",
+                    icone: <SettingsRoundedIcon />,
+                    conteudo: conteudoConfiguracao,
+                  },
+                ]}
+                ativo={painelAtivo}
+                onChange={setPainel}
+                rotuloAcessivel="Ações da planilha de chamada parcial"
+                variant="scrollable"
+              />
+            )}
+            {erro ? (
+              <AlertaCompacto variante="indisponivel" descricao={erro} tamanho="linha" />
+            ) : null}
+          </Stack>
+        </Acordeao>
+      </Box>
+      <Dialogo
+        aberto={confirmacao}
+        onFechar={() => {
+          if (!ocupado) setConfirmacao(false);
         }}
+        titulo="Preparar Chamada Parcial"
+        descricao={`A aba Chamada Parcial será criada com as colunas padrão em ${
+          integracao?.googlePlanilha?.nome ?? "a planilha escolhida"
+        }. Se já existir, o cabeçalho será conferido e o conteúdo será preservado.`}
       >
-        <DialogContent folha>
-          <DialogHeader>
-            <DialogTitle>Preparar Chamada Parcial</DialogTitle>
-            <DialogDescription>
-              A aba Chamada Parcial será criada com as colunas padrão em{" "}
-              {integracao?.googlePlanilha?.nome ?? "a planilha escolhida"}. Se já existir, o
-              cabeçalho será conferido e o conteúdo será preservado.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={ocupado}
-              onClick={() => setConfirmacao(false)}
-            >
-              Cancelar
-            </Button>
-            <Button type="button" disabled={ocupado} onClick={() => void preparar()}>
-              {ocupado && <LoaderCircle size={16} className="animate-spin" />}
-              Confirmar preparação
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+          <Botao
+            type="button"
+            variante="contorno"
+            disabled={ocupado}
+            onClick={() => setConfirmacao(false)}
+          >
+            Cancelar
+          </Botao>
+          <Botao
+            type="button"
+            variante="secundario"
+            disabled={ocupado}
+            carregando={ocupado}
+            onClick={() => void preparar()}
+          >
+            Confirmar preparação
+          </Botao>
+        </Stack>
+      </Dialogo>
     </>
   );
 }

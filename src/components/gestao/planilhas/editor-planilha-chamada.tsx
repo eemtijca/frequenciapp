@@ -2,19 +2,37 @@
 
 // Centraliza a revisão de linhas e valores da chamada por turma e mês na Gestão.
 import { useState } from "react";
-import {
-  FileSpreadsheet,
-  HelpCircle,
-  LockKeyhole,
-  PencilLine,
-  Trash2,
-  UserPlus,
-} from "lucide-react";
+import AddPersonRoundedIcon from "@mui/icons-material/AddPersonRounded";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import type { SvgIconComponent } from "@mui/icons-material";
 import { diasDoMes, rotuloMes } from "@/domain/frequencia";
-import { Button } from "@/components/ui/button";
-import { Selecionar } from "@/components/ui/selecionar";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import DialogoEnvio, { type ObjetivoEdicaoPlanilha } from "@/components/grade/dialogo-envio";
+
+const ACOES: readonly {
+  acao: ObjetivoEdicaoPlanilha;
+  titulo: string;
+  icone: SvgIconComponent;
+}[] = [
+  { acao: "adicionar", titulo: "Adicionar alunos", icone: AddPersonRoundedIcon },
+  { acao: "corrigir", titulo: "Corrigir dados", icone: EditNoteRoundedIcon },
+  {
+    acao: "remover",
+    titulo: "Retirar linhas ou colunas",
+    icone: DeleteOutlineRoundedIcon,
+  },
+];
 
 export function EditorPlanilhaChamada({
   turmas,
@@ -40,38 +58,56 @@ export function EditorPlanilhaChamada({
   );
   const habilitado = disponivel && Boolean(turma) && vinculos.length > 0;
   const dias = diasDoMes(mes);
+
   return (
-    <section
+    <Box
+      component="section"
       aria-label="Editar planilhas de chamada"
-      className="superficie flex flex-col gap-3 p-4"
+      sx={(tema) => ({
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        padding: 2,
+        border: `1px solid ${tema.vars.palette.divider}`,
+        borderRadius: 2,
+        minWidth: 0,
+      })}
     >
-      <h3 className="font-medium">Editar chamada</h3>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Selecionar
-          id="editor-planilha-turma"
-          buscavel
-          value={turmaId}
-          onValueChange={setTurmaId}
-          placeholder="Escolha a turma"
-          ariaLabel="Turma da planilha para editar"
-          opcoes={turmas.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
-        />
-        <SeletorPeriodo
-          id="editor-planilha-mes"
-          modo="mes"
-          valor={mes}
-          max={diaCorrente.slice(0, 7)}
-          rotuloAcessivel="Mês da planilha para editar"
-          rotulo={rotuloMes(mes)}
-          onValor={setMes}
-        />
-      </div>
-      <p
+      <Typography component="h3" variant="subtitle1">
+        Editar chamada
+      </Typography>
+      <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
+        <Campo id="editor-planilha-turma" rotulo="Turma da planilha para editar">
+          <Selecionar
+            id="editor-planilha-turma"
+            buscavel
+            valor={turmaId}
+            onValor={setTurmaId}
+            placeholder="Escolha a turma"
+            ariaLabel="Turma da planilha para editar"
+            opcoes={turmas.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
+          />
+        </Campo>
+        <Campo id="editor-planilha-mes" rotulo="Mês da planilha para editar">
+          <SeletorPeriodo
+            id="editor-planilha-mes"
+            modo="mes"
+            valor={mes}
+            max={diaCorrente.slice(0, 7)}
+            rotuloAcessivel="Mês da planilha para editar"
+            rotulo={rotuloMes(mes)}
+            onValor={setMes}
+          />
+        </Campo>
+      </Box>
+      <Stack
         role="status"
-        className="text-muted-foreground flex items-start gap-2 text-xs wrap-anywhere"
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: "flex-start", color: "text.secondary" }}
       >
-        <FileSpreadsheet aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-        <span>
+        <DescriptionRoundedIcon fontSize="small" aria-hidden="true" sx={{ marginTop: 0.25 }} />
+        <Typography variant="caption" sx={{ overflowWrap: "anywhere" }}>
           {!disponivel
             ? "Conecte e configure a planilha para editar."
             : !turma
@@ -79,58 +115,71 @@ export function EditorPlanilhaChamada({
               : vinculos.length === 0
                 ? "Sem aba neste mês. Prepare o mês ou revise a estrutura."
                 : `Destino: ${vinculos.map((item) => item.aba).join(", ")}.`}
-        </span>
-      </p>
-      <div className="grid grid-cols-3 gap-2">
-        {(
-          [
-            ["adicionar", "Adicionar alunos", UserPlus],
-            ["corrigir", "Corrigir dados", PencilLine],
-            ["remover", "Retirar linhas ou colunas", Trash2],
-          ] as const
-        ).map(([acao, titulo, Icone]) => {
+        </Typography>
+      </Stack>
+      <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "repeat(3, minmax(0, 1fr))" }}>
+        {ACOES.map(({ acao, titulo, icone: Icone }) => {
           const protegida = acao !== "adicionar" && !modoCompleto;
           return (
-            <Button
+            <Botao
               key={acao}
               type="button"
-              variant="outline"
-              className="relative h-auto min-h-28 min-w-0 flex-col gap-2 rounded-2xl px-2 py-3 whitespace-normal"
+              variante="contorno"
               disabled={!habilitado || protegida}
               onClick={() => setObjetivo(acao)}
+              icone={<Icone />}
+              sx={{
+                position: "relative",
+                minHeight: 112,
+                height: "auto",
+                flexDirection: "column",
+                gap: 1,
+                paddingX: 1,
+                textAlign: "center",
+                whiteSpace: "normal",
+              }}
             >
-              <span
-                className={`flex size-10 items-center justify-center rounded-2xl ${acao === "remover" ? "bg-falta-fraca text-falta-texto" : "bg-primary/10 text-primary"}`}
-              >
-                <Icone aria-hidden="true" className="size-5" />
-              </span>
-              <span className="text-center text-xs leading-4 sm:text-sm">{titulo}</span>
-              {protegida && (
-                <LockKeyhole
+              {titulo}
+              {protegida ? (
+                <LockRoundedIcon
                   aria-hidden="true"
-                  className="text-muted-foreground absolute top-2 right-2 size-3"
+                  sx={{ position: "absolute", top: 8, right: 8, fontSize: 14 }}
                 />
-              )}
-            </Button>
+              ) : null}
+            </Botao>
           );
         })}
-      </div>
-      <details className="text-muted-foreground text-xs">
-        <summary className="flex min-h-9 cursor-pointer items-center gap-2 font-medium">
-          <HelpCircle aria-hidden="true" className="size-4" />
-          Ajuda
-        </summary>
-        <ul className="mt-1 flex flex-col gap-2">
-          <li>Adicionar alunos cria as linhas que faltam e preenche as chamadas do mês.</li>
-          <li>Corrigir dados atualiza nomes, turmas e chamadas com os dados do aplicativo.</li>
-          <li>Retirar linhas ou colunas abre a seleção de exclusões.</li>
-          <li>
+      </Box>
+      <Acordeao
+        titulo="Ajuda"
+        nivelTitulo="h4"
+        resumo={
+          <Typography
+            component="span"
+            variant="body2"
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+          >
+            <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />O que cada ação altera
+          </Typography>
+        }
+      >
+        <Box component="ul" sx={{ margin: 0, paddingLeft: 2, color: "text.secondary" }}>
+          <Typography component="li" variant="body2">
+            Adicionar alunos cria as linhas que faltam e preenche as chamadas do mês.
+          </Typography>
+          <Typography component="li" variant="body2">
+            Corrigir dados atualiza nomes, turmas e chamadas com os dados do aplicativo.
+          </Typography>
+          <Typography component="li" variant="body2">
+            Retirar linhas ou colunas abre a seleção de exclusões.
+          </Typography>
+          <Typography component="li" variant="body2">
             Cada ação abre uma prévia antes de gravar. O cadastro e as chamadas no aplicativo são
             preservados.
-          </li>
-        </ul>
-      </details>
-      {objetivo && turma && (
+          </Typography>
+        </Box>
+      </Acordeao>
+      {objetivo && turma ? (
         <DialogoEnvio
           key={`${turmaId}-${mes}-${objetivo}`}
           objetivo={objetivo}
@@ -145,7 +194,7 @@ export function EditorPlanilhaChamada({
           modoCompleto={modoCompleto}
           aoConcluir={aoConcluir}
         />
-      )}
-    </section>
+      ) : null}
+    </Box>
   );
 }

@@ -2,24 +2,20 @@
 
 // Prepara as abas mensais das turmas em sequência, com confirmação e resultado por turma.
 import { useEffect, useState } from "react";
-import { CalendarPlus, LoaderCircle, RotateCcw } from "lucide-react";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { rotuloMes } from "@/domain/frequencia";
 import { mesValido, nomeAbaMensal } from "@/domain/planilha-mensal";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Dialogo } from "@/components/ui/mui/dialogo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 interface ResultadoTurma {
   turmaOriginalId: string;
@@ -183,60 +179,55 @@ export function DialogoPrepararMes({
   const concluidas = resultados?.filter((item) => item.estado === "preparada").length ?? 0;
   const ocupada = executando || reconexao.executando;
 
+  function fechar() {
+    if (ocupada) return;
+    setAberto(false);
+  }
+
   return (
     <>
-      <Button
+      <Botao
         type="button"
-        variant="outline"
-        className="h-10"
+        variante="contorno"
         disabled={disabled || ocupada || turmas.length === 0}
+        icone={<CalendarMonthRoundedIcon />}
+        sx={{ minWidth: 0, whiteSpace: "normal" }}
         onClick={() => {
           setResultados(null);
           setInterrupcao(null);
           setAberto(true);
         }}
       >
-        <CalendarPlus size={16} />
         Preparar mês
-      </Button>
-      <AlertDialog
-        open={aberto}
-        onOpenChange={(valor) => {
-          if (!ocupada) setAberto(valor);
-        }}
+      </Botao>
+      <Dialogo
+        aberto={aberto}
+        onFechar={fechar}
+        titulo={resultados === null ? "Preparar mês para todas as turmas" : "Abas do mês"}
+        descricao={
+          resultados === null
+            ? "Organiza as abas do mês, preservando dias úteis e sábados com chamada salva. Retira Turma atual, domingos e sábados sem chamada. Os meses mais recentes ficam primeiro."
+            : `${concluidas} de ${turmas.length} turmas prontas para ${rotuloMes(mes).toLowerCase()}.`
+        }
+        tamanho="grande"
       >
-        <AlertDialogContent className="max-h-[90dvh] overflow-y-auto">
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {resultados === null ? "Preparar mês para todas as turmas" : "Abas do mês"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {resultados === null
-                ? "Organiza as abas do mês, preservando dias úteis e sábados com chamada salva. Retira Turma atual, domingos e sábados sem chamada. Os meses mais recentes ficam primeiro."
-                : `${concluidas} de ${turmas.length} turmas prontas para ${rotuloMes(mes).toLowerCase()}.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {interrupcao && (
-            <div role="alert" className="superficie flex flex-col gap-3 p-3 text-sm">
-              <p>{interrupcao.mensagem}</p>
-              {interrupcao.reconectar && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="self-start"
-                  disabled={ocupada}
-                  onClick={() => void reconexao.executar()}
-                >
-                  {reconexao.executando ? (
-                    <LoaderCircle size={16} className="animate-spin" />
-                  ) : (
-                    <RotateCcw size={16} />
-                  )}
-                  Reconectar conta Google
-                </Button>
-              )}
-            </div>
-          )}
+        <Stack spacing={2}>
+          {interrupcao ? (
+            <AlertaCompacto
+              variante="dados_invalidos"
+              titulo="Interrupção na preparação"
+              descricao={interrupcao.mensagem}
+              tamanho="linha"
+              acao={
+                interrupcao.reconectar
+                  ? {
+                      rotulo: reconexao.executando ? "Reconectando..." : "Reconectar conta Google",
+                      onClick: () => void reconexao.executar(),
+                    }
+                  : undefined
+              }
+            />
+          ) : null}
           {resultados === null ? (
             <>
               <SeletorPeriodo
@@ -248,50 +239,70 @@ export function DialogoPrepararMes({
                 rotulo={rotuloMes(mes)}
                 onValor={onMes}
               />
-              <p className="text-muted-foreground text-sm">
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 Exemplo: {nomeAbaMensal(turmas[0]?.rotulo ?? "1º A", mes)}. Para incluir chamadas já
                 salvas, use o envio com prévia.
-              </p>
+              </Typography>
             </>
           ) : (
-            <ul className="space-y-2 text-sm" aria-label="Resultado da preparação por turma">
+            <Box
+              component="ul"
+              aria-label="Resultado da preparação por turma"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1,
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+              }}
+            >
               {resultados.map((item) => (
-                <li key={item.turmaOriginalId} className="rounded-lg border p-3">
-                  <strong className="block">{item.aba ?? item.rotulo}</strong>
-                  <p className={item.erro ? "text-falta-texto" : "text-muted-foreground"}>
+                <Box
+                  component="li"
+                  key={item.turmaOriginalId}
+                  sx={{ border: 1, borderColor: "divider", borderRadius: 2, padding: 2 }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600, display: "block" }}>
+                    {item.aba ?? item.rotulo}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: item.erro ? "error" : "text.secondary" }}
+                  >
                     {item.estado === "pendente"
                       ? "Não preparada"
                       : (item.erro ??
                         (item.criada ? "Criada" : item.atualizada ? "Atualizada" : "Reutilizada"))}
-                  </p>
-                </li>
+                  </Typography>
+                </Box>
               ))}
-            </ul>
+            </Box>
           )}
-          {executando && (
-            <p role="status" className="flex items-center gap-2 text-sm">
-              <LoaderCircle size={16} className="animate-spin" />
-              Preparando {turmaAtual}
-            </p>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={ocupada}>
+          {executando ? (
+            <Stack role="status" direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Typography variant="body2">Preparando {turmaAtual}</Typography>
+            </Stack>
+          ) : null}
+          <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <Botao type="button" variante="contorno" disabled={ocupada} onClick={fechar}>
               {resultados === null ? "Cancelar" : "Fechar"}
-            </AlertDialogCancel>
-            {(resultados === null || concluidas < turmas.length) && (
-              <AlertDialogAction
+            </Botao>
+            {resultados === null || concluidas < turmas.length ? (
+              <Botao
+                type="button"
+                variante="secundario"
                 disabled={disabled || ocupada || turmas.length === 0}
-                onClick={(evento) => {
-                  evento.preventDefault();
-                  void executar();
-                }}
+                carregando={executando}
+                icone={<RestartAltRoundedIcon />}
+                onClick={() => void executar()}
               >
                 {resultados === null ? `Preparar ${turmas.length} turmas` : "Tentar pendentes"}
-              </AlertDialogAction>
-            )}
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              </Botao>
+            ) : null}
+          </Stack>
+        </Stack>
+      </Dialogo>
     </>
   );
 }

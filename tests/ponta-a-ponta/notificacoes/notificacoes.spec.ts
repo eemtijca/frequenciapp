@@ -40,7 +40,7 @@ test.describe("configuração de notificações", () => {
     const pendencias = secao.getByRole("switch", { name: "Chamadas pendentes para a coordenação" });
     await expect(pendencias).toHaveAttribute("aria-checked", "false");
     await pendencias.click();
-    await secao.getByRole("button", { name: "Horário do aviso de pendências: 17:00" }).click();
+    await secao.getByLabel("Horário do aviso de pendências").click();
     const horario = page.getByRole("dialog", { name: "Horário do aviso de pendências" });
     await horario
       .getByRole("listbox", { name: "Horas" })
@@ -65,9 +65,7 @@ test.describe("configuração de notificações", () => {
     await expect(
       secao.getByRole("switch", { name: "Chamadas pendentes para a coordenação" }),
     ).toHaveAttribute("aria-checked", "true");
-    await expect(
-      secao.getByRole("button", { name: "Horário do aviso de pendências: 16:30" }),
-    ).toBeVisible();
+    await expect(secao.getByLabel("Horário do aviso de pendências")).toHaveValue("16:30");
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

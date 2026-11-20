@@ -2,7 +2,14 @@
 
 // Acesso direto aos meses preparados e transferência conferida das abas antigas.
 import { useState } from "react";
-import { CalendarDays, ExternalLink, LoaderCircle } from "lucide-react";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
+import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Link from "@mui/material/Link";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { rotuloMes } from "@/domain/frequencia";
 import {
   chaveResolucaoAntiga,
@@ -14,16 +21,12 @@ import { IndiceChamadas } from "./indice-chamadas";
 import { corpoJson, pedir, ErroApi } from "@/lib/api-cliente";
 import { mensagemAmigavel } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Selecionar } from "@/components/ui/selecionar";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { Selecionar } from "@/components/ui/mui/selecionar";
 
 interface Catalogo {
   abas: { aba: string; mes: string; url: string; oculta: boolean }[];
@@ -48,6 +51,17 @@ function temComplementos(previa: Previa): boolean {
   );
 }
 
+const CAIXA = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  border: 1,
+  borderColor: "divider",
+  borderRadius: 2,
+  padding: 2,
+  minWidth: 0,
+} as const;
+
 export function DialogoMostrarMes({
   mesAtual,
   disabled,
@@ -65,6 +79,7 @@ export function DialogoMostrarMes({
   const [andamento, setAndamento] = useState("");
   const [descartarComplementos, setDescartarComplementos] = useState(false);
   const [senha, setSenha] = useState("");
+  const [abasAntigasAbertas, setAbasAntigasAbertas] = useState(false);
   const acoes = useAcoesPorChave();
   const ocupado = acoes.chaveAtiva !== null;
   async function executar(
@@ -83,7 +98,7 @@ export function DialogoMostrarMes({
           const dados = await pedir<Catalogo>("/api/planilha/mensal/visibilidade");
           setCatalogo(dados);
           setMes(
-            dados.abas.some((aba) => aba.mes === mesAtual)
+            dados.abas.some((item) => item.mes === mesAtual)
               ? mesAtual
               : (dados.abas[0]?.mes ?? mesAtual),
           );
@@ -185,7 +200,7 @@ export function DialogoMostrarMes({
       }
     });
   }
-  const meses = [...new Set(catalogo?.abas.map((aba) => aba.mes) ?? [])];
+  const meses = [...new Set(catalogo?.abas.map((item) => item.mes) ?? [])];
   const prontas =
     conferencias?.filter(
       (item) =>
@@ -232,267 +247,330 @@ export function DialogoMostrarMes({
   }
   return (
     <>
-      <Button
+      <Botao
         type="button"
-        variant="outline"
-        className="h-10"
+        variante="contorno"
         disabled={disabled || ocupado}
+        icone={<CalendarMonthRoundedIcon />}
+        sx={{ minWidth: 0, whiteSpace: "normal" }}
         onClick={() => void executar("abrir")}
       >
-        <CalendarDays size={16} /> Meses da frequência
-      </Button>
-      <Dialog
-        open={aberto}
-        onOpenChange={(valor) => {
-          if (!ocupado) {
-            setAberto(valor);
-            if (!valor) {
-              setSenha("");
-              setDescartarComplementos(false);
-            }
-          }
+        Meses da frequência
+      </Botao>
+      <Dialogo
+        aberto={aberto}
+        onFechar={() => {
+          if (ocupado) return;
+          setAberto(false);
+          setSenha("");
+          setDescartarComplementos(false);
         }}
+        titulo="Meses da frequência"
+        descricao="Escolha o mês e abra a turma no Google Planilhas."
+        tamanho="grande"
       >
-        <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Meses da frequência</DialogTitle>
-            <DialogDescription>Escolha o mês e abra a turma no Google Planilhas.</DialogDescription>
-          </DialogHeader>
-          {!catalogo && ocupado && (
-            <p role="status" className="flex items-center gap-2 text-sm">
-              <LoaderCircle size={16} className="animate-spin" /> Carregando meses...
-            </p>
-          )}
-          {catalogo && (
+        <Stack spacing={2}>
+          {!catalogo && ocupado ? (
+            <Typography role="status" variant="body2">
+              Carregando meses...
+            </Typography>
+          ) : null}
+          {catalogo ? (
             <>
               {meses.length > 0 ? (
                 <>
                   <IndiceChamadas disabled={ocupado} />
                   <Selecionar
                     id="planilha-mes-acesso"
-                    value={mes}
-                    onValueChange={setMes}
+                    valor={mes}
+                    onValor={setMes}
                     ariaLabel="Mês das frequências"
                     disabled={ocupado}
                     opcoes={meses.map((valor) => ({ valor, rotulo: rotuloMes(valor) }))}
                   />
-                  <div className="grid gap-2 sm:grid-cols-2" aria-label="Turmas do mês">
+                  <Box
+                    aria-label="Turmas do mês"
+                    sx={{
+                      display: "grid",
+                      gap: 1,
+                      gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                    }}
+                  >
                     {catalogo.abas
-                      .filter((aba) => aba.mes === mes)
-                      .map((aba) => (
-                        <a
-                          key={aba.url}
-                          href={aba.url}
+                      .filter((item) => item.mes === mes)
+                      .map((item) => (
+                        <Link
+                          key={item.url}
+                          href={item.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          aria-label={`Abrir ${aba.aba}`}
-                          aria-disabled={aba.oculta}
+                          aria-label={`Abrir ${item.aba}`}
+                          aria-disabled={item.oculta}
+                          underline="hover"
                           onClick={(evento) => {
-                            if (aba.oculta) {
+                            if (item.oculta) {
                               evento.preventDefault();
                               setMensagem("Use Liberar meses para acessar as abas ocultas.");
                             }
                           }}
-                          className="controle flex min-h-11 items-center justify-between gap-2 px-3 py-2 text-sm"
+                          sx={(tema) => ({
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            gap: 1,
+                            minHeight: 48,
+                            paddingX: 2,
+                            paddingY: 1,
+                            border: `1px solid ${tema.vars.palette.divider}`,
+                            borderRadius: 2,
+                            color: "text.primary",
+                            textDecoration: "none",
+                            "&:hover": {
+                              backgroundColor: tema.vars.palette.action.hover,
+                              textDecoration: "none",
+                            },
+                          })}
                         >
-                          <span className="min-w-0 truncate">{aba.aba}</span>
-                          <ExternalLink size={16} className="shrink-0" aria-hidden="true" />
-                        </a>
+                          <Typography
+                            component="span"
+                            variant="body2"
+                            sx={{
+                              minWidth: 0,
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {item.aba}
+                          </Typography>
+                          <LaunchRoundedIcon fontSize="small" aria-hidden="true" />
+                        </Link>
                       ))}
-                  </div>
-                  <Button
-                    variant="outline"
+                  </Box>
+                  <Botao
+                    variante="contorno"
                     disabled={ocupado}
                     onClick={() => void executar("liberar")}
+                    sx={{ alignSelf: "flex-start" }}
                   >
                     Liberar meses
-                  </Button>
+                  </Botao>
                 </>
               ) : (
-                <p className="text-muted-foreground text-sm">
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
                   Prepare um mês para criar as abas das turmas.
-                </p>
+                </Typography>
               )}
-              {(catalogo.legadas.length > 0 || conferencias) && (
-                <details className="bg-secondary/30 rounded-xl p-3">
-                  <summary className="cursor-pointer text-sm font-medium">Abas sem mês</summary>
-                  <div className="mt-3 flex flex-col gap-3">
-                    <p className="text-muted-foreground text-sm">
+              {catalogo.legadas.length > 0 || conferencias ? (
+                <Acordeao
+                  titulo="Abas sem mês"
+                  nivelTitulo="h4"
+                  resumo={
+                    <Typography component="span" variant="body2" sx={{ color: "text.secondary" }}>
+                      Transferência conferida das abas antigas
+                    </Typography>
+                  }
+                  aberto={abasAntigasAbertas}
+                  onChange={setAbasAntigasAbertas}
+                >
+                  <Stack spacing={2}>
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
                       Move as frequências para os meses preparados e retira as abas antigas após a
                       conferência.
-                    </p>
-                    <Button
-                      variant="outline"
+                    </Typography>
+                    <Botao
+                      variante="contorno"
                       disabled={ocupado || !catalogo.legadas.length}
                       onClick={() => void executar("conferir")}
+                      sx={{ alignSelf: "flex-start" }}
                     >
                       Conferir abas antigas
-                    </Button>
+                    </Botao>
                     {conferencias?.map((item) => (
-                      <div key={item.aba} className="rounded-lg border p-3 text-sm">
-                        <p className="font-medium">{item.aba}</p>
+                      <Box key={item.aba} sx={CAIXA}>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {item.aba}
+                        </Typography>
                         {item.concluida ? (
-                          <p className="text-primary">Transferida e retirada</p>
+                          <Typography variant="body2" color="primary">
+                            Transferida e retirada
+                          </Typography>
                         ) : item.erro ? (
-                          <p className="text-falta-texto">{item.erro}</p>
-                        ) : (
-                          item.previa && (
-                            <>
-                              <p>
-                                {item.previa.preenchidas}{" "}
-                                {item.previa.preenchidas === 1 ? "marca a mover" : "marcas a mover"}{" "}
-                                · {item.previa.conferidas}{" "}
-                                {item.previa.conferidas === 1 ? "já preservada" : "já preservadas"}
-                              </p>
-                              <p className="text-muted-foreground">
-                                {item.previa.destinos.map((destino) => destino.aba).join(", ")}
-                              </p>
-                              {(item.previa.substituidas > 0 || item.previa.mantidas > 0) && (
-                                <p className="mt-2">
-                                  Marcas mensais: {item.previa.substituidas} a substituir ·{" "}
-                                  {item.previa.mantidas} a manter
-                                </p>
-                              )}
-                              {item.previa.totalPendencias > 0 && (
-                                <PendenciasAbaAntiga
-                                  pendencias={item.previa.pendencias}
-                                  total={item.previa.totalPendencias}
-                                  resolucoes={item.resolucoes ?? []}
-                                  disabled={ocupado}
-                                  onEscolher={(escolhas, remover) =>
-                                    escolher(item.aba, escolhas, remover)
+                          <Typography variant="body2" color="error">
+                            {item.erro}
+                          </Typography>
+                        ) : item.previa ? (
+                          <>
+                            <Typography variant="body2">
+                              {item.previa.preenchidas}{" "}
+                              {item.previa.preenchidas === 1 ? "marca a mover" : "marcas a mover"} ·{" "}
+                              {item.previa.conferidas}{" "}
+                              {item.previa.conferidas === 1 ? "já preservada" : "já preservadas"}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                              {item.previa.destinos.map((destino) => destino.aba).join(", ")}
+                            </Typography>
+                            {item.previa.substituidas > 0 || item.previa.mantidas > 0 ? (
+                              <Typography variant="body2">
+                                Marcas mensais: {item.previa.substituidas} a substituir ·{" "}
+                                {item.previa.mantidas} a manter
+                              </Typography>
+                            ) : null}
+                            {item.previa.totalPendencias > 0 ? (
+                              <PendenciasAbaAntiga
+                                pendencias={item.previa.pendencias}
+                                total={item.previa.totalPendencias}
+                                resolucoes={item.resolucoes ?? []}
+                                disabled={ocupado}
+                                onEscolher={(escolhas, remover) =>
+                                  escolher(item.aba, escolhas, remover)
+                                }
+                              />
+                            ) : null}
+                            {item.previa.alunosIncluidos > 0 ? (
+                              <Typography variant="body2">
+                                Linhas de alunos a incluir: {item.previa.alunosIncluidos}
+                              </Typography>
+                            ) : null}
+                            {temComplementos(item.previa) ? (
+                              <Stack spacing={1}>
+                                <Typography variant="body2">
+                                  Fórmulas: {item.previa.complementos.formulas} · Notas:{" "}
+                                  {item.previa.complementos.notas} · Totais:{" "}
+                                  {item.previa.complementos.totais}
+                                </Typography>
+                                <Acordeao
+                                  titulo="Ver exemplos de células"
+                                  nivelTitulo="h6"
+                                  resumo={
+                                    <Typography
+                                      component="span"
+                                      variant="body2"
+                                      sx={{ color: "text.secondary" }}
+                                    >
+                                      Amostra de até 18 ocorrências
+                                    </Typography>
                                   }
-                                />
-                              )}
-                              {item.previa.alunosIncluidos > 0 && (
-                                <p className="mt-2">
-                                  Linhas de alunos a incluir: {item.previa.alunosIncluidos}
-                                </p>
-                              )}
-                              {temComplementos(item.previa) && (
-                                <>
-                                  <p className="mt-2">
-                                    Fórmulas: {item.previa.complementos.formulas} · Notas:{" "}
-                                    {item.previa.complementos.notas} · Totais:{" "}
-                                    {item.previa.complementos.totais}
-                                  </p>
-                                  <details className="mt-2">
-                                    <summary className="cursor-pointer">
-                                      Ver exemplos de células
-                                    </summary>
-                                    <div className="mt-2 flex flex-wrap gap-2">
+                                >
+                                  <Stack spacing={1}>
+                                    <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
                                       {item.previa.complementos.amostras.map((celula) => (
-                                        <a
+                                        <Link
                                           key={`${celula.celula}:${celula.tipo}`}
-                                          href={`${item.previa?.urlAntiga}&range=${celula.celula}`}
+                                          href={`${item.previa?.urlAntiga ?? ""}&range=${celula.celula}`}
                                           target="_blank"
                                           rel="noopener noreferrer"
-                                          className="text-primary underline"
+                                          underline="hover"
                                         >
                                           {celula.celula} ({celula.tipo})
-                                        </a>
+                                        </Link>
                                       ))}
-                                    </div>
+                                    </Stack>
                                     {item.previa.complementos.formulas +
                                       item.previa.complementos.notas +
                                       item.previa.complementos.totais >
-                                      item.previa.complementos.amostras.length && (
-                                      <p className="text-muted-foreground mt-2">
+                                    item.previa.complementos.amostras.length ? (
+                                      <Typography
+                                        variant="caption"
+                                        sx={{ color: "text.secondary" }}
+                                      >
                                         Amostra de até 18 ocorrências. Abra a aba antiga para
                                         conferir todas.
-                                      </p>
-                                    )}
-                                    <a
+                                      </Typography>
+                                    ) : null}
+                                    <Link
                                       href={item.previa.urlAntiga}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="text-primary mt-2 inline-block underline"
+                                      underline="hover"
                                     >
                                       Abrir aba antiga
-                                    </a>
-                                  </details>
-                                </>
-                              )}
-                            </>
-                          )
-                        )}
-                        {!item.concluida && (
-                          <Button
+                                    </Link>
+                                  </Stack>
+                                </Acordeao>
+                              </Stack>
+                            ) : null}
+                          </>
+                        ) : null}
+                        {!item.concluida ? (
+                          <Botao
                             type="button"
-                            size="sm"
-                            variant="outline"
-                            className="mt-3"
+                            variante="contorno"
+                            tamanho="pequeno"
                             disabled={ocupado}
                             onClick={() => void executar("rever", item.aba)}
+                            sx={{ alignSelf: "flex-start" }}
                           >
                             {item.alterada ? "Conferir escolhas" : "Conferir esta aba novamente"}
-                          </Button>
-                        )}
-                      </div>
+                          </Botao>
+                        ) : null}
+                      </Box>
                     ))}
-                    {comComplementos && (
-                      <div className="flex flex-col gap-3 rounded-lg border p-3 text-sm">
-                        <p>
+                    {comComplementos ? (
+                      <Box sx={CAIXA}>
+                        <Typography variant="body2">
                           As frequências serão preservadas nos meses. Os totais e as notas listados
                           serão apagados com as abas antigas.
-                        </p>
-                        <label className="flex cursor-pointer items-start gap-3">
-                          <input
-                            type="checkbox"
-                            className="accent-primary mt-0.5 size-5 shrink-0"
-                            checked={descartarComplementos}
-                            disabled={ocupado}
-                            onChange={(evento) => setDescartarComplementos(evento.target.checked)}
-                          />
-                          Autorizo descartar os totais e notas antigos listados
-                        </label>
-                      </div>
-                    )}
-                    {(comEscolhas || (comComplementos && descartarComplementos)) && (
-                      <div className="flex flex-col gap-1.5 rounded-lg border p-3 text-sm">
-                        {comEscolhas && (
-                          <p>
+                        </Typography>
+                        <FormControlLabel
+                          control={
+                            <Checkbox
+                              checked={descartarComplementos}
+                              disabled={ocupado}
+                              onChange={(evento) => setDescartarComplementos(evento.target.checked)}
+                            />
+                          }
+                          label="Autorizo descartar os totais e notas antigos listados"
+                          sx={{ minHeight: 48, margin: 0, alignItems: "flex-start" }}
+                        />
+                      </Box>
+                    ) : null}
+                    {comEscolhas || (comComplementos && descartarComplementos) ? (
+                      <Box sx={CAIXA}>
+                        {comEscolhas ? (
+                          <Typography variant="body2">
                             As escolhas de alunos e marcas foram conferidas. Confirme a retirada com
                             a senha administrativa.
-                          </p>
-                        )}
-                        <label htmlFor="senha-descarte-abas">Senha administrativa</label>
-                        <Input
-                          id="senha-descarte-abas"
-                          type="password"
-                          autoComplete="current-password"
-                          value={senha}
-                          disabled={ocupado}
-                          onChange={(evento) => setSenha(evento.target.value)}
-                        />
-                      </div>
-                    )}
-                    {revisadas.length > 0 && (
-                      <Button
+                          </Typography>
+                        ) : null}
+                        <Campo id="senha-descarte-abas" rotulo="Senha administrativa">
+                          <CampoSenha
+                            id="senha-descarte-abas"
+                            autoComplete="current-password"
+                            valor={senha}
+                            onValor={setSenha}
+                            disabled={ocupado}
+                          />
+                        </Campo>
+                      </Box>
+                    ) : null}
+                    {revisadas.length > 0 ? (
+                      <Botao
                         disabled={ocupado || !prontas}
                         onClick={() => void executar("aplicar")}
+                        sx={{ alignSelf: "flex-start" }}
                       >
                         Transferir e retirar{" "}
                         {prontas === 1 ? "1 aba" : prontas > 1 ? `${prontas} abas` : ""}
-                      </Button>
-                    )}
-                  </div>
-                </details>
-              )}
+                      </Botao>
+                    ) : null}
+                  </Stack>
+                </Acordeao>
+              ) : null}
             </>
-          )}
-          {andamento && (
-            <p role="status" className="text-sm">
+          ) : null}
+          {andamento ? (
+            <Typography role="status" variant="body2">
               Conferindo {andamento}...
-            </p>
-          )}
-          {mensagem && (
-            <p role="status" className="text-sm">
+            </Typography>
+          ) : null}
+          {mensagem ? (
+            <Typography role="status" variant="body2">
               {mensagem}
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
+            </Typography>
+          ) : null}
+        </Stack>
+      </Dialogo>
     </>
   );
 }

@@ -3,29 +3,26 @@
 // Calendário anual de feriados no rascunho das configurações, com
 // sincronização externa imediata e remoção confirmada.
 import { useState } from "react";
-import { CalendarDays, HelpCircle, Plus, Trash2 } from "lucide-react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { ehAnoLetivoValido, type Feriado } from "@/domain/calendario-letivo";
 import { ehDiaValido, rotuloData } from "@/domain/frequencia";
 import { avisarSucesso } from "@/lib/avisos";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
-import ControleSincronizarFeriados from "@/components/gestao/configuracoes/controle-sincronizar-feriados";
-import { Selo } from "@/components/ui/selo";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { SeletorAno } from "@/components/ui/mui/seletor-ano";
+import { Selo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { SeletorAno } from "@/components/ui/seletor-ano";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
+import ControleSincronizarFeriados from "@/components/gestao/configuracoes/controle-sincronizar-feriados";
 
 interface Props {
   feriados: Feriado[];
@@ -100,156 +97,225 @@ export default function SecaoCalendarioLetivo({
   const revisaoFeriados = feriadosDoAno.map((feriado) => feriado.dia).join("|");
 
   return (
-    <SecaoRecolhivel
-      titulo="Calendário letivo"
-      icone={CalendarDays}
-      aberto={aberto}
-      onAbertoChange={setAberto}
-      dataSecao="config-calendario"
-      resumo={
-        <Selo>
-          {anoValido
-            ? `${ano} · ${feriadosDoAno.length} ${feriadosDoAno.length === 1 ? "feriado" : "feriados"}`
-            : "Selecione o ano"}
-        </Selo>
-      }
-    >
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:max-w-48">
-          <span className="text-sm font-medium">Ano do calendário</span>
-          <SeletorAno
-            id="calendario-letivo-ano"
-            valor={ano}
-            min={1900}
-            max={2199}
-            disabled={bloqueado}
-            rotuloAcessivel="Ano do calendário"
-            onValor={mudarAno}
-          />
-        </div>
-        <Selo>Todas as turmas</Selo>
-      </div>
-      <ControleSincronizarFeriados
-        ano={ano}
-        anoValido={anoValido}
-        revisao={revisaoFeriados}
-        desabilitado={bloqueado}
-        onExecutandoChange={setSincronizando}
-        onAtualizar={onSincronizar}
-      />
-      <form
-        aria-label="Adicionar feriado ao calendário"
-        className="grid min-w-0 gap-3 rounded-xl border p-3 sm:grid-cols-[12rem_minmax(0,1fr)]"
-        onSubmit={(evento) => {
-          evento.preventDefault();
-          if (!bloqueado) adicionar();
-        }}
+    <Box data-secao="config-calendario">
+      <Acordeao
+        titulo="Calendário letivo"
+        resumo={
+          <Selo>
+            {anoValido
+              ? `${ano} · ${feriadosDoAno.length} ${
+                  feriadosDoAno.length === 1 ? "feriado" : "feriados"
+                }`
+              : "Selecione o ano"}
+          </Selo>
+        }
+        aberto={aberto}
+        onChange={setAberto}
       >
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="calendario-feriado-data">Data do feriado</Label>
-          <SeletorPeriodo
-            id="calendario-feriado-data"
-            modo="dia"
-            valor={dia}
-            max="2199-12-31"
-            mostrarSelo={false}
-            rotuloAcessivel="Data do feriado"
-            rotulo={rotuloData(dia)}
-            disabled={bloqueado || !anoValido}
-            onValor={escolherDia}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="calendario-feriado-nome">Nome do feriado</Label>
-          <Input
-            id="calendario-feriado-nome"
-            value={nome}
-            maxLength={120}
-            required
-            className="h-11"
-            disabled={bloqueado}
-            onChange={(evento) => setNome(evento.target.value)}
-          />
-        </div>
-        <Button
-          type="submit"
-          disabled={bloqueado || !anoValido || !nome.trim()}
-          className="h-auto min-h-11 min-w-0 whitespace-normal sm:col-span-2 sm:justify-self-end"
-        >
-          <Plus size={16} aria-hidden="true" />
-          Adicionar feriado
-        </Button>
-      </form>
-      {erro && <AvisoCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />}
-      {anoValido &&
-        (feriadosDoAno.length ? (
-          <ul
-            aria-label={`Feriados de ${ano}`}
-            className="flex flex-col divide-y rounded-2xl border"
+        <Stack spacing={2}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ alignItems: { sm: "flex-end" }, flexWrap: "wrap" }}
           >
-            {feriadosDoAno.map((feriado) => (
-              <li key={feriado.dia} className="flex items-center gap-2 px-3 py-2">
-                <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <span className="text-sm font-medium break-words">{feriado.nome}</span>
-                  <time
-                    dateTime={feriado.dia}
-                    className="numerais-tabulares text-muted-foreground text-xs"
-                  >
-                    {rotuloData(feriado.dia)}
-                  </time>
-                </div>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="text-falta-texto size-11"
-                  aria-label={`Remover feriado ${feriado.nome}`}
+            <Box sx={{ flex: 1, minWidth: 0, maxWidth: { sm: 220 } }}>
+              <Campo id="calendario-letivo-ano" rotulo="Ano do calendário">
+                <SeletorAno
+                  id="calendario-letivo-ano"
+                  valor={ano}
+                  min={1900}
+                  max={2199}
                   disabled={bloqueado}
-                  onClick={() => {
-                    setErro("");
-                    setParaRemover(feriado);
-                  }}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                </Button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-muted-foreground text-sm">Nenhum feriado em {ano}.</p>
-        ))}
-      <details className="text-muted-foreground text-xs">
-        <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
-          <HelpCircle size={16} aria-hidden="true" />
-          Ajuda
-        </summary>
-        <p>Feriados e recessos suspendem a chamada em todas as turmas.</p>
-        <p className="mt-2">
-          Datas adicionadas ou removidas manualmente valem ao salvar as configurações.
-        </p>
-      </details>
-      <AlertDialog
-        open={paraRemover !== null}
-        onOpenChange={(valor) => {
-          if (!valor) setParaRemover(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover feriado?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {paraRemover ? `${paraRemover.nome} (${rotuloData(paraRemover.dia)}). ` : ""}A data
-              voltará a seguir a grade semanal. As frequências salvas serão preservadas.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={remover}>
-              Remover
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </SecaoRecolhivel>
+                  rotuloAcessivel="Ano do calendário"
+                  onValor={mudarAno}
+                />
+              </Campo>
+            </Box>
+            <Selo>Todas as turmas</Selo>
+          </Stack>
+
+          <ControleSincronizarFeriados
+            ano={ano}
+            anoValido={anoValido}
+            revisao={revisaoFeriados}
+            desabilitado={bloqueado}
+            onExecutandoChange={setSincronizando}
+            onAtualizar={onSincronizar}
+          />
+
+          <Box
+            component="form"
+            aria-label="Adicionar feriado ao calendário"
+            onSubmit={(evento) => {
+              evento.preventDefault();
+              if (!bloqueado) adicionar();
+            }}
+            noValidate
+            sx={{
+              display: "grid",
+              gap: 2,
+              padding: 2,
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+              gridTemplateColumns: { xs: "1fr", sm: "12rem minmax(0, 1fr)" },
+            }}
+          >
+            <Campo id="calendario-feriado-data" rotulo="Data do feriado">
+              <SeletorPeriodo
+                id="calendario-feriado-data"
+                modo="dia"
+                valor={dia}
+                max="2199-12-31"
+                mostrarSelo={false}
+                rotuloAcessivel="Data do feriado"
+                rotulo={rotuloData(dia)}
+                disabled={bloqueado || !anoValido}
+                onValor={escolherDia}
+              />
+            </Campo>
+            <Campo id="calendario-feriado-nome" rotulo="Nome do feriado">
+              <CampoTexto
+                id="calendario-feriado-nome"
+                valor={nome}
+                onValor={setNome}
+                maxLength={120}
+                required
+                disabled={bloqueado}
+              />
+            </Campo>
+            <Botao
+              type="submit"
+              variante="primario"
+              disabled={bloqueado || !anoValido || !nome.trim()}
+              icone={<AddRoundedIcon />}
+              sx={{ gridColumn: { sm: "1 / -1" }, justifySelf: { sm: "end" } }}
+            >
+              Adicionar feriado
+            </Botao>
+          </Box>
+
+          {erro ? (
+            <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
+          ) : null}
+
+          {anoValido ? (
+            feriadosDoAno.length ? (
+              <Box
+                component="ul"
+                aria-label={`Feriados de ${ano}`}
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  margin: 0,
+                  padding: 0,
+                  listStyle: "none",
+                  border: 1,
+                  borderColor: "divider",
+                  borderRadius: 2,
+                }}
+              >
+                {feriadosDoAno.map((feriado) => (
+                  <Stack
+                    component="li"
+                    key={feriado.dia}
+                    direction="row"
+                    spacing={1}
+                    sx={{
+                      alignItems: "center",
+                      paddingX: 2,
+                      paddingY: 1,
+                      borderBottom: 1,
+                      borderColor: "divider",
+                      "&:last-of-type": { borderBottom: 0 },
+                    }}
+                  >
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
+                      >
+                        {feriado.nome}
+                      </Typography>
+                      <Box
+                        component="time"
+                        dateTime={feriado.dia}
+                        sx={{
+                          display: "block",
+                          typography: "caption",
+                          color: "text.secondary",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {rotuloData(feriado.dia)}
+                      </Box>
+                    </Box>
+                    <BotaoIcone
+                      rotulo={`Remover feriado ${feriado.nome}`}
+                      variante="destrutivo"
+                      disabled={bloqueado}
+                      icone={<DeleteOutlineRoundedIcon />}
+                      onClick={() => {
+                        setErro("");
+                        setParaRemover(feriado);
+                      }}
+                    />
+                  </Stack>
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Nenhum feriado em {ano}.
+              </Typography>
+            )
+          ) : null}
+
+          <Acordeao
+            titulo="Ajuda"
+            nivelTitulo="h4"
+            resumo={
+              <Typography
+                component="span"
+                variant="body2"
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />
+                Como os feriados afetam a chamada
+              </Typography>
+            }
+          >
+            <Stack spacing={1} sx={{ color: "text.secondary" }}>
+              <Typography variant="body2">
+                Feriados e recessos suspendem a chamada em todas as turmas.
+              </Typography>
+              <Typography variant="body2">
+                Datas adicionadas ou removidas manualmente valem ao salvar as configurações.
+              </Typography>
+            </Stack>
+          </Acordeao>
+
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <CalendarMonthRoundedIcon fontSize="small" aria-hidden="true" />
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              Os feriados são compartilhados por todas as turmas da escola.
+            </Typography>
+          </Box>
+        </Stack>
+      </Acordeao>
+
+      <DialogoConfirmacao
+        aberto={paraRemover !== null}
+        titulo="Remover feriado?"
+        descricao={
+          paraRemover
+            ? `${paraRemover.nome} (${rotuloData(paraRemover.dia)}). A data voltará a seguir a grade semanal. As frequências salvas serão preservadas.`
+            : "A data voltará a seguir a grade semanal. As frequências salvas serão preservadas."
+        }
+        rotuloConfirmar="Remover"
+        destrutivo
+        onConfirmar={remover}
+        onCancelar={() => setParaRemover(null)}
+      />
+    </Box>
   );
 }
