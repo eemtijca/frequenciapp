@@ -1,5 +1,7 @@
 // Indicador visual compartilhado para feriados nos cartões do Painel.
-import { CalendarOff } from "lucide-react";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
 
 interface Props {
   nome: string;
@@ -7,11 +9,29 @@ interface Props {
 
 export function IndicadorFeriado({ nome }: Props) {
   return (
-    <div className="flex items-center gap-2.5">
-      <div className="text-muted-foreground flex size-12 shrink-0 items-center justify-center rounded-full border sm:size-14">
-        <CalendarOff aria-hidden="true" className="size-5" />
-      </div>
-      <span className="text-muted-foreground text-xs break-words sm:text-sm">{nome}</span>
-    </div>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+      <Box
+        sx={(theme) => ({
+          display: "flex",
+          width: { xs: 48, sm: 56 },
+          height: { xs: 48, sm: 56 },
+          flexShrink: 0,
+          alignItems: "center",
+          justifyContent: "center",
+          border: 1,
+          borderColor: "divider",
+          borderRadius: "50%",
+          color: theme.vars.palette.text.secondary,
+        })}
+      >
+        <EventBusyRoundedIcon aria-hidden="true" />
+      </Box>
+      <Typography
+        variant="caption"
+        sx={{ color: "text.secondary", overflowWrap: "anywhere", minWidth: 0 }}
+      >
+        {nome}
+      </Typography>
+    </Box>
   );
 }

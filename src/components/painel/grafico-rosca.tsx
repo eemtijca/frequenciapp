@@ -1,10 +1,14 @@
 "use client";
 
-// Rosca de distribuição de faltas com a paleta do app e legenda acessível.
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import type { CSSProperties } from "react";
-import { CirculoValor } from "@/components/ui/circulo-contagem";
-import { ItemLegendaGrafico } from "@/components/ui/item-legenda-grafico";
+// Rosca de distribuição de faltas em MUI X, com legenda acessível e total no centro.
+import { useId } from "react";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { useTheme } from "@mui/material/styles";
+import { PieChart } from "@mui/x-charts/PieChart";
+import { CirculoValor } from "@/components/ui/mui/circulo-contagem";
+import { ItemLegendaGrafico } from "@/components/ui/mui/item-legenda-grafico";
 
 export interface FatiaGrafico {
   nome: string;
@@ -15,13 +19,23 @@ export interface FatiaGrafico {
   unidadePlural?: string;
 }
 
-// Tons do próprio tema: verde institucional, verde claro e grafite. O
-// vermelho fica reservado ao sentido de falta e erro.
-const CORES = ["var(--chart-1)", "var(--chart-4)", "var(--chart-3)", "var(--primary)"];
+const TAMANHO_GRAFICO = 176;
 const percentual = new Intl.NumberFormat("pt-BR", {
   style: "percent",
   maximumFractionDigits: 1,
 });
+
+const TEXTO_OCULTO = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  padding: 0,
+  margin: -1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
 
 interface Props {
   titulo: string;
@@ -42,94 +56,167 @@ export default function GraficoRosca({
   vazio = "Nenhuma falta registrada",
   tomValores = "neutro",
 }: Props) {
+  const descricaoId = useId();
+  const tema = useTheme();
+  const paleta = tema.vars ?? tema;
+  const cores = [
+    paleta.palette.primary.main,
+    paleta.palette.falta.main,
+    paleta.palette.justificada.main,
+    paleta.palette.alerta.main,
+    paleta.palette.success.main,
+    paleta.palette.info.main,
+  ];
   const visiveis = fatias.filter((fatia) => fatia.valor > 0);
   const total = visiveis.reduce((soma, fatia) => soma + fatia.valor, 0);
   const rotuloFatia = (fatia: FatiaGrafico) =>
     `${fatia.valor} ${fatia.valor === 1 ? (fatia.unidadeSingular ?? unidadeSingular) : (fatia.unidadePlural ?? unidadePlural)}`;
+  const descricao = `${titulo}: ${visiveis
+    .map((fatia) => `${fatia.nome}, ${rotuloFatia(fatia)}`)
+    .join("; ")}. Total: ${total} ${rotuloTotal}.`;
 
   if (total === 0) {
     return (
-      <div className="superficie text-muted-foreground flex min-h-40 items-center justify-center border-dashed px-4 text-center text-sm shadow-none">
-        {vazio}
-      </div>
+      <Box
+        sx={{
+          display: "flex",
+          minHeight: 160,
+          alignItems: "center",
+          justifyContent: "center",
+          px: 2,
+          py: 2,
+          textAlign: "center",
+          border: 1,
+          borderStyle: "dashed",
+          borderColor: "divider",
+          borderRadius: 1,
+        }}
+      >
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          {vazio}
+        </Typography>
+      </Box>
     );
   }
 
   return (
-    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-      <div
-        className="relative size-44 shrink-0"
+    <Stack
+      direction={{ xs: "column", sm: "row" }}
+      spacing={2.5}
+      sx={{ alignItems: "center", minWidth: 0 }}
+    >
+      <Box
         role="img"
         aria-label={titulo}
+        aria-describedby={descricaoId}
         data-grafico={titulo}
+        sx={{
+          position: "relative",
+          width: TAMANHO_GRAFICO,
+          height: TAMANHO_GRAFICO,
+          flexShrink: 0,
+        }}
       >
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={visiveis}
-              dataKey="valor"
-              nameKey="nome"
-              innerRadius="62%"
-              outerRadius="96%"
-              paddingAngle={2}
-              stroke="var(--card)"
-              strokeWidth={1}
-              isAnimationActive={false}
-            >
-              {visiveis.map((fatia, indice) => (
-                <Cell
-                  key={fatia.nome}
-                  className="grafico-fatia"
-                  fill={CORES[indice % CORES.length]}
-                  style={{ "--cor-fatia": CORES[indice % CORES.length] } as CSSProperties}
-                />
-              ))}
-            </Pie>
-            <Tooltip
-              content={({ active, payload }) =>
-                active && payload?.length ? (
-                  <div className="superficie text-foreground max-w-44 px-3 py-2 text-xs break-words whitespace-normal">
-                    {payload.map((item) => (
-                      <p key={String(item.name)} className="numerais-tabulares">
-                        {String(item.name)}: {rotuloFatia(item.payload as FatiaGrafico)}
-                      </p>
-                    ))}
-                  </div>
-                ) : null
-              }
-              wrapperStyle={{ opacity: 1, zIndex: 30, pointerEvents: "none" }}
-              allowEscapeViewBox={{ x: false, y: true }}
-              offset={12}
-              isAnimationActive={false}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-        <span
+        <PieChart
+          series={[
+            {
+              data: visiveis.map((fatia, indice) => ({
+                id: fatia.nome,
+                value: fatia.valor,
+                label: fatia.nome,
+                color: cores[indice % cores.length],
+              })),
+              innerRadius: "62%",
+              outerRadius: "96%",
+              paddingAngle: 2,
+              valueFormatter: (_valor, contexto) => {
+                const fatia = visiveis[contexto.dataIndex];
+                return fatia ? rotuloFatia(fatia) : "";
+              },
+            },
+          ]}
+          width={TAMANHO_GRAFICO}
+          height={TAMANHO_GRAFICO}
+          margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+          hideLegend
+          skipAnimation
+          slotProps={{ tooltip: { trigger: "item" } }}
+          title={titulo}
+          desc={descricao}
+        />
+        <Box
           aria-hidden="true"
-          className="superficie pointer-events-none absolute inset-[24%] flex flex-col items-center justify-center rounded-full"
+          sx={{
+            position: "absolute",
+            inset: "24%",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            border: 1,
+            borderColor: "divider",
+            borderRadius: "50%",
+            backgroundColor: "background.paper",
+            pointerEvents: "none",
+          }}
         >
-          <strong className="numerais-tabulares text-2xl font-semibold">{total}</strong>
-          <span className="text-muted-foreground text-[11px]">{rotuloTotal}</span>
-        </span>
-      </div>
-      <ul className="w-full min-w-0 flex-1 space-y-1.5">
+          <Typography
+            component="strong"
+            variant="h5"
+            sx={{
+              fontVariantNumeric: "tabular-nums",
+              fontWeight: 600,
+              lineHeight: 1,
+            }}
+          >
+            {total}
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {rotuloTotal}
+          </Typography>
+        </Box>
+      </Box>
+      <Typography id={descricaoId} sx={TEXTO_OCULTO}>
+        {descricao}
+      </Typography>
+      <Stack
+        component="ul"
+        spacing={0.75}
+        aria-label={`Legenda de ${titulo}`}
+        sx={{ width: "100%", minWidth: 0, flex: 1, m: 0, p: 0, listStyle: "none" }}
+      >
         {visiveis.map((fatia, indice) => (
           <ItemLegendaGrafico
             key={fatia.nome}
-            cor={CORES[indice % CORES.length] ?? "var(--primary)"}
+            cor={cores[indice % cores.length] ?? paleta.palette.primary.main}
             nome={fatia.nome}
             detalhe={
               fatia.alunos !== undefined ? (
-                <span
+                <Box
+                  component="span"
                   role="img"
                   aria-label={fatia.detalhe ?? `${fatia.alunos} alunos`}
                   title={fatia.detalhe ?? `${fatia.alunos} alunos`}
-                  className="numerais-tabulares bg-secondary text-muted-foreground border-border mt-1 block w-fit min-w-10 rounded-[6px] border px-2 py-1 text-center text-xs leading-none whitespace-nowrap"
+                  sx={{
+                    display: "inline-block",
+                    mt: 0.5,
+                    px: 1,
+                    py: 0.5,
+                    border: 1,
+                    borderColor: "divider",
+                    borderRadius: 1,
+                    backgroundColor: "action.hover",
+                    color: "text.secondary",
+                    fontVariantNumeric: "tabular-nums",
+                    fontSize: "0.75rem",
+                    lineHeight: 1.2,
+                    whiteSpace: "nowrap",
+                  }}
                 >
                   <span aria-hidden="true">{fatia.alunos} alunos</span>
-                </span>
+                </Box>
               ) : fatia.detalhe ? (
-                <span className="text-muted-foreground block text-xs">{fatia.detalhe}</span>
+                fatia.detalhe
               ) : null
             }
           >
@@ -145,7 +232,7 @@ export default function GraficoRosca({
             />
           </ItemLegendaGrafico>
         ))}
-      </ul>
-    </div>
+      </Stack>
+    </Stack>
   );
 }

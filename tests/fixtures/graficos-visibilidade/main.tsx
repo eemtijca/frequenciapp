@@ -1,10 +1,12 @@
 import { createRoot } from "react-dom/client";
+import { ThemeProvider } from "@mui/material/styles";
 import { Circle } from "lucide-react";
 import AbasDeslizantes from "@/components/ui/abas-deslizantes";
 import FaixaGraficos from "@/components/painel/faixa-graficos";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
 import GraficoSobDemanda from "@/components/graficos/grafico-sob-demanda";
 import { ProvedorVisibilidadeGraficos } from "@/components/graficos/visibilidade-graficos";
+import { tema } from "@/theme/tema";
 import { useState, type ReactNode } from "react";
 import "@/app/globals.css";
 
@@ -65,67 +67,70 @@ function CenarioErro() {
 }
 const root = document.getElementById("root");
 if (!root) throw new Error("Raiz ausente");
+document.documentElement.setAttribute("data-mui-color-scheme", "light");
 createRoot(root).render(
-  location.search === "?lazy-oculto" ? (
-    <CenarioLazyOculto />
-  ) : location.search === "?erro" ? (
-    <CenarioErro />
-  ) : location.search === "?aquecimento" ? (
-    <main style={{ paddingTop: 2500 }}>
-      <FaixaControlada
-        itens={[
-          { id: "aquecido", rotulo: "Aquecido", render: () => grafico("Rosca aquecida") },
-          {
-            id: "vazio",
-            rotulo: "Vazio",
-            render: () => <GraficoRosca titulo="Vazio" fatias={[]} />,
-          },
-        ]}
-      />
-      <FaixaControlada itens={[]} />
-    </main>
-  ) : (
-    <main style={{ padding: 16 }}>
-      <AbasDeslizantes rotuloAcessivel="Telas" abaInicial="painel" abas={abas} dataPager="telas">
-        {(tela) =>
-          tela === "painel" ? (
-            <AbasDeslizantes
-              rotuloAcessivel="Abas internas"
-              abaInicial="graficos"
-              abas={internas}
-              dataPager="interno"
-            >
-              {(aba) =>
-                aba === "graficos" ? (
-                  <>
-                    <label>
-                      Observação <input aria-label="Observação" />
-                    </label>
-                    <FaixaControlada
-                      itens={[
-                        {
-                          id: "primeiro",
-                          rotulo: "Primeiro",
-                          render: () => grafico("Rosca primeiro"),
-                        },
-                        {
-                          id: "segundo",
-                          rotulo: "Segundo",
-                          render: () => grafico("Rosca segundo"),
-                        },
-                      ]}
-                    />
-                  </>
-                ) : (
-                  <p>Outra aba</p>
-                )
-              }
-            </AbasDeslizantes>
-          ) : (
-            <p>Chamada aberta</p>
-          )
-        }
-      </AbasDeslizantes>
-    </main>
-  ),
+  <ThemeProvider theme={tema}>
+    {location.search === "?lazy-oculto" ? (
+      <CenarioLazyOculto />
+    ) : location.search === "?erro" ? (
+      <CenarioErro />
+    ) : location.search === "?aquecimento" ? (
+      <main style={{ paddingTop: 2500 }}>
+        <FaixaControlada
+          itens={[
+            { id: "aquecido", rotulo: "Aquecido", render: () => grafico("Rosca aquecida") },
+            {
+              id: "vazio",
+              rotulo: "Vazio",
+              render: () => <GraficoRosca titulo="Vazio" fatias={[]} />,
+            },
+          ]}
+        />
+        <FaixaControlada itens={[]} />
+      </main>
+    ) : (
+      <main style={{ padding: 16 }}>
+        <AbasDeslizantes rotuloAcessivel="Telas" abaInicial="painel" abas={abas} dataPager="telas">
+          {(tela) =>
+            tela === "painel" ? (
+              <AbasDeslizantes
+                rotuloAcessivel="Abas internas"
+                abaInicial="graficos"
+                abas={internas}
+                dataPager="interno"
+              >
+                {(aba) =>
+                  aba === "graficos" ? (
+                    <>
+                      <label>
+                        Observação <input aria-label="Observação" />
+                      </label>
+                      <FaixaControlada
+                        itens={[
+                          {
+                            id: "primeiro",
+                            rotulo: "Primeiro",
+                            render: () => grafico("Rosca primeiro"),
+                          },
+                          {
+                            id: "segundo",
+                            rotulo: "Segundo",
+                            render: () => grafico("Rosca segundo"),
+                          },
+                        ]}
+                      />
+                    </>
+                  ) : (
+                    <p>Outra aba</p>
+                  )
+                }
+              </AbasDeslizantes>
+            ) : (
+              <p>Chamada aberta</p>
+            )
+          }
+        </AbasDeslizantes>
+      </main>
+    )}
+  </ThemeProvider>,
 );
