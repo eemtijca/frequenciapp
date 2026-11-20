@@ -860,425 +860,435 @@ function ConteudoConfiguracoes({
 
   const cadastros = (
     <Stack spacing={2}>
-      <Acordeao
-        titulo="Justificativas"
-        resumo={<Selo>{`${atual.justificativas.filter((item) => item.ativo).length} ativas`}</Selo>}
-        aberto={abertoJustificativas}
-        onChange={setAbertoJustificativas}
-      >
-        <Box
-          role="region"
-          aria-label="Justificativas"
-          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+      <Box data-secao="config-justificativas">
+        <Acordeao
+          titulo="Justificativas"
+          resumo={
+            <Selo>{`${atual.justificativas.filter((item) => item.ativo).length} ativas`}</Selo>
+          }
+          aberto={abertoJustificativas}
+          onChange={setAbertoJustificativas}
         >
-          <Acordeao
-            titulo="Adicionar justificativa"
-            nivelTitulo="h4"
-            resumo={
-              <Typography
-                component="span"
-                variant="body2"
-                sx={{ display: "flex", alignItems: "center", gap: 1 }}
-              >
-                <AddRoundedIcon fontSize="inherit" aria-hidden="true" />
-                Código e rótulo
-              </Typography>
-            }
+          <Box
+            role="region"
+            aria-label="Justificativas"
+            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
           >
+            <Acordeao
+              titulo="Adicionar justificativa"
+              nivelTitulo="h4"
+              resumo={
+                <Typography
+                  component="span"
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
+                  <AddRoundedIcon fontSize="inherit" aria-hidden="true" />
+                  Código e rótulo
+                </Typography>
+              }
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: { xs: "column", sm: "row" },
+                  alignItems: { sm: "flex-end" },
+                  gap: 2,
+                }}
+              >
+                <Box sx={ESTILO_CAMPO_CODIGO}>
+                  <Campo id="justificativa-codigo" rotulo="Código">
+                    <CampoTexto
+                      id="justificativa-codigo"
+                      valor={novaCodigo}
+                      onValor={setNovaCodigo}
+                      maxLength={10}
+                      autoComplete="off"
+                      placeholder="Ex.: At"
+                    />
+                  </Campo>
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Campo id="justificativa-rotulo" rotulo="Rótulo">
+                    <CampoTexto
+                      id="justificativa-rotulo"
+                      valor={novaRotulo}
+                      onValor={setNovaRotulo}
+                      maxLength={60}
+                      autoComplete="off"
+                      placeholder="Ex.: Atestado"
+                    />
+                  </Campo>
+                </Box>
+                <Botao
+                  type="button"
+                  variante="primario"
+                  icone={<AddRoundedIcon />}
+                  onClick={criarJustificativa}
+                  disabled={novaCodigo.trim() === "" || novaRotulo.trim() === ""}
+                >
+                  Adicionar
+                </Botao>
+              </Box>
+            </Acordeao>
+
+            {erroJustificativa ? (
+              <AlertaCompacto
+                variante="dados_invalidos"
+                descricao={erroJustificativa}
+                tamanho="linha"
+              />
+            ) : null}
+
             <Box
+              component="ul"
               sx={{
                 display: "flex",
-                flexDirection: { xs: "column", sm: "row" },
-                alignItems: { sm: "flex-end" },
-                gap: 2,
+                flexDirection: "column",
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 2,
               }}
             >
-              <Box sx={ESTILO_CAMPO_CODIGO}>
-                <Campo id="justificativa-codigo" rotulo="Código">
-                  <CampoTexto
-                    id="justificativa-codigo"
-                    valor={novaCodigo}
-                    onValor={setNovaCodigo}
-                    maxLength={10}
-                    autoComplete="off"
-                    placeholder="Ex.: At"
-                  />
-                </Campo>
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Campo id="justificativa-rotulo" rotulo="Rótulo">
-                  <CampoTexto
-                    id="justificativa-rotulo"
-                    valor={novaRotulo}
-                    onValor={setNovaRotulo}
-                    maxLength={60}
-                    autoComplete="off"
-                    placeholder="Ex.: Atestado"
-                  />
-                </Campo>
-              </Box>
-              <Botao
-                type="button"
-                variante="primario"
-                icone={<AddRoundedIcon />}
-                onClick={criarJustificativa}
-                disabled={novaCodigo.trim() === "" || novaRotulo.trim() === ""}
-              >
-                Adicionar
-              </Botao>
+              {atual.justificativas.map((item) => (
+                <Box
+                  component="li"
+                  key={item.codigo}
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    alignItems: "center",
+                    gap: 1,
+                    minHeight: 56,
+                    paddingX: 2,
+                    paddingY: 1,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    opacity: item.ativo ? 1 : 0.6,
+                    "&:last-of-type": { borderBottom: 0 },
+                  }}
+                >
+                  {editando === item.codigo ? (
+                    <Box
+                      sx={{
+                        gridColumn: "1 / -1",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        minWidth: 0,
+                      }}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <CampoTexto
+                          id={`justificativa-rotulo-${item.codigo}`}
+                          valor={rotuloEdicao}
+                          onValor={setRotuloEdicao}
+                          maxLength={60}
+                          autoComplete="off"
+                          ariaLabel={`Rótulo de ${item.codigo}`}
+                        />
+                      </Box>
+                      <BotaoIcone
+                        rotulo={`Salvar rótulo de ${item.codigo}`}
+                        variante="secundario"
+                        icone={<CheckRoundedIcon />}
+                        onClick={() => salvarRotulo(item.codigo)}
+                        disabled={rotuloEdicao.trim().length < 2}
+                      />
+                      <BotaoIcone
+                        rotulo={`Cancelar edição de ${item.codigo}`}
+                        variante="secundario"
+                        icone={<CloseRoundedIcon />}
+                        onClick={() => {
+                          setEditando(null);
+                          setRotuloEdicao("");
+                        }}
+                      />
+                    </Box>
+                  ) : (
+                    <>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
+                        >
+                          {item.rotulo}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                        >
+                          {item.codigo}
+                          {item.ativo ? "" : " · desativada"}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                        <Switch
+                          checked={item.ativo}
+                          slotProps={{
+                            input: {
+                              "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
+                            },
+                          }}
+                          onChange={() => alternarAtivo(item)}
+                        />
+                        <BotaoIcone
+                          rotulo={`Editar rótulo de ${item.codigo}`}
+                          variante="texto"
+                          icone={<TuneRoundedIcon />}
+                          onClick={() => {
+                            setEditando(item.codigo);
+                            setRotuloEdicao(item.rotulo);
+                          }}
+                        />
+                        <BotaoIcone
+                          rotulo={`Excluir ${item.codigo}`}
+                          variante="texto"
+                          icone={<DeleteOutlineRoundedIcon />}
+                          onClick={() => setExcluirAlvo(item)}
+                          sx={(tema) => ({ color: tema.vars.palette.falta.main })}
+                        />
+                      </Stack>
+                    </>
+                  )}
+                </Box>
+              ))}
             </Box>
-          </Acordeao>
 
-          {erroJustificativa ? (
-            <AlertaCompacto
-              variante="dados_invalidos"
-              descricao={erroJustificativa}
-              tamanho="linha"
+            <DialogoConfirmacao
+              aberto={excluirAlvo !== null}
+              titulo={`Excluir a justificativa ${excluirAlvo?.codigo ?? ""}?`}
+              descricao="A exclusão é aplicada ao salvar as configurações. Se houver faltas ou saídas usando o código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
+              rotuloConfirmar="Excluir"
+              destrutivo
+              onConfirmar={() => {
+                if (excluirAlvo) removerJustificativa(excluirAlvo);
+              }}
+              onCancelar={() => setExcluirAlvo(null)}
             />
-          ) : null}
+          </Box>
+        </Acordeao>
+      </Box>
 
+      <Box data-secao="config-liberadores">
+        <Acordeao
+          titulo="Quem libera as saídas"
+          resumo={<Selo>{`${atual.liberadores.filter((item) => item.ativo).length} ativos`}</Selo>}
+          aberto={abertoLiberadores}
+          onChange={setAbertoLiberadores}
+        >
           <Box
-            component="ul"
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              margin: 0,
-              padding: 0,
-              listStyle: "none",
-              border: 1,
-              borderColor: "divider",
-              borderRadius: 2,
-            }}
+            role="region"
+            aria-label="Quem libera as saídas"
+            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
           >
-            {atual.justificativas.map((item) => (
+            <Acordeao
+              titulo="Adicionar responsável"
+              nivelTitulo="h4"
+              resumo={
+                <Typography
+                  component="span"
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
+                  <AddRoundedIcon fontSize="inherit" aria-hidden="true" />
+                  Código e rótulo
+                </Typography>
+              }
+            >
               <Box
-                component="li"
-                key={item.codigo}
                 sx={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr) auto",
-                  alignItems: "center",
-                  gap: 1,
-                  minHeight: 56,
-                  paddingX: 2,
-                  paddingY: 1,
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  opacity: item.ativo ? 1 : 0.6,
-                  "&:last-of-type": { borderBottom: 0 },
+                  display: "flex",
+                  flexDirection: { xs: "column", sm: "row" },
+                  alignItems: { sm: "flex-end" },
+                  gap: 2,
                 }}
               >
-                {editando === item.codigo ? (
-                  <Box
-                    sx={{
-                      gridColumn: "1 / -1",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <CampoTexto
-                        id={`justificativa-rotulo-${item.codigo}`}
-                        valor={rotuloEdicao}
-                        onValor={setRotuloEdicao}
-                        maxLength={60}
-                        autoComplete="off"
-                        ariaLabel={`Rótulo de ${item.codigo}`}
-                      />
-                    </Box>
-                    <BotaoIcone
-                      rotulo={`Salvar rótulo de ${item.codigo}`}
-                      variante="secundario"
-                      icone={<CheckRoundedIcon />}
-                      onClick={() => salvarRotulo(item.codigo)}
-                      disabled={rotuloEdicao.trim().length < 2}
+                <Box sx={ESTILO_CAMPO_CODIGO}>
+                  <Campo id="liberador-codigo" rotulo="Código">
+                    <CampoTexto
+                      id="liberador-codigo"
+                      valor={novaCodigoLiberador}
+                      onValor={setNovaCodigoLiberador}
+                      maxLength={20}
+                      autoComplete="off"
+                      placeholder="Ex.: maria"
                     />
-                    <BotaoIcone
-                      rotulo={`Cancelar edição de ${item.codigo}`}
-                      variante="secundario"
-                      icone={<CloseRoundedIcon />}
-                      onClick={() => {
-                        setEditando(null);
-                        setRotuloEdicao("");
-                      }}
+                  </Campo>
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Campo id="liberador-rotulo" rotulo="Rótulo">
+                    <CampoTexto
+                      id="liberador-rotulo"
+                      valor={novaRotuloLiberador}
+                      onValor={setNovaRotuloLiberador}
+                      maxLength={60}
+                      autoComplete="off"
+                      placeholder="Ex.: Coordenadora Maria"
                     />
-                  </Box>
-                ) : (
-                  <>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
-                      >
-                        {item.rotulo}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                      >
-                        {item.codigo}
-                        {item.ativo ? "" : " · desativada"}
-                      </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-                      <Switch
-                        checked={item.ativo}
-                        slotProps={{
-                          input: {
-                            "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
-                          },
-                        }}
-                        onChange={() => alternarAtivo(item)}
-                      />
-                      <BotaoIcone
-                        rotulo={`Editar rótulo de ${item.codigo}`}
-                        variante="texto"
-                        icone={<TuneRoundedIcon />}
-                        onClick={() => {
-                          setEditando(item.codigo);
-                          setRotuloEdicao(item.rotulo);
-                        }}
-                      />
-                      <BotaoIcone
-                        rotulo={`Excluir ${item.codigo}`}
-                        variante="texto"
-                        icone={<DeleteOutlineRoundedIcon />}
-                        onClick={() => setExcluirAlvo(item)}
-                        sx={(tema) => ({ color: tema.vars.palette.falta.main })}
-                      />
-                    </Stack>
-                  </>
-                )}
+                  </Campo>
+                </Box>
+                <Botao
+                  type="button"
+                  variante="primario"
+                  icone={<AddRoundedIcon />}
+                  onClick={criarLiberador}
+                  disabled={novaCodigoLiberador.trim() === "" || novaRotuloLiberador.trim() === ""}
+                >
+                  Adicionar
+                </Botao>
               </Box>
-            ))}
-          </Box>
+            </Acordeao>
 
-          <DialogoConfirmacao
-            aberto={excluirAlvo !== null}
-            titulo={`Excluir a justificativa ${excluirAlvo?.codigo ?? ""}?`}
-            descricao="A exclusão é aplicada ao salvar as configurações. Se houver faltas ou saídas usando o código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
-            rotuloConfirmar="Excluir"
-            destrutivo
-            onConfirmar={() => {
-              if (excluirAlvo) removerJustificativa(excluirAlvo);
-            }}
-            onCancelar={() => setExcluirAlvo(null)}
-          />
-        </Box>
-      </Acordeao>
+            {erroLiberador ? (
+              <AlertaCompacto
+                variante="dados_invalidos"
+                descricao={erroLiberador}
+                tamanho="linha"
+              />
+            ) : null}
 
-      <Acordeao
-        titulo="Quem libera as saídas"
-        resumo={<Selo>{`${atual.liberadores.filter((item) => item.ativo).length} ativos`}</Selo>}
-        aberto={abertoLiberadores}
-        onChange={setAbertoLiberadores}
-      >
-        <Box
-          role="region"
-          aria-label="Quem libera as saídas"
-          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-        >
-          <Acordeao
-            titulo="Adicionar responsável"
-            nivelTitulo="h4"
-            resumo={
-              <Typography
-                component="span"
-                variant="body2"
-                sx={{ display: "flex", alignItems: "center", gap: 1 }}
-              >
-                <AddRoundedIcon fontSize="inherit" aria-hidden="true" />
-                Código e rótulo
+            {atual.liberadores.length === 0 ? (
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Nenhum nome cadastrado.
               </Typography>
-            }
-          >
+            ) : null}
+
             <Box
+              component="ul"
               sx={{
                 display: "flex",
-                flexDirection: { xs: "column", sm: "row" },
-                alignItems: { sm: "flex-end" },
-                gap: 2,
+                flexDirection: "column",
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 2,
               }}
             >
-              <Box sx={ESTILO_CAMPO_CODIGO}>
-                <Campo id="liberador-codigo" rotulo="Código">
-                  <CampoTexto
-                    id="liberador-codigo"
-                    valor={novaCodigoLiberador}
-                    onValor={setNovaCodigoLiberador}
-                    maxLength={20}
-                    autoComplete="off"
-                    placeholder="Ex.: maria"
-                  />
-                </Campo>
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Campo id="liberador-rotulo" rotulo="Rótulo">
-                  <CampoTexto
-                    id="liberador-rotulo"
-                    valor={novaRotuloLiberador}
-                    onValor={setNovaRotuloLiberador}
-                    maxLength={60}
-                    autoComplete="off"
-                    placeholder="Ex.: Coordenadora Maria"
-                  />
-                </Campo>
-              </Box>
-              <Botao
-                type="button"
-                variante="primario"
-                icone={<AddRoundedIcon />}
-                onClick={criarLiberador}
-                disabled={novaCodigoLiberador.trim() === "" || novaRotuloLiberador.trim() === ""}
-              >
-                Adicionar
-              </Botao>
-            </Box>
-          </Acordeao>
-
-          {erroLiberador ? (
-            <AlertaCompacto variante="dados_invalidos" descricao={erroLiberador} tamanho="linha" />
-          ) : null}
-
-          {atual.liberadores.length === 0 ? (
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Nenhum nome cadastrado.
-            </Typography>
-          ) : null}
-
-          <Box
-            component="ul"
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              margin: 0,
-              padding: 0,
-              listStyle: "none",
-              border: 1,
-              borderColor: "divider",
-              borderRadius: 2,
-            }}
-          >
-            {atual.liberadores.map((item) => (
-              <Box
-                component="li"
-                key={item.codigo}
-                sx={{
-                  display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr) auto",
-                  alignItems: "center",
-                  gap: 1,
-                  minHeight: 56,
-                  paddingX: 2,
-                  paddingY: 1,
-                  borderBottom: 1,
-                  borderColor: "divider",
-                  opacity: item.ativo ? 1 : 0.6,
-                  "&:last-of-type": { borderBottom: 0 },
-                }}
-              >
-                {editandoLiberador === item.codigo ? (
-                  <Box
-                    sx={{
-                      gridColumn: "1 / -1",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 1,
-                      minWidth: 0,
-                    }}
-                  >
-                    <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <CampoTexto
-                        id={`liberador-rotulo-${item.codigo}`}
-                        valor={rotuloEdicaoLiberador}
-                        onValor={setRotuloEdicaoLiberador}
-                        maxLength={60}
-                        autoComplete="off"
-                        ariaLabel={`Rótulo de ${item.codigo}`}
-                      />
-                    </Box>
-                    <BotaoIcone
-                      rotulo={`Salvar rótulo de ${item.codigo}`}
-                      variante="secundario"
-                      icone={<CheckRoundedIcon />}
-                      onClick={() => salvarRotuloLiberador(item.codigo)}
-                      disabled={rotuloEdicaoLiberador.trim().length < 2}
-                    />
-                    <BotaoIcone
-                      rotulo={`Cancelar edição de ${item.codigo}`}
-                      variante="secundario"
-                      icone={<CloseRoundedIcon />}
-                      onClick={() => {
-                        setEditandoLiberador(null);
-                        setRotuloEdicaoLiberador("");
+              {atual.liberadores.map((item) => (
+                <Box
+                  component="li"
+                  key={item.codigo}
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    alignItems: "center",
+                    gap: 1,
+                    minHeight: 56,
+                    paddingX: 2,
+                    paddingY: 1,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    opacity: item.ativo ? 1 : 0.6,
+                    "&:last-of-type": { borderBottom: 0 },
+                  }}
+                >
+                  {editandoLiberador === item.codigo ? (
+                    <Box
+                      sx={{
+                        gridColumn: "1 / -1",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1,
+                        minWidth: 0,
                       }}
-                    />
-                  </Box>
-                ) : (
-                  <>
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography
-                        variant="body2"
-                        sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
-                      >
-                        {item.rotulo}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                      >
-                        {item.codigo}
-                        {item.ativo ? "" : " · desativado"}
-                      </Typography>
-                    </Box>
-                    <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-                      <Switch
-                        checked={item.ativo}
-                        slotProps={{
-                          input: {
-                            "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
-                          },
-                        }}
-                        onChange={() => alternarAtivoLiberador(item)}
+                    >
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <CampoTexto
+                          id={`liberador-rotulo-${item.codigo}`}
+                          valor={rotuloEdicaoLiberador}
+                          onValor={setRotuloEdicaoLiberador}
+                          maxLength={60}
+                          autoComplete="off"
+                          ariaLabel={`Rótulo de ${item.codigo}`}
+                        />
+                      </Box>
+                      <BotaoIcone
+                        rotulo={`Salvar rótulo de ${item.codigo}`}
+                        variante="secundario"
+                        icone={<CheckRoundedIcon />}
+                        onClick={() => salvarRotuloLiberador(item.codigo)}
+                        disabled={rotuloEdicaoLiberador.trim().length < 2}
                       />
                       <BotaoIcone
-                        rotulo={`Editar rótulo de ${item.codigo}`}
-                        variante="texto"
-                        icone={<TuneRoundedIcon />}
+                        rotulo={`Cancelar edição de ${item.codigo}`}
+                        variante="secundario"
+                        icone={<CloseRoundedIcon />}
                         onClick={() => {
-                          setEditandoLiberador(item.codigo);
-                          setRotuloEdicaoLiberador(item.rotulo);
+                          setEditandoLiberador(null);
+                          setRotuloEdicaoLiberador("");
                         }}
                       />
-                      <BotaoIcone
-                        rotulo={`Excluir ${item.codigo}`}
-                        variante="texto"
-                        icone={<DeleteOutlineRoundedIcon />}
-                        onClick={() => setExcluirAlvoLiberador(item)}
-                        sx={(tema) => ({ color: tema.vars.palette.falta.main })}
-                      />
-                    </Stack>
-                  </>
-                )}
-              </Box>
-            ))}
-          </Box>
+                    </Box>
+                  ) : (
+                    <>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
+                        >
+                          {item.rotulo}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                        >
+                          {item.codigo}
+                          {item.ativo ? "" : " · desativado"}
+                        </Typography>
+                      </Box>
+                      <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                        <Switch
+                          checked={item.ativo}
+                          slotProps={{
+                            input: {
+                              "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
+                            },
+                          }}
+                          onChange={() => alternarAtivoLiberador(item)}
+                        />
+                        <BotaoIcone
+                          rotulo={`Editar rótulo de ${item.codigo}`}
+                          variante="texto"
+                          icone={<TuneRoundedIcon />}
+                          onClick={() => {
+                            setEditandoLiberador(item.codigo);
+                            setRotuloEdicaoLiberador(item.rotulo);
+                          }}
+                        />
+                        <BotaoIcone
+                          rotulo={`Excluir ${item.codigo}`}
+                          variante="texto"
+                          icone={<DeleteOutlineRoundedIcon />}
+                          onClick={() => setExcluirAlvoLiberador(item)}
+                          sx={(tema) => ({ color: tema.vars.palette.falta.main })}
+                        />
+                      </Stack>
+                    </>
+                  )}
+                </Box>
+              ))}
+            </Box>
 
-          <DialogoConfirmacao
-            aberto={excluirAlvoLiberador !== null}
-            titulo={`Excluir ${excluirAlvoLiberador?.rotulo ?? ""}?`}
-            descricao="A exclusão é aplicada ao salvar as configurações. Se houver saídas com este código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
-            rotuloConfirmar="Excluir"
-            destrutivo
-            onConfirmar={() => {
-              if (excluirAlvoLiberador) removerLiberador(excluirAlvoLiberador);
-            }}
-            onCancelar={() => setExcluirAlvoLiberador(null)}
-          />
-        </Box>
-      </Acordeao>
+            <DialogoConfirmacao
+              aberto={excluirAlvoLiberador !== null}
+              titulo={`Excluir ${excluirAlvoLiberador?.rotulo ?? ""}?`}
+              descricao="A exclusão é aplicada ao salvar as configurações. Se houver saídas com este código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
+              rotuloConfirmar="Excluir"
+              destrutivo
+              onConfirmar={() => {
+                if (excluirAlvoLiberador) removerLiberador(excluirAlvoLiberador);
+              }}
+              onCancelar={() => setExcluirAlvoLiberador(null)}
+            />
+          </Box>
+        </Acordeao>
+      </Box>
     </Stack>
   );
 

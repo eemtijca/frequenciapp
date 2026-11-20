@@ -140,8 +140,8 @@ async function conferirFoco(botao: Locator) {
   ).toBe(true);
 }
 async function conferirAcao(botao: Locator) {
+  await botao.page().mouse.move(0, 0);
   await botao.waitFor({ state: "visible" });
-  // O redimensionamento pode manter o hover por um instante; aguarda o repouso.
   await expect
     .poll(() => botao.evaluate((el) => getComputedStyle(el).backgroundColor))
     .toBe("rgba(0, 0, 0, 0)");
@@ -176,17 +176,14 @@ for (const tema of ["light", "dark"] as const) {
         "Excluir lx",
         "Editar rótulo de ly",
         "Excluir ly",
-      ])
+      ]) {
         await conferirAcao(page.getByRole("button", { name: nome, exact: true }));
+      }
       await conferirPerigo(page.getByRole("button", { name: "Excluir At", exact: true }));
       await conferirPerigo(page.getByRole("button", { name: "Excluir lx", exact: true }));
       await conferirFoco(page.getByRole("button", { name: "Editar rótulo de At", exact: true }));
-      expect(
-        await page.getByRole("switch", { name: "Desativar At" }).getAttribute("aria-checked"),
-      ).toBe("true");
-      expect(
-        await page.getByRole("switch", { name: "Reativar Jx" }).getAttribute("aria-checked"),
-      ).toBe("false");
+      expect(await page.getByRole("switch", { name: "Desativar At" }).isChecked()).toBe(true);
+      expect(await page.getByRole("switch", { name: "Reativar Jx" }).isChecked()).toBe(false);
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.mouse.move(0, 0);
       await conferirAcao(page.getByRole("button", { name: "Editar rótulo de At", exact: true }));
@@ -274,9 +271,9 @@ for (const tema of ["light", "dark"] as const) {
         expect(await page.getByText(`Novo rótulo ${codigo}`, { exact: true }).count()).toBe(0);
       }
       await page.getByRole("switch", { name: "Reativar Jx" }).click();
-      expect(
-        await page.getByRole("switch", { name: "Desativar Jx" }).getAttribute("aria-checked"),
-      ).toBe("true");
+      await expect
+        .poll(() => page.getByRole("switch", { name: "Desativar Jx" }).isChecked())
+        .toBe(true);
       expect(gravacoes).toEqual([]);
     } finally {
       await page.close();

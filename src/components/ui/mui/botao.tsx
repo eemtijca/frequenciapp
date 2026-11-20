@@ -149,11 +149,13 @@ function estilosIcone(theme: Theme, variante: VarianteBotao) {
     case "texto":
       return {
         color: palette.text.secondary,
-        backgroundColor: "transparent",
-        borderColor: "transparent",
-        "&:hover": {
-          backgroundColor: palette.action.hover,
+        "&.MuiIconButton-root": {
+          backgroundColor: "transparent",
           borderColor: "transparent",
+          "&:hover": {
+            backgroundColor: palette.action.hover,
+            borderColor: "transparent",
+          },
         },
       };
     case "contorno":
@@ -202,17 +204,15 @@ export function BotaoIcone({
       onClick={usaLink ? undefined : onClick}
       disabled={desabilitado}
       loading={carregando}
-      sx={combinarSx(
-        [
-          {
-            width: TOKENS_LAYOUT.botao[tamanho],
-            height: TOKENS_LAYOUT.botao[tamanho],
-            ...ALVO_TOQUE,
-          },
-          (theme) => estilosIcone(theme, variante),
-        ],
-        sx,
-      )}
+      sx={[
+        {
+          width: TOKENS_LAYOUT.botao[tamanho],
+          height: TOKENS_LAYOUT.botao[tamanho],
+          ...ALVO_TOQUE,
+        },
+        (theme) => estilosIcone(theme, variante),
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
       {...props}
     >
       {icone}

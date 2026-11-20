@@ -12,9 +12,10 @@ const TONS = {
   perigo: "error",
 } as const satisfies Record<TomSelo, ChipProps["color"]>;
 
-export type SeloProps = Omit<ChipProps, "color" | "size" | "label" | "className"> & {
+export type SeloProps = Omit<ChipProps, "color" | "size" | "label" | "className" | "children"> & {
   /** Texto do selo, equivalente ao conteúdo enviado como children. */
   rotulo?: ReactNode;
+  children?: ReactNode;
   tom?: TomSelo;
   tamanho?: TamanhoSelo;
 };

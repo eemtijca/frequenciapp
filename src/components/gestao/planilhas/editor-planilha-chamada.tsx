@@ -2,7 +2,7 @@
 
 // Centraliza a revisão de linhas e valores da chamada por turma e mês na Gestão.
 import { useState } from "react";
-import AddPersonRoundedIcon from "@mui/icons-material/AddPersonRounded";
+import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import LockRoundedIcon from "@mui/icons-material/LockRounded";
@@ -25,7 +25,7 @@ const ACOES: readonly {
   titulo: string;
   icone: SvgIconComponent;
 }[] = [
-  { acao: "adicionar", titulo: "Adicionar alunos", icone: AddPersonRoundedIcon },
+  { acao: "adicionar", titulo: "Adicionar alunos", icone: PersonAddAlt1RoundedIcon },
   { acao: "corrigir", titulo: "Corrigir dados", icone: EditNoteRoundedIcon },
   {
     acao: "remover",

@@ -372,7 +372,7 @@ export default function IntegracaoPlanilha({
 
   const conteudoEnviar = (
     <Box
-      ref={(elemento) => {
+      ref={(elemento: HTMLDivElement | null) => {
         etapas.current.envio = elemento;
       }}
       tabIndex={-1}
@@ -585,7 +585,7 @@ export default function IntegracaoPlanilha({
         onEtapa={irParaEtapa}
       />
       <Box
-        ref={(elemento) => {
+        ref={(elemento: HTMLDivElement | null) => {
           etapas.current.conexao = elemento;
         }}
         tabIndex={-1}
@@ -601,7 +601,7 @@ export default function IntegracaoPlanilha({
         </EtapaPlanilha>
       </Box>
       <Box
-        ref={(elemento) => {
+        ref={(elemento: HTMLDivElement | null) => {
           etapas.current.estrutura = elemento;
         }}
         tabIndex={-1}
