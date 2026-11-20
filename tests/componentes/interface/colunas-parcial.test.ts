@@ -56,7 +56,7 @@ it("alinha a tabela no desktop, mantém os cartões no celular e responde à lar
       [480, 768, 964].map((coluna) => ({ width: 1440, fonte, coluna })),
     ),
   ]) {
-    for (const tema of ["light", "dark"]) {
+    for (const tema of ["light", "dark"] as const) {
       const page = await navegador.newPage({ viewport: { width, height: 900 } });
       try {
         await page.emulateMedia({ colorScheme: tema });
@@ -383,7 +383,7 @@ it("alinha a tabela no desktop, mantém os cartões no celular e responde à lar
             .waitFor({ state: "visible" });
           const chave = page.getByRole("switch", { name: "Registro na Seduc: Aluno Justificado" });
           await chave.click();
-          await expect(chave).toBeChecked();
+          await expect.poll(() => chave.isChecked()).toBe(true);
           expect(confirmacoes).toEqual([
             {
               dia: "2026-10-27",

@@ -22,7 +22,7 @@ import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import type { SxProps, Theme } from "@mui/material/styles";
+import type { Theme } from "@mui/material/styles";
 import type {
   Aluno,
   ConfirmacaoSeducAluno,
@@ -167,9 +167,9 @@ function estiloAcaoBase(tema: Theme) {
   };
 }
 
-const ESTILO_ACAO = (tema: Theme): SxProps<Theme> => estiloAcaoBase(tema);
+const ESTILO_ACAO = (tema: Theme) => estiloAcaoBase(tema);
 
-const ESTILO_ACAO_ICONE = (tema: Theme): SxProps<Theme> => ({
+const ESTILO_ACAO_ICONE = (tema: Theme) => ({
   ...estiloAcaoBase(tema),
   width: 48,
   height: 48,
