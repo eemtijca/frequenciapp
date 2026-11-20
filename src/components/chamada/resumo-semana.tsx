@@ -434,7 +434,7 @@ export function VistaResumoSemana({
         (a.horario ?? "").localeCompare(b.horario ?? "") ||
         a.nome.localeCompare(b.nome, "pt-BR"),
     );
-  }, [alunos, dados, mostrarSaidas, turmas]);
+  }, [alunos, dados, mostrarSaidas]);
 
   const movimentacoesPorDia = useMemo(
     () =>

@@ -20,6 +20,7 @@ export interface CampoSenhaProps {
   name?: string;
   autoComplete?: string;
   required?: boolean;
+  maxLength?: number;
 }
 
 export function CampoSenha({
@@ -32,6 +33,7 @@ export function CampoSenha({
   name,
   autoComplete,
   required,
+  maxLength,
 }: CampoSenhaProps) {
   const [visivel, setVisivel] = useState(false);
   const campo = useCampo();
@@ -51,6 +53,7 @@ export function CampoSenha({
       name={name}
       autoComplete={autoComplete}
       required={required}
+      maxLength={maxLength}
       endAdornment={
         <InputAdornment position="end">
           <IconButton

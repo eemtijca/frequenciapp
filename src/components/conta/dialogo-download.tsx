@@ -3,24 +3,24 @@
 // Escolha comum a todas as exportações: ZIP protegido por padrão,
 // senha apenas em memória e preparação do arquivo após confirmação.
 import { useEffect, useId, useRef, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import Box from "@mui/material/Box";
+import FormControl from "@mui/material/FormControl";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import FormLabel from "@mui/material/FormLabel";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { erroSenhaZip, MAXIMO_SENHA_ZIP } from "@/domain/downloads";
 import { baixarArquivo, protegerArquivo, type ArquivoDownload } from "@/lib/downloads";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro } from "@/lib/avisos";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { CampoSenha } from "@/components/ui/campo-senha";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 
 interface Props {
   aberto: boolean;
@@ -30,6 +30,8 @@ interface Props {
   onConcluido: () => void;
 }
 
+type Formato = "protegido" | "original";
+
 function ConteudoDownload({
   onAbrir,
   preparar,
@@ -37,7 +39,8 @@ function ConteudoDownload({
   confirmarAdmin,
 }: Omit<Props, "aberto">) {
   const id = useId();
-  const [protegido, setProtegido] = useState(true);
+  const idFormulario = `${id}-formulario`;
+  const [formato, setFormato] = useState<Formato>("protegido");
   const [senha, setSenha] = useState("");
   const [confirmacao, setConfirmacao] = useState("");
   const [senhaAdmin, setSenhaAdmin] = useState("");
@@ -49,6 +52,7 @@ function ConteudoDownload({
       montado.current = false;
     };
   }, []);
+  const protegido = formato === "protegido";
   const { executando, executar } = useAcaoUnica(async () => {
     if (confirmarAdmin && !senhaAdmin) {
       setErro("Informe a senha atual do administrador para baixar a cópia completa.");
@@ -100,163 +104,133 @@ function ConteudoDownload({
   }
 
   return (
-    <DialogContent
-      showCloseButton={!executando}
-      onEscapeKeyDown={(evento) => {
-        evento.preventDefault();
-        fechar();
-      }}
-      onPointerDownOutside={(evento) => {
-        evento.preventDefault();
-        fechar();
-      }}
+    <Dialogo
+      aberto
+      onFechar={fechar}
+      titulo="Preparar download"
+      descricao="O arquivo contém dados escolares. A proteção por senha ajuda a limitar o acesso ao conteúdo ao compartilhar ou guardar a exportação."
+      tamanho="medio"
+      acoes={
+        <>
+          <Botao type="button" variante="contorno" disabled={executando} onClick={fechar}>
+            Cancelar
+          </Botao>
+          <Botao type="submit" form={idFormulario} carregando={executando} disabled={executando}>
+            {executando
+              ? "Preparando..."
+              : protegido
+                ? "Baixar ZIP protegido"
+                : "Baixar arquivo original"}
+          </Botao>
+        </>
+      }
     >
-      <DialogHeader>
-        <DialogTitle>Preparar download</DialogTitle>
-        <DialogDescription>
-          O arquivo contém dados escolares. A proteção por senha ajuda a limitar o acesso ao
-          conteúdo ao compartilhar ou guardar a exportação.
-        </DialogDescription>
-      </DialogHeader>
-      <form
-        className="flex flex-col gap-4"
+      <Box
+        component="form"
+        id={idFormulario}
         noValidate
         onSubmit={(evento) => {
           evento.preventDefault();
           void executar();
         }}
       >
-        {confirmarAdmin && (
-          <div className="flex flex-col gap-2">
-            <Label htmlFor={`${id}-admin`}>Senha atual do administrador</Label>
-            <CampoSenha
+        <Stack spacing={2}>
+          {confirmarAdmin ? (
+            <Campo
               id={`${id}-admin`}
-              value={senhaAdmin}
-              onChange={(evento) => setSenhaAdmin(evento.target.value)}
-              autoComplete="current-password"
-              maxLength={200}
+              rotulo="Senha atual do administrador"
+              descricao="Confirma o acesso à cópia completa da escola. É diferente da senha do ZIP."
               disabled={executando}
-              className="h-11"
-            />
-            <p className="text-muted-foreground text-xs">
-              Confirma o acesso à cópia completa da escola. É diferente da senha do ZIP.
-            </p>
-          </div>
-        )}
-        <fieldset disabled={executando} className="flex flex-col gap-3">
-          <legend className="mb-2 text-sm font-medium">Formato do download</legend>
-          <Label
-            className={cn(
-              "controle flex min-h-11 cursor-pointer items-center gap-3 p-3",
-              protegido && "selecionado",
-            )}
-          >
-            <input
-              type="radio"
-              name={`${id}-formato`}
-              checked={protegido}
-              onChange={() => {
-                setProtegido(true);
-                setErro("");
-              }}
-            />
-            ZIP protegido por senha
-          </Label>
-          <Label
-            className={cn(
-              "controle flex min-h-11 cursor-pointer items-center gap-3 p-3",
-              !protegido && "selecionado",
-            )}
-          >
-            <input
-              type="radio"
-              name={`${id}-formato`}
-              checked={!protegido}
-              onChange={() => {
-                setProtegido(false);
-                setSenha("");
-                setConfirmacao("");
-                setErro("");
-              }}
-            />
-            Arquivo original sem senha
-          </Label>
-        </fieldset>
-        {protegido ? (
-          <>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={`${id}-senha`}>Senha do ZIP</Label>
+            >
               <CampoSenha
+                valor={senhaAdmin}
+                onValor={setSenhaAdmin}
+                autoComplete="current-password"
+                maxLength={200}
+                disabled={executando}
+              />
+            </Campo>
+          ) : null}
+          <FormControl
+            component="fieldset"
+            disabled={executando}
+            sx={{ border: 0, m: 0, p: 0, minWidth: 0 }}
+          >
+            <FormLabel component="legend" sx={{ mb: 1 }}>
+              Formato do download
+            </FormLabel>
+            <RadioGroup
+              value={formato}
+              onChange={(evento) => {
+                const escolhido = evento.target.value === "original" ? "original" : "protegido";
+                setFormato(escolhido);
+                if (escolhido === "original") {
+                  setSenha("");
+                  setConfirmacao("");
+                }
+                setErro("");
+              }}
+            >
+              <FormControlLabel
+                value="protegido"
+                control={<Radio />}
+                label="ZIP protegido por senha"
+              />
+              <FormControlLabel
+                value="original"
+                control={<Radio />}
+                label="Arquivo original sem senha"
+              />
+            </RadioGroup>
+          </FormControl>
+          {protegido ? (
+            <>
+              <Campo
                 id={`${id}-senha`}
-                value={senha}
-                onChange={(evento) => setSenha(evento.target.value)}
-                autoComplete="off"
-                maxLength={MAXIMO_SENHA_ZIP * 2}
+                rotulo="Senha do ZIP"
+                descricao="De 12 a 128 caracteres. Prefira uma frase longa, diferente da senha de acesso."
                 disabled={executando}
-                spellCheck={false}
-                autoCapitalize="none"
-                aria-describedby={`${id}-ajuda`}
-                className="h-11"
-              />
-              <p id={`${id}-ajuda`} className="text-muted-foreground text-xs">
-                De 12 a 128 caracteres. Prefira uma frase longa, diferente da senha de acesso.
-              </p>
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={`${id}-confirmacao`}>Confirmar senha do ZIP</Label>
-              <CampoSenha
-                id={`${id}-confirmacao`}
-                value={confirmacao}
-                onChange={(evento) => setConfirmacao(evento.target.value)}
-                autoComplete="off"
-                maxLength={MAXIMO_SENHA_ZIP * 2}
-                disabled={executando}
-                spellCheck={false}
-                autoCapitalize="none"
-                className="h-11"
-              />
-            </div>
-            <p className="text-muted-foreground text-xs">
-              A senha do ZIP não é enviada ao servidor nem guardada pelo app e não pode ser
-              recuperada. Compartilhe a senha por outro canal. Para abrir, use um extrator
-              compatível com ZIP AES, como 7-Zip ou Keka. Extraia o arquivo antes de importar uma
-              cópia ou relação.
-            </p>
-          </>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            O conteúdo ficará acessível a quem tiver o arquivo. Guarde em local seguro e compartilhe
-            somente com pessoas autorizadas.
-          </p>
-        )}
-        {erro && (
-          <p role="alert" className="text-destructive text-sm">
-            {erro}
-          </p>
-        )}
-        <DialogFooter>
-          <Button type="button" variant="outline" disabled={executando} onClick={fechar}>
-            Cancelar
-          </Button>
-          <Button type="submit" disabled={executando}>
-            {executando && <LoaderCircle size={16} className="animate-spin" />}
-            {executando
-              ? "Preparando..."
-              : protegido
-                ? "Baixar ZIP protegido"
-                : "Baixar arquivo original"}
-          </Button>
-        </DialogFooter>
-      </form>
-    </DialogContent>
+              >
+                <CampoSenha
+                  valor={senha}
+                  onValor={setSenha}
+                  autoComplete="off"
+                  maxLength={MAXIMO_SENHA_ZIP * 2}
+                  disabled={executando}
+                />
+              </Campo>
+              <Campo id={`${id}-confirmacao`} rotulo="Confirmar senha do ZIP" disabled={executando}>
+                <CampoSenha
+                  valor={confirmacao}
+                  onValor={setConfirmacao}
+                  autoComplete="off"
+                  maxLength={MAXIMO_SENHA_ZIP * 2}
+                  disabled={executando}
+                />
+              </Campo>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                A senha do ZIP não é enviada ao servidor nem guardada pelo app e não pode ser
+                recuperada. Compartilhe a senha por outro canal. Para abrir, use um extrator
+                compatível com ZIP AES, como 7-Zip ou Keka. Extraia o arquivo antes de importar uma
+                cópia ou relação.
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              O conteúdo ficará acessível a quem tiver o arquivo. Guarde em local seguro e
+              compartilhe somente com pessoas autorizadas.
+            </Typography>
+          )}
+          {erro ? (
+            <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
+          ) : null}
+        </Stack>
+      </Box>
+    </Dialogo>
   );
 }
 
 export default function DialogoDownload({ aberto, ...props }: Props) {
   // Desmontar o conteúdo limpa a senha também ao fechar ou trocar de visão.
-  return (
-    <Dialog open={aberto} onOpenChange={props.onAbrir}>
-      {aberto && <ConteudoDownload {...props} />}
-    </Dialog>
-  );
+  return aberto ? <ConteudoDownload {...props} /> : null;
 }
