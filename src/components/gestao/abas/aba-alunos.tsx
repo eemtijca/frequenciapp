@@ -2,54 +2,48 @@
 
 // Aba de alunos: criar, editar, mover de turma, ativar, desativar e
 // excluir, agrupados por turma com busca por nome.
-import { memo, useCallback, useMemo, useState } from "react";
-import {
-  Check,
-  FileDown,
-  FileUp,
-  LoaderCircle,
-  Pencil,
-  Plus,
-  Power,
-  Trash2,
-  UserRound,
-  UserRoundX,
-} from "lucide-react";
-import { toast } from "sonner";
+import { Fragment, memo, useCallback, useMemo, useState } from "react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CheckBoxOutlineBlankRoundedIcon from "@mui/icons-material/CheckBoxOutlineBlankRounded";
+import CheckBoxRoundedIcon from "@mui/icons-material/CheckBoxRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
+import FileUploadRoundedIcon from "@mui/icons-material/FileUploadRounded";
+import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
+import PersonOffRoundedIcon from "@mui/icons-material/PersonOffRounded";
+import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
+import SearchOffRoundedIcon from "@mui/icons-material/SearchOffRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
+import { TabelaPadrao } from "@/components/layout/tabela-padrao";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { SecaoConteudo } from "@/components/layout/secao-conteudo";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import type { Aluno, Turma } from "@/domain/frequencia";
+import { normalizar } from "@/domain/frequencia";
+import { relacaoParaCsv } from "@/domain/importacao-alunos";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import type { Aluno, Turma } from "@/domain/frequencia";
-import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { BarraBusca } from "@/components/ui/barra-busca";
-import { Label } from "@/components/ui/label";
-import { Selecionar } from "@/components/ui/selecionar";
 import DialogoDownload from "@/components/conta/dialogo-download";
 import DialogoImportarRelacao from "@/components/gestao/cadastros/dialogo-importar-relacao";
 import DialogoRestaurarOrigens from "@/components/gestao/cadastros/dialogo-restaurar-origens";
-import { relacaoParaCsv } from "@/domain/importacao-alunos";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   turmas: Turma[];
@@ -75,6 +69,16 @@ interface PropsLinhaAluno {
   onExcluir: (aluno: Aluno) => void;
 }
 
+interface AcaoAluno {
+  tipo: "ativo" | "excluir";
+  aluno: Aluno;
+}
+
+const ALVO_ACAO = {
+  width: TOKENS_LAYOUT.alvoToque,
+  height: TOKENS_LAYOUT.alvoToque,
+} as const;
+
 const LinhaAluno = memo(function LinhaAluno({
   aluno,
   origem,
@@ -87,114 +91,83 @@ const LinhaAluno = memo(function LinhaAluno({
   onExcluir,
 }: PropsLinhaAluno) {
   return (
-    <li className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}>
-      {modoSelecao && (
-        <button
-          type="button"
-          aria-pressed={selecionado}
-          aria-label={`Selecionar ${aluno.nome}`}
-          onClick={() => onSelecionar(aluno.id)}
-          className="pressionavel -ml-2 flex size-11 shrink-0 items-center justify-center rounded-lg"
-        >
-          <span
-            className={`flex size-5 items-center justify-center rounded ${
-              selecionado ? "bg-primary text-primary-foreground" : "bg-secondary"
-            }`}
-          >
-            {selecionado && <Check size={13} aria-hidden="true" />}
-          </span>
-        </button>
-      )}
-      <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
+    <TableRow sx={{ opacity: aluno.ativo ? 1 : 0.55 }}>
+      <TableCell sx={{ width: 64, color: "text.secondary", fontVariantNumeric: "tabular-nums" }}>
         {String(aluno.ordem).padStart(2, "0")}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{aluno.nome}</p>
-        {aluno.turmaOriginalId !== aluno.turmaId && (
-          <p className="text-muted-foreground text-xs">Origem {origem}</p>
-        )}
-        {aluno.desistenteEm ? (
-          <p className="text-muted-foreground text-xs">Desistente</p>
-        ) : !aluno.ativo ? (
-          <p className="text-muted-foreground text-xs">desativado</p>
-        ) : null}
-      </div>
-      {!modoSelecao && (
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-11"
-            aria-label={`Editar ${aluno.nome}`}
-            onClick={() => onEditar(aluno)}
+      </TableCell>
+      <TableCell component="th" scope="row">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
+          {modoSelecao ? (
+            <BotaoIcone
+              rotulo={`Selecionar ${aluno.nome}`}
+              icone={
+                selecionado ? (
+                  <CheckBoxRoundedIcon fontSize="small" />
+                ) : (
+                  <CheckBoxOutlineBlankRoundedIcon fontSize="small" />
+                )
+              }
+              variante="texto"
+              aria-pressed={selecionado}
+              sx={ALVO_ACAO}
+              onClick={() => onSelecionar(aluno.id)}
+            />
+          ) : null}
+          <Box sx={{ minWidth: 0 }}>
+            <Typography noWrap sx={{ fontWeight: 500 }}>
+              {aluno.nome}
+            </Typography>
+            {aluno.turmaOriginalId !== aluno.turmaId ? (
+              <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
+                Origem {origem}
+              </Typography>
+            ) : null}
+            {aluno.desistenteEm ? (
+              <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
+                Desistente
+              </Typography>
+            ) : !aluno.ativo ? (
+              <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
+                desativado
+              </Typography>
+            ) : null}
+          </Box>
+        </Stack>
+      </TableCell>
+      {!modoSelecao ? (
+        <TableCell align="right">
+          <Stack
+            direction="row"
+            spacing={0.5}
+            sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}
           >
-            <Pencil size={16} />
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-11"
-                aria-label={aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`}
-                disabled={ocupado || Boolean(aluno.desistenteEm)}
-              >
-                <Power size={16} />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {aluno.ativo ? `Desativar ${aluno.nome}?` : `Reativar ${aluno.nome}?`}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  {aluno.ativo
-                    ? "O aluno sai das chamadas futuras, mas o histórico existente é preservado. Para apagar os dados, use a exclusão."
-                    : "O aluno volta a aparecer nas chamadas futuras. O histórico existente é preservado."}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={() => onAlternarAtivo(aluno)} disabled={ocupado}>
-                  {aluno.ativo ? "Desativar" : "Reativar"}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-falta-texto size-11"
-                aria-label={`Excluir ${aluno.nome}`}
-              >
-                <Trash2 size={16} />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Excluir {aluno.nome}?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  A exclusão é definitiva e apaga também faltas, saídas e entradas do aluno. Para
-                  preservar o histórico, desative em vez de excluir.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  onClick={() => onExcluir(aluno)}
-                  disabled={ocupado}
-                >
-                  Excluir
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      )}
-    </li>
+            <BotaoIcone
+              rotulo={`Editar ${aluno.nome}`}
+              icone={<EditRoundedIcon fontSize="small" />}
+              variante="texto"
+              sx={ALVO_ACAO}
+              onClick={() => onEditar(aluno)}
+            />
+            <BotaoIcone
+              rotulo={aluno.ativo ? `Desativar ${aluno.nome}` : `Reativar ${aluno.nome}`}
+              icone={<PowerSettingsNewRoundedIcon fontSize="small" />}
+              variante="texto"
+              sx={ALVO_ACAO}
+              disabled={ocupado || Boolean(aluno.desistenteEm)}
+              onClick={() => onAlternarAtivo(aluno)}
+            />
+            <BotaoIcone
+              rotulo={`Excluir ${aluno.nome}`}
+              icone={<DeleteRoundedIcon fontSize="small" />}
+              variante="texto"
+              sx={[ALVO_ACAO, (tema) => ({ color: tema.vars.palette.falta.texto })]}
+              disabled={ocupado}
+              onClick={() => onExcluir(aluno)}
+            />
+          </Stack>
+        </TableCell>
+      ) : null}
+    </TableRow>
   );
 });
 
@@ -215,6 +188,9 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
   const [origemEmMassa, setOrigemEmMassa] = useState("");
   const [downloadAberto, setDownloadAberto] = useState(false);
   const [importarAberto, setImportarAberto] = useState(false);
+  const [acaoAluno, setAcaoAluno] = useState<AcaoAluno | null>(null);
+  const [confirmarDesistencia, setConfirmarDesistencia] = useState(false);
+  const [confirmarOrigem, setConfirmarOrigem] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();
 
   const opcoesTurma = useMemo(
@@ -292,6 +268,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     setModoSelecao(false);
     setSelecionados(new Set());
     setOrigemEmMassa("");
+    setConfirmarOrigem(false);
   }
 
   const { executando: aplicando, executar: aplicarOrigem } = useAcaoUnica(async () => {
@@ -313,9 +290,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       cancelarSelecao();
       await onMudanca();
     } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível atualizar a origem.";
-      toast.error(mensagem);
+      avisarErro(excecao, { contexto: "Não foi possível atualizar a origem." });
     }
   });
 
@@ -380,12 +355,10 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             `/api/alunos/${aluno.id}`,
             corpoAlteracao("PATCH", { ativo: !aluno.ativo }),
           );
-          toast.success(aluno.ativo ? "Aluno desativado." : "Aluno reativado.");
+          avisarSucesso(aluno.ativo ? "Aluno desativado." : "Aluno reativado.");
           await onMudanca();
         } catch (excecao) {
-          const mensagem =
-            excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar o aluno.";
-          toast.error(mensagem);
+          avisarErro(excecao, { contexto: "Não foi possível alterar o aluno." });
         }
       });
     },
@@ -399,15 +372,13 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
           `/api/alunos/${aluno.id}`,
           corpoAlteracao("PATCH", { desistente: !aluno.desistenteEm }),
         );
-        toast.success(
+        avisarSucesso(
           aluno.desistenteEm ? "Desistência desfeita." : "Aluno marcado como desistente.",
         );
         setDialogoAberto(false);
         await onMudanca();
       } catch (excecao) {
-        const mensagem =
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a situação.";
-        toast.error(mensagem);
+        avisarErro(excecao, { contexto: "Não foi possível alterar a situação." });
       }
     });
   }
@@ -417,12 +388,10 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       void executarPorChave(aluno.id, async () => {
         try {
           await pedir<{ ok: boolean }>(`/api/alunos/${aluno.id}`, corpoAlteracao("DELETE"));
-          toast.success("Aluno excluído.");
+          avisarSucesso("Aluno excluído.");
           await onMudanca();
         } catch (excecao) {
-          const mensagem =
-            excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir o aluno.";
-          toast.error(mensagem);
+          avisarErro(excecao, { contexto: "Não foi possível excluir o aluno." });
         }
       });
     },
@@ -457,162 +426,188 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
     };
   }
 
+  function confirmarAcaoAluno() {
+    const acao = acaoAluno;
+    setAcaoAluno(null);
+    if (!acao) return;
+    if (acao.tipo === "excluir") excluir(acao.aluno);
+    else alternarAtivo(acao.aluno);
+  }
+
+  const alunoConfirmado = acaoAluno?.aluno;
+  const tituloAcao =
+    acaoAluno?.tipo === "excluir"
+      ? `Excluir ${alunoConfirmado?.nome ?? ""}?`
+      : alunoConfirmado?.ativo
+        ? `Desativar ${alunoConfirmado.nome}?`
+        : `Reativar ${alunoConfirmado?.nome ?? ""}?`;
+  const descricaoAcao =
+    acaoAluno?.tipo === "excluir"
+      ? "A exclusão é definitiva e apaga também faltas, saídas e entradas do aluno. Para preservar o histórico, desative em vez de excluir."
+      : alunoConfirmado?.ativo
+        ? "O aluno sai das chamadas futuras, mas o histórico existente é preservado. Para apagar os dados, use a exclusão."
+        : "O aluno volta a aparecer nas chamadas futuras. O histórico existente é preservado.";
+
   return (
-    <div className="flex flex-col gap-4">
-      {/* No celular, as ações ficam numa grade de duas colunas, sem corte. */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <p className="text-muted-foreground text-sm">
+    <Stack spacing={2}>
+      <Stack
+        direction={{ xs: "column", lg: "row" }}
+        spacing={2}
+        useFlexGap
+        sx={{ alignItems: { xs: "stretch", lg: "center" }, justifyContent: "space-between" }}
+      >
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {modoSelecao
             ? `${selecionados.size} ${
                 selecionados.size === 1 ? "aluno selecionado" : "alunos selecionados"
               }`
             : `${alunos.length} no total · ${ativos} ativos`}
-        </p>
+        </Typography>
         {modoSelecao ? (
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
-            <Button variant="outline" className="h-11 whitespace-nowrap" onClick={alternarTodos}>
-              <Check size={16} />
+          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+            <Botao
+              variante="contorno"
+              icone={<CheckRoundedIcon />}
+              sx={{ whiteSpace: "nowrap" }}
+              onClick={alternarTodos}
+            >
               Selecionar todos
-            </Button>
-            <Button variant="ghost" className="h-11 whitespace-nowrap" onClick={cancelarSelecao}>
+            </Botao>
+            <Botao variante="texto" sx={{ whiteSpace: "nowrap" }} onClick={cancelarSelecao}>
               Cancelar
-            </Button>
-          </div>
+            </Botao>
+          </Stack>
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
-            <Button
-              variant="outline"
-              className="h-11 whitespace-nowrap"
+          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+            <Botao
+              variante="contorno"
+              icone={<FileUploadRoundedIcon />}
+              sx={{ whiteSpace: "nowrap" }}
               onClick={() => setImportarAberto(true)}
               disabled={turmas.length === 0}
             >
-              <FileUp size={16} />
               Importar relação
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11 whitespace-nowrap"
+            </Botao>
+            <Botao
+              variante="contorno"
+              icone={<FileDownloadRoundedIcon />}
+              sx={{ whiteSpace: "nowrap" }}
               onClick={() => setDownloadAberto(true)}
               disabled={ativos === 0}
             >
-              <FileDown size={16} />
               Exportar relação
-            </Button>
-            <Button
-              variant="outline"
-              className="h-11 whitespace-nowrap"
+            </Botao>
+            <Botao
+              variante="contorno"
+              icone={<CheckRoundedIcon />}
+              sx={{ whiteSpace: "nowrap" }}
               onClick={() => setModoSelecao(true)}
               disabled={turmas.length === 0 || alunos.length === 0}
             >
-              <Check size={16} />
               Definir origem
-            </Button>
+            </Botao>
             <DialogoRestaurarOrigens turmas={turmas} alunos={alunos} onMudanca={onMudanca} />
-            <Button
-              size="lg"
-              className="h-11 whitespace-nowrap"
+            <Botao
+              variante="secundario"
+              icone={<AddRoundedIcon />}
+              sx={{ whiteSpace: "nowrap" }}
               onClick={abrirNovo}
               disabled={turmas.length === 0}
             >
-              <Plus size={16} />
               Novo aluno
-            </Button>
-          </div>
+            </Botao>
+          </Stack>
         )}
-      </div>
+      </Stack>
 
-      {modoSelecao && (
-        <div className="superficie flex flex-col gap-3 p-3">
-          <p className="text-muted-foreground text-xs leading-relaxed">
-            Mudar a turma de origem não move o aluno. A Grade e a planilha passam a agrupar o
-            histórico pela origem escolhida.
-          </p>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <Label htmlFor="origem-em-massa">Turma de origem</Label>
-              <Selecionar
-                id="origem-em-massa"
-                value={origemEmMassa}
-                buscavel
-                onValueChange={setOrigemEmMassa}
-                placeholder="Escolha a turma"
-                opcoes={opcoesTurma}
-              />
-            </div>
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  className="h-11 sm:w-auto"
-                  disabled={aplicando || selecionados.size === 0 || origemEmMassa === ""}
-                >
-                  {aplicando ? (
-                    <LoaderCircle size={16} className="animate-spin" />
-                  ) : (
-                    <Check size={16} />
-                  )}
-                  Aplicar origem
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Aplicar origem em massa?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    A origem de {selecionados.size}{" "}
-                    {selecionados.size === 1 ? "aluno selecionado" : "alunos selecionados"} passa a
-                    ser {rotulo(origemEmMassa)}. A turma atual não muda; a Grade e a planilha usam a
-                    nova origem.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => void aplicarOrigem()} disabled={aplicando}>
-                    Aplicar origem
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
-        </div>
-      )}
+      {modoSelecao ? (
+        <SecaoConteudo descricao="Mudar a turma de origem não move o aluno. A Grade e a planilha passam a agrupar o histórico pela origem escolhida.">
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ alignItems: { xs: "stretch", sm: "flex-end" } }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Campo id="origem-em-massa" rotulo="Turma de origem">
+                <Selecionar
+                  valor={origemEmMassa}
+                  buscavel
+                  onValor={setOrigemEmMassa}
+                  placeholder="Escolha a turma"
+                  opcoes={opcoesTurma}
+                />
+              </Campo>
+            </Box>
+            <Botao
+              variante="secundario"
+              icone={<CheckRoundedIcon />}
+              carregando={aplicando}
+              disabled={selecionados.size === 0 || origemEmMassa === ""}
+              onClick={() => setConfirmarOrigem(true)}
+            >
+              Aplicar origem
+            </Botao>
+          </Stack>
+        </SecaoConteudo>
+      ) : null}
 
-      <div className="superficie overflow-hidden">
-        <BarraBusca
-          id="busca-gestao-aluno"
-          valor={busca}
-          onValor={setBusca}
-          placeholder="Buscar aluno"
-          className="rounded-none px-3 py-1.5"
+      <BarraBusca
+        id="busca-gestao-aluno"
+        valor={busca}
+        onValor={setBusca}
+        placeholder="Buscar aluno"
+      />
+
+      {turmas.length === 0 ? (
+        <EstadoVazio
+          icone={<PersonAddRoundedIcon />}
+          titulo="Nenhuma turma cadastrada"
+          descricao="Crie séries e turmas antes de cadastrar alunos."
         />
-
-        {turmas.length === 0 ? (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 text-center">
-            <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
-            <p className="font-medium">Nenhuma turma cadastrada</p>
-            <p className="text-muted-foreground text-sm">
-              Crie séries e turmas antes de cadastrar alunos.
-            </p>
-          </div>
-        ) : gruposFiltrados.length === 0 ||
-          gruposFiltrados.every(([, , lista]) => lista.length === 0) ? (
-          <div className="flex min-h-40 flex-col items-center justify-center gap-2 px-6 text-center">
-            <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
-            <p className="font-medium">Nenhum aluno encontrado</p>
-            <p className="text-muted-foreground text-sm">
-              {busca === "" ? "Cadastre o primeiro aluno da turma." : "Nenhum aluno com esse nome."}
-            </p>
-          </div>
-        ) : (
-          gruposFiltrados
-            .filter(([, , lista]) => lista.length > 0)
-            .map(([id, turma, lista]) => (
-              <div key={id} className="grupo-distante">
-                <div className="bg-secondary/50 flex items-center justify-between border-y px-4 py-2.5 first:border-t-0">
-                  <h2 className="font-medium">{turma?.rotulo ?? "Turma"}</h2>
-                  <span className="numerais-tabulares text-muted-foreground text-xs">
-                    {lista.filter((aluno) => aluno.ativo).length} ativos
-                  </span>
-                </div>
-                <ul className="divide-y">
+      ) : gruposFiltrados.length === 0 ||
+        gruposFiltrados.every(([, , lista]) => lista.length === 0) ? (
+        <EstadoVazio
+          icone={<SearchOffRoundedIcon />}
+          titulo="Nenhum aluno encontrado"
+          descricao={
+            busca === "" ? "Cadastre o primeiro aluno da turma." : "Nenhum aluno com esse nome."
+          }
+        />
+      ) : (
+        <TabelaPadrao caption="Alunos por turma, com a origem quando ela difere da turma atual.">
+          <TableHead>
+            <TableRow>
+              <TableCell scope="col">Ordem</TableCell>
+              <TableCell scope="col">Aluno</TableCell>
+              {!modoSelecao ? (
+                <TableCell scope="col" align="right">
+                  Ações
+                </TableCell>
+              ) : null}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {gruposFiltrados
+              .filter(([, , lista]) => lista.length > 0)
+              .map(([id, turma, lista]) => (
+                <Fragment key={id}>
+                  <TableRow sx={{ backgroundColor: "action.hover" }}>
+                    <TableCell colSpan={modoSelecao ? 2 : 3} component="th" scope="colgroup">
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        useFlexGap
+                        sx={{ alignItems: "baseline", justifyContent: "space-between" }}
+                      >
+                        <Typography component="h2" variant="subtitle2" sx={{ m: 0 }}>
+                          {turma?.rotulo ?? "Turma"}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          {lista.filter((aluno) => aluno.ativo).length} ativos
+                        </Typography>
+                      </Stack>
+                    </TableCell>
+                  </TableRow>
                   {lista.map((aluno) => (
                     <LinhaAluno
                       key={aluno.id}
@@ -623,134 +618,166 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                       ocupado={chaveAtiva === aluno.id}
                       onSelecionar={alternarSelecao}
                       onEditar={abrirEdicao}
-                      onAlternarAtivo={alternarAtivo}
-                      onExcluir={excluir}
+                      onAlternarAtivo={(selecionado) =>
+                        setAcaoAluno({ tipo: "ativo", aluno: selecionado })
+                      }
+                      onExcluir={(selecionado) =>
+                        setAcaoAluno({ tipo: "excluir", aluno: selecionado })
+                      }
                     />
                   ))}
-                </ul>
-              </div>
-            ))
-        )}
-      </div>
+                </Fragment>
+              ))}
+          </TableBody>
+        </TabelaPadrao>
+      )}
 
-      <Dialog open={dialogoAberto} onOpenChange={setDialogoAberto}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{emEdicao ? `Editar ${emEdicao.nome}` : "Novo aluno"}</DialogTitle>
-          </DialogHeader>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(evento) => {
-              evento.preventDefault();
-              void submeter();
-            }}
-            noValidate
-          >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="nome-aluno-gestao">Nome</Label>
-              <Input
-                id="nome-aluno-gestao"
-                value={formulario.nome}
+      <Dialogo
+        aberto={dialogoAberto}
+        onFechar={() => setDialogoAberto(false)}
+        titulo={emEdicao ? `Editar ${emEdicao.nome}` : "Novo aluno"}
+        acoes={
+          <>
+            <Botao variante="texto" onClick={() => setDialogoAberto(false)}>
+              Cancelar
+            </Botao>
+            <Botao variante="secundario" carregando={enviando} onClick={() => void submeter()}>
+              {emEdicao ? "Salvar" : "Cadastrar"}
+            </Botao>
+          </>
+        }
+      >
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            void submeter();
+          }}
+          noValidate
+        >
+          <Stack spacing={2}>
+            <Campo id="nome-aluno-gestao" rotulo="Nome">
+              <CampoTexto
+                valor={formulario.nome}
+                onValor={(nome) => setFormulario((atual) => ({ ...atual, nome }))}
                 required
-                minLength={2}
                 maxLength={100}
                 autoComplete="off"
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, nome: evento.target.value }))
-                }
                 placeholder="Nome do aluno"
-                className="h-11"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="turma-aluno-gestao">Turma atual</Label>
+            </Campo>
+            <Campo
+              id="turma-aluno-gestao"
+              rotulo="Turma atual"
+              descricao={
+                emEdicao
+                  ? "Escolha outra turma para mover o aluno. As chamadas anteriores e a turma de origem são preservadas."
+                  : undefined
+              }
+            >
               <Selecionar
-                id="turma-aluno-gestao"
-                value={formulario.turmaId}
+                valor={formulario.turmaId}
                 buscavel
-                onValueChange={(valor) =>
+                onValor={(turmaId) =>
                   setFormulario((atual) => ({
                     ...atual,
-                    turmaId: valor,
+                    turmaId,
                     // Só o cadastro novo acompanha a turma; na edição a origem
                     // do aluno fica como está.
                     turmaOriginalId:
                       emEdicao === null && atual.turmaOriginalId === atual.turmaId
-                        ? valor
+                        ? turmaId
                         : atual.turmaOriginalId,
                   }))
                 }
                 opcoes={opcoesTurma}
               />
-              {emEdicao && (
-                <p className="text-muted-foreground text-xs">
-                  Escolha outra turma para mover o aluno. As chamadas anteriores e a turma de origem
-                  são preservadas.
-                </p>
-              )}
-            </div>
-            {emEdicao && emEdicao.ativo && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button type="button" variant="outline" className="justify-start">
-                    <UserRoundX size={16} />
-                    {emEdicao.desistenteEm ? "Desfazer desistência" : "Marcar como desistente"}
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>
-                      {emEdicao.desistenteEm
-                        ? `Desfazer a desistência de ${emEdicao.nome}?`
-                        : `Marcar ${emEdicao.nome} como desistente?`}
-                    </AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {emEdicao.desistenteEm
-                        ? "O aluno volta a poder receber marcas nas chamadas atuais. Os registros anteriores permanecem."
-                        : "O aluno continua visível na Chamada, com a marcação bloqueada. As faltas anteriores permanecem."}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction
-                      onClick={() => alternarDesistencia(emEdicao)}
-                      disabled={chaveAtiva === emEdicao.id}
-                    >
-                      Confirmar
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
-            )}
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="origem-aluno-gestao">Turma de origem</Label>
+            </Campo>
+            {emEdicao && emEdicao.ativo ? (
+              <Box>
+                <Botao
+                  variante="contorno"
+                  icone={<PersonOffRoundedIcon />}
+                  disabled={chaveAtiva === emEdicao.id}
+                  onClick={() => setConfirmarDesistencia(true)}
+                >
+                  {emEdicao.desistenteEm ? "Desfazer desistência" : "Marcar como desistente"}
+                </Botao>
+              </Box>
+            ) : null}
+            <Campo
+              id="origem-aluno-gestao"
+              rotulo="Turma de origem"
+              descricao="Para a Grade do mês. Por padrão é a própria turma; mude quando o aluno veio de outra."
+            >
               <Selecionar
-                id="origem-aluno-gestao"
-                value={formulario.turmaOriginalId}
+                valor={formulario.turmaOriginalId}
                 buscavel
-                onValueChange={(valor) =>
-                  setFormulario((atual) => ({ ...atual, turmaOriginalId: valor }))
+                onValor={(turmaOriginalId) =>
+                  setFormulario((atual) => ({ ...atual, turmaOriginalId }))
                 }
                 opcoes={opcoesTurma}
               />
-              <p className="text-muted-foreground text-xs">
-                Para a Grade do mês. Por padrão é a própria turma; mude quando o aluno veio de
-                outra.
-              </p>
-            </div>
-            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={enviando}>
-                {enviando && <LoaderCircle size={16} className="animate-spin" />}
-                {emEdicao ? "Salvar" : "Cadastrar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </Campo>
+            {erro ? (
+              <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+            ) : null}
+          </Stack>
+        </form>
+      </Dialogo>
+
+      <DialogoConfirmacao
+        aberto={acaoAluno !== null}
+        titulo={tituloAcao}
+        descricao={descricaoAcao}
+        rotuloConfirmar={
+          acaoAluno?.tipo === "excluir"
+            ? "Excluir"
+            : alunoConfirmado?.ativo
+              ? "Desativar"
+              : "Reativar"
+        }
+        destrutivo={acaoAluno?.tipo === "excluir"}
+        operacaoEmAndamento={alunoConfirmado?.id === chaveAtiva}
+        onConfirmar={confirmarAcaoAluno}
+        onCancelar={() => setAcaoAluno(null)}
+      />
+
+      <DialogoConfirmacao
+        aberto={confirmarDesistencia && emEdicao !== null}
+        titulo={
+          emEdicao?.desistenteEm
+            ? `Desfazer a desistência de ${emEdicao.nome}?`
+            : `Marcar ${emEdicao?.nome ?? ""} como desistente?`
+        }
+        descricao={
+          emEdicao?.desistenteEm
+            ? "O aluno volta a poder receber marcas nas chamadas atuais. Os registros anteriores permanecem."
+            : "O aluno continua visível na Chamada, com a marcação bloqueada. As faltas anteriores permanecem."
+        }
+        rotuloConfirmar="Confirmar"
+        operacaoEmAndamento={emEdicao !== null && chaveAtiva === emEdicao.id}
+        onConfirmar={() => {
+          setConfirmarDesistencia(false);
+          if (emEdicao) alternarDesistencia(emEdicao);
+        }}
+        onCancelar={() => setConfirmarDesistencia(false)}
+      />
+
+      <DialogoConfirmacao
+        aberto={confirmarOrigem}
+        titulo="Aplicar origem em massa?"
+        descricao={`A origem de ${selecionados.size} ${
+          selecionados.size === 1 ? "aluno selecionado" : "alunos selecionados"
+        } passa a ser ${rotulo(origemEmMassa)}. A turma atual não muda; a Grade e a planilha usam a nova origem.`}
+        rotuloConfirmar="Aplicar origem"
+        operacaoEmAndamento={aplicando}
+        onConfirmar={() => {
+          setConfirmarOrigem(false);
+          void aplicarOrigem();
+        }}
+        onCancelar={() => setConfirmarOrigem(false)}
+      />
+
       <DialogoDownload
         aberto={downloadAberto}
         onAbrir={setDownloadAberto}
@@ -768,6 +795,6 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         turmas={turmas}
         onImportado={onMudanca}
       />
-    </div>
+    </Stack>
   );
 }

@@ -2,25 +2,20 @@
 
 // Volta dos alunos remanejados de uma série às turmas de origem, com prévia por turma e confirmação.
 import { useMemo, useState } from "react";
-import { LoaderCircle, Undo2 } from "lucide-react";
+import UndoRoundedIcon from "@mui/icons-material/UndoRounded";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { alunosForaDaOrigem, resumoDaRestauracao } from "@/domain/restauracao-origens";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { Dialogo } from "@/components/ui/mui/dialogo";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Selecionar } from "@/components/ui/selecionar";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 function contarAlunos(quantidade: number): string {
   return quantidade === 1 ? "1 aluno" : `${quantidade} alunos`;
@@ -109,89 +104,96 @@ export default function DialogoRestaurarOrigens({
 
   return (
     <>
-      <Button
-        type="button"
-        variant="outline"
-        className="h-11 whitespace-nowrap"
+      <Botao
+        variante="contorno"
+        icone={<UndoRoundedIcon />}
         disabled={series.length === 0 || executando}
         title={series.length === 0 ? "Todos os alunos já estão nas turmas de origem." : undefined}
+        sx={{ whiteSpace: "nowrap" }}
         onClick={() => setAberto(true)}
       >
-        <Undo2 size={16} />
         Restaurar origens
-      </Button>
-      <AlertDialog
-        open={aberto}
-        onOpenChange={(valor) => {
-          if (!executando) setAberto(valor);
+      </Botao>
+      <Dialogo
+        aberto={aberto}
+        onFechar={() => {
+          if (!executando) setAberto(false);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Restaurar as turmas de origem?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Os alunos remanejados dentro da série, ativos e inativos, voltam para a turma de
-              origem. Quem mudou de série não é alterado.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {serie && (
-            <div className="flex flex-col gap-3">
-              {series.length > 1 && (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="restaurar-origens-serie">Série</Label>
-                  <Selecionar
-                    id="restaurar-origens-serie"
-                    value={serie.id}
-                    onValueChange={setSerieEscolhida}
-                    disabled={executando}
-                    opcoes={series.map((item) => ({
-                      valor: item.id,
-                      rotulo: `${item.nome} (${contarAlunos(item.movidos.length)})`,
-                    }))}
-                  />
-                </div>
-              )}
-              <ul className="superficie divide-y text-sm" aria-label="Prévia da restauração">
-                {resumo.map((item) => (
-                  <li key={item.turmaId} className="flex flex-col gap-0.5 px-3 py-2">
-                    <span className="font-medium">
-                      {rotulo(item.turmaId)}: {contarAlunos(item.quantidade)}
-                    </span>
-                    <span className="text-muted-foreground text-xs">
-                      Voltam de {item.de.map(rotulo).join(", ")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <div className="text-muted-foreground flex flex-col gap-2 text-sm">
-                <p>
-                  As turmas que perdem ou recebem alunos são reorganizadas em ordem alfabética, com
-                  inativos no fim, pela mesma regra de Reorganizar turmas. As demais turmas mantêm a
-                  numeração.
-                </p>
-                <p>
-                  Saídas já registradas desses alunos passam a aparecer na turma de origem no
-                  relatório de saídas e entradas e na planilha de saídas. Faltas, chamadas salvas,
-                  entradas e registros parciais continuam como estão.
-                </p>
-              </div>
-            </div>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={executando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(evento) => {
-                evento.preventDefault();
-                void executar();
-              }}
-              disabled={executando || !serie}
+        titulo="Restaurar as turmas de origem?"
+        descricao="Os alunos remanejados dentro da série, ativos e inativos, voltam para a turma de origem. Quem mudou de série não é alterado."
+        tamanho="grande"
+        acoes={
+          <>
+            <Botao variante="texto" disabled={executando} onClick={() => setAberto(false)}>
+              Cancelar
+            </Botao>
+            <Botao
+              variante="secundario"
+              carregando={executando}
+              disabled={!serie}
+              onClick={() => void executar()}
             >
-              {executando && <LoaderCircle size={16} className="animate-spin" />}
               {serie ? `Restaurar ${contarAlunos(serie.movidos.length)}` : "Restaurar"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </Botao>
+          </>
+        }
+      >
+        {serie ? (
+          <Stack spacing={2}>
+            {series.length > 1 ? (
+              <Campo id="restaurar-origens-serie" rotulo="Série">
+                <Selecionar
+                  valor={serie.id}
+                  onValor={setSerieEscolhida}
+                  disabled={executando}
+                  opcoes={series.map((item) => ({
+                    valor: item.id,
+                    rotulo: `${item.nome} (${contarAlunos(item.movidos.length)})`,
+                  }))}
+                />
+              </Campo>
+            ) : null}
+            <List
+              aria-label="Prévia da restauração"
+              disablePadding
+              sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}
+            >
+              {resumo.map((item) => (
+                <ListItem
+                  key={item.turmaId}
+                  sx={{
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    gap: 0.5,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    "&:last-of-type": { borderBottom: 0 },
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {rotulo(item.turmaId)}: {contarAlunos(item.quantidade)}
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Voltam de {item.de.map(rotulo).join(", ")}
+                  </Typography>
+                </ListItem>
+              ))}
+            </List>
+            <Stack spacing={1} sx={{ color: "text.secondary" }}>
+              <Typography variant="body2">
+                As turmas que perdem ou recebem alunos são reorganizadas em ordem alfabética, com
+                inativos no fim, pela mesma regra de Reorganizar turmas. As demais turmas mantêm a
+                numeração.
+              </Typography>
+              <Typography variant="body2">
+                Saídas já registradas desses alunos passam a aparecer na turma de origem no
+                relatório de saídas e entradas e na planilha de saídas. Faltas, chamadas salvas,
+                entradas e registros parciais continuam como estão.
+              </Typography>
+            </Stack>
+          </Stack>
+        ) : null}
+      </Dialogo>
     </>
   );
 }
