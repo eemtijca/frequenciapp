@@ -202,6 +202,27 @@ it("alinha cabeçalhos e linhas com ações diferentes em desktop e mantém a di
           const cabSeduc = colunas[2].getBoundingClientRect();
           const cabAcoes = colunas[3].getBoundingClientRect();
           const desktop = getComputedStyle(cabecalho.parentElement as Element).display !== "none";
+          const turma = secao?.querySelector("#parcial-turma");
+          const navegacaoDia = secao?.querySelector(".navegacao-dia");
+          const busca = cartao.querySelector("#parcial-busca")?.closest(".campo");
+          const filtro = cartao.querySelector("#parcial-filtro");
+          const contexto = turma?.closest(".superficie");
+          if (!turma || !navegacaoDia || !busca || !filtro || !contexto || !secao)
+            return ["Controles da chamada parcial ausentes"];
+          const fonte = parseFloat(getComputedStyle(document.documentElement).fontSize);
+          const pares = [
+            [turma, navegacaoDia, contexto, secao.getBoundingClientRect().width >= 36 * fonte],
+            [busca, filtro, cartao, limites.width - 2 >= 34 * fonte],
+          ] as const;
+          for (const [primeiro, segundo, painel, ladoALado] of pares) {
+            const a = primeiro.getBoundingClientRect();
+            const b = segundo.getBoundingClientRect();
+            const caixa = painel.getBoundingClientRect();
+            if (!painel.contains(segundo) || b.right > caixa.right + 1)
+              erros.push("Controle fora de seu painel");
+            if (ladoALado ? b.left < a.right : b.top < a.bottom)
+              erros.push("Turma, data ou filtros não se adaptaram à largura disponível");
+          }
           for (const linha of Array.from(lista.children)) {
             const grade = linha.firstElementChild;
             if (!grade) return ["Grade ausente"];
