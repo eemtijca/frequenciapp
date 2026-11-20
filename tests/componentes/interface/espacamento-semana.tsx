@@ -1,8 +1,10 @@
 // Reproduz as dimensões da página de chamada com dados sintéticos e o resumo real.
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
+import { ThemeProvider } from "@mui/material/styles";
 import { VistaResumoSemana } from "../../../src/components/chamada/resumo-semana";
 import { CONFIGURACOES_PADRAO, type Aluno, type Turma } from "../../../src/domain/frequencia";
+import { tema } from "../../../src/theme/tema";
 import "../../../src/app/globals.css";
 
 const dias = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31"];
@@ -65,4 +67,8 @@ function Exemplo() {
 }
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Elemento raiz ausente");
-createRoot(raiz).render(<Exemplo />);
+createRoot(raiz).render(
+  <ThemeProvider theme={tema}>
+    <Exemplo />
+  </ThemeProvider>,
+);

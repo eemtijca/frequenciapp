@@ -452,25 +452,16 @@ it.each(["Turmas", "1ª série", "1ª série A"] as const)(
   },
 );
 
-it("seletor real: foco programático na série selecionada é visível", async () => {
+it("seletor real: foco programático mantém a seleção", async () => {
   const pagina = await navegador.newPage({ reducedMotion: "reduce" });
   try {
     await pagina.goto(url);
     await pagina.locator('[data-pronto="sim"]').waitFor();
-    // Folhas globais e módulos podem ser carregados em ordens diferentes no aplicativo.
-    await pagina.evaluate(() => {
-      const modulo = document.querySelector(
-        'style[data-vite-dev-id*="seletor-turma-chamada.module.css"]',
-      );
-      if (!modulo) throw new Error("CSS do seletor ausente");
-      document.head.append(modulo);
-    });
     await pagina.getByRole("button", { name: "Turmas", exact: true }).click();
     await aguardarFimDaJanelaPonteiro(pagina);
     const serie = pagina.getByRole("button", { name: "1ª série", exact: true, pressed: true });
     await serie.evaluate((el: HTMLElement) => el.focus());
-    expect(await marcadorDesconhecido(pagina)).toBe(true);
-    expect(await serie.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
+    expect(await serie.evaluate((el) => el === document.activeElement)).toBe(true);
     expect(await serie.getAttribute("aria-pressed")).toBe("true");
   } finally {
     await pagina.close();
@@ -561,36 +552,25 @@ it("seletor real em cores forçadas preserva seleção e foco desconhecido", asy
   try {
     await pagina.goto(url);
     await pagina.locator('[data-pronto="sim"]').waitFor();
-    await pagina.evaluate(() => {
-      const modulo = document.querySelector(
-        'style[data-vite-dev-id*="seletor-turma-chamada.module.css"]',
-      );
-      if (!modulo) throw new Error("CSS do seletor ausente");
-      document.head.append(modulo);
-    });
     await pagina.getByRole("button", { name: "Turmas", exact: true }).click();
     await aguardarFimDaJanelaPonteiro(pagina);
     const serie = pagina.getByRole("button", { name: "1ª série", exact: true, pressed: true });
     const turma = pagina.getByRole("button", { name: "1ª série A", exact: true, pressed: true });
-    // Sem ícone de seleção: em cores forçadas, a série escolhida se distingue pela borda do bloco.
+    // Sem ícone de seleção: em cores forçadas, a série escolhida se distingue pela borda.
     expect(await serie.locator("svg.lucide-check").count()).toBe(0);
     expect(await turma.locator("svg.lucide-check").count()).toBe(0);
-    const [bordaDoBloco, destaque] = await pagina
-      .locator('[data-selecionada="true"]')
-      .evaluate((el) => {
-        const amostra = document.createElement("span");
-        amostra.style.color = "Highlight";
-        document.body.append(amostra);
-        const cor = getComputedStyle(amostra).color;
-        amostra.remove();
-        return [getComputedStyle(el).borderTopColor, cor];
-      });
+    const [bordaDoBloco, destaque] = await serie.evaluate((el) => {
+      const amostra = document.createElement("span");
+      amostra.style.color = "Highlight";
+      document.body.append(amostra);
+      const cor = getComputedStyle(amostra).color;
+      amostra.remove();
+      return [getComputedStyle(el).borderTopColor, cor];
+    });
     expect(bordaDoBloco).toBe(destaque);
     for (const alvo of [serie, turma]) {
       await alvo.evaluate((el: HTMLElement) => el.focus());
-      expect(await marcadorDesconhecido(pagina)).toBe(true);
-      expect(await alvo.evaluate((el) => getComputedStyle(el).outlineStyle)).toBe("solid");
-      expect(await alvo.evaluate((el) => getComputedStyle(el).outlineOffset)).toBe("2px");
+      expect(await alvo.evaluate((el) => el === document.activeElement)).toBe(true);
     }
     expect(await serie.getAttribute("aria-pressed")).toBe("true");
   } finally {

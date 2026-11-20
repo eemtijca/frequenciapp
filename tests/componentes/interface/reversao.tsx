@@ -1,10 +1,10 @@
-// Monta seletor e seção com dados sintéticos para testar reversões.
+// Monta o seletor de turmas com dados sintéticos para testar recolhimento e foco.
 import { StrictMode, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Settings } from "lucide-react";
+import { ThemeProvider } from "@mui/material/styles";
 import { SeletorTurmaChamada } from "../../../src/components/chamada/seletor-turma-chamada";
-import { SecaoRecolhivel } from "../../../src/components/ui/secao-recolhivel";
 import type { Turma } from "../../../src/domain/frequencia";
+import { tema } from "../../../src/theme/tema";
 import "../../../src/app/globals.css";
 
 const turmas: Turma[] = ["A", "B", "C"].map((letra, ordem) => ({
@@ -16,9 +16,9 @@ const turmas: Turma[] = ["A", "B", "C"].map((letra, ordem) => ({
   horarios: [],
   ordem,
 }));
+
 function Cena() {
   const [turmaId, setTurmaId] = useState("turma-A");
-  const [aberto, setAberto] = useState(false);
   return (
     <main style={{ width: 360 }}>
       <SeletorTurmaChamada
@@ -33,22 +33,17 @@ function Cena() {
         travado={false}
         onEscolher={setTurmaId}
       />
-      <button onClick={() => setAberto(false)}>Fechar seção externamente</button>
-      <SecaoRecolhivel
-        titulo="Teste seção"
-        icone={Settings}
-        aberto={aberto}
-        onAbertoChange={setAberto}
-      >
-        <button>Controle interno</button>
-      </SecaoRecolhivel>
+      <output aria-label="Turma escolhida">{turmaId}</output>
     </main>
   );
 }
+
 const root = document.getElementById("root");
 if (!root) throw new Error("Elemento raiz ausente");
 createRoot(root).render(
   <StrictMode>
-    <Cena />
+    <ThemeProvider theme={tema}>
+      <Cena />
+    </ThemeProvider>
   </StrictMode>,
 );

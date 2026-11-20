@@ -373,13 +373,13 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await aguardarHidratacao(page);
   await trocarVisao(page, "Chamada", "chamada");
   secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
-  // Aguarda o aviso antes de tocar no cabeçalho; o hover do teste pausa o aviso.
+  // Aguarda o aviso antes de tocar no cabeçalho; o aviso expira sozinho.
   const aviso = page.getByText("Rascunho recuperado. Desbloqueie a chamada, confira e salve.", {
     exact: true,
   });
   await expect(aviso).toBeVisible();
   await page.mouse.move(0, 0);
-  await expect(aviso).toHaveCount(0);
+  await expect(aviso).toHaveCount(0, { timeout: 12_000 });
   grupo = await abrirPrimeiraSerie(secao);
   await expect(turmaA()).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB()).toHaveAttribute("data-situacao", "concluida");
@@ -395,7 +395,7 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await expect(turmaB()).toBeDisabled();
   // O ponteiro sobre o aviso pausa sua duração; aguarda a saída antes do toque.
   await page.mouse.move(0, 0);
-  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0, { timeout: 15_000 });
   await recarregar.evaluate((elemento) => elemento.scrollIntoView({ block: "center" }));
   await recarregar.click();
   await expect(serie()).toHaveAttribute("data-situacao", "concluida");

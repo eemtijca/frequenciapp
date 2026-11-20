@@ -27,7 +27,7 @@ async function abrirChamada(page: Page) {
   await expect(aluno).toHaveAttribute("aria-pressed", "false");
   // A marca fica fora do botão do nome; o toque nela depende da camada que cobre a linha.
   const marca = aluno
-    .locator("xpath=ancestor::div[contains(@class,'faixa-toque')]")
+    .locator("xpath=ancestor::*[@data-faixa-toque]")
     .locator("span", { hasText: /^(P|F)$/ })
     .last();
   await marca.scrollIntoViewIfNeeded();

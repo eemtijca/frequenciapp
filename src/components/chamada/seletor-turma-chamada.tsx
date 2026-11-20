@@ -3,13 +3,15 @@
 // Painel Turmas recolhível, com séries que agrupam as turmas e seu progresso.
 // A seleção continua independente da conclusão, com nomes e estados acessíveis.
 import { useId, useMemo, useRef, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import * as Collapsible from "@radix-ui/react-collapsible";
+import KeyboardArrowDownRoundedIcon from "@mui/icons-material/KeyboardArrowDownRounded";
+import Box from "@mui/material/Box";
+import ButtonBase from "@mui/material/ButtonBase";
+import Collapse from "@mui/material/Collapse";
+import type { Theme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { alunoDesistenteNoDia, type Aluno, type Frequencia, type Turma } from "@/domain/frequencia";
 import { coberturaDoDia } from "@/domain/relatorios";
-import { Button } from "@/components/ui/button";
-import { ConteudoRecolhivel } from "@/components/ui/conteudo-recolhivel";
-import estilos from "./seletor-turma-chamada.module.css";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   turmas: Turma[];
@@ -45,16 +47,151 @@ function nomeDaSerie(nome: string): string {
   return nome.replace(/^(\d+)[º°]?\s+ano$/i, "$1ª série");
 }
 
+function estilosBloco(
+  theme: Theme,
+  situacao: Situacao,
+  selecionado: boolean,
+  semMovimento: boolean,
+) {
+  const palette = theme.vars.palette;
+  const transicao = semMovimento
+    ? "none"
+    : theme.transitions.create(["background-color", "border-color", "color"], {
+        duration: 150,
+      });
+
+  return {
+    display: "flex",
+    width: "100%",
+    minWidth: 0,
+    alignItems: "center",
+    gap: 1,
+    border: `1px solid ${selecionado ? palette.justificada.main : palette.divider}`,
+    borderRadius: 2,
+    backgroundColor: selecionado
+      ? palette.justificada.fraco
+      : situacao === "concluida"
+        ? palette.action.selected
+        : palette.background.paper,
+    color: selecionado ? palette.justificada.texto : palette.text.primary,
+    textAlign: "left" as const,
+    transition: transicao,
+    "&:hover": {
+      backgroundColor: selecionado
+        ? palette.justificada.fraco
+        : situacao === "concluida"
+          ? palette.action.selected
+          : palette.action.hover,
+    },
+    "&.Mui-disabled": {
+      backgroundColor: palette.action.disabledBackground,
+      color: palette.text.disabled,
+      cursor: "not-allowed",
+    },
+    "@media (forced-colors: active)": {
+      borderColor: selecionado ? "Highlight" : "ButtonText",
+      backgroundColor: "Canvas",
+      color: "CanvasText",
+    },
+  };
+}
+
 function BarraProgresso({ progresso }: { progresso: number | null }) {
+  if (progresso === null) return null;
   return (
-    <span
+    <Box
+      component="span"
       aria-hidden="true"
-      className={estilos.barra}
-      data-disponivel={progresso !== null}
-      data-progresso={progresso ?? undefined}
+      data-progresso={progresso}
+      sx={(theme) => ({
+        display: "block",
+        height: 6,
+        minWidth: 24,
+        maxWidth: 160,
+        flex: 1,
+        overflow: "hidden",
+        borderRadius: "999px",
+        backgroundColor: theme.vars.palette.action.hover,
+        "@media (forced-colors: active)": {
+          border: "1px solid CanvasText",
+          backgroundColor: "Canvas",
+        },
+      })}
     >
-      <span className={estilos.preenchimento} style={{ width: `${progresso ?? 0}%` }} />
-    </span>
+      <Box
+        component="span"
+        sx={(theme) => ({
+          display: "block",
+          height: "100%",
+          width: `${progresso}%`,
+          borderRadius: "inherit",
+          backgroundColor: theme.vars.palette.primary.main,
+          "@media (forced-colors: active)": { backgroundColor: "Highlight" },
+        })}
+      />
+    </Box>
+  );
+}
+
+function Seta({ aberto }: { aberto: boolean }) {
+  return (
+    <KeyboardArrowDownRoundedIcon
+      aria-hidden="true"
+      fontSize="small"
+      sx={(theme: Theme) => ({
+        flexShrink: 0,
+        color: theme.vars.palette.text.secondary,
+        transform: aberto ? "rotate(180deg)" : "rotate(0deg)",
+        transition: theme.transitions.create("transform", { duration: 150 }),
+      })}
+    />
+  );
+}
+
+function AnelProgresso({
+  progresso,
+  concluida,
+  semMovimento,
+}: {
+  progresso: number | null;
+  concluida: boolean;
+  semMovimento: boolean;
+}) {
+  if (progresso === null) return null;
+  return (
+    <Box
+      component="span"
+      aria-hidden="true"
+      data-progresso={progresso}
+      sx={(theme) => ({
+        position: "absolute",
+        inset: 3,
+        color: concluida ? theme.vars.palette.primary.main : theme.vars.palette.text.disabled,
+        pointerEvents: "none",
+        transition: semMovimento ? "none" : "color 180ms ease",
+        "@media (forced-colors: active)": {
+          color: concluida ? "Highlight" : "CanvasText",
+        },
+      })}
+    >
+      <Box
+        component="svg"
+        viewBox="0 0 64 64"
+        focusable="false"
+        sx={{ display: "block", width: "100%", height: "100%" }}
+      >
+        <rect
+          x="5"
+          y="5"
+          width="54"
+          height="54"
+          rx="12"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+        />
+      </Box>
+    </Box>
   );
 }
 
@@ -76,6 +213,8 @@ export function SeletorTurmaChamada({
   const [aberto, setAberto] = useState(false);
   const gatilho = useRef<HTMLButtonElement>(null);
   const [serieRecolhida, setSerieRecolhida] = useState<string | null>(null);
+  const semMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const tempoColapso = semMovimento ? 0 : 180;
 
   const series = useMemo(() => {
     const grupos: { id: string; nome: string; turmas: Turma[] }[] = [];
@@ -171,12 +310,10 @@ export function SeletorTurmaChamada({
   }
 
   return (
-    <Collapsible.Root
-      open={aberto}
-      onOpenChange={setAberto}
+    <Box
       role="group"
       aria-label="Turma atual"
-      className={estilos.seletor}
+      sx={{ minWidth: 0, p: 0.5 }}
       onKeyDown={(evento) => {
         if (evento.key === "Escape" && aberto) {
           evento.preventDefault();
@@ -186,74 +323,171 @@ export function SeletorTurmaChamada({
         }
       }}
     >
-      <Collapsible.Trigger asChild>
-        <Button
-          ref={gatilho}
-          type="button"
-          variant="outline"
-          aria-label="Turmas"
-          aria-describedby={`${id}-progresso-geral`}
-          data-situacao={situacaoGeral}
-          disabled={series.length === 0}
-          className={estilos.gatilho}
+      <ButtonBase
+        ref={gatilho}
+        type="button"
+        aria-label="Turmas"
+        aria-expanded={aberto}
+        aria-describedby={`${id}-progresso-geral`}
+        data-situacao={situacaoGeral}
+        disabled={series.length === 0}
+        onClick={() => setAberto((atual) => !atual)}
+        sx={(theme) => ({
+          ...estilosBloco(theme, situacaoGeral, false, semMovimento),
+          minHeight: TOKENS_LAYOUT.alvoToque,
+          borderRadius: 2,
+          px: 1.75,
+          py: 1,
+          gap: 1.5,
+        })}
+      >
+        <Box
+          component="span"
+          aria-hidden="true"
+          sx={{ flex: "0 1 auto", minWidth: 0, fontWeight: 600, fontSize: 13 }}
         >
-          <span className={estilos.nome} aria-hidden="true">
-            Turmas
-          </span>
-          <BarraProgresso progresso={progressoGeral} />
-          <span className={estilos.percentual} aria-hidden="true">
-            {progressoGeral === null ? "-" : `${progressoGeral}%`}
-          </span>
-          <ChevronDown aria-hidden="true" className={estilos.seta} />
-          <span id={`${id}-progresso-geral`} className="sr-only">
-            {totalGeral} {totalGeral === 1 ? "aluno" : "alunos"}. {ROTULOS[situacaoGeral]}.
-            {progressoGeral !== null
-              ? ` Progresso geral do dia: ${progressoGeral}%, considerando os alunos de todas as séries.`
-              : ""}
-            {feriado ? ` ${feriado}.` : ""}
-          </span>
-        </Button>
-      </Collapsible.Trigger>
-      <ConteudoRecolhivel aberto={aberto} className={estilos.conteudo}>
-        <div role="group" aria-label="Séries" className={estilos.lista}>
+          Turmas
+        </Box>
+        <BarraProgresso progresso={progressoGeral} />
+        <Box
+          component="span"
+          aria-hidden="true"
+          sx={(theme) => ({
+            flexShrink: 0,
+            borderRadius: "999px",
+            px: 1,
+            py: 0.25,
+            backgroundColor: theme.vars.palette.action.hover,
+            color:
+              situacaoGeral === "concluida"
+                ? theme.vars.palette.primary.main
+                : theme.vars.palette.text.secondary,
+            fontSize: 13,
+            fontWeight: 600,
+            fontVariantNumeric: "tabular-nums",
+          })}
+        >
+          {progressoGeral === null ? "-" : `${progressoGeral}%`}
+        </Box>
+        <Seta aberto={aberto} />
+        <Box
+          component="span"
+          id={`${id}-progresso-geral`}
+          sx={{
+            position: "absolute",
+            width: 1,
+            height: 1,
+            overflow: "hidden",
+            clip: "rect(0, 0, 0, 0)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {totalGeral} {totalGeral === 1 ? "aluno" : "alunos"}. {ROTULOS[situacaoGeral]}.
+          {progressoGeral !== null
+            ? ` Progresso geral do dia: ${progressoGeral}%, considerando os alunos de todas as séries.`
+            : ""}
+          {feriado ? ` ${feriado}.` : ""}
+        </Box>
+      </ButtonBase>
+
+      <Collapse in={aberto} timeout={tempoColapso}>
+        <Box
+          role="group"
+          aria-label="Séries"
+          sx={{ display: "flex", flexDirection: "column", gap: 1, p: 0.5 }}
+        >
           {resumos.map(({ grupo, nome, situacao, percentual, descricao }) => {
             const ehAtiva = grupo.id === ativa?.id;
+            const expandida = ehAtiva && serieRecolhida !== grupo.id;
             return (
-              <Collapsible.Root
+              <Box
                 key={grupo.id}
-                open={ehAtiva && serieRecolhida !== grupo.id}
-                className={estilos.blocoSerie}
-                data-selecionada={ehAtiva}
+                data-selecionada={ehAtiva ? "true" : "false"}
+                sx={(theme) => ({
+                  minWidth: 0,
+                  borderRadius: 2,
+                  backgroundColor: ehAtiva
+                    ? theme.vars.palette.action.hover
+                    : theme.vars.palette.background.paper,
+                  "@media (forced-colors: active)": {
+                    border: "1px solid ButtonText",
+                    backgroundColor: "Canvas",
+                  },
+                })}
               >
-                <Collapsible.Trigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    aria-label={nome}
-                    aria-describedby={`${id}-serie-${grupo.id}`}
-                    aria-pressed={ehAtiva}
-                    data-situacao={situacao}
-                    disabled={travado && !ehAtiva}
-                    onClick={() => aoTocarSerie(grupo.id)}
-                    className={estilos.serie}
-                  >
-                    <span className={estilos.nome} aria-hidden="true">
-                      {nome}
-                    </span>
-                    <span className={estilos.percentual} aria-hidden="true">
-                      {percentual === null ? "-" : `${percentual}%`}
-                    </span>
-                    <ChevronDown aria-hidden="true" className={estilos.seta} />
-                    <span id={`${id}-serie-${grupo.id}`} className="sr-only">
-                      {descricao}
-                    </span>
-                  </Button>
-                </Collapsible.Trigger>
-                <ConteudoRecolhivel
-                  aberto={ehAtiva && serieRecolhida !== grupo.id}
-                  className={estilos.conteudo}
+                <ButtonBase
+                  type="button"
+                  aria-label={nome}
+                  aria-describedby={`${id}-serie-${grupo.id}`}
+                  aria-expanded={expandida}
+                  aria-pressed={ehAtiva}
+                  data-situacao={situacao}
+                  disabled={travado && !ehAtiva}
+                  onClick={() => aoTocarSerie(grupo.id)}
+                  sx={(theme) => ({
+                    ...estilosBloco(theme, situacao, ehAtiva, semMovimento),
+                    minHeight: TOKENS_LAYOUT.alvoToque,
+                    px: 1.75,
+                    py: 1,
+                    gap: 1.5,
+                  })}
                 >
-                  <div role="group" aria-label={`Turmas de ${nome}`} className={estilos.faixa}>
+                  <Box
+                    component="span"
+                    aria-hidden="true"
+                    sx={{
+                      flex: 1,
+                      minWidth: 0,
+                      overflowWrap: "anywhere",
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
+                    {nome}
+                  </Box>
+                  <Box
+                    component="span"
+                    aria-hidden="true"
+                    sx={(theme) => ({
+                      flexShrink: 0,
+                      color: ehAtiva
+                        ? theme.vars.palette.justificada.texto
+                        : theme.vars.palette.text.secondary,
+                      fontSize: 13,
+                      fontWeight: 600,
+                      fontVariantNumeric: "tabular-nums",
+                    })}
+                  >
+                    {percentual === null ? "-" : `${percentual}%`}
+                  </Box>
+                  <Seta aberto={expandida} />
+                  <Box
+                    component="span"
+                    id={`${id}-serie-${grupo.id}`}
+                    sx={{
+                      position: "absolute",
+                      width: 1,
+                      height: 1,
+                      overflow: "hidden",
+                      clip: "rect(0, 0, 0, 0)",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {descricao}
+                  </Box>
+                </ButtonBase>
+                <Collapse in={expandida} timeout={tempoColapso}>
+                  <Box
+                    role="group"
+                    aria-label={`Turmas de ${nome}`}
+                    sx={{
+                      display: "grid",
+                      gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                      alignItems: "stretch",
+                      gap: 1,
+                      p: 1.25,
+                    }}
+                  >
                     {grupo.turmas.map((opcao) => {
                       const ativo = opcao.id === turmaId;
                       const total = contagem.get(opcao.id) ?? 0;
@@ -263,10 +497,9 @@ export function SeletorTurmaChamada({
                       const progresso =
                         situacao === "concluida" ? 100 : situacao === "pendente" ? 0 : null;
                       return (
-                        <Button
+                        <ButtonBase
                           key={opcao.id}
                           type="button"
-                          variant="outline"
                           aria-label={opcao.rotulo}
                           aria-describedby={`${id}-turma-${opcao.id}`}
                           title={`${opcao.rotulo}: ${ROTULOS[situacao]}`}
@@ -274,30 +507,67 @@ export function SeletorTurmaChamada({
                           aria-pressed={ativo}
                           disabled={travado}
                           onClick={() => onEscolher(opcao.id)}
-                          className={estilos.turma}
+                          sx={(theme) => ({
+                            position: "relative",
+                            display: "flex",
+                            width: "min(100%, 64px)",
+                            minHeight: 44,
+                            aspectRatio: "1",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            justifySelf: "center",
+                            alignSelf: "start",
+                            border: `1px solid ${
+                              ativo
+                                ? theme.vars.palette.justificada.main
+                                : theme.vars.palette.divider
+                            }`,
+                            borderRadius: 2,
+                            p: 1,
+                            backgroundColor: ativo
+                              ? theme.vars.palette.justificada.fraco
+                              : theme.vars.palette.background.paper,
+                            color: ativo
+                              ? theme.vars.palette.justificada.texto
+                              : theme.vars.palette.text.primary,
+                            "@media (forced-colors: active)": {
+                              borderColor: ativo ? "Highlight" : "ButtonText",
+                              backgroundColor: "Canvas",
+                              color: "CanvasText",
+                            },
+                          })}
                         >
-                          <span className={estilos.nome} aria-hidden="true">
-                            {opcao.nome}
-                          </span>
-                          <span
+                          <Box
+                            component="span"
                             aria-hidden="true"
-                            className={estilos.anel}
-                            data-progresso={progresso ?? undefined}
+                            sx={{
+                              position: "relative",
+                              maxWidth: "100%",
+                              overflowWrap: "anywhere",
+                              fontSize: 13,
+                              fontWeight: 600,
+                              lineHeight: 1.2,
+                            }}
                           >
-                            <svg viewBox="0 0 64 64" focusable="false" className="size-full">
-                              <rect
-                                x="5"
-                                y="5"
-                                width="54"
-                                height="54"
-                                rx="12"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                              />
-                            </svg>
-                          </span>
-                          <span id={`${id}-turma-${opcao.id}`} className="sr-only">
+                            {opcao.nome}
+                          </Box>
+                          <AnelProgresso
+                            progresso={progresso}
+                            concluida={situacao === "concluida"}
+                            semMovimento={semMovimento}
+                          />
+                          <Box
+                            component="span"
+                            id={`${id}-turma-${opcao.id}`}
+                            sx={{
+                              position: "absolute",
+                              width: 1,
+                              height: 1,
+                              overflow: "hidden",
+                              clip: "rect(0, 0, 0, 0)",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
                             {total} {total === 1 ? "aluno" : "alunos"}. {ROTULOS[situacao]}
                             {progresso !== null ? `. ${progresso}% concluído` : ""}
                             {feriado
@@ -305,17 +575,17 @@ export function SeletorTurmaChamada({
                               : temAlteracoes && ativo
                                 ? ". Alterações por salvar"
                                 : "."}
-                          </span>
-                        </Button>
+                          </Box>
+                        </ButtonBase>
                       );
                     })}
-                  </div>
-                </ConteudoRecolhivel>
-              </Collapsible.Root>
+                  </Box>
+                </Collapse>
+              </Box>
             );
           })}
-        </div>
-      </ConteudoRecolhivel>
-    </Collapsible.Root>
+        </Box>
+      </Collapse>
+    </Box>
   );
 }

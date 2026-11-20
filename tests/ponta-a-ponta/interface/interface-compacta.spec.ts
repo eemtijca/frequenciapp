@@ -18,7 +18,7 @@ for (const [nome, largura, altura] of [
   ["desktop estreito", 1024, 900],
   ["celular", 390, 844],
 ] as const) {
-  test(`barra de salvamento compacta no ${nome}`, async ({ page }) => {
+  test(`rodapé de salvamento no ${nome}`, async ({ page }) => {
     await page.setViewportSize({ width: largura, height: altura });
     await page.goto("/?visao=chamada");
     await aguardarHidratacao(page);
@@ -34,7 +34,8 @@ for (const [nome, largura, altura] of [
     expect(inicial).not.toBeNull();
     expect(secao).not.toBeNull();
     if (largura >= 1024) {
-      expect((inicial?.width ?? 0) / (secao?.width ?? 1)).toBeLessThan(0.75);
+      expect((inicial?.width ?? 0) / (secao?.width ?? 1)).toBeGreaterThan(0.9);
+      expect((inicial?.width ?? 0) / (secao?.width ?? 1)).toBeLessThanOrEqual(1.01);
     } else {
       expect(inicial?.width ?? 0).toBeLessThan(largura);
       expect(inicial?.height ?? altura).toBeLessThan(100);
@@ -48,11 +49,9 @@ for (const [nome, largura, altura] of [
     const depois = await barra.boundingBox();
     expect(depois).not.toBeNull();
     if (largura >= 1024) {
-      expect((depois?.width ?? 0) / (secao?.width ?? 1)).toBeLessThan(0.85);
-      // No desktop, a barra fica à direita do conteúdo, sem ocupar a largura da lista.
-      expect((depois?.x ?? 0) + (depois?.width ?? 0)).toBeGreaterThan(
-        (secao?.x ?? 0) + (secao?.width ?? 0) / 2,
-      );
+      expect((depois?.width ?? 0) / (secao?.width ?? 1)).toBeGreaterThan(0.9);
+      expect((depois?.width ?? 0) / (secao?.width ?? 1)).toBeLessThanOrEqual(1.01);
+      expect(Math.abs((depois?.x ?? 0) - (secao?.x ?? 0))).toBeLessThan(2);
     } else {
       // No celular, fica centralizada e dentro da tela.
       const centro = (depois?.x ?? 0) + (depois?.width ?? 0) / 2;

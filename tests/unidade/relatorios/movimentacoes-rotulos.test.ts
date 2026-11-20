@@ -2,6 +2,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ThemeProvider } from "@mui/material/styles";
+import { tema } from "@/theme/tema";
 import type { Aluno, SaidaAntecipada, Turma } from "@/domain/frequencia";
 import type { EntradaAtrasada } from "@/domain/entradas";
 import type { RelatorioMovimentacoes } from "@/domain/relatorio-movimentacoes";
@@ -103,15 +105,19 @@ function blocos(html: string, tag: string): string[] {
 }
 function renderizarResumo(tipo: "saida" | "entrada" = "saida"): string {
   return renderToStaticMarkup(
-    createElement(VistaResumoMovimentacoes, {
-      tipo,
-      turmas,
-      alunos,
-      dias,
-      ativo: true,
-      fuso: "America/Fortaleza",
-      onAbrirDia: () => {},
-    }),
+    createElement(
+      ThemeProvider,
+      { theme: tema },
+      createElement(VistaResumoMovimentacoes, {
+        tipo,
+        turmas,
+        alunos,
+        dias,
+        ativo: true,
+        fuso: "America/Fortaleza",
+        onAbrirDia: () => {},
+      }),
+    ),
   );
 }
 

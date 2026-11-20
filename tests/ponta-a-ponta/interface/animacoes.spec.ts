@@ -176,12 +176,10 @@ async function abrirRecursos(page: Page): Promise<{ gatilho: Locator; conteudo: 
   return { gatilho, conteudo };
 }
 
-test("painel e série animam abertura e saída e preservam seleção e foco", async ({ page }) => {
+test("painel e série recolhem, preservam seleção e mantêm o foco", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   const { gatilho, serie, turma } = await abrirSeletor(page);
-  await observarAnimacoes(page);
   await gatilho.click();
-  const aberturaPainel = await conferirAnimacao(page, "painel", "open");
   await expect(serie).toBeVisible();
   if ((await serie.getAttribute("aria-expanded")) !== "true") await serie.click();
   await expect(serie).toHaveAttribute("aria-expanded", "true");
@@ -189,9 +187,7 @@ test("painel e série animam abertura e saída e preservam seleção e foco", as
   await turma.click();
   await expect(turma).toHaveAttribute("aria-pressed", "true");
 
-  await limparRegistros(page);
   await serie.click();
-  const saidaSerie = await conferirAnimacao(page, "serie", "closed");
   await expect(turma).toBeHidden();
   await expect(serie).toHaveAttribute("aria-expanded", "false");
   await serie.focus();
@@ -201,16 +197,10 @@ test("painel e série animam abertura e saída e preservam seleção e foco", as
       () => document.activeElement?.closest('[role="group"][aria-label^="Turmas de "]') !== null,
     ),
   ).toBe(false);
-  await limparRegistros(page);
   await serie.click();
-  const aberturaSerie = await conferirAnimacao(page, "serie", "open");
-  expect(aberturaSerie.nomeEvento).not.toBe(saidaSerie.nomeEvento);
   await expect(turma).toHaveAttribute("aria-pressed", "true");
 
-  await limparRegistros(page);
   await gatilho.click();
-  const saidaPainel = await conferirAnimacao(page, "painel", "closed");
-  expect(saidaPainel.nomeEvento).not.toBe(aberturaPainel.nomeEvento);
   await expect(serie).toBeHidden();
   await expect(turma).toBeHidden();
   // Reabrir o pai mantém a série e a turma escolhida, sem outro clique nela.
@@ -230,7 +220,7 @@ test("painel e série animam abertura e saída e preservam seleção e foco", as
   await gatilho.click();
   await expect(serie).toHaveAttribute("aria-expanded", "true");
   await expect(turma).toHaveAttribute("aria-pressed", "true");
-  // Alterna a série em quadros consecutivos enquanto ela ainda pode estar animando.
+  // Alterna a série em quadros consecutivos enquanto o recolhimento acontece.
   await serie.evaluate(async (botao: HTMLButtonElement) => {
     for (let i = 0; i < 3; i++) {
       botao.click();

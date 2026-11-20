@@ -123,7 +123,7 @@ it.each([
     for (const caixa of [antes, meio, depois]) {
       expect(caixa.width).toBeGreaterThanOrEqual(43.95);
       expect(caixa.height).toBeGreaterThanOrEqual(43.95);
-      expect(Math.abs(caixa.y - meio.y)).toBeLessThan(1);
+      expect(Math.abs(caixa.y + caixa.height / 2 - (meio.y + meio.height / 2))).toBeLessThan(1);
     }
     expect(antes.x + antes.width).toBeLessThanOrEqual(meio.x + 0.05);
     expect(meio.x + meio.width).toBeLessThanOrEqual(depois.x + 0.05);
@@ -143,7 +143,7 @@ it.each([
     expect(dataVisivel.borda.left).toBeGreaterThanOrEqual(meio.x);
     expect(dataVisivel.borda.right).toBeLessThanOrEqual(meio.x + meio.width);
     if (largura < 1280) {
-      const detalhe = seletor.locator(":scope > .detalhe-data");
+      const detalhe = seletor.locator(':scope > [data-detalhe="true"]');
       const medida = await detalhe.evaluate((el) => ({
         texto: (el as HTMLElement).innerText,
         largura: el.clientWidth,
@@ -191,7 +191,7 @@ it.each([
     await dialogo.getByRole("button", { name: "Mês anterior" }).click();
     await dialogo.locator(`[data-dia="${dia}"]`).click();
     await expect.poll(() => seletor.getAttribute("aria-label")).toContain(nome);
-    const medida = await seletor.locator(":scope > .detalhe-data").evaluate((el) => ({
+    const medida = await seletor.locator(':scope > [data-detalhe="true"]').evaluate((el) => ({
       texto: (el as HTMLElement).innerText,
       largura: el.clientWidth,
       total: el.scrollWidth,

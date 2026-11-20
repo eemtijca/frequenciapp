@@ -1,6 +1,7 @@
 // Monta controles reais para verificar foco sem banco ou autenticação.
 import { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { ThemeProvider } from "@mui/material/styles";
 import { Button } from "../../../src/components/ui/button";
 import { Input } from "../../../src/components/ui/input";
 import { BarraBusca } from "../../../src/components/ui/barra-busca";
@@ -9,6 +10,7 @@ import { SeletorTurmaChamada } from "../../../src/components/chamada/seletor-tur
 import { Selecionar } from "../../../src/components/ui/selecionar";
 import { SelecionarBuscavel } from "../../../src/components/ui/selecionar-buscavel";
 import { Switch } from "../../../src/components/ui/switch";
+import { tema } from "../../../src/theme/tema";
 import { Popover, PopoverContent, PopoverTrigger } from "../../../src/components/ui/popover";
 import {
   Dialog,
@@ -180,4 +182,9 @@ function Aplicacao() {
 }
 
 const raiz = document.getElementById("root");
-if (raiz) createRoot(raiz).render(<Aplicacao />);
+if (raiz)
+  createRoot(raiz).render(
+    <ThemeProvider theme={tema}>
+      <Aplicacao />
+    </ThemeProvider>,
+  );
