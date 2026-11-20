@@ -97,6 +97,7 @@ async function medir(page: Page, rotulo: string): Promise<Medida> {
 async function medirFoco(page: Page, rotulo: string): Promise<MedidaFoco> {
   const alvo = page.getByLabel(rotulo, { exact: true });
   await alvo.focus();
+  await page.waitForTimeout(180);
   return alvo.evaluate((elemento) => {
     const campo = elemento.closest(".MuiOutlinedInput-root, .MuiInputBase-root");
     if (!campo) throw new Error("Raiz do campo ausente");

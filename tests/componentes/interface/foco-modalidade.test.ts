@@ -91,6 +91,7 @@ it("foco por teclado mostra o anel de 3 px do tema no botão e no campo", async 
     expect(focoBotao.largura).toBe(`${TOKENS_LAYOUT.campo.foco}px`);
     expect(focoBotao.deslocamento).toBe("2px");
     await focarComTab(pagina, campo);
+    await pagina.waitForTimeout(300);
     const focoCampo = await estiloDoCampo(campo);
     expect(focoCampo.focoVisivel).toBe(true);
     expect(focoCampo.raio).toBe(`${TOKENS_LAYOUT.campo.raio}px`);

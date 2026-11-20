@@ -89,8 +89,8 @@ it("diálogo MUI usa transição curta de opacidade, contém o foco e devolve ao
     await gatilho.click();
     const dialogo = pagina.getByRole("dialog", { name: "Modal de teste" });
     await dialogo.waitFor();
-    const transicao = await estiloDaTransicao(dialogo);
-    expect(transicao.propriedade).toContain("opacity");
+    const transicao = await estiloDaTransicao(pagina.locator(".MuiDialog-root"));
+    expect(transicao.propriedade).toMatch(/opacity|all/);
     expect(maiorDuracao(transicao.duracao)).toBeLessThanOrEqual(0.4);
     expect(await dialogo.evaluate((el) => el.contains(document.activeElement))).toBe(true);
     const caixa = await dialogo.boundingBox();

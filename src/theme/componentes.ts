@@ -384,7 +384,7 @@ const inputs: Components<Theme> = {
       select: {
         display: "flex",
         alignItems: "center",
-        minHeight: `${TOKENS_LAYOUT.campo.pequeno - 2}px`,
+        minHeight: 0,
       },
       icon: { color: cinza[500] },
     },
