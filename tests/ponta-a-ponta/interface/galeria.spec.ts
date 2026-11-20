@@ -254,10 +254,10 @@ async function prepararAlunos(page: Page, agrupamento?: "Turma atual" | "Turma d
   await expect(secao).toBeVisible();
   if (!agrupamento) return;
   const botao = secao
-    .getByRole("group", { name: "Agrupamento da lista", exact: true })
-    .getByRole("button", { name: agrupamento, exact: true });
+    .getByRole("radiogroup", { name: "Agrupamento da lista", exact: true })
+    .getByRole("radio", { name: agrupamento, exact: true });
   await botao.click();
-  await expect(botao).toHaveAttribute("aria-pressed", "true");
+  await expect(botao).toHaveAttribute("aria-checked", "true");
 }
 
 async function prepararGestao(page: Page, aba: string): Promise<void> {
