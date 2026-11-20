@@ -12430,6 +12430,243 @@
           }
         }
       }
+    },
+    "/api/provas-bimestrais": {
+      "get": {
+        "operationId": "listarProvasBimestrais",
+        "summary": "Consultar o horário de provas bimestrais",
+        "description": "Qualquer sessão. Provas de hoje em diante, de todas as turmas; datas passadas não aparecem.",
+        "tags": ["horarios"],
+        "responses": {
+          "200": {
+            "description": "Provas de hoje em diante.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvasBimestrais"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "provas": [
+                        {
+                          "id": "9b1c2d3e-4f50-4a61-8b72-c3d4e5f60718",
+                          "turmaId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                          "dia": "2026-11-24",
+                          "inicio": "07:00",
+                          "fim": "09:00",
+                          "disciplina": "Matemática"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      },
+      "post": {
+        "operationId": "adicionarProvasBimestrais",
+        "summary": "Cadastrar uma prova bimestral",
+        "description": "Apenas administração, com origem confiável e auditoria. Grava a mesma prova para cada turma da lista. Recusa com 409 a turma que já tem prova na mesma janela do dia; uma prova pode começar quando a outra termina. Apaga, de passagem, as provas de datas passadas.",
+        "tags": ["horarios"],
+        "requestBody": {
+          "required": true,
+          "description": "Turmas, data, horário e disciplina.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NovaProvaBimestral"
+              },
+              "examples": {
+                "Prova": {
+                  "summary": "Prova",
+                  "value": {
+                    "turmaIds": [
+                      "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                      "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+                    ],
+                    "dia": "2026-11-24",
+                    "inicio": "07:00",
+                    "fim": "09:00",
+                    "disciplina": "Matemática"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Provas cadastradas, uma por turma.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvasBimestrais"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "provas": [
+                        {
+                          "id": "9b1c2d3e-4f50-4a61-8b72-c3d4e5f60718",
+                          "turmaId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                          "dia": "2026-11-24",
+                          "inicio": "07:00",
+                          "fim": "09:00",
+                          "disciplina": "Matemática"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/provas-bimestrais/{id}": {
+      "delete": {
+        "operationId": "removerProvaBimestral",
+        "summary": "Remover uma prova bimestral",
+        "description": "Apenas administração, com origem confiável e auditoria. Remove a prova de uma turma.",
+        "tags": ["horarios"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da prova.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "9b1c2d3e-4f50-4a61-8b72-c3d4e5f60718"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Prova removida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "ok": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/provas-bimestrais/encerrar": {
+      "post": {
+        "operationId": "encerrarProvasBimestrais",
+        "summary": "Encerrar o período de provas",
+        "description": "Apenas administração, com origem confiável e auditoria. Apaga o horário de provas de todas as turmas.",
+        "tags": ["horarios"],
+        "requestBody": {
+          "required": true,
+          "description": "Confirmação.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EncerrarProvasBimestrais"
+              },
+              "examples": {
+                "Confirmacao": {
+                  "summary": "Confirmacao",
+                  "value": {
+                    "confirmar": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Período encerrado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EncerramentoProvasBimestrais"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "removidas": 12
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -20352,6 +20589,131 @@
               }
             ],
             "description": "Chamada que precisa ser recarregada após remover a personalização, se havia base."
+          }
+        }
+      },
+      "ProvaBimestral": {
+        "type": "object",
+        "title": "Prova bimestral",
+        "description": "Prova de uma turma em uma data, com horário e disciplina.",
+        "required": ["id", "turmaId", "dia", "inicio", "fim", "disciplina"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "9b1c2d3e-4f50-4a61-8b72-c3d4e5f60718"
+          },
+          "turmaId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+          },
+          "dia": {
+            "type": "string",
+            "format": "date",
+            "description": "Data civil da prova.",
+            "example": "2026-11-24"
+          },
+          "inicio": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "example": "07:00"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "example": "09:00"
+          },
+          "disciplina": {
+            "type": "string",
+            "maxLength": 80,
+            "example": "Matemática"
+          }
+        }
+      },
+      "ProvasBimestrais": {
+        "type": "object",
+        "title": "Provas bimestrais",
+        "description": "Provas de hoje em diante, de todas as turmas, em ordem de data e de início.",
+        "required": ["provas"],
+        "properties": {
+          "provas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProvaBimestral"
+            }
+          }
+        }
+      },
+      "NovaProvaBimestral": {
+        "type": "object",
+        "title": "Nova prova bimestral",
+        "description": "A mesma prova para uma ou mais turmas.",
+        "required": ["turmaIds", "dia", "inicio", "fim", "disciplina"],
+        "additionalProperties": false,
+        "properties": {
+          "turmaIds": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 60,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Turmas que fazem a prova.",
+            "example": [
+              "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+              "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+            ]
+          },
+          "dia": {
+            "type": "string",
+            "format": "date",
+            "description": "Data de hoje em diante, fora do domingo.",
+            "example": "2026-11-24"
+          },
+          "inicio": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "example": "07:00"
+          },
+          "fim": {
+            "type": "string",
+            "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+            "description": "Posterior ao início.",
+            "example": "09:00"
+          },
+          "disciplina": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "example": "Matemática"
+          }
+        }
+      },
+      "EncerrarProvasBimestrais": {
+        "type": "object",
+        "title": "Encerramento do período de provas",
+        "required": ["confirmar"],
+        "additionalProperties": false,
+        "properties": {
+          "confirmar": {
+            "const": true,
+            "description": "Precisa ser verdadeiro para apagar o horário de provas.",
+            "example": true
+          }
+        }
+      },
+      "EncerramentoProvasBimestrais": {
+        "type": "object",
+        "title": "Resultado do encerramento",
+        "required": ["removidas"],
+        "properties": {
+          "removidas": {
+            "type": "integer",
+            "description": "Provas apagadas, de todas as turmas.",
+            "example": 12
           }
         }
       }
