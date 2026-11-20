@@ -15,10 +15,10 @@ const Evolucao = lazy(() => import("@/components/relatorios/grafico-evolucao"));
 
 const TEXTO_OCULTO = {
   position: "absolute",
-  width: 1,
-  height: 1,
+  width: "1px",
+  height: "1px",
   padding: 0,
-  margin: -1,
+  margin: "-1px",
   overflow: "hidden",
   clip: "rect(0 0 0 0)",
   whiteSpace: "nowrap",
@@ -28,7 +28,9 @@ const TEXTO_OCULTO = {
 function Espera({ altura }: { altura: number }) {
   return (
     <Box role="status" aria-live="polite" sx={{ width: "100%" }}>
-      <Typography sx={TEXTO_OCULTO}>Carregando gráfico</Typography>
+      <Box component="span" sx={TEXTO_OCULTO}>
+        Carregando gráfico
+      </Box>
       <Skeleton variant="rounded" height={altura} sx={{ width: "100%" }} />
     </Box>
   );
@@ -66,7 +68,9 @@ export function GraficoRosca(props: ComponentProps<typeof Rosca>) {
       spacing={2.5}
       sx={{ alignItems: "center", width: "100%" }}
     >
-      <Typography sx={TEXTO_OCULTO}>Carregando gráfico</Typography>
+      <Box component="span" sx={TEXTO_OCULTO}>
+        Carregando gráfico
+      </Box>
       <Skeleton variant="circular" width={176} height={176} sx={{ flexShrink: 0 }} />
       <Stack spacing={0.75} sx={{ width: "100%", minWidth: 0, flex: 1 }}>
         {fatias.map((fatia) => (

@@ -107,9 +107,24 @@ export async function aguardarFontes(page: Page): Promise<void> {
 export async function conferirSemRolagemHorizontal(page: Page): Promise<void> {
   const excesso = await page.evaluate(() => {
     const raiz = document.documentElement;
-    return Math.max(0, raiz.scrollWidth - raiz.clientWidth);
+    const limite = raiz.clientWidth;
+    const itens = Array.from(document.querySelectorAll("body *"))
+      .filter((el): el is HTMLElement => el instanceof HTMLElement)
+      .filter((el) => {
+        const caixa = el.getBoundingClientRect();
+        return caixa.width > 0 && caixa.right > limite + 1;
+      })
+      .slice(0, 6)
+      .map(
+        (el) =>
+          `${el.tagName}.${String(el.className).slice(0, 40)}: ${(el.textContent ?? "").slice(0, 80)}`,
+      );
+    return { excesso: Math.max(0, raiz.scrollWidth - limite), itens };
   });
-  expect(excesso, `Rolagem horizontal de ${excesso} px em ${page.url()}`).toBeLessThanOrEqual(1);
+  expect(
+    excesso.excesso,
+    `Rolagem horizontal de ${excesso.excesso} px em ${page.url()}: ${excesso.itens.join(", ")}`,
+  ).toBeLessThanOrEqual(1);
 }
 
 /**

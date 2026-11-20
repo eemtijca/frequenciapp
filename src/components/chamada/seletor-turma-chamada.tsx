@@ -375,8 +375,8 @@ export function SeletorTurmaChamada({
           id={`${id}-progresso-geral`}
           sx={{
             position: "absolute",
-            width: 1,
-            height: 1,
+            width: "1px",
+            height: "1px",
             overflow: "hidden",
             clip: "rect(0, 0, 0, 0)",
             whiteSpace: "nowrap",
@@ -466,8 +466,8 @@ export function SeletorTurmaChamada({
                     id={`${id}-serie-${grupo.id}`}
                     sx={{
                       position: "absolute",
-                      width: 1,
-                      height: 1,
+                      width: "1px",
+                      height: "1px",
                       overflow: "hidden",
                       clip: "rect(0, 0, 0, 0)",
                       whiteSpace: "nowrap",
@@ -561,8 +561,8 @@ export function SeletorTurmaChamada({
                             id={`${id}-turma-${opcao.id}`}
                             sx={{
                               position: "absolute",
-                              width: 1,
-                              height: 1,
+                              width: "1px",
+                              height: "1px",
                               overflow: "hidden",
                               clip: "rect(0, 0, 0, 0)",
                               whiteSpace: "nowrap",

@@ -128,10 +128,10 @@ const VISOES: Visao[] = [
 
 const VISUALMENTE_OCULTO = {
   position: "absolute",
-  width: 1,
-  height: 1,
+  width: "1px",
+  height: "1px",
   padding: 0,
-  margin: -1,
+  margin: "-1px",
   overflow: "hidden",
   clip: "rect(0, 0, 0, 0)",
   whiteSpace: "nowrap",
@@ -531,9 +531,13 @@ export default function Aplicacao({
     if (podeOperar) lista.splice(2, 0, ITEM_CHAMADA_PARCIAL);
     if (configuracoes.saidaAntecipada) lista.push(ITEM_SAIDAS);
     lista.push(ITEM_RELATORIOS);
-    if (itemFinal) lista.push(itemFinal);
+    if (ehAdmin) {
+      for (const item of ITENS_FIM) lista.push(item);
+    } else if (itemFinal) {
+      lista.push(itemFinal);
+    }
     return lista;
-  }, [configuracoes.saidaAntecipada, itemFinal, podeOperar]);
+  }, [configuracoes.saidaAntecipada, ehAdmin, itemFinal, podeOperar]);
   const indiceAtivo = itens.findIndex((item) => item.visao === visao);
   const tituloAtual = itens.find((item) => item.visao === visao)?.rotulo ?? "FrequenciApp";
   // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
@@ -1155,6 +1159,15 @@ export default function Aplicacao({
             open
             slots={{ docked: "aside" }}
             aria-label="Navegação do aplicativo"
+            slotProps={{
+              paper: {
+                sx: {
+                  display: { xs: "none", md: "flex" },
+                  visibility: { xs: "hidden", md: "visible" },
+                  pointerEvents: { xs: "none", md: "auto" },
+                },
+              },
+            }}
             sx={{
               display: { xs: "none", md: "block" },
               visibility: { xs: "hidden", md: "visible" },
