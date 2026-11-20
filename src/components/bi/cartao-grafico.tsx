@@ -11,7 +11,6 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
-import TableCaption from "@mui/material/TableCaption";
 import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
@@ -473,7 +472,9 @@ export function CartaoGrafico({
                       "@media print": { tableLayout: "fixed" },
                     }}
                   >
-                    <TableCaption sx={APENAS_LEITOR}>Dados de {config.titulo}</TableCaption>
+                    <Box component="caption" sx={APENAS_LEITOR}>
+                      Dados de {config.titulo}
+                    </Box>
                     <TableHead>
                       <TableRow>
                         {colunas.map((c) => (

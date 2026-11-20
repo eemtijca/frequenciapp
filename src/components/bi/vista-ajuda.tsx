@@ -7,7 +7,7 @@ import { Botao } from "@/components/ui/mui/botao";
 import { SecaoConteudo } from "@/components/layout/secao-conteudo";
 import { ROTULOS_RECURSOS_BI, type RecursoBi } from "@/domain/bi";
 import type { DadosBi } from "@/domain/bi-analise";
-const METRICAS = [
+const METRICAS: ReadonlyArray<readonly [string, string]> = [
   [
     "Alunos registrados",
     "Soma dos alunos considerados em cada chamada salva. Um aluno em vários dias conta várias vezes; desistência e histórico seguem o relatório interno.",

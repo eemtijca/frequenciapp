@@ -46,6 +46,7 @@ export default function VistaGrafico({
   onFiltrar: (p: PontoBi) => void;
 }) {
   const tema = useTheme();
+  const paleta = tema.vars?.palette ?? tema.palette;
   const pontos = useMemo(() => rotularPontosBi(originais), [originais]);
   const cores = CORES_BI[config.paleta];
   const cor = cores[0];
@@ -98,12 +99,12 @@ export default function VistaGrafico({
           : formatar(v)
       }
       contentStyle={{
-        background: tema.vars.palette.background.paper,
-        color: tema.vars.palette.text.primary,
-        borderColor: tema.vars.palette.divider,
+        background: paleta.background.paper,
+        color: paleta.text.primary,
+        borderColor: paleta.divider,
         borderRadius: 8,
       }}
-      labelStyle={{ color: tema.vars.palette.text.primary }}
+      labelStyle={{ color: paleta.text.primary }}
     />
   );
   const valores = config.mostrarValores ? (
@@ -117,19 +118,19 @@ export default function VistaGrafico({
   ) : null;
   const base = (
     <>
-      <CartesianGrid stroke={tema.vars.palette.divider} strokeDasharray="3 3" />
+      <CartesianGrid stroke={paleta.divider} strokeDasharray="3 3" />
       {tooltip}
-      <YAxis width={54} tick={{ fill: tema.vars.palette.text.secondary, fontSize: 11 }} />
+      <YAxis width={54} tick={{ fill: paleta.text.secondary, fontSize: 11 }} />
       <XAxis
         dataKey="nome"
         tickFormatter={rotuloEixoBi}
-        tick={{ fill: tema.vars.palette.text.secondary, fontSize: 11 }}
+        tick={{ fill: paleta.text.secondary, fontSize: 11 }}
         interval="preserveStartEnd"
       />
       {config.meta !== null && (
         <ReferenceLine
           y={config.meta}
-          stroke={tema.vars.palette.falta.main}
+          stroke={paleta.falta.main}
           strokeDasharray="4 4"
           label="Referência"
         />
@@ -218,15 +219,13 @@ export default function VistaGrafico({
                       width={60}
                       height={44}
                       rx={7}
-                      fill={
-                        p && p.valor !== null ? cor : tema.vars.palette.action.disabledBackground
-                      }
+                      fill={p && p.valor !== null ? cor : paleta.action.disabledBackground}
                       fillOpacity={
                         p && p.valor !== null
                           ? 0.15 + Math.max(0, p.valor / calor.maximo) * 0.85
                           : 1
                       }
-                      stroke={p?.valor === null ? tema.vars.palette.text.secondary : "none"}
+                      stroke={p?.valor === null ? paleta.text.secondary : "none"}
                       strokeDasharray={p?.valor === null ? "3 3" : undefined}
                       role={p ? "button" : "img"}
                       tabIndex={p ? 0 : undefined}
@@ -300,18 +299,18 @@ export default function VistaGrafico({
         </PieChart>
       ) : config.tipo === "dispersao" ? (
         <ScatterChart margin={{ top: 24, right: 24, bottom: 5, left: 0 }}>
-          <CartesianGrid stroke={tema.vars.palette.divider} />
+          <CartesianGrid stroke={paleta.divider} />
           <XAxis
             type="number"
             dataKey="registros"
             name="Registros"
-            tick={{ fill: tema.vars.palette.text.secondary }}
+            tick={{ fill: paleta.text.secondary }}
           />
           <YAxis
             type="number"
             dataKey="valor"
             name={NOMES_MEDIDAS[config.medida]}
-            tick={{ fill: tema.vars.palette.text.secondary }}
+            tick={{ fill: paleta.text.secondary }}
           />
           {tooltip}
           <Scatter
@@ -396,14 +395,14 @@ export default function VistaGrafico({
           layout="vertical"
           margin={{ top: 5, right: config.mostrarValores ? 65 : 24, bottom: 5, left: 0 }}
         >
-          <CartesianGrid stroke={tema.vars.palette.divider} />
-          <XAxis type="number" tick={{ fill: tema.vars.palette.text.secondary, fontSize: 11 }} />
+          <CartesianGrid stroke={paleta.divider} />
+          <XAxis type="number" tick={{ fill: paleta.text.secondary, fontSize: 11 }} />
           <YAxis
             dataKey="nome"
             type="category"
             width={105}
             tickFormatter={rotuloEixoBi}
-            tick={{ fill: tema.vars.palette.text.secondary, fontSize: 11 }}
+            tick={{ fill: paleta.text.secondary, fontSize: 11 }}
           />
           {tooltip}
           <Bar

@@ -6,7 +6,6 @@ import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
-import TableCaption from "@mui/material/TableCaption";
 import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
@@ -118,7 +117,9 @@ export function TabelaApoioBi({
               "@media print": { tableLayout: "fixed" },
             }}
           >
-            <TableCaption sx={APENAS_LEITOR}>Dados escolares de apoio</TableCaption>
+            <Box component="caption" sx={APENAS_LEITOR}>
+              Dados escolares de apoio
+            </Box>
             <TableHead>
               <TableRow>
                 {colunas.map((c) => (
