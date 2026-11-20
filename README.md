@@ -86,7 +86,7 @@ A demonstração pública fica em https://frequenciappjca.vercel.app. Para exper
 - PostgreSQL 17 com Prisma ORM 7, conexão do runtime em `DATABASE_URL` e conexão do CLI em `DIRECT_URL`, com adaptador oficial `pg`.
 - Autenticação própria: scrypt para senhas, sessões opacas em cookies HttpOnly e papéis de administração e coordenação.
 - Transações ACID com isolamento serializável e repetição automática em conflitos.
-- Tailwind CSS 4 com componentes shadcn/ui personalizados, animações com Motion e gráficos com Recharts.
+- Material UI 9 com tema próprio em CSS variables, componentes MUI compartilhados, gráficos MUI X e Recharts restrito ao FrequenciBI.
 - Service worker próprio para a experiência instalável e o aviso offline.
 - Vitest para testes de unidade e contratos de API.
 
