@@ -43,7 +43,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          node-version: 26.13.0
+          node-version: 26.13.1
 
       - name: Verificar configuração e migrações sintéticas
         run: node --test tests/servidor/ambiente-seguro.test.mjs tests/servidor/configuracao-segura.test.mjs tests/servidor/contexto-docker.test.mjs tests/servidor/migrar-incompleta.test.mjs
@@ -51,7 +51,7 @@ jobs:
       - name: Preparar imagens fixadas do ensaio Caddy
         run: |
           docker pull caddy:2.11-alpine@sha256:78bd35025c7ba85961dd149ae670315129954e77abe2383ac47c89106b35ade9
-          docker pull node:26.13.0-bookworm-slim@sha256:add5c17c14752c54d2f3d519ec46a3815684d41c33f198bcb09fb998f7dcbf68
+          docker pull node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
 
       - name: Validar servidor
         run: bash infra/servidor/validar.sh
