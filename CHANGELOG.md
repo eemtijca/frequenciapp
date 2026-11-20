@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O cabeçalho da Chamada Parcial fica mais compacto, com título e botão Enviar para a planilha. Em telas estreitas, o botão passa para a linha seguinte.
+
 - As massas dos testes de chamada alinham o cadastro das turmas e dos alunos ao dia de referência, evitando conflitos históricos artificiais no domingo. Uma regressão usa domingo fixo na geração da massa e salva o sábado pela API real, sem alterar o relógio do aplicativo nem dispensar a confirmação histórica quando necessária.
 
 - As massas próprias de Chamada Parcial e Seduc seguem o dia de referência e preservam os alunos inativos e desistentes com situação temporal explícita. Os cenários de saída preparam chamada com participantes e retrato de aulas pela API, sem substituir referência comprovada por confirmação de histórico desconhecido. Os testes de remoção de saídas passam a criar os próprios registros e independem da ordem de execução.

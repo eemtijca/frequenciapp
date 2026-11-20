@@ -544,19 +544,16 @@ export default function VistaFrequenciaParcial({
       data-testid="chamada-parcial"
       className="flex flex-col gap-4"
     >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Chamada parcial</h1>
-          <p className="text-muted-foreground text-sm">Ajustes por aluno e conferência na Seduc.</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h1 className="text-xl font-semibold tracking-tight">Chamada parcial</h1>
         <Button
           type="button"
           variant="outline"
+          aria-haspopup="dialog"
           onClick={() => setEnvioAberto(true)}
           disabled={!estadoPlanilha?.podeEnviar || ocupado || sujo}
-          className="h-11 shrink-0"
         >
-          <FileSpreadsheet size={16} />
+          <FileSpreadsheet aria-hidden="true" className="size-5" />
           Enviar para a planilha
         </Button>
       </div>
