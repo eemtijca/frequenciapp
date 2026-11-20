@@ -1,8 +1,19 @@
 "use client";
 
-// Histórico: frequências salvas de um mês, abertas em um toque.
+// Histórico: frequências salvas de um mês, filtradas por série e abertas em um toque.
 import { useState } from "react";
-import { ArrowUpRight, ChevronLeft, ChevronRight, RotateCcw, History } from "lucide-react";
+import ArrowOutwardRoundedIcon from "@mui/icons-material/ArrowOutwardRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
+import Box from "@mui/material/Box";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import ListItemButton from "@mui/material/ListItemButton";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type { Frequencia, Serie, Turma } from "@/domain/frequencia";
 import {
   dataNoFuso,
@@ -13,8 +24,11 @@ import {
   rotuloDiaSemana,
   rotuloMes,
 } from "@/domain/frequencia";
-import { Button } from "@/components/ui/button";
-import { BarraBusca } from "@/components/ui/barra-busca";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { GrupoOpcoes } from "@/components/ui/mui/grupo-opcoes";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
 interface Props {
@@ -71,29 +85,31 @@ export default function VistaHistorico({
   });
 
   return (
-    <section aria-label="Histórico de frequências" className="flex flex-col gap-4 pb-6">
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Histórico</h1>
-          <p className="text-muted-foreground text-sm">
-            {frequencias.length === 0
-              ? "Frequências salvas do mês"
-              : `${frequencias.length} ${frequencias.length === 1 ? "frequência salva" : "frequências salvas"}`}
-          </p>
-        </div>
-      </div>
+    <Box
+      component="section"
+      aria-label="Histórico de frequências"
+      sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 3, minWidth: 0 }}
+    >
+      <Box>
+        <Typography component="h1" variant="h4">
+          Histórico
+        </Typography>
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          {frequencias.length === 0
+            ? "Frequências salvas do mês"
+            : `${frequencias.length} ${frequencias.length === 1 ? "frequência salva" : "frequências salvas"}`}
+        </Typography>
+      </Box>
 
-      <div className="navegacao-dia flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Mês anterior"
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <BotaoIcone
+          rotulo="Mês anterior"
+          variante="contorno"
+          icone={<ChevronLeftRoundedIcon />}
           onClick={() => onMes(mesSeguinte(mes, -1))}
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="min-w-0 flex-1">
+          sx={{ width: 48, height: 48 }}
+        />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <SeletorPeriodo
             id="mes-historico"
             modo="mes"
@@ -103,70 +119,57 @@ export default function VistaHistorico({
             rotulo={rotuloMes(mes)}
             onValor={onMes}
           />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Mês seguinte"
+        </Box>
+        <BotaoIcone
+          rotulo="Mês seguinte"
+          variante="contorno"
+          icone={<ChevronRightRoundedIcon />}
           disabled={mes >= mesCorrente}
           onClick={() => onMes(mesSeguinte(mes, 1))}
-        >
-          <ChevronRight size={18} />
-        </Button>
-      </div>
-      {mes !== mesCorrente && (
-        <Button
-          type="button"
-          onClick={() => onMes(mesCorrente)}
-          variant="secondary"
-          className="self-start"
-        >
-          <RotateCcw size={16} aria-hidden="true" />
-          Voltar para este mês
-        </Button>
-      )}
+          sx={{ width: 48, height: 48 }}
+        />
+      </Stack>
 
-      {series.length > 0 && (
-        <div role="group" aria-label="Filtrar por série" className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            aria-pressed={serieFiltro === ""}
-            onClick={() => setSerieFiltro("")}
-            className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${serieFiltro === "" ? "" : "controle"}`}
+      {mes !== mesCorrente ? (
+        <Box sx={{ display: "flex" }}>
+          <Botao
+            variante="secundario"
+            icone={<ReplayRoundedIcon />}
+            onClick={() => onMes(mesCorrente)}
           >
-            Todas
-          </button>
-          {series.map((serie) => (
-            <button
-              key={serie.id}
-              type="button"
-              aria-pressed={serieFiltro === serie.id}
-              onClick={() => setSerieFiltro(serie.id)}
-              className={`controle pressionavel flex h-11 items-center px-4 text-sm font-medium transition-colors ${serieFiltro === serie.id ? "" : "controle"}`}
-            >
-              {serie.nome}
-            </button>
-          ))}
-        </div>
-      )}
+            Voltar para este mês
+          </Botao>
+        </Box>
+      ) : null}
 
-      {bloqueado && (
-        <p className="bg-secondary text-secondary-foreground rounded-lg px-4 py-3 text-sm">
-          Há alterações na frequência em aberto. Salve antes de abrir outra.
-        </p>
-      )}
+      {series.length > 0 ? (
+        <GrupoOpcoes
+          rotulo="Filtrar por série"
+          valor={serieFiltro}
+          onValor={setSerieFiltro}
+          opcoes={[
+            { valor: "", rotulo: "Todas" },
+            ...series.map((serie) => ({ valor: serie.id, rotulo: serie.nome })),
+          ]}
+        />
+      ) : null}
+
+      {bloqueado ? (
+        <AlertaCompacto
+          variante="conflito"
+          descricao="Há alterações na frequência em aberto. Salve antes de abrir outra."
+          tamanho="linha"
+        />
+      ) : null}
 
       {frequencias.length === 0 ? (
-        <div className="superficie flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
-          <History size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Nenhuma frequência neste mês</p>
-          <p className="text-muted-foreground text-sm">
-            Escolha outro mês ou faça a primeira frequência do período.
-          </p>
-        </div>
+        <EstadoVazio
+          icone={<HistoryRoundedIcon />}
+          titulo="Nenhuma frequência neste mês"
+          descricao="Escolha outro mês ou faça a primeira frequência do período."
+        />
       ) : (
-        <div className="flex flex-col gap-3">
+        <Stack spacing={2}>
           <BarraBusca
             id="busca-historico"
             valor={busca}
@@ -174,91 +177,127 @@ export default function VistaHistorico({
             placeholder="Buscar por turma, dia ou autoria"
           />
           {filtradas.length === 0 ? (
-            <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-              <p className="font-medium">Nenhuma frequência encontrada</p>
-              <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
-            </div>
+            <EstadoVazio
+              icone={<HistoryRoundedIcon />}
+              titulo="Nenhuma frequência encontrada"
+              descricao="Tente outro termo de busca."
+            />
           ) : (
-            <ul className="superficie divide-y overflow-hidden">
-              {filtradas.map((frequencia) => {
-                const rotulo = rotuloDia(frequencia.dia);
-                const dataSalva = dataNoFuso(frequencia.atualizadoEm, fuso);
-                const hora = horaNoFuso(frequencia.atualizadoEm, fuso);
-                const turma = turmas.find((item) => item.id === frequencia.turmaId);
-                const aulasDoDia = horariosDaChamada(turma?.horarios ?? [], frequencia.dia, true);
-                const totalAulas = frequencia.aulas?.length ?? aulasDoDia.length;
-                const estimativaAulas = frequencia.faltas.length > 0 && !frequencia.aulas?.length;
-                const parciais = frequencia.faltas.filter(
-                  (falta) => totalAulas > 0 && falta.horarios.length < totalAulas,
-                ).length;
-                const justificadas = frequencia.faltas.filter(
-                  (falta) => falta.justificativa,
-                ).length;
-                const resumo =
-                  frequencia.faltas.length === 0
-                    ? "Todos presentes"
-                    : `${frequencia.faltas.length} ${
-                        frequencia.faltas.length === 1 ? "falta" : "faltas"
-                      }${
-                        justificadas > 0
-                          ? ` · ${justificadas} ${
-                              justificadas === 1 ? "justificada" : "justificadas"
-                            }`
-                          : ""
-                      }${
-                        parciais > 0
-                          ? ` · ${parciais} ${parciais === 1 ? "saída parcial" : "saídas parciais"}`
-                          : ""
-                      }`;
-                const autoria =
-                  dataSalva && hora
-                    ? ` · salva em ${dataSalva} às ${hora}${frequencia.atualizadoPorNome ? ` por ${frequencia.atualizadoPorNome}` : ""}`
-                    : "";
-                return (
-                  <li
-                    key={`${frequencia.dia}|${frequencia.turmaId}`}
-                    className="last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
-                  >
-                    <button
-                      type="button"
-                      disabled={bloqueado}
-                      onClick={() => onAbrir(frequencia.dia, frequencia.turmaId)}
-                      className="enabled:hover:bg-secondary/60 pressionavel flex w-full items-center gap-3 px-4 py-3 text-left transition-colors disabled:cursor-not-allowed disabled:text-[var(--texto-desabilitado)]"
+            <Paper variant="outlined" sx={{ overflow: "hidden", boxShadow: "none" }}>
+              <List disablePadding>
+                {filtradas.map((frequencia) => {
+                  const rotulo = rotuloDia(frequencia.dia);
+                  const dataSalva = dataNoFuso(frequencia.atualizadoEm, fuso);
+                  const hora = horaNoFuso(frequencia.atualizadoEm, fuso);
+                  const turma = turmas.find((item) => item.id === frequencia.turmaId);
+                  const aulasDoDia = horariosDaChamada(turma?.horarios ?? [], frequencia.dia, true);
+                  const totalAulas = frequencia.aulas?.length ?? aulasDoDia.length;
+                  const estimativaAulas = frequencia.faltas.length > 0 && !frequencia.aulas?.length;
+                  const parciais = frequencia.faltas.filter(
+                    (falta) => totalAulas > 0 && falta.horarios.length < totalAulas,
+                  ).length;
+                  const justificadas = frequencia.faltas.filter(
+                    (falta) => falta.justificativa,
+                  ).length;
+                  const resumo =
+                    frequencia.faltas.length === 0
+                      ? "Todos presentes"
+                      : `${frequencia.faltas.length} ${
+                          frequencia.faltas.length === 1 ? "falta" : "faltas"
+                        }${
+                          justificadas > 0
+                            ? ` · ${justificadas} ${
+                                justificadas === 1 ? "justificada" : "justificadas"
+                              }`
+                            : ""
+                        }${
+                          parciais > 0
+                            ? ` · ${parciais} ${
+                                parciais === 1 ? "saída parcial" : "saídas parciais"
+                              }`
+                            : ""
+                        }`;
+                  const autoria =
+                    dataSalva && hora
+                      ? ` · salva em ${dataSalva} às ${hora}${frequencia.atualizadoPorNome ? ` por ${frequencia.atualizadoPorNome}` : ""}`
+                      : "";
+                  return (
+                    <ListItem
+                      key={`${frequencia.dia}|${frequencia.turmaId}`}
+                      disablePadding
+                      divider
+                      sx={{ "&:last-of-type": { borderBottom: 0 } }}
                     >
-                      <span className="bg-secondary flex size-12 shrink-0 flex-col items-center justify-center rounded-lg leading-none">
-                        <span className="numerais-tabulares text-lg font-semibold">
-                          {rotulo.numero}
-                        </span>
-                        <span className="text-muted-foreground text-xs uppercase">
-                          {rotulo.semana}
-                        </span>
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">
-                          Turma {rotuloTurma(frequencia.turmaId)}
-                          <span className="numerais-tabulares text-muted-foreground ml-2 text-xs">
-                            {rotulo.mesAno}
-                          </span>
-                        </span>
-                        <span className="text-muted-foreground block text-sm break-words">
-                          {resumo}
-                          {autoria}
-                        </span>
-                        {estimativaAulas && (
-                          <span className="text-muted-foreground block text-xs">
-                            Aulas estimadas pela grade atual.
-                          </span>
-                        )}
-                      </span>
-                      <ArrowUpRight size={18} className="text-muted-foreground shrink-0" />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                      <ListItemButton
+                        disabled={bloqueado}
+                        onClick={() => onAbrir(frequencia.dia, frequencia.turmaId)}
+                        sx={{ gap: 2, px: 2, py: 1.5, alignItems: "center" }}
+                      >
+                        <Box
+                          sx={{
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            width: 48,
+                            height: 48,
+                            flexShrink: 0,
+                            borderRadius: 1,
+                            bgcolor: "action.hover",
+                            lineHeight: 1,
+                          }}
+                        >
+                          <Typography
+                            component="span"
+                            sx={{ fontWeight: 600, fontSize: "1.125rem" }}
+                          >
+                            {rotulo.numero}
+                          </Typography>
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{ color: "text.secondary", textTransform: "uppercase" }}
+                          >
+                            {rotulo.semana}
+                          </Typography>
+                        </Box>
+                        <Box sx={{ minWidth: 0, flex: 1 }}>
+                          <Typography noWrap sx={{ fontWeight: 500 }}>
+                            Turma {rotuloTurma(frequencia.turmaId)}
+                            <Typography
+                              component="span"
+                              variant="caption"
+                              sx={{ color: "text.secondary", ml: 1 }}
+                            >
+                              {rotulo.mesAno}
+                            </Typography>
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                          >
+                            {resumo}
+                            {autoria}
+                          </Typography>
+                          {estimativaAulas ? (
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                              Aulas estimadas pela grade atual.
+                            </Typography>
+                          ) : null}
+                        </Box>
+                        <ArrowOutwardRoundedIcon
+                          aria-hidden="true"
+                          sx={{ color: "text.secondary", flexShrink: 0 }}
+                        />
+                      </ListItemButton>
+                    </ListItem>
+                  );
+                })}
+              </List>
+            </Paper>
           )}
-        </div>
+        </Stack>
       )}
-    </section>
+    </Box>
   );
 }

@@ -3,22 +3,27 @@
 // Envio com prévia por aba e mês, processado em sequência com resultado individual.
 // Divergências e remoções dependem do modo completo.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { LoaderCircle, Send } from "lucide-react";
-import { toast } from "sonner";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import CircularProgress from "@mui/material/CircularProgress";
+import FormControl from "@mui/material/FormControl";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import FormLabel from "@mui/material/FormLabel";
+import Paper from "@mui/material/Paper";
+import Radio from "@mui/material/Radio";
+import RadioGroup from "@mui/material/RadioGroup";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import { Button } from "@/components/ui/button";
-import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
+import { Dialogo } from "@/components/ui/mui/dialogo";
 
 interface PlanoResumo {
   turmaOriginalId: string;
@@ -299,7 +304,7 @@ export default function DialogoEnvio({
     const semConfirmacao = finais.filter((item) => item === "sem_confirmacao").length;
     aoConcluir();
     if (enviados === finais.length) {
-      toast.success(`${enviados} ${enviados === 1 ? "aba enviada" : "abas enviadas"}.`);
+      avisarSucesso(`${enviados} ${enviados === 1 ? "aba enviada" : "abas enviadas"}.`);
       onAbrir(false);
       return;
     }
@@ -344,402 +349,27 @@ export default function DialogoEnvio({
     }));
   }
 
+  const rotuloConcluir = enviou
+    ? "Nova prévia"
+    : totalExclusoes > 0 || objetivo
+      ? "Aplicar alterações"
+      : "Enviar";
+
   return (
-    <Dialog open={aberto} onOpenChange={onAbrir}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>
-            {objetivo ? "Editar planilha de " : "Enviar "}
-            {rotulo}
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-3">
-          {objetivo && (
-            <p className="text-muted-foreground text-sm">
-              {objetivo === "adicionar"
-                ? "Novas linhas e chamadas do mês."
-                : objetivo === "corrigir"
-                  ? "Correções de nomes, turmas e chamadas."
-                  : "Marque as linhas ou colunas para retirar."}
-            </p>
-          )}
-          {modoCompleto && !objetivo && (
-            <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
-              Edição da planilha liberada. Primeiro selecione as alterações; nada é excluído ao
-              marcar.
-            </p>
-          )}
-
-          {!online && (
-            <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
-              Sem conexão. O envio fica indisponível até a internet voltar.
-            </p>
-          )}
-
-          {!objetivo && (
-            <fieldset className="flex flex-col gap-2 text-sm" disabled={enviando || carregando}>
-              <legend className="sr-only">O que enviar</legend>
-              <div className="grid grid-cols-2 gap-2">
-                <label className="bg-secondary/40 has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg p-2.5">
-                  <input
-                    type="radio"
-                    name="alcance-envio"
-                    checked={somenteAlteradas}
-                    onChange={() => setAlcance("pendentes")}
-                    className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
-                  />
-                  <span>Só chamadas pendentes</span>
-                </label>
-                <label className="bg-secondary/40 has-[:checked]:bg-primary/10 flex cursor-pointer items-start gap-2 rounded-lg p-2.5">
-                  <input
-                    type="radio"
-                    name="alcance-envio"
-                    checked={!somenteAlteradas}
-                    onChange={() => setAlcance("periodo")}
-                    className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
-                  />
-                  <span>O período inteiro ({periodo})</span>
-                </label>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                {somenteAlteradas
-                  ? "Dias com chamada ainda não confirmada na planilha, por turma de origem."
-                  : "Para conferência ou recuperação; no modo conservador, só preenche o que está vazio."}
-              </p>
-            </fieldset>
-          )}
-
-          {carregando && (
-            <p className="text-muted-foreground flex items-center gap-2 text-sm">
-              <LoaderCircle size={16} className="animate-spin" />
-              Lendo a planilha e montando a prévia...
-            </p>
-          )}
-
-          {bloqueado && (
-            <AvisoCompacto
-              variante="dados_invalidos"
-              descricao={
-                simulacao?.planos.find((item) => item.avisos.length > 0)?.avisos[0] ??
-                "A estrutura da planilha impede a escrita. Ajuste o cabeçalho."
-              }
-              tamanho="linha"
-            />
-          )}
-
-          {simulacao && !carregando && nadaAEnviar && (
-            <div className="bg-secondary/40 flex flex-col items-start gap-2 rounded-lg px-3 py-2 text-sm">
-              <p>
-                {objetivo ? (
-                  "Nenhuma alteração necessária para esta turma e mês."
-                ) : (
-                  <>
-                    Nenhuma chamada pendente{todas ? " em nenhuma turma" : ""}. Para conferir o
-                    período inteiro, escolha a segunda opção.
-                  </>
-                )}
-              </p>
-              {!todas && somenteAlteradas && (
-                <Button type="button" variant="outline" onClick={() => setAlcance("periodo")}>
-                  Conferir linhas da turma
-                </Button>
-              )}
-            </div>
-          )}
-
-          {simulacao && !carregando && !bloqueado && !nadaAEnviar && (
-            <ul
-              className="bg-secondary/40 flex flex-col gap-3 rounded-lg px-3 py-2.5 text-xs"
-              aria-label="Turmas do envio"
-              aria-live="polite"
-            >
-              {simulacao.planos.map((item) => {
-                const estado = andamento[item.aba];
-                return (
-                  <li
-                    key={item.aba}
-                    data-turma={item.rotulo}
-                    data-aba={item.aba}
-                    className="flex flex-col gap-1.5"
-                  >
-                    <span className="flex flex-wrap items-baseline gap-x-2">
-                      <span className="font-medium">Aba {item.aba}</span>
-                      {item.mes && (
-                        <span className="text-muted-foreground">
-                          {item.mes.slice(5)}/{item.mes.slice(0, 4)}
-                        </span>
-                      )}
-                      {item.semEnvio && (
-                        <span className="text-muted-foreground">sem alterações</span>
-                      )}
-                      {!item.semEnvio && estado && <span>{ROTULO_ANDAMENTO[estado]}</span>}
-                    </span>
-                    {!item.semEnvio && !estado && (
-                      <CaixasDeInfo partes={chipsDoPlano(item, modoCompleto)} />
-                    )}
-                    {estado && detalhes[item.aba] && (
-                      <span
-                        className={
-                          estado === "sem_confirmacao"
-                            ? "text-falta-texto"
-                            : "text-muted-foreground"
-                        }
-                      >
-                        {detalhes[item.aba]}
-                      </span>
-                    )}
-                    {!estado &&
-                      !item.semEnvio &&
-                      item.avisos.slice(0, 3).map((aviso) => (
-                        <span key={aviso} className="text-muted-foreground">
-                          {aviso}
-                        </span>
-                      ))}
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          {objetivo === "adicionar" && !carregando && !enviou && plano && (
-            <div className="superficie flex flex-col gap-2 p-3">
-              <p className="text-sm font-medium">Alunos sem linha na aba {plano.aba}</p>
-              {plano.novosAlunos.length > 0 ? (
-                <ul aria-label="Alunos que serão adicionados" className="text-sm">
-                  {plano.novosAlunos.map((aluno, indice) => (
-                    <li key={`${aluno.nome}-${indice}`}>{aluno.nome}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-muted-foreground text-sm">
-                  Nenhum aluno precisa de uma linha nova.
-                </p>
-              )}
-            </div>
-          )}
-
-          {temDetalhes && !enviou && plano && (
-            <details className="text-xs">
-              <summary className="text-muted-foreground cursor-pointer py-1">
-                Ver detalhes da prévia
-              </summary>
-              <div className="bg-secondary/40 mt-1 flex flex-col gap-1 rounded-lg px-3 py-2">
-                {plano.novasColunas.length > 0 && (
-                  <span>
-                    Dias novos: {plano.novasColunas.map((coluna) => coluna.dia).join(", ")}
-                  </span>
-                )}
-                {plano.sinalizar.length > 0 && (
-                  <span>
-                    Nome na planilha:{" "}
-                    {plano.sinalizar
-                      .slice(0, 5)
-                      .map((item) => `${item.celula} ${item.anterior} para ${item.valor}`)
-                      .join(", ")}
-                    {plano.sinalizar.length > 5 ? " ..." : ""}
-                  </span>
-                )}
-                {plano.substituir.length > 0 && (
-                  <span className="text-falta-texto">
-                    Divergências:{" "}
-                    {plano.substituir
-                      .slice(0, 5)
-                      .map(
-                        (item) =>
-                          `${item.celula} ${item.anterior || "vazia"} para ${item.valor}${
-                            item.campo === "nome"
-                              ? " (nome)"
-                              : item.campo === "turma"
-                                ? " (turma)"
-                                : ""
-                          }`,
-                      )
-                      .join(", ")}
-                    {plano.substituir.length > 5 ? " ..." : ""}
-                  </span>
-                )}
-              </div>
-            </details>
-          )}
-
-          <details className="text-sm">
-            <summary className="text-muted-foreground cursor-pointer py-1 text-xs">
-              {objetivo ? "Opções da edição" : "Opções do envio"}
-            </summary>
-            <div className="mt-1 flex flex-col gap-2">
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={criarColunas}
-                  disabled={enviando}
-                  onChange={(evento) => setCriarColunas(evento.target.checked)}
-                  className="size-4 accent-[var(--primary)]"
-                />
-                Criar colunas para dias sem coluna
-              </label>
-              <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={novosAlunos}
-                  disabled={enviando}
-                  onChange={(evento) => setNovosAlunos(evento.target.checked)}
-                  className="size-4 accent-[var(--primary)]"
-                />
-                Acrescentar alunos sem linha
-              </label>
-              {modoCompleto && (
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={substituir}
-                    disabled={enviando}
-                    onChange={(evento) => setSubstituir(evento.target.checked)}
-                    className="size-4 accent-[var(--primary)]"
-                  />
-                  Atualizar divergências, nomes e turma atual
-                </label>
-              )}
-            </div>
-          </details>
-
-          {podeRemover && (linhasRemoviveis.length > 0 || colunasRemoviveis.length > 0) && (
-            <p className="text-muted-foreground text-xs">
-              {modoCompleto
-                ? "As exclusões abaixo afetam somente a aba indicada na prévia. O cadastro e as chamadas no aplicativo são preservados."
-                : "Para selecionar exclusões, abra Gestão, Configurações, Planilha de frequência e libere o modo completo. Depois, reabra esta prévia."}
-            </p>
-          )}
-          {podeRemover && linhasRemoviveis.length > 0 && (
-            <fieldset className="flex flex-col gap-1.5" disabled={enviando || !modoCompleto}>
-              <legend className="text-muted-foreground mb-1 text-xs">
-                Retirar linhas de alunos da planilha
-              </legend>
-              <p className="text-muted-foreground text-xs">
-                Alunos que não pertencem mais a esta turma. Selecione somente as linhas que devem
-                sair da aba {plano?.aba}. A linha inteira será apagada, incluindo as frequências
-                registradas nela.
-              </p>
-              {linhasRemoviveis.map((item) => (
-                <label key={item.linha} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    aria-label={`Retirar ${item.nome} da planilha (linha ${item.linha})`}
-                    checked={removerMarcadas?.includes(item.linha) ?? false}
-                    onChange={(evento) => {
-                      const marcado = evento.target.checked;
-                      alterarRemocoes((atual) => ({
-                        ...atual,
-                        linhas: marcado
-                          ? [...atual.linhas, item.linha]
-                          : atual.linhas.filter((linha) => linha !== item.linha),
-                      }));
-                    }}
-                    className="size-4 accent-[var(--primary)]"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium">{item.nome}</span>
-                    <span className="text-muted-foreground text-xs">Linha {item.linha}</span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-          )}
-          {podeRemover && colunasRemoviveis.length > 0 && (
-            <fieldset className="flex flex-col gap-1.5" disabled={enviando || !modoCompleto}>
-              <legend className="text-muted-foreground mb-1 text-xs">
-                Remover colunas de dia criadas pela integração
-              </legend>
-              <div className="flex gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    alterarRemocoes((atual) => ({
-                      ...atual,
-                      colunas: colunasRemoviveis.map((item) => item.coluna),
-                    }))
-                  }
-                >
-                  Marcar todas
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => alterarRemocoes((atual) => ({ ...atual, colunas: [] }))}
-                >
-                  Limpar
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {colunasRemoviveis.map((item) => (
-                  <label
-                    key={`coluna-${item.coluna}`}
-                    className="bg-secondary/40 has-[:checked]:bg-primary/10 flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-xs"
-                  >
-                    <input
-                      type="checkbox"
-                      aria-label={`Remover coluna ${item.rotulo} (${item.letra})`}
-                      checked={removerColunasMarcadas?.includes(item.coluna) ?? false}
-                      onChange={(evento) => {
-                        const marcado = evento.target.checked;
-                        alterarRemocoes((atual) => ({
-                          ...atual,
-                          colunas: marcado
-                            ? [...atual.colunas, item.coluna]
-                            : atual.colunas.filter((coluna) => coluna !== item.coluna),
-                        }));
-                      }}
-                      className="size-3.5 accent-[var(--primary)]"
-                    />
-                    {item.data ? diaCurto(item.data) : item.rotulo} ({item.letra})
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          )}
-
-          {totalExclusoes > 0 && !carregando && !enviou && !erro && (
-            <label className="bg-falta-fraca text-falta-texto flex items-start gap-2 rounded-lg p-3 text-sm">
-              <input
-                type="checkbox"
-                checked={exclusoesConferidas}
-                disabled={enviando}
-                onChange={(evento) => setExclusoesConferidas(evento.target.checked)}
-                className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
-              />
-              Conferi as exclusões na aba {plano?.aba} e confirmo que podem ser aplicadas.
-            </label>
-          )}
-
-          {erro && (
-            <div className="flex flex-col items-start gap-2">
-              <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => void simular()}
-                disabled={carregando || enviando}
-              >
-                Repetir prévia
-              </Button>
-            </div>
-          )}
-        </div>
-
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onAbrir(false)}
-            disabled={enviando}
-          >
+    <Dialogo
+      aberto={aberto}
+      onFechar={() => onAbrir(false)}
+      titulo={`${objetivo ? "Editar planilha de " : "Enviar "}${rotulo}`}
+      tamanho="grande"
+      acoes={
+        <>
+          <Botao variante="contorno" onClick={() => onAbrir(false)} disabled={enviando}>
             {enviou ? "Fechar" : "Cancelar"}
-          </Button>
-          <Button
-            type="button"
+          </Botao>
+          <Botao
+            variante="secundario"
+            carregando={enviando}
+            icone={<SendRoundedIcon />}
             onClick={() => void (enviou ? simular() : enviar())}
             disabled={
               enviando ||
@@ -752,16 +382,485 @@ export default function DialogoEnvio({
               (nadaAEnviar && !enviou)
             }
           >
-            {enviando ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
-            {enviou
-              ? "Nova prévia"
-              : totalExclusoes > 0 || objetivo
-                ? "Aplicar alterações"
-                : "Enviar"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            {rotuloConcluir}
+          </Botao>
+        </>
+      }
+    >
+      <Stack spacing={2}>
+        {objetivo ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            {objetivo === "adicionar"
+              ? "Novas linhas e chamadas do mês."
+              : objetivo === "corrigir"
+                ? "Correções de nomes, turmas e chamadas."
+                : "Marque as linhas ou colunas para retirar."}
+          </Typography>
+        ) : null}
+        {modoCompleto && !objetivo ? (
+          <AlertaCompacto
+            variante="conflito"
+            descricao="Edição da planilha liberada. Primeiro selecione as alterações; nada é excluído ao marcar."
+            tamanho="linha"
+          />
+        ) : null}
+        {!online ? (
+          <AlertaCompacto
+            variante="offline"
+            descricao="Sem conexão. O envio fica indisponível até a internet voltar."
+            tamanho="linha"
+          />
+        ) : null}
+
+        {!objetivo ? (
+          <FormControl component="fieldset" disabled={enviando || carregando} sx={{ minWidth: 0 }}>
+            <FormLabel
+              component="legend"
+              sx={{
+                position: "absolute",
+                width: 1,
+                height: 1,
+                overflow: "hidden",
+                clip: "rect(0 0 0 0)",
+              }}
+            >
+              O que enviar
+            </FormLabel>
+            <RadioGroup
+              row
+              value={somenteAlteradas ? "pendentes" : "periodo"}
+              onChange={(evento) =>
+                setAlcance(evento.target.value === "pendentes" ? "pendentes" : "periodo")
+              }
+            >
+              <FormControlLabel
+                value="pendentes"
+                control={<Radio />}
+                label="Só chamadas pendentes"
+              />
+              <FormControlLabel
+                value="periodo"
+                control={<Radio />}
+                label={`O período inteiro (${periodo})`}
+              />
+            </RadioGroup>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {somenteAlteradas
+                ? "Dias com chamada ainda não confirmada na planilha, por turma de origem."
+                : "Para conferência ou recuperação; no modo conservador, só preenche o que está vazio."}
+            </Typography>
+          </FormControl>
+        ) : null}
+
+        {carregando ? (
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <CircularProgress size={16} aria-hidden="true" />
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Lendo a planilha e montando a prévia...
+            </Typography>
+          </Stack>
+        ) : null}
+
+        {bloqueado ? (
+          <AlertaCompacto
+            variante="dados_invalidos"
+            descricao={
+              simulacao?.planos.find((item) => item.avisos.length > 0)?.avisos[0] ??
+              "A estrutura da planilha impede a escrita. Ajuste o cabeçalho."
+            }
+            tamanho="linha"
+          />
+        ) : null}
+
+        {simulacao && !carregando && nadaAEnviar ? (
+          <Paper variant="outlined" sx={{ p: 2, boxShadow: "none" }}>
+            <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
+              <Typography variant="body2">
+                {objetivo
+                  ? "Nenhuma alteração necessária para esta turma e mês."
+                  : `Nenhuma chamada pendente${todas ? " em nenhuma turma" : ""}. Para conferir o período inteiro, escolha a segunda opção.`}
+              </Typography>
+              {!todas && somenteAlteradas ? (
+                <Botao variante="contorno" onClick={() => setAlcance("periodo")}>
+                  Conferir linhas da turma
+                </Botao>
+              ) : null}
+            </Stack>
+          </Paper>
+        ) : null}
+
+        {simulacao && !carregando && !bloqueado && !nadaAEnviar ? (
+          <Box
+            component="ul"
+            aria-label="Turmas do envio"
+            aria-live="polite"
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 1.5,
+              m: 0,
+              px: 2,
+              py: 1.5,
+              bgcolor: "action.hover",
+              borderRadius: 1,
+              listStyle: "none",
+            }}
+          >
+            {simulacao.planos.map((item) => {
+              const estado = andamento[item.aba];
+              return (
+                <Stack
+                  component="li"
+                  key={item.aba}
+                  data-turma={item.rotulo}
+                  data-aba={item.aba}
+                  spacing={0.5}
+                >
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: "baseline", flexWrap: "wrap" }}
+                  >
+                    <Typography component="span" variant="caption" sx={{ fontWeight: 600 }}>
+                      Aba {item.aba}
+                    </Typography>
+                    {item.mes ? (
+                      <Typography
+                        component="span"
+                        variant="caption"
+                        sx={{ color: "text.secondary" }}
+                      >
+                        {item.mes.slice(5)}/{item.mes.slice(0, 4)}
+                      </Typography>
+                    ) : null}
+                    {item.semEnvio ? (
+                      <Typography
+                        component="span"
+                        variant="caption"
+                        sx={{ color: "text.secondary" }}
+                      >
+                        sem alterações
+                      </Typography>
+                    ) : null}
+                    {!item.semEnvio && estado ? (
+                      <Typography component="span" variant="caption">
+                        {ROTULO_ANDAMENTO[estado]}
+                      </Typography>
+                    ) : null}
+                  </Stack>
+                  {!item.semEnvio && !estado ? (
+                    <CaixasDeInfo itens={chipsDoPlano(item, modoCompleto)} />
+                  ) : null}
+                  {estado && detalhes[item.aba] ? (
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: estado === "sem_confirmacao" ? "falta.texto" : "text.secondary",
+                      }}
+                    >
+                      {detalhes[item.aba]}
+                    </Typography>
+                  ) : null}
+                  {!estado && !item.semEnvio
+                    ? item.avisos.slice(0, 3).map((aviso) => (
+                        <Typography key={aviso} variant="caption" sx={{ color: "text.secondary" }}>
+                          {aviso}
+                        </Typography>
+                      ))
+                    : null}
+                </Stack>
+              );
+            })}
+          </Box>
+        ) : null}
+
+        {objetivo === "adicionar" && !carregando && !enviou && plano ? (
+          <Paper variant="outlined" sx={{ p: 2, boxShadow: "none" }}>
+            <Stack spacing={1}>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Alunos sem linha na aba {plano.aba}
+              </Typography>
+              {plano.novosAlunos.length > 0 ? (
+                <Box component="ul" aria-label="Alunos que serão adicionados" sx={{ m: 0, pl: 2 }}>
+                  {plano.novosAlunos.map((aluno, indice) => (
+                    <Typography component="li" key={`${aluno.nome}-${indice}`} variant="body2">
+                      {aluno.nome}
+                    </Typography>
+                  ))}
+                </Box>
+              ) : (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Nenhum aluno precisa de uma linha nova.
+                </Typography>
+              )}
+            </Stack>
+          </Paper>
+        ) : null}
+
+        {temDetalhes && !enviou && plano ? (
+          <Box component="details">
+            <Typography
+              component="summary"
+              variant="caption"
+              sx={{ cursor: "pointer", py: 1, color: "text.secondary" }}
+            >
+              Ver detalhes da prévia
+            </Typography>
+            <Stack spacing={0.5} sx={{ px: 2, py: 1, bgcolor: "action.hover", borderRadius: 1 }}>
+              {plano.novasColunas.length > 0 ? (
+                <Typography variant="caption">
+                  Dias novos: {plano.novasColunas.map((coluna) => coluna.dia).join(", ")}
+                </Typography>
+              ) : null}
+              {plano.sinalizar.length > 0 ? (
+                <Typography variant="caption">
+                  Nome na planilha:{" "}
+                  {plano.sinalizar
+                    .slice(0, 5)
+                    .map((item) => `${item.celula} ${item.anterior} para ${item.valor}`)
+                    .join(", ")}
+                  {plano.sinalizar.length > 5 ? " ..." : ""}
+                </Typography>
+              ) : null}
+              {plano.substituir.length > 0 ? (
+                <Typography variant="caption" sx={{ color: "falta.texto" }}>
+                  Divergências:{" "}
+                  {plano.substituir
+                    .slice(0, 5)
+                    .map(
+                      (item) =>
+                        `${item.celula} ${item.anterior || "vazia"} para ${item.valor}${
+                          item.campo === "nome"
+                            ? " (nome)"
+                            : item.campo === "turma"
+                              ? " (turma)"
+                              : ""
+                        }`,
+                    )
+                    .join(", ")}
+                  {plano.substituir.length > 5 ? " ..." : ""}
+                </Typography>
+              ) : null}
+            </Stack>
+          </Box>
+        ) : null}
+
+        <Acordeao titulo={objetivo ? "Opções da edição" : "Opções do envio"} nivelTitulo="h3">
+          <Stack spacing={1}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={criarColunas}
+                  disabled={enviando}
+                  onChange={(evento) => setCriarColunas(evento.target.checked)}
+                />
+              }
+              label="Criar colunas para dias sem coluna"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={novosAlunos}
+                  disabled={enviando}
+                  onChange={(evento) => setNovosAlunos(evento.target.checked)}
+                />
+              }
+              label="Acrescentar alunos sem linha"
+            />
+            {modoCompleto ? (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={substituir}
+                    disabled={enviando}
+                    onChange={(evento) => setSubstituir(evento.target.checked)}
+                  />
+                }
+                label="Atualizar divergências, nomes e turma atual"
+              />
+            ) : null}
+          </Stack>
+        </Acordeao>
+
+        {podeRemover && (linhasRemoviveis.length > 0 || colunasRemoviveis.length > 0) ? (
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {modoCompleto
+              ? "As exclusões abaixo afetam somente a aba indicada na prévia. O cadastro e as chamadas no aplicativo são preservados."
+              : "Para selecionar exclusões, abra Gestão, Configurações, Planilha de frequência e libere o modo completo. Depois, reabra esta prévia."}
+          </Typography>
+        ) : null}
+
+        {podeRemover && linhasRemoviveis.length > 0 ? (
+          <FormControl
+            component="fieldset"
+            disabled={enviando || !modoCompleto}
+            sx={{ border: 0, m: 0, p: 0, minWidth: 0 }}
+          >
+            <FormLabel component="legend" sx={{ fontSize: 12, color: "text.secondary", mb: 0.5 }}>
+              Retirar linhas de alunos da planilha
+            </FormLabel>
+            <Typography variant="caption" sx={{ color: "text.secondary", mb: 1 }}>
+              Alunos que não pertencem mais a esta turma. Selecione somente as linhas que devem sair
+              da aba {plano?.aba}. A linha inteira será apagada, incluindo as frequências
+              registradas nela.
+            </Typography>
+            <Stack spacing={0.5}>
+              {linhasRemoviveis.map((item) => (
+                <FormControlLabel
+                  key={item.linha}
+                  control={
+                    <Checkbox
+                      slotProps={{
+                        input: {
+                          "aria-label": `Retirar ${item.nome} da planilha (linha ${item.linha})`,
+                        },
+                      }}
+                      checked={removerMarcadas?.includes(item.linha) ?? false}
+                      onChange={(evento) => {
+                        const marcado = evento.target.checked;
+                        alterarRemocoes((atual) => ({
+                          ...atual,
+                          linhas: marcado
+                            ? [...atual.linhas, item.linha]
+                            : atual.linhas.filter((linha) => linha !== item.linha),
+                        }));
+                      }}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {item.nome}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        Linha {item.linha}
+                      </Typography>
+                    </Box>
+                  }
+                />
+              ))}
+            </Stack>
+          </FormControl>
+        ) : null}
+
+        {podeRemover && colunasRemoviveis.length > 0 ? (
+          <FormControl
+            component="fieldset"
+            disabled={enviando || !modoCompleto}
+            sx={{ border: 0, m: 0, p: 0, minWidth: 0 }}
+          >
+            <FormLabel component="legend" sx={{ fontSize: 12, color: "text.secondary", mb: 0.5 }}>
+              Remover colunas de dia criadas pela integração
+            </FormLabel>
+            <Stack direction="row" spacing={1} sx={{ mb: 1 }}>
+              <Botao
+                variante="contorno"
+                tamanho="pequeno"
+                onClick={() =>
+                  alterarRemocoes((atual) => ({
+                    ...atual,
+                    colunas: colunasRemoviveis.map((item) => item.coluna),
+                  }))
+                }
+              >
+                Marcar todas
+              </Botao>
+              <Botao
+                variante="texto"
+                tamanho="pequeno"
+                onClick={() => alterarRemocoes((atual) => ({ ...atual, colunas: [] }))}
+              >
+                Limpar
+              </Botao>
+            </Stack>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+              {colunasRemoviveis.map((item) => (
+                <FormControlLabel
+                  key={`coluna-${item.coluna}`}
+                  sx={{
+                    m: 0,
+                    px: 1,
+                    py: 0.25,
+                    border: 1,
+                    borderColor: "divider",
+                    borderRadius: 1,
+                    bgcolor: "action.hover",
+                  }}
+                  control={
+                    <Checkbox
+                      size="small"
+                      slotProps={{
+                        input: {
+                          "aria-label": `Remover coluna ${item.rotulo} (${item.letra})`,
+                        },
+                      }}
+                      checked={removerColunasMarcadas?.includes(item.coluna) ?? false}
+                      onChange={(evento) => {
+                        const marcado = evento.target.checked;
+                        alterarRemocoes((atual) => ({
+                          ...atual,
+                          colunas: marcado
+                            ? [...atual.colunas, item.coluna]
+                            : atual.colunas.filter((coluna) => coluna !== item.coluna),
+                        }));
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography variant="caption">
+                      {item.data ? diaCurto(item.data) : item.rotulo} ({item.letra})
+                    </Typography>
+                  }
+                />
+              ))}
+            </Stack>
+          </FormControl>
+        ) : null}
+
+        {totalExclusoes > 0 && !carregando && !enviou && !erro ? (
+          <FormControlLabel
+            sx={{
+              m: 0,
+              p: 1.5,
+              alignItems: "flex-start",
+              bgcolor: "falta.fraco",
+              borderRadius: 1,
+              color: "falta.texto",
+            }}
+            control={
+              <Checkbox
+                slotProps={{
+                  input: {
+                    "aria-label": `Conferi as exclusões na aba ${plano?.aba} e confirmo que podem ser aplicadas.`,
+                  },
+                }}
+                checked={exclusoesConferidas}
+                disabled={enviando}
+                onChange={(evento) => setExclusoesConferidas(evento.target.checked)}
+              />
+            }
+            label={
+              <Typography variant="body2">
+                Conferi as exclusões na aba {plano?.aba} e confirmo que podem ser aplicadas.
+              </Typography>
+            }
+          />
+        ) : null}
+
+        {erro ? (
+          <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
+            <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+            <Botao
+              variante="contorno"
+              onClick={() => void simular()}
+              disabled={carregando || enviando}
+            >
+              Repetir prévia
+            </Botao>
+          </Stack>
+        ) : null}
+      </Stack>
+    </Dialogo>
   );
 }
 
