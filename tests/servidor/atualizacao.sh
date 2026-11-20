@@ -35,7 +35,10 @@ export ESTADO_DIR="$TMP_RAIZ/estado"
 export LOG_DIR="$TMP_RAIZ/log"
 export BACKUP_DIR="$TMP_RAIZ/backups"
 export BACKUP_BANCO_DIR="$TMP_RAIZ/backups/banco"
-mkdir -m 700 -p "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_BANCO_DIR" "$SERVIDOR_CONFIG_DIR"
+(
+  umask 077
+  mkdir -p "$ESTADO_DIR" "$LOG_DIR" "$BACKUP_BANCO_DIR" "$SERVIDOR_CONFIG_DIR"
+)
 : >"$APP_ENV_FILE"
 : >"$OPS_ENV_FILE"
 chmod 600 "$APP_ENV_FILE" "$OPS_ENV_FILE"
