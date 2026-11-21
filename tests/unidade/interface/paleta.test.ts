@@ -5,6 +5,7 @@ import { tema } from "@/theme/tema";
 import {
   contraste,
   deltaE,
+  hexParaRgb,
   hslParaRgb,
   lerHsl,
   oklchParaRgb,
@@ -29,7 +30,7 @@ function paleta(esquema: "light" | "dark") {
 
 function cor(valor: string | undefined, rotulo: string): Rgb {
   if (!valor) throw new Error(`Cor ${rotulo} ausente no tema`);
-  return hslParaRgb(...lerHsl(valor));
+  return valor.startsWith("#") ? hexParaRgb(valor) : hslParaRgb(...lerHsl(valor));
 }
 
 describe.each([

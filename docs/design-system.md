@@ -129,7 +129,7 @@ Regras:
 - A ação principal usa o verde sólido `brand.700` com texto `brand.50` nos dois temas. O anel de foco é independente do preenchimento.
 - `success` é comparado com `primary`, não com um passo isolado da escala.
 - `justificada` é comparada com `primary` e com `falta` nos dois temas, inclusive sob simulação de daltonismo.
-- O anel de foco translúcido é validado em 3:1 contra o fundo adjacente.
+- O contorno sólido de foco usa a cor primária do tema e deve atingir 3:1 contra o fundo adjacente.
 - Nenhum estado usa cor como único sinal. Falta, justificada, alerta e sucesso também têm rótulo textual, ícone ou padrão.
 
 ## Botões
@@ -147,7 +147,7 @@ Regras:
 - Nas primitivas compartilhadas, use `principal` ou `neutro` para explicitar a função. Os nomes `primario` e `secundario` mantêm a compatibilidade dos chamadores que ainda serão revisados.
 - Altura pequena de 36 px e altura média de 40 px.
 - O alvo de toque é de 48 dp, mesmo quando a caixa visual tem 36 dp.
-- O foco visível tem 3 px, com o primário translúcido e deslocamento de 2 px.
+- O foco visível tem 3 px, com a cor primária e deslocamento de 2 px.
 - Não há sombra em repouso.
 - `textTransform` é `none`.
 - Cada região tem uma única ação principal. Duas ações contidas verdes na mesma região não são permitidas.
@@ -258,7 +258,7 @@ Regras de composição:
 
 - Layout `sign-in-side`, com conteúdo de marca e destaques à esquerda e cartão de entrada à direita no desktop.
 - No celular, a marca, o título e o formulário ficam em uma coluna, centralizados.
-- Fundo radial do template e seletor de tema no canto superior direito.
+- Fundo neutro sem gradiente e seletor de tema no canto superior direito.
 - Campos de e-mail ou identificador, senha, manter conectado e aviso de erro.
 - Links do repositório, documentação da API, Sobre, privacidade e FrequenciBI.
 - Nenhum login social, texto de demonstração ou dado fictício.

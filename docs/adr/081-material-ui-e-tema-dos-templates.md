@@ -51,7 +51,7 @@ O resultado era inconsistência visual entre telas, revisão mais difícil, cust
 - O espaçamento segue a grade de 8 dp, com valores permitidos de 4, 8, 16, 24, 32, 40 e 48 dp. `theme.spacing(1)` continua 8 px.
 - Toda tela usa `LayoutPagina` e `LayoutConteudo`. Cabeçalho, seções, cartões, formulários, tabelas e diálogos usam os componentes compartilhados de `src/components/layout/`.
 - Cores, espaçamentos e variantes vêm de `theme.vars`, `sx` e dos tokens de `src/theme/layout.ts`. Nenhuma tela define largura máxima própria, grid próprio, margem arbitrária ou `position: absolute` fora de overlays.
-- O foco visível usa contorno de 3 px com o primário translúcido e deslocamento de 2 px.
+- O foco visível usa contorno sólido de 3 px na cor primária, com deslocamento de 2 px.
 
 ### Gráficos, datas e horas
 
@@ -97,7 +97,7 @@ O resultado era inconsistência visual entre telas, revisão mais difícil, cust
 - O First Load JS deve ser medido antes e depois. A meta é aumento de até 10% ou justificativa aprovada na revisão.
 - Testes de componente, ponta a ponta, PWA e contraste precisam acompanhar cada fase.
 - O verde da marca pode se confundir com o verde de sucesso. A separação é validada por teste de contraste e de daltonismo nos dois temas.
-- O botão verde usa `brand.700` com texto `brand.50` no tema claro, porque `brand.600` com branco fica em torno de 4,25:1. No tema escuro, o botão verde usa `brand.300` com texto escuro.
+- A ação principal usa `brand.700` sólido com texto `brand.50` nos dois temas. O brilho e o gradiente do template não fazem parte do acabamento da marca.
 - A documentação de interface, as capturas e os ADRs 061 e 062 precisam refletir o novo contrato.
 
 ## Licença e origem dos templates

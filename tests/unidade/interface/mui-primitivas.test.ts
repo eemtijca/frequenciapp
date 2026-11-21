@@ -70,9 +70,11 @@ const VARIANTES_ESTADO: readonly VarianteEstado[] = [
 ];
 
 describe("Botao", () => {
-  it("mapeia as cinco variantes e os dois tamanhos", () => {
+  it("mapeia ações principais, neutras, legadas e os dois tamanhos", () => {
     const casos = [
-      ["primario", "MuiButton-contained", "MuiButton-colorPrimary"],
+      ["principal", "MuiButton-contained", "MuiButton-colorPrimary"],
+      ["neutro", "MuiButton-contained", "MuiButton-colorInherit"],
+      ["primario", "MuiButton-contained", "MuiButton-colorInherit"],
       ["secundario", "MuiButton-contained", "MuiButton-colorSecondary"],
       ["contorno", "MuiButton-outlined", "MuiButton-colorPrimary"],
       ["texto", "MuiButton-text", "MuiButton-colorPrimary"],
