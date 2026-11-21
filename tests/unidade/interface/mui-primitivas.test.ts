@@ -6,6 +6,7 @@ import { createElement, type ReactElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import { ThemeProvider } from "@mui/material/styles";
+import { semEstilos } from "../../helpers/html";
 import { describe, expect, it } from "vitest";
 import { tema } from "@/theme/tema";
 import { Alerta } from "@/components/ui/mui/alerta";
@@ -34,10 +35,6 @@ import { AlertaCompacto, TelaEstado, type VarianteEstado } from "@/components/ui
 
 function renderizar(elemento: ReactElement): string {
   return renderToStaticMarkup(createElement(ThemeProvider, { theme: tema }, elemento));
-}
-
-function semEstilos(html: string): string {
-  return html.replace(/<style[^>]*>[\s\S]*?<\/style>/g, "");
 }
 
 function contarClasse(html: string, classe: string): number {

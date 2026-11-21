@@ -4,6 +4,7 @@ import path from "node:path";
 import { createElement, type ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ThemeProvider } from "@mui/material/styles";
+import { semEstilos } from "../../helpers/html";
 import { describe, expect, it } from "vitest";
 import { tema } from "@/theme/tema";
 import { TOKENS_LAYOUT } from "@/theme/layout";
@@ -31,10 +32,6 @@ type ValorGrupo = "presente" | "falta" | "justificada";
 
 function renderizar(elemento: ReactNode): string {
   return renderToStaticMarkup(createElement(ThemeProvider, { theme: tema }, elemento));
-}
-
-function semEstilos(html: string): string {
-  return html.replace(/<style[^>]*>[\s\S]*?<\/style>/g, "");
 }
 
 function criar<P extends object>(

@@ -1,6 +1,7 @@
 // Renderiza os consumidores reais com carga sintética e seções abertas, sem rede ou navegador.
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createElement, type ReactElement } from "react";
+import { textoVisivel } from "../../helpers/html";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ThemeProvider } from "@mui/material/styles";
 import { tema } from "@/theme/tema";
@@ -92,12 +93,7 @@ function saida(
   };
 }
 function texto(html: string): string {
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, " ")
-    .replace(/<script[\s\S]*?<\/script>/gi, " ")
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return textoVisivel(html);
 }
 function comTema(elemento: ReactElement): ReactElement {
   return createElement(ThemeProvider, { theme: tema }, elemento);

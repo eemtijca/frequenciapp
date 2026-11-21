@@ -224,9 +224,9 @@ for (const tema of ["light", "dark"] as const) {
       }
       const mover = page.getByRole("button", { name: "Descer 1º ano A" });
       await mover.hover();
-      expect(await mover.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
-        "rgba(0, 0, 0, 0)",
-      );
+      await expect
+        .poll(() => mover.evaluate((el) => getComputedStyle(el).backgroundColor))
+        .not.toBe("rgba(0, 0, 0, 0)");
       await page.setViewportSize({ width: 1280, height: 900 });
       await page.mouse.move(0, 0);
       await conferirAcao(mover);
