@@ -195,10 +195,12 @@ export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
       text: {
         primary: cinza[800],
         secondary: cinza[600],
+        disabled: cinza[600],
       },
       action: {
         hover: "hsla(220, 30%, 94%, 0.2)",
         selected: "hsla(220, 30%, 94%, 0.3)",
+        disabled: cinza[500],
       },
       baseShadow:
         "hsla(220, 30%, 5%, 0.07) 0px 4px 16px 0px, hsla(220, 25%, 10%, 0.07) 0px 8px 16px -5px",
@@ -277,10 +279,12 @@ export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
       text: {
         primary: "hsl(0, 0%, 100%)",
         secondary: cinza[400],
+        disabled: cinza[400],
       },
       action: {
         hover: "hsla(220, 20%, 35%, 0.2)",
         selected: "hsla(220, 20%, 35%, 0.3)",
+        disabled: cinza[400],
       },
       baseShadow:
         "hsla(220, 30%, 5%, 0.7) 0px 4px 16px 0px, hsla(220, 25%, 10%, 0.8) 0px 8px 16px -5px",

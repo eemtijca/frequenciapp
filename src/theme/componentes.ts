@@ -288,12 +288,12 @@ const inputs: Components<Theme> = {
   MuiInputBase: {
     styleOverrides: {
       root: { border: "none" },
-      input: {
+      input: ({ theme }) => ({
         "&::placeholder": {
-          opacity: 0.7,
-          color: cinza[500],
+          opacity: 1,
+          color: theme.vars.palette.text.secondary,
         },
-      },
+      }),
     },
   },
   MuiOutlinedInput: {
