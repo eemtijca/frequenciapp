@@ -681,8 +681,9 @@ export function SeletorPeriodo({
           opacity: 0.8,
         }}
       />
-      <Typography
+      <Box
         component="span"
+        className="numerais-tabulares"
         sx={{
           maxWidth: "100%",
           minWidth: 0,
@@ -693,17 +694,17 @@ export function SeletorPeriodo({
         }}
       >
         {rotulo}
-      </Typography>
+      </Box>
       {detalhe && (
         <Box
           component="span"
+          className="detalhe-data"
           data-detalhe="true"
           sx={{
             maxWidth: "100%",
             minWidth: 0,
             flexShrink: 0,
-            color: "inherit",
-            opacity: 0.8,
+            color: "text.secondary",
             overflowWrap: "anywhere",
           }}
         >

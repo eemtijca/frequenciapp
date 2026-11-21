@@ -35,14 +35,18 @@ export function SelecionarBuscavel({
   ariaLabel,
 }: SelecionarBuscavelProps) {
   const campo = useCampo();
-  const [aberto, setAberto] = useState(false);
-  const [termo, setTermo] = useState("");
   const idFinal = campo?.id ?? id;
   const desabilitado = disabled ?? campo?.disabled ?? false;
   const selecionada = useMemo(
     () => opcoes.find((opcao) => opcao.valor === valor) ?? null,
     [opcoes, valor],
   );
+  const rotuloSelecionado = selecionada?.rotulo ?? "";
+  const chaveSelecionada = `${selecionada?.valor ?? ""}\u0000${rotuloSelecionado}`;
+  // O texto digitado vale enquanto a seleção não mudar; a troca externa
+  // (por exemplo, ao limpar o formulário) volta ao rótulo atual sem efeito.
+  const [edicao, setEdicao] = useState<{ chave: string; texto: string } | null>(null);
+  const texto = edicao?.chave === chaveSelecionada ? edicao.texto : rotuloSelecionado;
 
   // O próprio campo é a busca: abrir o teclado no celular não troca o foco nem fecha a lista.
   return (
@@ -50,20 +54,21 @@ export function SelecionarBuscavel({
       id={idFinal}
       options={opcoes}
       value={selecionada ?? undefined}
-      onChange={(_evento, nova) => onValor(nova?.valor ?? "")}
+      onChange={(_evento, nova) => {
+        setEdicao(null);
+        onValor(nova?.valor ?? "");
+      }}
+      inputValue={texto}
+      onInputChange={(_evento, novo, motivo) => {
+        if (motivo === "input") setEdicao({ chave: chaveSelecionada, texto: novo });
+        else if (motivo === "reset") setEdicao(null);
+      }}
       getOptionLabel={(opcao) => opcao.rotulo}
       getOptionKey={(opcao) => opcao.valor}
       isOptionEqualToValue={(opcao, atual) => opcao.valor === atual.valor}
       filterOptions={(lista, estado) => filtrarOpcoes(lista, estado.inputValue)}
-      inputValue={aberto ? termo : (selecionada?.rotulo ?? "")}
-      onInputChange={(_evento, novo) => setTermo(novo)}
-      open={aberto}
-      onOpen={(evento) => {
-        if (evento.type !== "change") setTermo("");
-        setAberto(true);
-      }}
-      onClose={() => setAberto(false)}
       openOnFocus
+      selectOnFocus
       clearOnBlur={false}
       disableClearable
       fullWidth
@@ -75,7 +80,7 @@ export function SelecionarBuscavel({
       openText="Abrir"
       slotProps={{
         paper: { sx: { mt: 0.5 } },
-        listbox: { sx: { maxHeight: 320 } },
+        listbox: { "aria-label": "Opções", sx: { maxHeight: 320 } },
       }}
       sx={(tema) => ({
         width: "100%",

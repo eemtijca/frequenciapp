@@ -3,6 +3,7 @@
 // Seletor de horário em 24 horas com TimePicker, valor HH:mm, pt-BR e alvo de 48 dp.
 import dayjs, { type Dayjs } from "dayjs";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+import { renderMultiSectionDigitalClockTimeView } from "@mui/x-date-pickers/timeViewRenderers";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 import { useCampo } from "./campo";
 
@@ -63,25 +64,38 @@ export function SeletorHorario({
       onChange={(novo) => onValor(deHorario(novo))}
       format={FORMATO_HORARIO}
       ampm={false}
+      // Em telas estreitas o seletor vira diálogo e não depende da rolagem da página.
+      desktopModeMediaQuery="(min-width: 600px)"
       views={["hours", "minutes"]}
+      viewRenderers={{
+        hours: renderMultiSectionDigitalClockTimeView,
+        minutes: renderMultiSectionDigitalClockTimeView,
+      }}
       timeSteps={{ minutes: 1 }}
       minutesStep={1}
       referenceDate={referencia}
       disabled={desabilitado}
       label={rotuloAcessivel}
       slotProps={{
+        popper: {
+          "aria-label": rotuloAcessivel,
+          // O painel não pode depender da rolagem da página para mostrar a hora ativa.
+          modifiers: [
+            {
+              name: "preventOverflow",
+              options: { boundary: "viewport", rootBoundary: "viewport" },
+            },
+            { name: "flip", options: { boundary: "viewport", rootBoundary: "viewport" } },
+          ],
+        },
         textField: {
           id: idFinal,
           fullWidth: true,
           error: Boolean(campo?.erro),
           slotProps: {
             htmlInput: { "aria-describedby": campo?.descritoPor },
-            ...(campo
-              ? {
-                  input: { notched: false },
-                  inputLabel: { sx: ROTULO_INVISIVEL },
-                }
-              : {}),
+            input: { notched: false },
+            inputLabel: { sx: ROTULO_INVISIVEL },
           },
           sx: (tema) => ({
             width: "100%",

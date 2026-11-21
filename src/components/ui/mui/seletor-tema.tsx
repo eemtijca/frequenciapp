@@ -92,7 +92,7 @@ export function SeletorTema() {
         slotProps={{
           list: {
             role: "radiogroup",
-            "aria-labelledby": idGatilho,
+            "aria-label": "Tema do aplicativo",
             sx: { minWidth: 180 },
           },
         }}
