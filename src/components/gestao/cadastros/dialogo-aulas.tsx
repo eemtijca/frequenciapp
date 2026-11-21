@@ -414,9 +414,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
   return (
     <Dialogo
       aberto={aberto}
-      onFechar={() => {
-        if (!ocupado) onAbrir(false);
-      }}
+      onFechar={() => onAbrir(false)}
       titulo={`Horários de ${turma?.rotulo ?? "turma"}`}
       tamanho="grande"
       fecharDesabilitado={ocupado}
