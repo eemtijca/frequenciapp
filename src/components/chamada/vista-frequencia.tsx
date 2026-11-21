@@ -246,6 +246,7 @@ export default function VistaFrequencia({
   onAbrirGestao,
 }: Props) {
   const podeAdministrar = temCapacidade(usuario.papel, "administrar");
+  const temTurmas = turmas.length > 0;
   const [turmaId, setTurmaId] = useState(() => alvo?.turmaId ?? turmas[0]?.id ?? "");
   // No domingo, a abertura é o resumo da semana encerrada. Um atalho de
   // histórico continua abrindo o dia pedido, nunca o resumo.
@@ -303,7 +304,7 @@ export default function VistaFrequencia({
   const semMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   useEffect(() => {
-    if (!ativo || nav.resumo) return;
+    if (!ativo || nav.resumo || !temTurmas) return;
     const grade = gradeDiariaRef.current;
     const coluna = colunaAlunosRef.current;
     const barra = barraSalvamentoRef.current;
@@ -339,12 +340,21 @@ export default function VistaFrequencia({
       const controle = foco.matches("[data-marcar-falta]")
         ? (foco.closest("[data-faixa-toque]") ?? foco)
         : foco;
-      const caixa = controle.getBoundingClientRect();
       const topoBarra = barra.getBoundingClientRect().top;
-      const topo =
+      const limiteInferior = (caixa: DOMRect) =>
         sobreposicao?.height && cruzaNaHorizontal(caixa, sobreposicao)
           ? Math.min(topoBarra, sobreposicao.top)
           : topoBarra;
+      const linha = foco.closest("li");
+      const caixaLinha =
+        linha && listaAlunosRef.current?.contains(linha) ? linha.getBoundingClientRect() : null;
+      // Quando cabe, preserve a linha inteira, inclusive justificativa e aulas.
+      // Uma linha maior que a área livre não deve deslocar o foco para fora dela.
+      const caixa =
+        caixaLinha && caixaLinha.height + folga <= limiteInferior(caixaLinha) - limites.top
+          ? caixaLinha
+          : controle.getBoundingClientRect();
+      const topo = limiteInferior(caixa);
       if (caixa.top < limites.bottom && caixa.top > limites.top && caixa.bottom + folga > topo) {
         // Mova só o necessário, sem trocar o elemento focado.
         rolagem.scrollTop += Math.min(caixa.bottom + folga - topo, caixa.top - limites.top);
@@ -368,6 +378,7 @@ export default function VistaFrequencia({
     montagem.observe(document.body, { childList: true });
     tamanhos.observe(rolagem);
     tamanhos.observe(barra);
+    tamanhos.observe(coluna);
     grade.addEventListener("focusin", agendar);
     window.addEventListener("resize", agendar);
     acompanharAviso();
@@ -379,7 +390,7 @@ export default function VistaFrequencia({
       cancelAnimationFrame(quadro);
       grade.style.removeProperty(reserva);
     };
-  }, [ativo, nav.resumo]);
+  }, [ativo, nav.resumo, temTurmas]);
 
   const atualizarTela = useCallback(() => {
     if (sujo) {
@@ -1110,7 +1121,7 @@ export default function VistaFrequencia({
                     : "Não iniciada";
 
   // Sem turmas cadastradas ou visíveis, o estado vazio explica o próximo passo.
-  if (turmas.length === 0) {
+  if (!temTurmas) {
     return (
       <LayoutConteudo largura="leitura">
         <Box component="section" aria-label="Fazer chamada">

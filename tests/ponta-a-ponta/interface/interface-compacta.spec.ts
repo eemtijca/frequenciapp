@@ -128,12 +128,14 @@ function sobrepoe(a: Caixa, b: Caixa) {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
 
-for (const [largura, altura, tema] of [
-  [320, 844, "dark"],
-  [390, 844, "light"],
-  [1440, 900, "light"],
+for (const [largura, altura, tema, faltasFiltradas] of [
+  [320, 844, "dark", 0],
+  [390, 844, "light", 0],
+  [390, 844, "light", 3],
+  [1440, 900, "light", 0],
 ] as const) {
-  test(`a falha de salvamento não cobre o último aluno focado a ${largura} px`, async ({
+  const recorte = faltasFiltradas ? ` com ${faltasFiltradas} faltas filtradas` : "";
+  test(`a falha de salvamento não cobre o último aluno focado a ${largura} px${recorte}`, async ({
     page,
   }) => {
     await page.setViewportSize({ width: largura, height: altura });
@@ -151,6 +153,22 @@ for (const [largura, altura, tema] of [
     const linhas = lista.getByRole("listitem");
     await expect(linhas).toHaveCount(24);
     await lista.getByRole("button", { name: /^E2E Aluno Um\b/ }).click();
+    if (faltasFiltradas) {
+      for (let i = 1; i < faltasFiltradas; i++) {
+        await linhas
+          .nth(i)
+          .getByRole("button", { name: /presença|presente/i })
+          .click();
+      }
+      const resumo = chamada.getByRole("button", { name: /^Resumo (de hoje|do dia)$/ });
+      await resumo.click();
+      await chamada
+        .getByRole("region", { name: /^Resumo (de hoje|do dia)$/ })
+        .getByRole("button", { name: /Faltas\b/ })
+        .click();
+      await resumo.click();
+      await expect(linhas).toHaveCount(faltasFiltradas);
+    }
     await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
     const confirmar = page.getByRole("alertdialog", { name: "Salvar chamada?", exact: true });
     await confirmar.getByRole("button", { name: "Salvar chamada", exact: true }).click();
@@ -162,12 +180,16 @@ for (const [largura, altura, tema] of [
     expect(enviosSimulados).toBe(1);
 
     const ultima = linhas.last();
-    const ultimoAluno = ultima.getByRole("button", { name: /presença|presente/i });
+    const rotuloMarcacao = faltasFiltradas ? /: falta em/i : /presença|presente/i;
+    const ultimoAluno = ultima.getByRole("button", { name: rotuloMarcacao });
     await linhas
-      .nth(22)
-      .getByRole("button", { name: /presença|presente/i })
+      .nth((await linhas.count()) - 2)
+      .getByRole("button", { name: rotuloMarcacao })
       .focus();
-    await page.keyboard.press("Tab");
+    for (let i = 0; i < (faltasFiltradas ? 8 : 1); i++) {
+      await page.keyboard.press("Tab");
+      if (await ultimoAluno.evaluate((elemento) => elemento === document.activeElement)) break;
+    }
     await expect(ultimoAluno).toBeFocused();
     const barra = chamada.locator('footer[aria-label="Barra de salvamento"]');
     await expect
@@ -193,10 +215,14 @@ for (const [largura, altura, tema] of [
       .toBe(true);
     await expect(ultimoAluno).toBeFocused();
     await page.keyboard.press("Space");
-    await expect(ultima.getByRole("button", { name: /falta em/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    if (faltasFiltradas) {
+      await expect(linhas).toHaveCount(faltasFiltradas - 1);
+    } else {
+      await expect(ultima.getByRole("button", { name: /falta em/ })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+    }
   });
 }
 
