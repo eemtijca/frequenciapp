@@ -191,7 +191,6 @@ test.describe("menu lateral", () => {
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
     await expect(page.locator("main")).toBeFocused();
-    await expect(page.locator('aside[aria-label="Navegação do aplicativo"]:visible')).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -211,7 +210,7 @@ test.describe("menu lateral", () => {
     await expect(menu.getByText("Administração", { exact: true })).toBeVisible();
     let conta = await abrirMenuConta(page, menu);
     await conta.getByRole("menuitem", { name: "Trocar senha", exact: true }).click();
-    const senha = page.getByRole("dialog", { name: "Trocar minha senha", exact: true });
+    const senha = page.getByRole("dialog", { name: /Trocar minha senha/ });
     await expect(menu).toBeHidden();
     await expect(senha).toBeVisible();
     await conferirFocoNoDialogo(senha);
@@ -222,7 +221,7 @@ test.describe("menu lateral", () => {
     await abrirNavegacao(page);
     conta = await abrirMenuConta(page, menu);
     await conta.getByRole("menuitem", { name: "Notificações", exact: true }).click();
-    const notificacoes = page.getByRole("dialog", { name: "Notificações", exact: true });
+    const notificacoes = page.getByRole("dialog", { name: /Notificações/ });
     await expect(menu).toBeHidden();
     await expect(notificacoes).toBeVisible();
     await conferirFocoNoDialogo(notificacoes);

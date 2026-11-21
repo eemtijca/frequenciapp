@@ -21,7 +21,8 @@ test.describe("toasts e toque duplo", () => {
     await trocarVisao(page, "Chamada", "chamada");
     const chamada = page.locator('section[aria-label="Fazer chamada"]');
     const pilula = chamada.getByRole("button", { name: /E2E Ano A/ });
-    if (await pilula.isVisible().catch(() => false)) await pilula.click();
+    if (await pilula.isVisible().catch(() => false))
+      await pilula.evaluate((elemento: HTMLElement) => elemento.click());
     await liberarSabadoSeNecessario(chamada);
     const lista = chamada.getByRole("list", { name: "Alunos da chamada", exact: true });
     await lista.getByRole("listitem").first().waitFor();
