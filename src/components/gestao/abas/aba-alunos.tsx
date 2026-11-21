@@ -2,7 +2,7 @@
 
 // Aba de alunos: criar, editar, mover de turma, ativar, desativar e
 // excluir, agrupados por turma com busca por nome.
-import { Fragment, memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useMemo, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import CheckBoxOutlineBlankRoundedIcon from "@mui/icons-material/CheckBoxOutlineBlankRounded";
 import CheckBoxRoundedIcon from "@mui/icons-material/CheckBoxRounded";
@@ -591,49 +591,47 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
               ) : null}
             </TableRow>
           </TableHead>
-          <TableBody>
-            {gruposFiltrados
-              .filter(([, , lista]) => lista.length > 0)
-              .map(([id, turma, lista]) => (
-                <Fragment key={id}>
-                  <TableRow sx={{ backgroundColor: "action.hover" }}>
-                    <TableCell colSpan={modoSelecao ? 2 : 3} component="th" scope="colgroup">
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        useFlexGap
-                        sx={{ alignItems: "baseline", justifyContent: "space-between" }}
-                      >
-                        <Typography component="h2" variant="subtitle2" sx={{ m: 0 }}>
-                          {turma?.rotulo ?? "Turma"}
-                        </Typography>
-                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                          {lista.filter((aluno) => aluno.ativo).length} ativos
-                        </Typography>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                  {lista.map((aluno) => (
-                    <LinhaAluno
-                      key={aluno.id}
-                      aluno={aluno}
-                      origem={rotulo(aluno.turmaOriginalId)}
-                      modoSelecao={modoSelecao}
-                      selecionado={selecionados.has(aluno.id)}
-                      ocupado={chaveAtiva === aluno.id}
-                      onSelecionar={alternarSelecao}
-                      onEditar={abrirEdicao}
-                      onAlternarAtivo={(selecionado) =>
-                        setAcaoAluno({ tipo: "ativo", aluno: selecionado })
-                      }
-                      onExcluir={(selecionado) =>
-                        setAcaoAluno({ tipo: "excluir", aluno: selecionado })
-                      }
-                    />
-                  ))}
-                </Fragment>
-              ))}
-          </TableBody>
+          {gruposFiltrados
+            .filter(([, , lista]) => lista.length > 0)
+            .map(([id, turma, lista]) => (
+              <TableBody key={id} data-turma={turma?.rotulo ?? "Turma"}>
+                <TableRow sx={{ backgroundColor: "action.hover" }}>
+                  <TableCell colSpan={modoSelecao ? 2 : 3} component="th" scope="colgroup">
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      useFlexGap
+                      sx={{ alignItems: "baseline", justifyContent: "space-between" }}
+                    >
+                      <Typography component="h2" variant="subtitle2" sx={{ m: 0 }}>
+                        {turma?.rotulo ?? "Turma"}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {lista.filter((aluno) => aluno.ativo).length} ativos
+                      </Typography>
+                    </Stack>
+                  </TableCell>
+                </TableRow>
+                {lista.map((aluno) => (
+                  <LinhaAluno
+                    key={aluno.id}
+                    aluno={aluno}
+                    origem={rotulo(aluno.turmaOriginalId)}
+                    modoSelecao={modoSelecao}
+                    selecionado={selecionados.has(aluno.id)}
+                    ocupado={chaveAtiva === aluno.id}
+                    onSelecionar={alternarSelecao}
+                    onEditar={abrirEdicao}
+                    onAlternarAtivo={(selecionado) =>
+                      setAcaoAluno({ tipo: "ativo", aluno: selecionado })
+                    }
+                    onExcluir={(selecionado) =>
+                      setAcaoAluno({ tipo: "excluir", aluno: selecionado })
+                    }
+                  />
+                ))}
+              </TableBody>
+            ))}
         </TabelaPadrao>
       )}
 

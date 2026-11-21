@@ -1,14 +1,14 @@
 "use client";
 
 // Prepara as abas mensais das turmas em sequência, com confirmação e resultado por turma.
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { rotuloMes } from "@/domain/frequencia";
-import { mesValido, nomeAbaMensal } from "@/domain/planilha-mensal";
+import { nomeAbaMensal } from "@/domain/planilha-mensal";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
@@ -71,18 +71,6 @@ export function DialogoPrepararMes({
   const [resultados, setResultados] = useState<ResultadoTurma[] | null>(null);
   const [turmaAtual, setTurmaAtual] = useState("");
   const [interrupcao, setInterrupcao] = useState<Interrupcao | null>(null);
-
-  useEffect(() => {
-    const url = new URL(window.location.href);
-    const mesDoRetorno = url.searchParams.get("googleMes");
-    if (!mesDoRetorno) return;
-    if (mesValido(mesDoRetorno) && mesDoRetorno <= mesMaximo) {
-      onMes(mesDoRetorno);
-    }
-    // O retorno recupera o mês, mas qualquer nova escrita depende de outro clique.
-    url.searchParams.delete("googleMes");
-    window.history.replaceState(null, "", url);
-  }, [mesMaximo, onMes]);
 
   const reconexao = useAcaoUnica(async () => {
     try {

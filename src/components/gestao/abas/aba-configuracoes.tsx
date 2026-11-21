@@ -1727,13 +1727,7 @@ function ConteudoConfiguracoes({
                 whiteSpace: "nowrap",
               }}
             >
-              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
-                Não salvo
-              </Box>
-              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                Alterações não salvas em {secoesAlteradas.length}{" "}
-                {secoesAlteradas.length === 1 ? "seção" : "seções"}
-              </Box>
+              Não salvo
             </Typography>
             <Botao
               type="button"

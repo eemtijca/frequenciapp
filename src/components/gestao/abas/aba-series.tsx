@@ -232,6 +232,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                 required
                 maxLength={40}
                 autoComplete="off"
+                autoFocus
                 placeholder="Por exemplo: 1º ano"
               />
             </Campo>

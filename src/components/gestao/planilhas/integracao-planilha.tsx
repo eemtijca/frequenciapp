@@ -19,6 +19,7 @@ import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useRascunhoConfiguracoes } from "@/components/gestao/configuracoes/rascunho-configuracoes";
 import { rotuloInstante, type AbaEsquema } from "@/domain/planilha";
 import { diasDoMes, rotuloData, rotuloMes } from "@/domain/frequencia";
+import { mesValido } from "@/domain/planilha-mensal";
 import { Abas } from "@/components/ui/mui/abas";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
@@ -148,7 +149,23 @@ export default function IntegracaoPlanilha({
   const ativaRascunho = rascunho?.planilhas.frequencia.ativa ?? ativaServidor;
   const envioRascunho =
     rascunho?.planilhas.frequencia.envioAutomatico ?? integracao?.envioAutomatico ?? false;
-  const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
+  // O retorno do OAuth traz o mês a retomar; o parâmetro não deve sobreviver à navegação.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const retorno = url.searchParams.get("googleMes");
+    if (!retorno) return;
+    if (mesValido(retorno) && retorno <= diaCorrente.slice(0, 7)) setMesEnvio(retorno);
+    url.searchParams.delete("googleMes");
+    window.history.replaceState(null, "", url);
+  }, [diaCorrente]);
+
+  const [mesEnvio, setMesEnvio] = useState(() => {
+    if (typeof window === "undefined") return diaCorrente.slice(0, 7);
+    const retorno = new URLSearchParams(window.location.search).get("googleMes");
+    return retorno && mesValido(retorno) && retorno <= diaCorrente.slice(0, 7)
+      ? retorno
+      : diaCorrente.slice(0, 7);
+  });
   const [envioAberto, setEnvioAberto] = useState(false);
   const [abaApresentacao, setAbaApresentacao] = useState("");
   const acoesOrganizacao = useAcoesPorChave();
