@@ -66,6 +66,8 @@ for (const [nome, largura, altura] of [
     const barra = chamada.locator('footer[aria-label="Barra de salvamento"]');
     await expect(barra).toHaveCount(1);
     await expect(barra).toBeVisible();
+    const raioDoBotao = await salvar.evaluate((botao) => getComputedStyle(botao).borderRadius);
+    await expect(barra).toHaveCSS("border-radius", raioDoBotao);
     const caixaInicial = await barra.boundingBox();
     const primeira = await linhas.first().boundingBox();
     const sexta = await linhas.nth(5).boundingBox();

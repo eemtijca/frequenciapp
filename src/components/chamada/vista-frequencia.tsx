@@ -208,7 +208,6 @@ function BarraSalvamento({ children, ref }: { children: ReactNode; ref: Ref<HTML
       ref={ref}
       aria-label="Barra de salvamento"
       elevation={0}
-      square
       sx={(theme) => ({
         position: { xs: "sticky", xl: "static" },
         bottom: { xs: 0, xl: "auto" },
@@ -221,7 +220,6 @@ function BarraSalvamento({ children, ref }: { children: ReactNode; ref: Ref<HTML
         paddingRight: "calc(8px + env(safe-area-inset-right, 0px))",
         paddingBottom: "calc(4px + env(safe-area-inset-bottom, 0px))",
         border: `1px solid ${theme.vars.palette.divider}`,
-        borderRadius: 2,
         backgroundColor: theme.vars.palette.background.paper,
       })}
     >
