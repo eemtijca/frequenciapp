@@ -74,7 +74,7 @@ O estilo Blocos suaves se estende à navegação, conta, Painel, Relatórios, Al
 - A falta justificada (FJ) usa um azul próprio, os tokens `--justificada`, e não o verde institucional. Vermelho e verde na mesma luminosidade se confundem para quem tem daltonismo vermelho-verde; o par falta e falta justificada é conferido em `tests/unidade/interface/paleta.test.ts` nos dois temas, com separação sob daltonismo simulado e contraste AA do texto.
 - Tema claro e escuro com preferência do sistema e troca manual persistida; as duas variações mantêm contraste AA.
 - Cantos de 16 px em cartões, botões e campos, seguindo o estilo Blocos suaves. Controles neutros usam fundo quase igual ao cartão com fio de baixo contraste ou ficam transparentes conforme a função; campos mantêm apenas a linha inferior e seleções recebem verde suave; Salvar e as confirmações principais mantêm verde sólido.
-- Tipografia Inter para interface e numerais tabulares para ordens, contagens e datas, para que colunas não dancem ao mudar de 9 para 10.
+- Tipografia Plus Jakarta Sans para interface e numerais tabulares para ordens, contagens e datas, para que colunas não dancem ao mudar de 9 para 10.
 
 ## Estados e retorno
 

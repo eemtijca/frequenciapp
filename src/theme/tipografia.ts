@@ -1,12 +1,13 @@
-// Tipografia do tema: Inter carregada pelo next/font, tamanhos do template
+// Tipografia do tema: Plus Jakarta Sans e JetBrains Mono carregadas pelo next/font, tamanhos do template
 // e a utilidade de numerais tabulares para tabelas e indicadores.
 import type { CSSProperties } from "react";
 import type { TypographyVariantsOptions } from "@mui/material/styles";
 
-export const FAMILIA_INTER = "var(--font-inter), Inter, sans-serif";
+export const FAMILIA_TEXTO = 'var(--font-jakarta), "Plus Jakarta Sans", sans-serif';
+export const FAMILIA_MONO = 'var(--font-jetbrains-mono), "JetBrains Mono", monospace';
 
 export const tipografia: TypographyVariantsOptions = {
-  fontFamily: FAMILIA_INTER,
+  fontFamily: FAMILIA_TEXTO,
   htmlFontSize: 16,
   fontSize: 14,
   fontWeightLight: 300,

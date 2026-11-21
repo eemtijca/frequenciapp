@@ -105,11 +105,10 @@ describe("layout da raiz", () => {
     }
   });
 
-  it("mantém apenas a variável da fonte do tema no corpo", () => {
-    expect(layout).toContain("className={fonteMaterial.variable}");
-    expect(layout).not.toContain("fonteInterface");
-    expect(layout).not.toContain("fonteNumeros");
-    expect(layout).not.toContain("Plus_Jakarta_Sans");
-    expect(layout).not.toContain("JetBrains_Mono");
+  it("mantém as variáveis das fontes da interface e dos números no corpo", () => {
+    expect(layout).toContain("className={`${fonteInterface.variable} ${fonteNumeros.variable}`}");
+    expect(layout).toContain("Plus_Jakarta_Sans");
+    expect(layout).toContain("JetBrains_Mono");
+    expect(layout).not.toContain("font-inter");
   });
 });

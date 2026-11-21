@@ -19,6 +19,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { FAMILIA_MONO } from "@/theme/tipografia";
 import { Botao, BotaoIcone } from "./botao";
 
 export type VarianteEstado =
@@ -242,7 +243,7 @@ export function TelaEstado({
             <Typography
               variant="caption"
               component="p"
-              sx={{ fontFamily: "monospace", overflowWrap: "anywhere" }}
+              sx={{ fontFamily: FAMILIA_MONO, overflowWrap: "anywhere" }}
             >
               Referência para suporte: {referencia}
             </Typography>

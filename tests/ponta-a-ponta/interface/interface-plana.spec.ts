@@ -34,11 +34,13 @@ async function conferirFonte(page: Page, elementos: Locator[]): Promise<void> {
       corpo: getComputedStyle(document.body).fontFamily,
       carregada: Array.from(document.fonts).some(
         (face) =>
-          /inter/i.test(face.family) && !/fallback/i.test(face.family) && face.status === "loaded",
+          /jakarta/i.test(face.family) &&
+          !/fallback/i.test(face.family) &&
+          face.status === "loaded",
       ),
     };
   });
-  expect(fonte.corpo).toMatch(/inter/i);
+  expect(fonte.corpo).toMatch(/jakarta/i);
   expect(fonte.carregada).toBe(true);
   for (const elemento of elementos) {
     await expect(elemento).toBeVisible();

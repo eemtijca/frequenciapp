@@ -55,7 +55,7 @@ A largura de 1280 px é a única exceção. Nenhuma outra tela cria `max-w-*`, `
 
 ## Tipografia
 
-A família é Inter, carregada por `next/font/google` com a variável `--font-inter`. A pilha de fallback é `var(--font-inter), Inter, sans-serif`.
+A família é Plus Jakarta Sans, carregada por `next/font/google` com a variável `--font-jakarta`. A pilha de fallback é `var(--font-jakarta), "Plus Jakarta Sans", sans-serif`. Valores monoespaçados usam JetBrains Mono em `--font-jetbrains-mono`.
 
 | Variante    | Tamanho | Peso | Altura de linha | Uso                                      |
 | ----------- | ------- | ---- | --------------- | ---------------------------------------- |
@@ -78,7 +78,6 @@ Regras:
 - Cada página tem um único `h1` ou `h2` visível, conforme a hierarquia do documento.
 - `textTransform` é `none`. Nenhum botão ou aba usa caixa alta automática.
 - Números de tabela, contadores, datas, percentuais e indicadores usam `font-variant-numeric: tabular-nums`.
-- Plus Jakarta Sans e JetBrains Mono não fazem parte do sistema.
 - O texto corrente não desce abaixo de 14 px. Texto de 12 px fica restrito a legenda, ajuda e metadado.
 
 ## Cores e semântica
@@ -439,7 +438,7 @@ A decisão completa, as alternativas e as consequências estão no [ADR-081](adr
 - [ADR-081: Material UI e o tema dos templates oficiais](adr/081-material-ui-e-tema-dos-templates.md).
 - [Issue #532](https://github.com/eemtijca/frequenciapp/issues/532): decisões de layout, medidas, cores, acessibilidade e licença.
 - [AppTheme.tsx no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/AppTheme.tsx): variáveis CSS, esquemas de cor e provider.
-- [themePrimitives.ts no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/themePrimitives.ts): Inter, tipografia, forma, paleta e sombras.
+- [themePrimitives.ts no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/themePrimitives.ts): tipografia, forma, paleta e sombras. O template usa Inter; o projeto mantém Plus Jakarta Sans e JetBrains Mono.
 - [inputs.tsx no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/customizations/inputs.tsx): botões de 36 e 40 px, foco de 3 px e campos.
 - [feedback.tsx no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/customizations/feedback.tsx): diálogo com raio 10, alerta e progresso.
 - [dataDisplay.tsx no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/customizations/dataDisplay.tsx): chips, tabelas e ícones.

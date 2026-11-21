@@ -69,8 +69,8 @@ describe("tema Material UI", () => {
     expect(tema.shadows[1]).toContain("--template-palette-baseShadow");
   });
 
-  it("aplica Inter e os tamanhos da tipografia", () => {
-    expect(tema.typography.fontFamily).toContain("var(--font-inter)");
+  it("aplica Plus Jakarta Sans e os tamanhos da tipografia", () => {
+    expect(tema.typography.fontFamily).toContain("var(--font-jakarta)");
     expect(tema.typography.h1.fontSize).toBe("3rem");
     expect(tema.typography.h1.fontWeight).toBe(600);
     expect(tema.typography.body1.fontSize).toBe("0.875rem");

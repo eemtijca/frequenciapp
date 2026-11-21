@@ -1,5 +1,5 @@
 // Tema Material UI do FrequenciApp: variáveis CSS, esquemas claro e escuro,
-// tipografia Inter, forma, sombras, breakpoints e customizações de componentes.
+// tipografia da interface, forma, sombras, breakpoints e customizações de componentes.
 import { createTheme, type Shadows } from "@mui/material/styles";
 import { colorSchemes } from "./paleta";
 import { tipografia } from "./tipografia";

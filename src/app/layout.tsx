@@ -1,14 +1,20 @@
-// Layout raiz com a tipografia Inter, o tema Material UI e os avisos compartilhados.
+// Layout raiz com a tipografia Plus Jakarta Sans, o tema Material UI e os avisos compartilhados.
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Inter } from "next/font/google";
+import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import { ProvedorAvisos } from "@/components/ui/mui/avisos";
 import { CORES_NAVEGADOR } from "@/theme/paleta";
 import { ProvedorTema } from "@/theme/provedor-tema";
 
-const fonteMaterial = Inter({
-  variable: "--font-inter",
+const fonteInterface = Plus_Jakarta_Sans({
+  variable: "--font-jakarta",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const fonteNumeros = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
   display: "swap",
 });
@@ -65,7 +71,7 @@ export default async function LayoutRaiz({
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body className={fonteMaterial.variable}>
+      <body className={`${fonteInterface.variable} ${fonteNumeros.variable}`}>
         <InitColorSchemeScript
           attribute="data-mui-color-scheme"
           defaultMode="system"

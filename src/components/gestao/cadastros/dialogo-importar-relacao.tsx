@@ -18,6 +18,7 @@ import { Dialogo } from "@/components/ui/mui/dialogo";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
+import { FAMILIA_MONO } from "@/theme/tipografia";
 import type { Turma } from "@/domain/frequencia";
 import {
   AJUDA_COLUNAS_RELACAO,
@@ -201,7 +202,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
           <Typography
             component="code"
             variant="body2"
-            sx={{ display: "block", fontFamily: "monospace", overflowWrap: "anywhere" }}
+            sx={{ display: "block", fontFamily: FAMILIA_MONO, overflowWrap: "anywhere" }}
           >
             {CABECALHO_RELACAO}
           </Typography>
@@ -210,7 +211,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
               {COLUNAS_RELACAO.map((coluna) => (
                 <li key={coluna}>
                   <Typography component="span" variant="body2">
-                    <Box component="span" sx={{ fontFamily: "monospace" }}>
+                    <Box component="span" sx={{ fontFamily: FAMILIA_MONO }}>
                       {coluna}
                     </Box>
                     : {AJUDA_COLUNAS_RELACAO[coluna]}.
@@ -267,7 +268,7 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
               }}
               sx={{
                 alignItems: "flex-start",
-                fontFamily: "monospace",
+                fontFamily: FAMILIA_MONO,
                 fontSize: "0.8125rem",
               }}
             />

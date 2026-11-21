@@ -27,7 +27,7 @@ O resultado era inconsistência visual entre telas, revisão mais difícil, cust
 - O tema deriva de `shared-theme/AppTheme.tsx` e `shared-theme/themePrimitives.ts` no tag `v9.5.0`.
 - `cssVariables.colorSchemeSelector` é `data-mui-color-scheme` e `cssVariables.cssVarPrefix` é `template`.
 - `colorSchemes` define os temas claro e escuro. `theme.applyStyles` e `theme.vars` substituem decisões por `theme.palette.mode` durante a renderização.
-- A tipografia é Inter, carregada por `next/font/google` com a variável `--font-inter`.
+- A tipografia é Plus Jakarta Sans, carregada por `next/font/google` com a variável `--font-jakarta`, mantendo a identidade da branch `main`. JetBrains Mono permanece para valores monoespaçados.
 - `shape.borderRadius` é 8. Cartões não têm sombra. Menus, popovers, diálogos e avisos usam a sombra base do template.
 - O azul da marca do template é substituído pelo verde institucional. A escala `brand` vai de 50 a 900 e está detalhada no [design system](../design-system.md).
 - No tema claro, `primary.main` é `brand.700`, `primary.light` é `brand.500` e `primary.dark` é `brand.900`. No tema escuro, `primary.main` é `brand.400`, `primary.light` é `brand.300` e `primary.dark` é `brand.700`.
@@ -138,7 +138,7 @@ O escopo inclui contraste de estados e textos secundários, foco em componentes 
 - [Coleção de templates no tag v9.5.0](https://github.com/mui/material-ui/tree/v9.5.0/docs/data/material/getting-started/templates): origem da composição visual.
 - [Apresentação dos templates no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/templates.md): temas customizado e padrão, com modos claro e escuro.
 - [AppTheme.tsx no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/AppTheme.tsx): `cssVariables`, `colorSchemes`, `ThemeProvider` e customizações.
-- [themePrimitives.ts no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/themePrimitives.ts): Inter, tipografia, raio 8, paleta, sombras e temas claro e escuro.
+- [themePrimitives.ts no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/themePrimitives.ts): tipografia, raio 8, paleta, sombras e temas claro e escuro. O template usa Inter; o projeto mantém Plus Jakarta Sans.
 - [inputs.tsx no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/customizations/inputs.tsx): botões de 36 e 40 px, foco de 3 px, campos e interruptores.
 - [dataDisplay.tsx no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/customizations/dataDisplay.tsx): chips, tabelas e ícones.
 - [feedback.tsx no tag v9.5.0](https://github.com/mui/material-ui/blob/v9.5.0/docs/data/material/getting-started/templates/shared-theme/customizations/feedback.tsx): diálogos com raio 10, alertas e progresso.
