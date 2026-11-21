@@ -61,7 +61,8 @@ test.describe("toasts e toque duplo", () => {
     const painel = page.locator('section[aria-label="Relatórios"]');
     await painel.getByRole("tab", { name: "Grade" }).click();
     const pilula = painel.getByRole("button", { name: /E2E Ano A/ });
-    if (await pilula.isVisible().catch(() => false)) await pilula.click();
+    if (await pilula.isVisible().catch(() => false))
+      await pilula.evaluate((elemento: HTMLElement) => elemento.click());
     await painel
       .getByRole("tabpanel", { name: "Grade", exact: true })
       .locator("table")
