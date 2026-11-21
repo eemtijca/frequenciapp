@@ -14,7 +14,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type FocusEvent,
   type ReactNode,
   type Ref,
 } from "react";
@@ -43,6 +42,7 @@ import Grow from "@mui/material/Grow";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import Paper from "@mui/material/Paper";
+import { snackbarClasses } from "@mui/material/Snackbar";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -265,6 +265,8 @@ export default function VistaFrequencia({
   const [sabadoDesbloqueado, setSabadoDesbloqueado] = useState<string | null>(null);
   const idResumo = useId();
   const listaAlunosRef = useRef<HTMLUListElement>(null);
+  const gradeDiariaRef = useRef<HTMLDivElement>(null);
+  const colunaAlunosRef = useRef<HTMLDivElement>(null);
   const barraSalvamentoRef = useRef<HTMLElement>(null);
   const [revisaoSalva, setRevisaoSalva] = useState(0);
   const [edicaoLiberada, setEdicaoLiberada] = useState(false);
@@ -299,6 +301,85 @@ export default function VistaFrequencia({
   const [motivoHistorico, setMotivoHistorico] = useState("");
   const [erroHistorico, setErroHistorico] = useState("");
   const semMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
+
+  useEffect(() => {
+    if (!ativo || nav.resumo) return;
+    const grade = gradeDiariaRef.current;
+    const coluna = colunaAlunosRef.current;
+    const barra = barraSalvamentoRef.current;
+    const rolagem = grade?.closest<HTMLElement>('[data-pager="principal"] > section');
+    if (!grade || !coluna || !barra || !rolagem) return;
+
+    let quadro = 0;
+    let aviso: HTMLElement | null = null;
+    const folga = 8;
+    const reserva = "--reserva-aviso-chamada";
+    const cruzaNaHorizontal = (a: DOMRect, b: DOMRect) => a.left < b.right && b.left < a.right;
+
+    const medir = () => {
+      quadro = 0;
+      const limites = rolagem.getBoundingClientRect();
+      const rodape = barra.getBoundingClientRect();
+      const sobreposicao = aviso?.getBoundingClientRect();
+      // A altura da barra, não sua posição no fluxo, mantém a reserva estável ao rolar.
+      const espaco =
+        sobreposicao?.height && cruzaNaHorizontal(coluna.getBoundingClientRect(), sobreposicao)
+          ? Math.max(0, limites.bottom - rodape.height - sobreposicao.top + folga)
+          : 0;
+      grade.style.setProperty(reserva, `${espaco}px`);
+
+      const foco = document.activeElement;
+      if (
+        !(foco instanceof HTMLElement) ||
+        !grade.contains(foco) ||
+        !foco.matches(":focus-visible")
+      ) {
+        return;
+      }
+      const controle = foco.matches("[data-marcar-falta]")
+        ? (foco.closest("[data-faixa-toque]") ?? foco)
+        : foco;
+      const caixa = controle.getBoundingClientRect();
+      const topoBarra = barra.getBoundingClientRect().top;
+      const topo =
+        sobreposicao?.height && cruzaNaHorizontal(caixa, sobreposicao)
+          ? Math.min(topoBarra, sobreposicao.top)
+          : topoBarra;
+      if (caixa.top < limites.bottom && caixa.top > limites.top && caixa.bottom + folga > topo) {
+        // Mova só o necessário, sem trocar o elemento focado.
+        rolagem.scrollTop += Math.min(caixa.bottom + folga - topo, caixa.top - limites.top);
+      }
+    };
+    const agendar = () => {
+      if (!quadro) quadro = requestAnimationFrame(medir);
+    };
+    const tamanhos = new ResizeObserver(agendar);
+    const acompanharAviso = () => {
+      // O aviso global é filho do body; só a Chamada em uso reserva espaço para ele.
+      const atual = document.body.querySelector<HTMLElement>(`:scope > .${snackbarClasses.root}`);
+      if (aviso !== atual) {
+        if (aviso) tamanhos.unobserve(aviso);
+        aviso = atual;
+        if (aviso) tamanhos.observe(aviso);
+      }
+      agendar();
+    };
+    const montagem = new MutationObserver(acompanharAviso);
+    montagem.observe(document.body, { childList: true });
+    tamanhos.observe(rolagem);
+    tamanhos.observe(barra);
+    grade.addEventListener("focusin", agendar);
+    window.addEventListener("resize", agendar);
+    acompanharAviso();
+    return () => {
+      montagem.disconnect();
+      tamanhos.disconnect();
+      grade.removeEventListener("focusin", agendar);
+      window.removeEventListener("resize", agendar);
+      cancelAnimationFrame(quadro);
+      grade.style.removeProperty(reserva);
+    };
+  }, [ativo, nav.resumo]);
 
   const atualizarTela = useCallback(() => {
     if (sujo) {
@@ -1059,21 +1140,6 @@ export default function VistaFrequencia({
     return justificativas.get(alunoId) ? "FJ" : "F";
   };
 
-  function manterFocoAcimaDaBarra({ currentTarget, target }: FocusEvent<HTMLElement>) {
-    if (!(target instanceof HTMLElement) || !currentTarget.contains(target)) return;
-    // O navegador considera a área rolável, mas não desconta o rodapé sticky.
-    requestAnimationFrame(() => {
-      const barra = barraSalvamentoRef.current;
-      if (!barra || document.activeElement !== target || !target.matches(":focus-visible")) return;
-      const controle = target.matches("[data-marcar-falta]")
-        ? (target.closest("[data-faixa-toque]") ?? target)
-        : target;
-      if (controle.getBoundingClientRect().bottom + 8 > barra.getBoundingClientRect().top) {
-        controle.scrollIntoView({ block: "center", inline: "nearest" });
-      }
-    });
-  }
-
   return (
     <Box sx={{ p: nav.resumo ? ESPACAMENTO_LATERAL_CONTEUDO : 0 }}>
       <Box
@@ -1084,8 +1150,7 @@ export default function VistaFrequencia({
           flexDirection: "column",
           gap: 1,
           minWidth: 0,
-          // No fim da lista, a barra encosta na área rolável do shell, sem subir sob os avisos.
-          ...(nav.resumo ? { pb: 2 } : { mb: { xs: -2, sm: -3, lg: -4 } }),
+          ...(nav.resumo ? { pb: 2 } : {}),
         }}
       >
         <Typography component="h1" sx={VISUALMENTE_OCULTO}>
@@ -1093,11 +1158,12 @@ export default function VistaFrequencia({
         </Typography>
 
         <Grid
+          ref={gradeDiariaRef}
           container
           columns={{ xs: 4, sm: 8, md: 12 }}
-          spacing={nav.resumo ? 2 : 1}
-          sx={{ alignItems: "flex-start" }}
-          onFocus={nav.resumo ? undefined : manterFocoAcimaDaBarra}
+          columnSpacing={nav.resumo ? 2 : { xs: 2, sm: 3 }}
+          rowSpacing={nav.resumo ? 2 : 1}
+          sx={{ alignItems: "flex-start", paddingBottom: "var(--reserva-aviso-chamada, 0px)" }}
         >
           <Grid
             size={{ xs: 4, sm: 8, md: 12, xl: nav.resumo ? "auto" : 5 }}
@@ -1404,6 +1470,7 @@ export default function VistaFrequencia({
           </Grid>
 
           <Grid
+            ref={colunaAlunosRef}
             size={{ xs: 4, sm: 8, md: 12, xl: nav.resumo ? "grow" : 7 }}
             data-coluna="lista"
             sx={{

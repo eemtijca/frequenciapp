@@ -1,5 +1,5 @@
-// Barra de salvamento da Chamada compacta e atualização global da tela ativa.
-import { expect, test } from "@playwright/test";
+// Barra de salvamento e foco da Chamada, além da atualização global da tela ativa.
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
 import {
@@ -27,6 +27,21 @@ test.beforeAll(async () => {
 });
 test.afterAll(limparMassaE2E);
 
+async function abrirChamadaDoDia(page: Page) {
+  await page.goto("/?visao=chamada");
+  await aguardarHidratacao(page);
+  await abrirDiaSeResumo(page);
+  const chamada = page.getByRole("region", { name: "Fazer chamada", exact: true });
+  const turmas = chamada.getByRole("group", { name: "Turma atual", exact: true });
+  if (await turmas.count()) {
+    await escolherTurmaNaChamada(chamada, /E2E Ano A/);
+    const seletor = turmas.getByRole("button", { name: "Turmas", exact: true });
+    if ((await seletor.getAttribute("aria-expanded")) === "true") await seletor.click();
+  }
+  await liberarSabadoSeNecessario(chamada);
+  return chamada;
+}
+
 for (const [nome, largura, altura] of [
   ["desktop", 1440, 900],
   ["desktop com gaveta", 905, 900],
@@ -37,17 +52,7 @@ for (const [nome, largura, altura] of [
   test(`rodapé de salvamento no ${nome}`, async ({ page }) => {
     await page.setViewportSize({ width: largura, height: altura });
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await page.goto("/?visao=chamada");
-    await aguardarHidratacao(page);
-    await abrirDiaSeResumo(page);
-    const chamada = page.getByRole("region", { name: "Fazer chamada", exact: true });
-    const turmas = chamada.getByRole("group", { name: "Turma atual", exact: true });
-    if (await turmas.count()) {
-      await escolherTurmaNaChamada(chamada, /E2E Ano A/);
-      const seletor = turmas.getByRole("button", { name: "Turmas", exact: true });
-      if ((await seletor.getAttribute("aria-expanded")) === "true") await seletor.click();
-    }
-    await liberarSabadoSeNecessario(chamada);
+    const chamada = await abrirChamadaDoDia(page);
 
     const lista = chamada.getByRole("list", { name: "Alunos da chamada" });
     const linhas = lista.getByRole("listitem");
@@ -114,6 +119,84 @@ for (const [nome, largura, altura] of [
     const dialogo = page.getByRole("alertdialog", { name: "Descartar alterações?" });
     await dialogo.getByRole("button", { name: "Descartar", exact: true }).click();
     await expect(descartar).toHaveCount(0);
+  });
+}
+
+type Caixa = NonNullable<Awaited<ReturnType<Locator["boundingBox"]>>>;
+
+function sobrepoe(a: Caixa, b: Caixa) {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+for (const [largura, altura, tema] of [
+  [320, 844, "dark"],
+  [390, 844, "light"],
+  [1440, 900, "light"],
+] as const) {
+  test(`a falha de salvamento não cobre o último aluno focado a ${largura} px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: largura, height: altura });
+    await page.emulateMedia({ colorScheme: tema, reducedMotion: "reduce" });
+    const mensagem = "Falha simulada na gravação da chamada.";
+    let enviosSimulados = 0;
+    await page.route("**/api/frequencias", async (rota) => {
+      if (rota.request().method() !== "POST") return rota.continue();
+      enviosSimulados += 1;
+      await rota.fulfill({ status: 503, json: { error: mensagem } });
+    });
+
+    const chamada = await abrirChamadaDoDia(page);
+    const lista = chamada.getByRole("list", { name: "Alunos da chamada" });
+    const linhas = lista.getByRole("listitem");
+    await expect(linhas).toHaveCount(24);
+    await lista.getByRole("button", { name: /^E2E Aluno Um\b/ }).click();
+    await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
+    const confirmar = page.getByRole("alertdialog", { name: "Salvar chamada?", exact: true });
+    await confirmar.getByRole("button", { name: "Salvar chamada", exact: true }).click();
+    const aviso = page.getByRole("alert").filter({
+      hasText: mensagem,
+      has: page.getByRole("button", { name: "Fechar aviso", exact: true }),
+    });
+    await expect(aviso).toBeVisible();
+    expect(enviosSimulados).toBe(1);
+
+    const ultima = linhas.last();
+    const ultimoAluno = ultima.getByRole("button", { name: /presença|presente/i });
+    await linhas
+      .nth(22)
+      .getByRole("button", { name: /presença|presente/i })
+      .focus();
+    await page.keyboard.press("Tab");
+    await expect(ultimoAluno).toBeFocused();
+    const barra = chamada.locator('footer[aria-label="Barra de salvamento"]');
+    await expect
+      .poll(
+        async () => {
+          const [linha, alerta, rodape] = await Promise.all([
+            ultima.boundingBox(),
+            aviso.boundingBox(),
+            barra.boundingBox(),
+          ]);
+          return Boolean(
+            linha &&
+            alerta &&
+            rodape &&
+            linha.y >= (largura >= 905 ? 64 : 56) &&
+            linha.y + linha.height <= rodape.y &&
+            !sobrepoe(linha, alerta) &&
+            !sobrepoe(rodape, alerta),
+          );
+        },
+        { timeout: 2_000, message: "A linha focada e o rodapé ficam livres com o aviso visível." },
+      )
+      .toBe(true);
+    await expect(ultimoAluno).toBeFocused();
+    await page.keyboard.press("Space");
+    await expect(ultima.getByRole("button", { name: /falta em/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 }
 
