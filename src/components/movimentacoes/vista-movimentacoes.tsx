@@ -115,7 +115,7 @@ export default function VistaMovimentacoes({
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
+      <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: "flex-start" }}>
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Abas
             rotuloAcessivel="Tipo de registro"
