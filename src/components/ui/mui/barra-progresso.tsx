@@ -49,12 +49,13 @@ export function BarraProgresso({
   sx,
 }: BarraProgressoProps) {
   const percentual = max > 0 ? Math.min(100, Math.max(0, (valor / max) * 100)) : 0;
-  const texto = descricao?.trim() ? descricao : `${Math.round(percentual)}%`;
+  const arredondado = Math.round(percentual);
+  const texto = descricao?.trim() ? descricao : `${arredondado}%`;
 
   return (
     <LinearProgress
       variant="determinate"
-      value={percentual}
+      value={arredondado}
       aria-label={rotulo}
       aria-valuetext={texto}
       aria-describedby={descritoPor}

@@ -358,6 +358,11 @@ export default function VistaPainel({
     return (
       <Stack spacing={2}>
         <Cartao aria-label={serieSelecionada ? serieSelecionada.nome : "Toda a escola"}>
+          <CartaoCabecalho>
+            <CartaoTitulo>
+              {serieSelecionada ? serieSelecionada.nome : "Toda a escola"}
+            </CartaoTitulo>
+          </CartaoCabecalho>
           <CartaoConteudo>
             <GraficoRosca
               tomValores="falta"
@@ -387,6 +392,7 @@ export default function VistaPainel({
         {!feriado && serieSelecionada && porOrigem && (
           <Cartao aria-label={`${serieSelecionada.nome} por turma original`}>
             <CartaoCabecalho>
+              <CartaoTitulo>{serieSelecionada.nome} por turma original</CartaoTitulo>
               <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Mesmas faltas, agrupadas pela turma de origem
               </Typography>

@@ -40,6 +40,7 @@ export function CarrosselCartoes({
   const cartaoAtivo = useRef<HTMLDivElement>(null);
   const esperaRolagem = useRef<number | undefined>(undefined);
   const alvoRolagem = useRef<string | null>(null);
+  const rolagemManual = useRef(false);
   const indice = Math.max(
     0,
     itens.findIndex((item) => item.id === valor),
@@ -70,8 +71,27 @@ export function CarrosselCartoes({
     });
   }, [valor]);
 
+  useEffect(() => {
+    const area = trilho.current;
+    if (!area) return;
+    const alinhar = () => {
+      const cartao = cartaoAtivo.current;
+      if (!cartao || area.clientWidth === 0) return;
+      alvoRolagem.current = valor;
+      area.scrollTo({ left: cartao.offsetLeft, behavior: "auto" });
+    };
+    const observador = new ResizeObserver(alinhar);
+    observador.observe(area);
+    window.addEventListener("resize", alinhar);
+    return () => {
+      observador.disconnect();
+      window.removeEventListener("resize", alinhar);
+    };
+  }, [valor]);
+
   function liberarRolagemManual() {
     alvoRolagem.current = null;
+    rolagemManual.current = true;
   }
 
   function irPara(destino: number) {
@@ -90,12 +110,16 @@ export function CarrosselCartoes({
   }
 
   function aoRolar() {
+    // Rolagem causada por montagem ou exibição da visão não troca o cartão:
+    // só o gesto ou a roda do usuário escolhem outro gráfico.
+    if (!rolagemManual.current) return;
     if (esperaRolagem.current !== undefined) {
       window.clearTimeout(esperaRolagem.current);
     }
     esperaRolagem.current = window.setTimeout(() => {
       const area = trilho.current;
       if (!area) return;
+      rolagemManual.current = false;
       const centro = area.scrollLeft + area.clientWidth / 2;
       let melhor: { id: string; distancia: number } | undefined;
       for (const cartao of area.querySelectorAll<HTMLElement>("[data-cartao]")) {
