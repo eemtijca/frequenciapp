@@ -2,14 +2,16 @@
 
 // Gestão: área do administrador. Séries, turmas, alunos, equipe, diretores
 // de turma e configurações em abas curtas.
-import { useEffect, useState, type KeyboardEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import type {
   Aluno,
@@ -20,6 +22,7 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import { Abas, type ItemAba } from "@/components/ui/mui/abas";
+import { Botao } from "@/components/ui/mui/botao";
 import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
 import AbaSeries from "@/components/gestao/abas/aba-series";
 import AbaTurmas from "@/components/gestao/abas/aba-turmas";
@@ -56,15 +59,6 @@ interface Props {
   onAbrirSaidas?: () => void;
   onAbrirParcial?: () => void;
 }
-
-const ORDEM_ABAS: readonly Aba[] = [
-  "series",
-  "turmas",
-  "alunos",
-  "equipe",
-  "diretores",
-  "configuracoes",
-];
 
 const ESTILO_TITULO_OCULTO = {
   position: "absolute",
@@ -108,6 +102,17 @@ export default function VistaGestao({
   const [aba, setAba] = useState<Aba>(() =>
     planilhaInicial ? "configuracoes" : (abaInicial ?? "series"),
   );
+  const estaEmConfiguracoes = aba === "configuracoes";
+  const cadastroAnterior = useRef<Aba>(abaInicial === "configuracoes" ? "series" : abaInicial);
+  const gatilhoConfiguracoes = useRef<HTMLButtonElement>(null);
+  const tituloConfiguracoes = useRef<HTMLHeadingElement>(null);
+  const destinoFoco = useRef<"titulo" | "gatilho" | null>(null);
+
+  useLayoutEffect(() => {
+    if (destinoFoco.current === "titulo") tituloConfiguracoes.current?.focus();
+    if (destinoFoco.current === "gatilho") gatilhoConfiguracoes.current?.focus();
+    destinoFoco.current = null;
+  }, [estaEmConfiguracoes]);
 
   useEffect(() => {
     onPendenciaHorarios?.(horariosPendentes);
@@ -131,17 +136,17 @@ export default function VistaGestao({
     setAtualizacao((valor) => valor + 1);
   });
 
-  // As setas trocam a aba selecionada, como no teclado das abas antigas.
-  function aoTeclar(evento: KeyboardEvent<HTMLDivElement>) {
-    if (evento.altKey || evento.ctrlKey || evento.metaKey) return;
-    if (evento.key !== "ArrowRight" && evento.key !== "ArrowLeft") return;
-    if (!(evento.target instanceof HTMLElement)) return;
-    if (evento.target.getAttribute("role") !== "tab") return;
-    const indice = ORDEM_ABAS.indexOf(aba);
-    if (indice < 0) return;
-    const passo = evento.key === "ArrowRight" ? 1 : -1;
-    const proximo = ORDEM_ABAS[(indice + passo + ORDEM_ABAS.length) % ORDEM_ABAS.length];
-    if (proximo) setAba(proximo);
+  function trocarAba(proxima: Aba) {
+    if (proxima === "configuracoes" && aba !== "configuracoes") {
+      cadastroAnterior.current = aba;
+      destinoFoco.current = "titulo";
+    }
+    setAba(proxima);
+  }
+
+  function voltarParaGestao() {
+    destinoFoco.current = "gatilho";
+    setAba(cadastroAnterior.current);
   }
 
   const itens: ItemAba<Aba>[] = [
@@ -190,6 +195,7 @@ export default function VistaGestao({
       valor: "configuracoes",
       rotulo: "Configurações",
       rotuloCurto: "Config.",
+      referencia: gatilhoConfiguracoes,
       icone: <SettingsRoundedIcon fontSize="small" aria-hidden="true" />,
       conteudo: (
         <AbaConfiguracoes
@@ -216,20 +222,47 @@ export default function VistaGestao({
   ];
 
   return (
-    <Box component="section" aria-label="Gestão da escola" onKeyDown={aoTeclar} sx={{ pb: 3 }}>
-      <Typography component="h1" sx={ESTILO_TITULO_OCULTO}>
-        Gestão
-      </Typography>
-      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
-        <AtualizadoDaVisao fuso={fuso} />
-      </Box>
+    <Box component="section" aria-label="Gestão da escola" sx={{ pb: 3 }}>
+      {estaEmConfiguracoes ? (
+        <Stack component="header" spacing={1} sx={{ mb: 3 }}>
+          <Botao
+            type="button"
+            variante="texto"
+            onClick={voltarParaGestao}
+            icone={<ArrowBackRoundedIcon />}
+            sx={{ alignSelf: "flex-start", minHeight: 48 }}
+          >
+            Voltar para Gestão
+          </Botao>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ justifyContent: "space-between" }}
+          >
+            <Typography component="h1" variant="h4" ref={tituloConfiguracoes} tabIndex={-1}>
+              Configurações
+            </Typography>
+            <AtualizadoDaVisao fuso={fuso} />
+          </Stack>
+        </Stack>
+      ) : (
+        <>
+          <Typography component="h1" sx={ESTILO_TITULO_OCULTO}>
+            Gestão
+          </Typography>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+            <AtualizadoDaVisao fuso={fuso} />
+          </Box>
+        </>
+      )}
 
       <Abas<Aba>
         rotuloAcessivel="Áreas de gestão"
         ativo={aba}
-        onChange={setAba}
+        onChange={trocarAba}
         itens={itens}
         dataPager="gestao"
+        ocultarTrilho={estaEmConfiguracoes}
       />
     </Box>
   );

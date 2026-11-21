@@ -130,10 +130,6 @@ test.describe("diretores de turma na Gestão", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: /Config/ }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Acesso e avisos", exact: true })
-      .click();
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Diretores");
     const secao = page.locator('[data-secao="config-acesso-diretores"]');
     await secao.getByRole("button", { name: /Acesso dos diretores/ }).click();

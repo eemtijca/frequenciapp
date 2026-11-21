@@ -1,5 +1,6 @@
 // Exportações protegidas nos três pontos do app, com senha local,
 // cancelamento, extração real e ausência de download em caso de falha.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type Download, type Page } from "@playwright/test";
 import { Uint8ArrayReader, ZipReader } from "@zip.js/zip.js";
@@ -39,10 +40,7 @@ async function abrirDownload(
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: tipo === "relacao" ? "Alunos" : "Configurações" }).click();
     if (tipo === "copia") {
-      await page
-        .getByRole("navigation", { name: "Categorias de configurações" })
-        .getByRole("button", { name: "Dados", exact: true })
-        .click();
+      await selecionarCategoriaConfiguracoes(page, "Dados");
       const secao = page.locator('[data-secao="config-copia"]');
       await secao.getByRole("button", { name: "Cópia de segurança" }).click();
       await secao.getByRole("button", { name: "Baixar cópia" }).click();

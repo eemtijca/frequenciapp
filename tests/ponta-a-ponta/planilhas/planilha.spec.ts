@@ -1,5 +1,9 @@
 // Integração com o Google Planilhas na interface, contra a Sheets API sintética:
 // conta Google, estrutura, mapa, prévia na Grade e desconexão.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { criarGoogleFalso, type GoogleFalso } from "../../helpers/google-falso";
@@ -64,11 +68,8 @@ test.describe("Google Planilhas", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações" }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Planilhas", exact: true })
-      .click();
+    await abrirConfiguracoesDaGestao(page);
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
     const cartao = page.locator('[data-secao="planilha-frequencia"]');
     await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
     await selecionarAcaoPlanilha(cartao, "Configurar");
@@ -79,11 +80,8 @@ test.describe("Google Planilhas", () => {
     await page.reload();
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações" }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Planilhas", exact: true })
-      .click();
+    await abrirConfiguracoesDaGestao(page);
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
     await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
     await selecionarAcaoPlanilha(cartao, "Configurar");
     await expect(cartao.getByText("Conta Google conectada", { exact: true })).toBeVisible();
@@ -244,11 +242,8 @@ test.describe("Google Planilhas", () => {
 
     // Desconexão, na zona de risco.
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações" }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Planilhas", exact: true })
-      .click();
+    await abrirConfiguracoesDaGestao(page);
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
     await selecionarAcaoPlanilha(cartao, "Configurar");
     await cartao.getByRole("button", { name: "Zona de risco" }).click();
     await cartao.getByRole("button", { name: "Desconectar" }).click();

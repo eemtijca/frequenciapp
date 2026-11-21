@@ -6,9 +6,9 @@ import { useEffect, useId, useMemo, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
-import EventNoteRoundedIcon from "@mui/icons-material/EventNoteRounded";
 import Box from "@mui/material/Box";
 import Checkbox from "@mui/material/Checkbox";
+import Divider from "@mui/material/Divider";
 import FormControl from "@mui/material/FormControl";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import FormLabel from "@mui/material/FormLabel";
@@ -44,7 +44,6 @@ import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { Botao } from "@/components/ui/mui/botao";
 import { Campo, useCampo } from "@/components/ui/mui/campo";
 import { CampoTexto } from "@/components/ui/mui/text-field";
-import { Cartao } from "@/components/ui/mui/cartao";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { SeletorHorario } from "@/components/ui/mui/seletor-horario";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
@@ -53,6 +52,7 @@ import { TOKENS_LAYOUT } from "@/theme/layout";
 interface Props {
   turmas: Turma[];
   diaCorrente: string;
+  rascunhoPendente: boolean;
 }
 
 /** A mesma prova cadastrada para várias turmas aparece numa linha só. */
@@ -176,7 +176,7 @@ function SeletorDataProva({ id, valor, min, max, disabled, onValor }: SeletorDat
   );
 }
 
-export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
+export default function SecaoProvasBimestrais({ turmas, diaCorrente, rascunhoPendente }: Props) {
   const base = useId();
   const [provas, setProvas] = useState<ProvaBimestral[]>([]);
   const [carregado, setCarregado] = useState(false);
@@ -306,15 +306,11 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
   });
 
   return (
-    <Stack spacing={2} sx={{ minWidth: 0 }}>
-      <Typography variant="body2" sx={{ color: "text.secondary" }}>
-        O horário de provas vale só durante o período de provas. A aba Horários mostra a cada turma
-        as provas de hoje em diante; datas passadas saem sozinhas, e Encerrar período de provas
-        apaga o horário inteiro.
-      </Typography>
+    <Stack spacing={3} sx={{ minWidth: 0 }}>
       <Box
         component="form"
-        aria-label="Nova prova"
+        aria-labelledby={`${base}-titulo`}
+        aria-describedby={`${base}-descricao`}
         onSubmit={(evento) => {
           evento.preventDefault();
           void adicionar();
@@ -324,13 +320,16 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
           flexDirection: "column",
           gap: 2,
           minWidth: 0,
-          padding: 2,
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 2,
-          backgroundColor: "background.paper",
         }}
       >
+        <Box>
+          <Typography id={`${base}-titulo`} component="h3" variant="h6">
+            Nova prova
+          </Typography>
+          <Typography id={`${base}-descricao`} variant="body2" color="text.secondary">
+            Adicionar prova grava o horário na hora, fora do rascunho de configurações.
+          </Typography>
+        </Box>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 4 }}>
             <Campo id={`${base}-dia`} rotulo="Data">
@@ -421,11 +420,8 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
                         sx={{
                           minHeight: TOKENS_LAYOUT.alvoToque,
                           m: 0,
-                          paddingX: 1,
-                          border: 1,
-                          borderColor: "divider",
-                          borderRadius: 1,
                           width: "100%",
+                          "& .MuiFormControlLabel-label": { overflowWrap: "anywhere" },
                         }}
                         control={
                           <Checkbox
@@ -445,12 +441,12 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
         </FormControl>
         {erro ? <AlertaCompacto variante="dados_invalidos" titulo={erro} tamanho="linha" /> : null}
         <Botao
-          variante="secundario"
+          variante={rascunhoPendente ? "contorno" : "principal"}
           type="submit"
           carregando={adicionando}
           disabled={adicionando}
           icone={<AddRoundedIcon />}
-          sx={{ alignSelf: "flex-start" }}
+          sx={{ alignSelf: "flex-start", minHeight: TOKENS_LAYOUT.alvoToque, height: "auto" }}
         >
           {turmaIds.length > 1
             ? `Adicionar prova para ${contarTurmas(turmaIds.length)}`
@@ -458,41 +454,57 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
         </Botao>
       </Box>
 
-      {erroLeitura ? (
-        <AlertaCompacto variante="erro_interno" titulo={erroLeitura} tamanho="linha" />
-      ) : null}
-      {carregado && !erroLeitura && dias.length === 0 ? (
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          Nenhuma prova cadastrada.
-        </Typography>
-      ) : null}
-      {dias.length > 0 ? (
-        <Cartao
-          component="section"
-          aria-label="Provas cadastradas"
-          sx={{ padding: 0, overflow: "hidden" }}
+      <Divider />
+      <Stack component="section" aria-labelledby={`${base}-cadastradas`} spacing={2}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" } }}
         >
-          <Stack
-            direction="row"
-            spacing={1}
-            sx={{
-              alignItems: "center",
-              px: 2,
-              py: 1.5,
-              backgroundColor: "action.hover",
-              borderBottom: 1,
-              borderColor: "divider",
-            }}
-          >
-            <EventNoteRoundedIcon fontSize="small" aria-hidden="true" />
-            <Typography component="h2" variant="subtitle2">
+          <Box>
+            <Typography id={`${base}-cadastradas`} component="h3" variant="h6">
               Provas cadastradas
             </Typography>
-          </Stack>
+            <Typography variant="body2" color="text.secondary">
+              A aba Horários mostra as provas de hoje em diante. Encerrar o período apaga todo o
+              horário de provas.
+            </Typography>
+          </Box>
+          {dias.length > 0 ? (
+            <Botao
+              variante="contorno"
+              type="button"
+              icone={<EventBusyRoundedIcon />}
+              onClick={() => setEncerrando(true)}
+              sx={{
+                color: "falta.texto",
+                minHeight: TOKENS_LAYOUT.alvoToque,
+                height: "auto",
+                flexShrink: 0,
+              }}
+            >
+              Encerrar período de provas
+            </Botao>
+          ) : null}
+        </Stack>
+        {erroLeitura ? (
+          <AlertaCompacto variante="erro_interno" titulo={erroLeitura} tamanho="linha" />
+        ) : null}
+        {carregado && !erroLeitura && dias.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Nenhuma prova cadastrada.
+          </Typography>
+        ) : null}
+        {dias.length > 0 ? (
           <List disablePadding>
             {dias.map((grupoDoDia) => (
-              <ListItem key={grupoDoDia.dia} divider sx={{ display: "block", px: 2, py: 1.5 }}>
-                <Typography component="h3" variant="subtitle2" sx={{ mb: 1 }}>
+              <ListItem
+                key={grupoDoDia.dia}
+                disableGutters
+                divider
+                sx={{ display: "block", py: 1.5 }}
+              >
+                <Typography component="h4" variant="subtitle2" sx={{ mb: 1 }}>
                   {rotuloDoDia(grupoDoDia.dia)}
                 </Typography>
                 <List disablePadding>
@@ -540,19 +552,8 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
               </ListItem>
             ))}
           </List>
-        </Cartao>
-      ) : null}
-      {dias.length > 0 ? (
-        <Botao
-          variante="contorno"
-          type="button"
-          icone={<EventBusyRoundedIcon />}
-          onClick={() => setEncerrando(true)}
-          sx={{ alignSelf: "flex-start", color: "falta.texto" }}
-        >
-          Encerrar período de provas
-        </Botao>
-      ) : null}
+        ) : null}
+      </Stack>
 
       <DialogoConfirmacao
         aberto={removendo !== null}

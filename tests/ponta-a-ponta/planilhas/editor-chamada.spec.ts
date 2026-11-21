@@ -1,4 +1,5 @@
 // Editor da Gestão por turma e mês, com prévias sintéticas e nenhuma escrita no Google.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -98,10 +99,7 @@ async function abrir(page: Page, completo: boolean, toque = false) {
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Planilhas", exact: true })
-    .click();
+  await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
   await selecionarAcaoPlanilha(cartao, "Editar");

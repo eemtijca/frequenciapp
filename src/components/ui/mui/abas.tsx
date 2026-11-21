@@ -2,7 +2,14 @@
 
 // Abas MUI como trilho de pílulas: todas visíveis no celular, troca por toque,
 // teclado e painéis visitados preservados, com vínculo ARIA completo.
-import { useRef, useState, type KeyboardEvent, type ReactElement, type ReactNode } from "react";
+import {
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+  type RefObject,
+} from "react";
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import { alpha, type Theme } from "@mui/material/styles";
@@ -18,6 +25,7 @@ export interface ItemAba<T extends string = string> {
   conteudo: ReactNode;
   icone?: string | ReactElement;
   desabilitado?: boolean;
+  referencia?: RefObject<HTMLButtonElement | null>;
 }
 
 export interface AbasProps<T extends string> {
@@ -28,6 +36,8 @@ export interface AbasProps<T extends string> {
   /** Mantido para compatibilidade; o trilho usa a mesma grade em qualquer largura. */
   variant?: VarianteAbas;
   dataPager?: string;
+  /** Permite uma apresentação de página sem desmontar os painéis visitados. */
+  ocultarTrilho?: boolean;
 }
 
 function estiloAba(tema: Theme, ativo: boolean) {
@@ -67,6 +77,7 @@ export function Abas<T extends string>({
   onChange,
   rotuloAcessivel,
   dataPager,
+  ocultarTrilho = false,
 }: AbasProps<T>) {
   const [visitados, setVisitados] = useState<ReadonlySet<T>>(() => new Set<T>([ativo]));
   const referencias = useRef<(HTMLButtonElement | null)[]>([]);
@@ -84,13 +95,16 @@ export function Abas<T extends string>({
   }
 
   function aoTeclar(evento: KeyboardEvent<HTMLDivElement>) {
+    if (evento.altKey || evento.ctrlKey || evento.metaKey) return;
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(evento.key)) return;
     evento.preventDefault();
     const habilitados = itens
       .map((item, indice) => ({ item, indice }))
       .filter(({ item }) => !item.desabilitado);
     if (habilitados.length === 0) return;
-    const posicao = habilitados.findIndex(({ item }) => item.valor === ativo);
+    const posicao = habilitados.findIndex(
+      ({ indice }) => referencias.current[indice] === evento.target,
+    );
     const passo = evento.key === "ArrowLeft" ? -1 : 1;
     const alvo =
       evento.key === "Home"
@@ -112,9 +126,10 @@ export function Abas<T extends string>({
       <Box
         role="tablist"
         aria-label={rotuloAcessivel}
+        hidden={ocultarTrilho}
         onKeyDown={aoTeclar}
         sx={(tema) => ({
-          display: "grid",
+          display: ocultarTrilho ? "none" : "grid",
           gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))`,
           gap: 0.5,
           p: 0.5,
@@ -129,6 +144,7 @@ export function Abas<T extends string>({
               key={item.valor}
               ref={(elemento) => {
                 referencias.current[indice] = elemento;
+                if (item.referencia) item.referencia.current = elemento;
               }}
               role="tab"
               aria-label={
@@ -176,12 +192,12 @@ export function Abas<T extends string>({
             <Box
               key={item.valor}
               id={idPainel(item.valor)}
-              role="tabpanel"
-              aria-labelledby={idAba(item.valor)}
+              role={ocultarTrilho && selecionado ? undefined : "tabpanel"}
+              aria-labelledby={ocultarTrilho && selecionado ? undefined : idAba(item.valor)}
               aria-hidden={!selecionado}
               hidden={!selecionado}
               inert={!selecionado}
-              tabIndex={0}
+              tabIndex={ocultarTrilho ? undefined : 0}
               sx={(tema) => ({
                 minWidth: 0,
                 "&:focus-visible": {

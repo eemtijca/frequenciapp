@@ -3,8 +3,15 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
+import {
+  chromium,
+  expect as verificarTela,
+  type Browser,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 
 const requireVitest = createRequire(import.meta.url);
 const caminho = requireVitest.resolve("vite", {
@@ -73,14 +80,53 @@ afterAll(async () => {
   await browser?.close();
   await servidor?.close();
 });
-async function abrir(page: Page, tema: "light" | "dark") {
+async function abrir(page: Page, tema: "light" | "dark", simularGravacao = false) {
   const gravacoes: string[] = [];
+  const prova = {
+    id: "prova-teste",
+    turmaId: "turma-0",
+    dia: "2026-03-10",
+    inicio: "07:00",
+    fim: "09:00",
+    disciplina: "Matemática",
+  };
+  let provas: (typeof prova)[] = [];
   await page.route("**/api/**", (route) => {
-    if (route.request().method() !== "GET")
-      gravacoes.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
-    return new URL(route.request().url()).pathname === "/api/configuracoes/completo"
-      ? route.fulfill({ json: completo })
-      : route.fulfill({ status: 503, json: { erro: "Indisponível no teste" } });
+    const { pathname } = new URL(route.request().url());
+    const metodo = route.request().method();
+    if (metodo !== "GET") gravacoes.push(`${metodo} ${pathname}`);
+    if (pathname === "/api/configuracoes/completo" && metodo === "GET") {
+      return route.fulfill({ json: completo });
+    }
+    if (simularGravacao && pathname === "/api/provas-bimestrais") {
+      if (metodo === "POST") {
+        expect(route.request().postDataJSON()).toEqual({
+          turmaIds: [prova.turmaId],
+          dia: prova.dia,
+          inicio: prova.inicio,
+          fim: prova.fim,
+          disciplina: prova.disciplina,
+        });
+        provas = [prova];
+      }
+      return route.fulfill({ json: { provas } });
+    }
+    if (simularGravacao && pathname === "/api/configuracoes/lote" && metodo === "POST") {
+      const { desejado } = route.request().postDataJSON();
+      expect(Object.keys(desejado)).toEqual(["justificativas"]);
+      expect(desejado.justificativas).toContainEqual({
+        codigo: "Ui",
+        rotulo: "Justificativa de teste",
+        ativo: true,
+      });
+      return route.fulfill({
+        json: {
+          completo: { ...completo, justificativas: desejado.justificativas },
+          segredosBi: [],
+        },
+      });
+    }
+    return route.fulfill({ status: 503, json: { error: "Indisponível no teste" } });
   });
   await page.goto(url);
   await page.evaluate(
@@ -95,21 +141,122 @@ async function abrir(page: Page, tema: "light" | "dark") {
     .getByRole("tablist", { name: "Ações da escola" })
     .getByRole("tab", { name: "Cadastros" })
     .click();
-  await page
-    .locator('[data-secao="config-justificativas"]')
-    .getByRole("button", { name: /Justificativas/ })
-    .click();
-  await page
-    .locator('[data-secao="config-liberadores"]')
-    .getByRole("button", { name: /Quem libera as saídas/ })
-    .click();
   return gravacoes;
 }
+
+it("grava a prova sem enviar o catálogo e só envia o lote na confirmação", async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  try {
+    const gravacoes = await abrir(page, "light", true);
+    const justificativas = page.getByRole("region", { name: "Justificativas", exact: true });
+    await justificativas.getByRole("button", { name: "Adicionar justificativa" }).click();
+    await justificativas.getByLabel("Código", { exact: true }).fill("Ui");
+    await justificativas.getByLabel("Rótulo", { exact: true }).fill("Justificativa de teste");
+    await justificativas.getByRole("button", { name: "Adicionar ao rascunho" }).click();
+    expect(gravacoes).toEqual([]);
+
+    const categorias = page.getByRole("navigation", { name: "Categorias de configurações" });
+    const seletor = categorias.getByRole("combobox", { name: /^Categoria/ });
+    const escola = categorias.getByRole("button", { name: "Escola", exact: true });
+    await verificarTela(seletor).toHaveText("Escola");
+    await verificarTela(escola).toBeHidden();
+    await page.setViewportSize({ width: 1240, height: 900 });
+    await verificarTela(seletor).toBeHidden();
+    await verificarTela(escola).toHaveAttribute("aria-current", "true");
+    await verificarTela(justificativas.getByText("Justificativa de teste")).toBeVisible();
+
+    await selecionarCategoriaConfiguracoes(page, "Horários");
+    await page.getByRole("tab", { name: "Provas", exact: true }).click();
+    const formulario = page.getByRole("form", { name: "Nova prova" });
+    await verificarTela(formulario).toHaveAccessibleDescription(/fora do rascunho/);
+    await formulario.getByLabel("Disciplina").fill("Matemática");
+    await formulario.getByRole("checkbox", { name: "1º ano A", exact: true }).check();
+    await formulario.getByRole("button", { name: "Adicionar prova", exact: true }).click();
+    await verificarTela(page.getByRole("region", { name: "Provas cadastradas" })).toContainText(
+      "Matemática",
+    );
+    expect(gravacoes).toEqual(["POST /api/provas-bimestrais"]);
+
+    const rodape = page.getByRole("region", { name: "Rascunho de configurações" });
+    await verificarTela(rodape).toHaveCount(1);
+    await verificarTela(rodape).toContainText("Alterações em 1 seção");
+    const revisar = rodape.getByRole("button", { name: "Revisar alterações", exact: true });
+    await revisar.click();
+    const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?", exact: true });
+    await verificarTela(revisao).toContainText("Justificativas");
+    await revisao.getByRole("button", { name: "Continuar revisando", exact: true }).click();
+    await verificarTela(revisar).toBeFocused();
+    expect(gravacoes).toEqual(["POST /api/provas-bimestrais"]);
+    await revisar.click();
+    await revisao.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+    await verificarTela(rodape).toBeHidden();
+    await verificarTela(revisao).toBeHidden();
+    expect(gravacoes).toEqual(["POST /api/provas-bimestrais", "POST /api/configuracoes/lote"]);
+  } finally {
+    await page.close();
+  }
+});
+it("transfere o foco da categoria ao ampliar a tela com o seletor aberto", async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  try {
+    const gravacoes = await abrir(page, "light");
+    const nav = page.getByRole("navigation", { name: "Categorias de configurações" });
+    const seletor = nav.getByRole("combobox", { name: /^Categoria/ });
+    await seletor.focus();
+    await seletor.press("Enter");
+    const opcoes = page.getByRole("listbox");
+    await verificarTela(opcoes).toBeVisible();
+
+    await page.setViewportSize({ width: 1240, height: 900 });
+    await verificarTela(opcoes).toBeHidden({ timeout: 2000 });
+    const escola = nav.getByRole("button", { name: "Escola", exact: true });
+    await verificarTela(escola).toBeFocused();
+    await verificarTela(escola).toHaveAttribute("aria-current", "true");
+    expect(gravacoes).toEqual([]);
+  } finally {
+    await page.close();
+  }
+});
+
+it("mantém o interruptor focado visível quando o primeiro rascunho mostra o rodapé", async () => {
+  const page = await browser.newPage({ viewport: { width: 320, height: 340 } });
+  try {
+    const gravacoes = await abrir(page, "light");
+    await page.getByRole("tab", { name: "Geral", exact: true }).click();
+    const recurso = page.getByRole("switch", { name: "Saídas e Entradas", exact: true });
+    await recurso.focus();
+    await recurso.evaluate((el) => {
+      window.scrollBy(0, el.getBoundingClientRect().bottom - (window.innerHeight - 12));
+    });
+    const gatilho = await recurso.boundingBox();
+    expect(gatilho && gatilho.y + gatilho.height).toBeGreaterThan(300);
+    await page.keyboard.press("Space");
+    const rodape = page.getByRole("region", { name: "Rascunho de configurações" });
+    await verificarTela(rodape).toBeVisible();
+    await verificarTela(recurso).toBeFocused();
+    await verificarTela
+      .poll(
+        async () => {
+          const controle = await recurso.boundingBox();
+          const barra = await rodape.boundingBox();
+          return (
+            controle !== null &&
+            barra !== null &&
+            controle.y >= 0 &&
+            controle.y + controle.height <= Math.min(340, barra.y)
+          );
+        },
+        { timeout: 2000 },
+      )
+      .toBe(true);
+    expect(gravacoes).toEqual([]);
+  } finally {
+    await page.close();
+  }
+});
+
 async function abrirAlmoco(page: Page) {
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Horários", exact: true })
-    .click();
+  await selecionarCategoriaConfiguracoes(page, "Horários");
   await page
     .getByRole("tablist", { name: "Ações dos horários" })
     .getByRole("tab", { name: "Almoço", exact: true })
@@ -253,7 +400,9 @@ for (const tema of ["light", "dark"] as const) {
         await conferirFoco(editar);
         await page.keyboard.press("Enter");
         const campo = page.getByRole("textbox", { name: `Rótulo de ${codigo}` });
-        const salvar = page.getByRole("button", { name: `Salvar rótulo de ${codigo}` });
+        const salvar = page.getByRole("button", {
+          name: `Aplicar rótulo de ${codigo} ao rascunho`,
+        });
         const cancelar = page.getByRole("button", { name: `Cancelar edição de ${codigo}` });
         await campo.fill("x");
         expect(await salvar.isDisabled()).toBe(true);

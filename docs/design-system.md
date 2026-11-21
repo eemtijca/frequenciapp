@@ -336,7 +336,7 @@ Regras de composição:
 
 - Abas Séries, Turmas, Alunos, Equipe, Diretores e Configurações.
 - Formulários em diálogo e tabelas com ações.
-- Configurações em Escola, Horários, Planilhas, Acesso e avisos e Dados.
+- Configurações tem título e retorno próprio. A navegação local de Escola, Horários, Planilhas, Acesso e avisos e Dados usa uma lista lateral a partir de 1240 px e um seletor rotulado abaixo disso.
 - Rascunho único, revisão, conflito e confirmação antes de salvar.
 - Em Horários, a aba Provas usa data, início, fim, disciplina e seleção de turmas por série, com checkbox tri-state e contagem.
 - A gravação das provas é imediata, fora do rascunho único.

@@ -291,24 +291,15 @@ test("o botão global atualiza a tela ativa e não descarta um rascunho", async 
   await page.getByRole("tab", { name: "Configurações" }).click();
   const recursos = page.locator('[data-secao="config-recursos"]');
   await recursos.getByRole("switch", { name: "Saídas e Entradas" }).click();
-  const barra = page.locator('div[role="region"][aria-label^="Salvar"]');
+  const barra = page.getByRole("region", { name: "Rascunho de configurações", exact: true });
   await expect(barra).toBeVisible();
 
-  // A barra de Configurações segue a lógica compacta da Chamada.
+  // A barra segue a largura do conteúdo e não invade a coluna das categorias.
   const caixaBarra = await barra.boundingBox();
   const caixaConteudo = await page.locator("#config-grupo-escola").boundingBox();
-  const largura = page.viewportSize()?.width ?? 0;
-  expect(caixaBarra).not.toBeNull();
-  expect(caixaConteudo).not.toBeNull();
-  expect(caixaBarra?.width ?? 0).toBeLessThan(caixaConteudo?.width ?? 0);
-  if (largura < 1024) {
-    const centro = (caixaBarra?.x ?? 0) + (caixaBarra?.width ?? 0) / 2;
-    expect(Math.abs(centro - largura / 2)).toBeLessThan(3);
-  } else {
-    expect((caixaBarra?.x ?? 0) + (caixaBarra?.width ?? 0)).toBeGreaterThan(
-      (caixaConteudo?.x ?? 0) + (caixaConteudo?.width ?? 0) - 24,
-    );
-  }
+  if (!caixaBarra || !caixaConteudo) throw new Error("O rascunho ou o conteúdo não apareceu.");
+  expect(Math.abs(caixaBarra.x - caixaConteudo.x)).toBeLessThan(2);
+  expect(Math.abs(caixaBarra.width - caixaConteudo.width)).toBeLessThan(2);
 
   await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
   await expect(

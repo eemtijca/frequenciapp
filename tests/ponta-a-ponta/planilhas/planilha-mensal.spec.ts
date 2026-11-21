@@ -1,5 +1,6 @@
 // Preparo mensal pela Gestão contra o Google sintético: confirmação, reuso,
 // vínculos fixos e prévia de envio para as abas do mês.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import {
@@ -141,10 +142,7 @@ async function abrirPlanilha(page: Page, acao: "Organizar" | "Configurar" = "Org
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Planilhas", exact: true })
-    .click();
+  await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
   await selecionarAcaoPlanilha(cartao, acao);

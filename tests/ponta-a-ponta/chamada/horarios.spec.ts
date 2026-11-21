@@ -1,4 +1,5 @@
 // Horários semanais: disciplinas por dia, gestão, consulta e formulário no celular.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -62,7 +63,7 @@ async function escolherDia(page: Page, vista: Locator, dia: string): Promise<voi
 async function abrirEdicaoDeHorarios(page: Page): Promise<Locator> {
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações", exact: true }).click();
-  await page.locator("#categoria-config-horarios").click();
+  await selecionarCategoriaConfiguracoes(page, "Horários");
   const vista = page.getByRole("region", { name: "Edição de horários", exact: true });
   await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
   await page.getByRole("option", { name: rotulo, exact: true }).click();

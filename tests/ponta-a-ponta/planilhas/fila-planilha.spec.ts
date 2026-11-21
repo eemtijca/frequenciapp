@@ -1,5 +1,6 @@
 // Painel da fila de envios automáticos na Gestão: contagens, itens pendentes e ações da
 // administração, com as respostas da API simuladas.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -56,10 +57,7 @@ async function abrirSecao(page: Page) {
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Planilhas", exact: true })
-    .click();
+  await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const secao = page.locator('[data-secao="planilha-fila"]');
   await secao.getByRole("button", { name: /Fila de envios automáticos/ }).click();
   return secao;

@@ -14,10 +14,6 @@ async function abrir(page: Page) {
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Acesso e avisos", exact: true })
-    .click();
   await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "FrequenciBI");
   const secao = page.locator('[data-secao="config-chaves-bi"]');
   const gatilho = secao.getByRole("button", { name: /^FrequenciBI/ });
@@ -49,7 +45,7 @@ test("cria no rascunho, exige a senha no lote e mostra o segredo uma única vez"
   await expect(secao.getByRole("heading", { name: `${prefixo} Principal` })).toBeVisible();
 
   // Sem a senha, o lote não é gravado e o diálogo de revisão permanece.
-  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  await page.getByRole("button", { name: "Revisar alterações", exact: true }).click();
   const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?" });
   await expect(revisao.getByLabel("Senha do administrador", { exact: true })).toBeVisible();
   await revisao.getByLabel("Senha do administrador", { exact: true }).fill(ADMIN_E2E.senha);
@@ -137,7 +133,7 @@ test("falha do lote mantém o rascunho e a revogação pode ser desfeita antes d
 
   // Falha de transporte: o rascunho não é perdido.
   await page.route("**/api/configuracoes/lote", (rota) => rota.abort("failed"));
-  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  await page.getByRole("button", { name: "Revisar alterações", exact: true }).click();
   const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?" });
   await revisao.getByLabel("Senha do administrador", { exact: true }).fill(ADMIN_E2E.senha);
   await revisao.getByRole("button", { name: "Salvar configurações", exact: true }).click();

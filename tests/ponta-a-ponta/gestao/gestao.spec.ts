@@ -1,9 +1,42 @@
 // Navegação da Gestão e das configurações, com preservação de rascunhos e retorno do Google.
+import {
+  conferirCategoriaConfiguracoes,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { selecionarAcaoConfiguracoes } from "../helpers/configuracoes";
 
 test.describe("abas da Gestão", () => {
+  test("Configurações tem contexto próprio e volta ao cadastro anterior com foco no gatilho", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+    const areas = page.getByRole("tablist", { name: "Áreas de gestão", exact: true });
+    await areas.getByRole("tab", { name: "Turmas", exact: true }).click();
+    const gatilho = areas.getByRole("tab", { name: "Configurações", exact: true });
+    await gatilho.press("Enter");
+
+    const titulo = page.getByRole("heading", { name: "Configurações", level: 1, exact: true });
+    await expect(titulo).toBeFocused();
+    await expect(areas).toBeHidden();
+    await selecionarAcaoConfiguracoes(page, "Horários", "Provas");
+    await expect(page.getByRole("form", { name: "Nova prova" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Voltar para Gestão", exact: true }).press("Enter");
+    await expect(areas.getByRole("tab", { name: "Turmas", exact: true })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    await expect(gatilho).toBeFocused();
+
+    await page.keyboard.press("Enter");
+    await expect(titulo).toBeFocused();
+    await expect(page.getByRole("form", { name: "Nova prova" })).toBeVisible();
+  });
+
   const retornosGoogle = [
     { finalidade: "FREQUENCIA", secao: "planilha-frequencia" },
     { finalidade: "SAIDAS", secao: "planilha-saidas" },
@@ -18,16 +51,9 @@ test.describe("abas da Gestão", () => {
       const finalidade = retorno.finalidade ? `&googleFinalidade=${retorno.finalidade}` : "";
       await page.goto(`/?visao=gestao&google=conectado${finalidade}`);
       await aguardarHidratacao(page);
-      await expect(page.getByRole("tab", { name: "Configurações" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
+      await expect(page.getByRole("heading", { name: "Configurações", level: 1 })).toBeVisible();
       await expect(page.getByText("Conta Google conectada. Escolha a planilha.")).toBeVisible();
-      await expect(
-        page
-          .getByRole("navigation", { name: "Categorias de configurações" })
-          .getByRole("button", { name: "Planilhas", exact: true }),
-      ).toHaveAttribute("aria-pressed", "true");
+      await conferirCategoriaConfiguracoes(page, "Planilhas");
       for (const secao of ["planilha-frequencia", "planilha-saidas", "planilha-parcial"]) {
         const cartao = page.locator(`[data-secao="${secao}"]`);
         await expect(cartao).toBeVisible();
@@ -53,13 +79,9 @@ test.describe("abas da Gestão", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
-    const categorias = page.getByRole("navigation", { name: "Categorias de configurações" });
     const justificativas = page.locator('[data-secao="config-justificativas"]');
     const copia = page.locator('[data-secao="config-copia"]');
-    await expect(categorias.getByRole("button", { name: "Escola", exact: true })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await conferirCategoriaConfiguracoes(page, "Escola");
     await expect(justificativas).toBeHidden();
     await selecionarAcaoConfiguracoes(page, "Escola", "Cadastros");
     await expect(justificativas).toBeVisible();
@@ -67,17 +89,18 @@ test.describe("abas da Gestão", () => {
     await expect(page.locator('[data-secao="planilha-frequencia"]')).toBeHidden();
     await expect(page.locator('[data-secao="config-acesso-diretores"]')).toBeHidden();
 
-    await justificativas.getByRole("button", { name: /^Justificativas/ }).click();
-    await justificativas.getByText("Adicionar justificativa", { exact: true }).click();
+    await justificativas
+      .getByRole("button", { name: "Adicionar justificativa", exact: true })
+      .click();
     await justificativas.getByLabel("Código", { exact: true }).fill("E2E");
     await justificativas.getByLabel("Rótulo", { exact: true }).fill("E2E Rascunho preservado");
-    await categorias.getByRole("button", { name: "Dados", exact: true }).click();
+    await selecionarCategoriaConfiguracoes(page, "Dados");
     await expect(copia).toBeVisible();
     await expect(justificativas).toBeHidden();
     await expect(page.locator('[data-secao="planilha-frequencia"]')).toBeHidden();
     await expect(page.locator('[data-secao="config-acesso-diretores"]')).toBeHidden();
 
-    await categorias.getByRole("button", { name: "Escola", exact: true }).click();
+    await selecionarCategoriaConfiguracoes(page, "Escola");
     await expect(copia).toBeHidden();
     await expect(justificativas).toBeVisible();
     await expect(justificativas.getByLabel("Código", { exact: true })).toHaveValue("E2E");

@@ -1,9 +1,10 @@
 // Navegação das configurações no celular, preservando o rascunho e a revisão antes de gravar.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { descartarConfiguracoes, selecionarAcaoConfiguracoes } from "../helpers/configuracoes";
 
-test.use({ serviceWorkers: "block", viewport: { width: 360, height: 800 }, hasTouch: true });
+test.use({ serviceWorkers: "block", viewport: { width: 320, height: 844 }, hasTouch: true });
 
 async function abrir(page: Page) {
   await page.goto("/");
@@ -24,22 +25,21 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
   const escola = page.getByRole("tablist", { name: "Ações da escola", exact: true });
   await escola.getByRole("tab", { name: "Cadastros", exact: true }).tap();
   const justificativas = page.locator('[data-secao="config-justificativas"]');
-  await justificativas.getByRole("button", { name: /^Justificativas/ }).tap();
+  await expect(
+    justificativas.getByRole("heading", { name: "Justificativas", exact: true }),
+  ).toBeVisible();
   await expect(justificativas.getByLabel("Código", { exact: true })).toBeHidden();
-  await justificativas.getByText("Adicionar justificativa", { exact: true }).tap();
+  await justificativas.getByRole("button", { name: "Adicionar justificativa", exact: true }).tap();
   await justificativas.getByLabel("Código", { exact: true }).fill("E2EUI");
   await justificativas.getByLabel("Rótulo", { exact: true }).fill("E2E Cadastro em revisão");
-  await justificativas.getByRole("button", { name: "Adicionar", exact: true }).tap();
+  await justificativas.getByRole("button", { name: "Adicionar ao rascunho", exact: true }).tap();
   await expect(justificativas.getByText("E2E Cadastro em revisão", { exact: true })).toBeVisible();
   const frequencia = escola.getByRole("tab", { name: "Frequência", exact: true });
   await frequencia.focus();
   await page.keyboard.press("Enter");
   await expect(frequencia).toHaveAttribute("aria-selected", "true");
   await expect(justificativas).toBeHidden();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Dados", exact: true })
-    .tap();
+  await selecionarCategoriaConfiguracoes(page, "Dados");
   const copia = page.locator('[data-secao="config-copia"]');
   await copia.getByRole("button", { name: /^Cópia de segurança/ }).tap();
   await copia.getByRole("button", { name: "Importar cópia", exact: true }).tap();
@@ -48,7 +48,7 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
   await importar.getByRole("button", { name: "Cancelar", exact: true }).tap();
   await selecionarAcaoConfiguracoes(page, "Escola", "Cadastros");
   await expect(justificativas.getByText("E2E Cadastro em revisão", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: "Salvar configurações", exact: true }).tap();
+  await page.getByRole("button", { name: "Revisar alterações", exact: true }).tap();
   const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?", exact: true });
   await expect(revisao).toContainText("Justificativas");
   await revisao.getByRole("button", { name: "Continuar revisando", exact: true }).tap();
@@ -68,7 +68,7 @@ test("as tarefas das categorias cabem no celular e seus painéis ficam acessíve
       nome: "Ações da escola",
       acoes: ["Geral", "Frequência", "Calendário", "Cadastros"],
     },
-    { categoria: "Horários", nome: "Ações dos horários", acoes: ["Aulas", "Almoço"] },
+    { categoria: "Horários", nome: "Ações dos horários", acoes: ["Aulas", "Almoço", "Provas"] },
     {
       categoria: "Acesso e avisos",
       nome: "Ações de acesso e avisos",
@@ -76,10 +76,7 @@ test("as tarefas das categorias cabem no celular e seus painéis ficam acessíve
     },
   ] as const;
   for (const grupo of grupos) {
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: grupo.categoria, exact: true })
-      .tap();
+    await selecionarCategoriaConfiguracoes(page, grupo.categoria);
     const navegacao = page.getByRole("tablist", { name: grupo.nome, exact: true });
     for (const acao of grupo.acoes) {
       const botao = navegacao.getByRole("tab", { name: acao, exact: true });

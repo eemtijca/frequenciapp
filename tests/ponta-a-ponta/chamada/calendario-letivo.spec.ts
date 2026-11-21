@@ -111,10 +111,6 @@ async function abrirCalendario(page: Page): Promise<Locator> {
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações", exact: true }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações", exact: true })
-    .getByRole("button", { name: "Escola", exact: true })
-    .click();
   await selecionarAcaoConfiguracoes(page, "Escola", "Calendário");
   const secao = page.locator('[data-secao="config-calendario"]');
   const abrir = secao.getByRole("button", { name: /^Calendário letivo/ });
@@ -387,7 +383,7 @@ test("falha do lote mantém o feriado no rascunho e permite tentar de novo", asy
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
 
   await page.route("**/api/configuracoes/lote", (rota) => rota.abort("failed"));
-  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  await page.getByRole("button", { name: "Revisar alterações", exact: true }).click();
   const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?" });
   await revisao.getByRole("button", { name: "Salvar configurações", exact: true }).click();
   await expect(revisao).toBeVisible();

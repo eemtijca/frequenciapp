@@ -1,5 +1,6 @@
 // Planilha de saídas na interface: configuração na Gestão e envio pela vista
 // Saídas, contra a Sheets API sintética.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { mesSeguinte, nomeDoMes, rotuloMes } from "@/domain/frequencia";
 import { criarGoogleFalso, type GoogleFalso } from "../../helpers/google-falso";
@@ -52,10 +53,7 @@ test.describe("Google Planilhas de saídas", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Planilhas", exact: true })
-      .click();
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
     const cartao = page.locator('[data-secao="planilha-saidas"]');
     await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();
     await selecionarAcaoPlanilha(cartao, "Configurar");
@@ -67,10 +65,7 @@ test.describe("Google Planilhas de saídas", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações" }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Planilhas", exact: true })
-      .click();
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
     await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();
     await selecionarAcaoPlanilha(cartao, "Configurar");
     await expect(cartao.getByText("Conta Google conectada", { exact: true })).toBeVisible();

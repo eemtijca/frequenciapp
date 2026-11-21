@@ -1,4 +1,5 @@
 // Configuração dos limites de infrequência na Gestão e leitura pela API.
+import { conferirCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import type { Configuracoes } from "@/domain/frequencia";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -16,7 +17,7 @@ test("a Gestão grava os limites de infrequência e a API devolve os valores", a
   try {
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: /Configurações/ }).click();
-    await page.getByRole("button", { name: "Escola", exact: true }).click();
+    await conferirCategoriaConfiguracoes(page, "Escola");
 
     await selecionarAcaoConfiguracoes(page, "Escola", "Frequência");
     const secao = page.locator('[data-secao="config-infrequencia"]');
@@ -25,7 +26,7 @@ test("a Gestão grava os limites de infrequência e a API devolve os valores", a
     await page.locator("#infrequencia-atencao").fill("5");
     await page.locator("#infrequencia-critica").fill("15");
 
-    await page.getByRole("button", { name: "Salvar configurações", exact: true }).first().click();
+    await page.getByRole("button", { name: "Revisar alterações", exact: true }).first().click();
     const dialogo = page.getByRole("alertdialog");
     await expect(dialogo).toBeVisible();
     await dialogo.getByRole("button", { name: "Salvar configurações", exact: true }).click();

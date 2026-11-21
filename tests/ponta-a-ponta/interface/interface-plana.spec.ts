@@ -191,6 +191,7 @@ test.describe("interface compartilhada", () => {
         await capturar(page, info, `${visao}-${tema}`);
       }
 
+      await page.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
       await page.getByRole("tab", { name: "Séries", exact: true }).click();
       await page.getByRole("button", { name: "Nova série", exact: true }).click();
       const dialogo = page.getByRole("dialog", { name: "Nova série", exact: true });

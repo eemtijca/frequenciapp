@@ -84,7 +84,7 @@ for (const largura of [390, 800]) {
 
     const origem = page.getByRole("group", { name: "Turma de origem na Chamada", exact: true });
     await origem.getByRole("switch").click();
-    await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+    await page.getByRole("button", { name: "Revisar alterações", exact: true }).click();
     const confirmar = page.getByRole("alertdialog", { name: "Salvar configurações?", exact: true });
     const resposta = page.waitForResponse(
       (item) =>

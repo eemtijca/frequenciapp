@@ -1,5 +1,6 @@
 // Configuração assistida com banco e Google sintéticos: leitura sem escrita,
 // diagnóstico mensal, recuperação de acesso e conferência antes de salvar o mapa.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   diaLocal,
@@ -76,10 +77,7 @@ async function abrirPlanilha(page: Page) {
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Planilhas", exact: true })
-    .click();
+  await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
   await selecionarAcaoPlanilha(cartao, "Configurar");
@@ -285,7 +283,7 @@ test("desativa a planilha no rascunho e só aplica depois de salvar", async ({ p
 
   await ativa.click();
   await expect(ativa).not.toBeChecked();
-  await expect(page.getByRole("region", { name: "Salvar configurações" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Rascunho de configurações" })).toBeVisible();
 
   await descartarConfiguracoes(page);
   await expect(ativa).toBeChecked();

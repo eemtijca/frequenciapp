@@ -2,7 +2,7 @@
 
 // Configurações da escola em um único rascunho: recursos, catálogos, avisos,
 // acesso, almoço, calendário e chaves do BI são revisados e gravados em lote.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
@@ -12,25 +12,22 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EventRepeatRoundedIcon from "@mui/icons-material/EventRepeatRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import FileUploadRoundedIcon from "@mui/icons-material/FileUploadRounded";
-import GridOnRoundedIcon from "@mui/icons-material/GridOnRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
-import Inventory2RoundedIcon from "@mui/icons-material/Inventory2Rounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
-import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
-import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
 import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import Box from "@mui/material/Box";
 import Checkbox from "@mui/material/Checkbox";
 import CircularProgress from "@mui/material/CircularProgress";
+import Divider from "@mui/material/Divider";
 import FormControlLabel from "@mui/material/FormControlLabel";
+import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
-import type { SvgIconComponent } from "@mui/icons-material";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { avisarBeneficiosMudaram } from "@/lib/eventos-beneficios";
 import { avisarOrdemAlmocoMudou } from "@/lib/eventos-ordem-almoco";
@@ -59,9 +56,12 @@ import { CampoTexto } from "@/components/ui/mui/text-field";
 import { Dialogo } from "@/components/ui/mui/dialogo";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { Interruptor } from "@/components/ui/mui/interruptor";
-import { PainelAcoes } from "@/components/ui/mui/painel-acoes";
 import { Selo } from "@/components/ui/mui/selo";
 import DialogoDownload from "@/components/conta/dialogo-download";
+import NavegacaoConfiguracoes, {
+  type CategoriaConfiguracoes,
+} from "@/components/gestao/configuracoes/navegacao-configuracoes";
+import SecaoCatalogo from "@/components/gestao/configuracoes/secao-catalogo";
 import SecaoChavesBi from "@/components/gestao/configuracoes/secao-chaves-bi";
 import SecaoAcessoDiretores from "@/components/gestao/configuracoes/secao-acesso-diretores";
 import SecaoNotificacoes from "@/components/gestao/configuracoes/secao-notificacoes";
@@ -75,6 +75,7 @@ import SecaoInfrequencia from "@/components/gestao/configuracoes/secao-infrequen
 import VistaHorarios from "@/components/horarios/vista-horarios";
 import SecaoProvasBimestrais from "@/components/horarios/secao-provas-bimestrais";
 import SecaoOrdemAlmoco from "@/components/gestao/configuracoes/secao-ordem-almoco";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 import {
   ProvedorRascunhoConfiguracoes,
   useRascunhoConfiguracoes,
@@ -107,23 +108,11 @@ interface ResultadoImportacao {
   conflitos: number;
 }
 
-type Categoria = "escola" | "horarios" | "planilhas" | "acesso" | "dados";
 type AcaoEscola = "geral" | "frequencia" | "calendario" | "cadastros";
 type AcaoHorarios = "aulas" | "almoco" | "provas";
 type AcaoAcesso = "diretores" | "notificacoes" | "bi";
 
 const LIMITE_ARQUIVO = 25 * 1024 * 1024;
-const CATEGORIAS: readonly {
-  valor: Categoria;
-  rotulo: string;
-  icone: SvgIconComponent;
-}[] = [
-  { valor: "escola", rotulo: "Escola", icone: TuneRoundedIcon },
-  { valor: "horarios", rotulo: "Horários", icone: ScheduleRoundedIcon },
-  { valor: "planilhas", rotulo: "Planilhas", icone: GridOnRoundedIcon },
-  { valor: "acesso", rotulo: "Acesso e avisos", icone: ShieldRoundedIcon },
-  { valor: "dados", rotulo: "Dados", icone: Inventory2RoundedIcon },
-];
 
 const CODIGO_JUSTIFICATIVA = /^[A-Za-z][A-Za-z0-9]*$/;
 
@@ -149,6 +138,38 @@ function contagem(n: number, singular: string, plural: string): string {
 }
 
 const ESTILO_CAMPO_CODIGO = { minWidth: 0, width: { xs: "100%", sm: 128 } } as const;
+
+function PainelCategoria({
+  valor,
+  titulo,
+  atual,
+  children,
+}: {
+  valor: CategoriaConfiguracoes;
+  titulo: string;
+  atual: CategoriaConfiguracoes;
+  children: ReactNode;
+}) {
+  const oculto = valor !== atual;
+  const id = `config-grupo-${valor}`;
+
+  return (
+    <Stack
+      component="section"
+      id={id}
+      aria-labelledby={`${id}-titulo`}
+      hidden={oculto}
+      inert={oculto}
+      spacing={2}
+      sx={{ minWidth: 0, "&[hidden]": { display: "none" } }}
+    >
+      <Typography component="h2" variant="h5" id={`${id}-titulo`} tabIndex={-1}>
+        {titulo}
+      </Typography>
+      {children}
+    </Stack>
+  );
+}
 
 export default function AbaConfiguracoes(props: Props) {
   return (
@@ -203,12 +224,12 @@ function ConteudoConfiguracoes({
   const [acaoEscola, setAcaoEscola] = useState<AcaoEscola>("geral");
   const [acaoHorarios, setAcaoHorarios] = useState<AcaoHorarios>("aulas");
   const [acaoAcesso, setAcaoAcesso] = useState<AcaoAcesso>("diretores");
-  const [categoria, setCategoria] = useState<Categoria>(planilhaInicial ? "planilhas" : "escola");
+  const [categoria, setCategoria] = useState<CategoriaConfiguracoes>(
+    planilhaInicial ? "planilhas" : "escola",
+  );
   // O editor de horários só monta na primeira visita e depois mantém o rascunho ao trocar de categoria.
   const [horariosAbertos, setHorariosAbertos] = useState(false);
   const [abertoRecursos, setAbertoRecursos] = useState(true);
-  const [abertoJustificativas, setAbertoJustificativas] = useState(false);
-  const [abertoLiberadores, setAbertoLiberadores] = useState(false);
   const [abertoCopia, setAbertoCopia] = useState(false);
   const [abertoTurmasOrigem, setAbertoTurmasOrigem] = useState(false);
   const [confirmarSalvar, setConfirmarSalvar] = useState(false);
@@ -221,6 +242,45 @@ function ConteudoConfiguracoes({
   const [erroCopia, setErroCopia] = useState("");
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const arquivoRef = useRef<HTMLInputElement | null>(null);
+  const rodapeRef = useRef<HTMLDivElement>(null);
+  const paineisRef = useRef<HTMLDivElement>(null);
+
+  function desobstruirFoco(controle: HTMLElement, barra: HTMLElement) {
+    if (controle.closest('[role="dialog"], [role="alertdialog"]')) return;
+    const rodape = barra.getBoundingClientRect();
+    const alvo = controle.getBoundingClientRect();
+    if (
+      rodape.height > 0 &&
+      alvo.bottom + 5 > rodape.top &&
+      alvo.top - 5 < rodape.bottom &&
+      alvo.right > rodape.left &&
+      alvo.left < rodape.right
+    ) {
+      controle.scrollIntoView({ block: "center", inline: "nearest" });
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (!alterado || !rodapeRef.current) return;
+    const barra = rodapeRef.current;
+    function verificarFoco() {
+      const foco = document.activeElement;
+      if (foco instanceof HTMLElement && paineisRef.current?.contains(foco)) {
+        desobstruirFoco(foco, barra);
+      }
+    }
+    // O primeiro rascunho pode criar a barra sem que o controle perca o foco.
+    verificarFoco();
+    const observador = new ResizeObserver(verificarFoco);
+    observador.observe(barra);
+    return () => observador.disconnect();
+  }, [alterado]);
+
+  function focarCategoriaSemRascunho() {
+    if (!rodapeRef.current && document.activeElement === document.body) {
+      paineisRef.current?.querySelector<HTMLElement>(`#config-grupo-${categoria}-titulo`)?.focus();
+    }
+  }
 
   const [novaCodigo, setNovaCodigo] = useState("");
   const [novaRotulo, setNovaRotulo] = useState("");
@@ -859,436 +919,388 @@ function ConteudoConfiguracoes({
   );
 
   const cadastros = (
-    <Stack spacing={2}>
-      <Box data-secao="config-justificativas">
-        <Acordeao
-          titulo="Justificativas"
-          resumo={
-            <Selo>{`${atual.justificativas.filter((item) => item.ativo).length} ativas`}</Selo>
-          }
-          aberto={abertoJustificativas}
-          onChange={setAbertoJustificativas}
-        >
+    <Stack spacing={3}>
+      <Typography variant="body2" color="text.secondary">
+        As mudanças dos cadastros entram no rascunho e só valem depois de salvar as configurações.
+      </Typography>
+      <SecaoCatalogo
+        id="config-justificativas"
+        titulo="Justificativas"
+        resumo={contagem(
+          atual.justificativas.filter((item) => item.ativo).length,
+          "ativa",
+          "ativas",
+        )}
+        acao="Adicionar justificativa"
+        editor={
           <Box
-            role="region"
-            aria-label="Justificativas"
-            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              alignItems: { sm: "flex-end" },
+              gap: 2,
+            }}
           >
-            <Acordeao
-              titulo="Adicionar justificativa"
-              nivelTitulo="h4"
-              resumo={
-                <Typography
-                  component="span"
-                  variant="body2"
-                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                >
-                  <AddRoundedIcon fontSize="inherit" aria-hidden="true" />
-                  Código e rótulo
-                </Typography>
-              }
+            <Box sx={ESTILO_CAMPO_CODIGO}>
+              <Campo id="justificativa-codigo" rotulo="Código">
+                <CampoTexto
+                  id="justificativa-codigo"
+                  valor={novaCodigo}
+                  onValor={setNovaCodigo}
+                  maxLength={10}
+                  autoComplete="off"
+                  placeholder="Ex.: At"
+                />
+              </Campo>
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Campo id="justificativa-rotulo" rotulo="Rótulo">
+                <CampoTexto
+                  id="justificativa-rotulo"
+                  valor={novaRotulo}
+                  onValor={setNovaRotulo}
+                  maxLength={60}
+                  autoComplete="off"
+                  placeholder="Ex.: Atestado"
+                />
+              </Campo>
+            </Box>
+            <Botao
+              type="button"
+              variante="neutro"
+              icone={<AddRoundedIcon />}
+              onClick={criarJustificativa}
+              disabled={novaCodigo.trim() === "" || novaRotulo.trim() === ""}
             >
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: { xs: "column", sm: "row" },
-                  alignItems: { sm: "flex-end" },
-                  gap: 2,
-                }}
-              >
-                <Box sx={ESTILO_CAMPO_CODIGO}>
-                  <Campo id="justificativa-codigo" rotulo="Código">
-                    <CampoTexto
-                      id="justificativa-codigo"
-                      valor={novaCodigo}
-                      onValor={setNovaCodigo}
-                      maxLength={10}
-                      autoComplete="off"
-                      placeholder="Ex.: At"
-                    />
-                  </Campo>
-                </Box>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Campo id="justificativa-rotulo" rotulo="Rótulo">
-                    <CampoTexto
-                      id="justificativa-rotulo"
-                      valor={novaRotulo}
-                      onValor={setNovaRotulo}
-                      maxLength={60}
-                      autoComplete="off"
-                      placeholder="Ex.: Atestado"
-                    />
-                  </Campo>
-                </Box>
-                <Botao
-                  type="button"
-                  variante="primario"
-                  icone={<AddRoundedIcon />}
-                  onClick={criarJustificativa}
-                  disabled={novaCodigo.trim() === "" || novaRotulo.trim() === ""}
-                >
-                  Adicionar
-                </Botao>
-              </Box>
-            </Acordeao>
+              Adicionar ao rascunho
+            </Botao>
+          </Box>
+        }
+      >
+        {erroJustificativa ? (
+          <AlertaCompacto
+            variante="dados_invalidos"
+            descricao={erroJustificativa}
+            tamanho="linha"
+          />
+        ) : null}
 
-            {erroJustificativa ? (
-              <AlertaCompacto
-                variante="dados_invalidos"
-                descricao={erroJustificativa}
-                tamanho="linha"
-              />
-            ) : null}
-
+        <Box
+          component="ul"
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            margin: 0,
+            padding: 0,
+            listStyle: "none",
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 2,
+          }}
+        >
+          {atual.justificativas.map((item) => (
             <Box
-              component="ul"
+              component="li"
+              key={item.codigo}
               sx={{
-                display: "flex",
-                flexDirection: "column",
-                margin: 0,
-                padding: 0,
-                listStyle: "none",
-                border: 1,
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) auto",
+                alignItems: "center",
+                gap: 1,
+                minHeight: 56,
+                paddingX: 2,
+                paddingY: 1,
+                borderBottom: 1,
                 borderColor: "divider",
-                borderRadius: 2,
+                opacity: item.ativo ? 1 : 0.6,
+                "&:last-of-type": { borderBottom: 0 },
               }}
             >
-              {atual.justificativas.map((item) => (
+              {editando === item.codigo ? (
                 <Box
-                  component="li"
-                  key={item.codigo}
                   sx={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    gridColumn: "1 / -1",
+                    display: "flex",
                     alignItems: "center",
                     gap: 1,
-                    minHeight: 56,
-                    paddingX: 2,
-                    paddingY: 1,
-                    borderBottom: 1,
-                    borderColor: "divider",
-                    opacity: item.ativo ? 1 : 0.6,
-                    "&:last-of-type": { borderBottom: 0 },
+                    minWidth: 0,
                   }}
                 >
-                  {editando === item.codigo ? (
-                    <Box
-                      sx={{
-                        gridColumn: "1 / -1",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        minWidth: 0,
-                      }}
-                    >
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <CampoTexto
-                          id={`justificativa-rotulo-${item.codigo}`}
-                          valor={rotuloEdicao}
-                          onValor={setRotuloEdicao}
-                          maxLength={60}
-                          autoComplete="off"
-                          ariaLabel={`Rótulo de ${item.codigo}`}
-                        />
-                      </Box>
-                      <BotaoIcone
-                        rotulo={`Salvar rótulo de ${item.codigo}`}
-                        variante="secundario"
-                        icone={<CheckRoundedIcon />}
-                        onClick={() => salvarRotulo(item.codigo)}
-                        disabled={rotuloEdicao.trim().length < 2}
-                      />
-                      <BotaoIcone
-                        rotulo={`Cancelar edição de ${item.codigo}`}
-                        variante="secundario"
-                        icone={<CloseRoundedIcon />}
-                        onClick={() => {
-                          setEditando(null);
-                          setRotuloEdicao("");
-                        }}
-                      />
-                    </Box>
-                  ) : (
-                    <>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
-                        >
-                          {item.rotulo}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                        >
-                          {item.codigo}
-                          {item.ativo ? "" : " · desativada"}
-                        </Typography>
-                      </Box>
-                      <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-                        <Switch
-                          checked={item.ativo}
-                          slotProps={{
-                            input: {
-                              "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
-                            },
-                          }}
-                          onChange={() => alternarAtivo(item)}
-                        />
-                        <BotaoIcone
-                          rotulo={`Editar rótulo de ${item.codigo}`}
-                          variante="texto"
-                          icone={<TuneRoundedIcon />}
-                          onClick={() => {
-                            setEditando(item.codigo);
-                            setRotuloEdicao(item.rotulo);
-                          }}
-                        />
-                        <BotaoIcone
-                          rotulo={`Excluir ${item.codigo}`}
-                          variante="texto"
-                          icone={<DeleteOutlineRoundedIcon />}
-                          onClick={() => setExcluirAlvo(item)}
-                          sx={(tema) => ({ color: tema.vars.palette.falta.main })}
-                        />
-                      </Stack>
-                    </>
-                  )}
-                </Box>
-              ))}
-            </Box>
-
-            <DialogoConfirmacao
-              aberto={excluirAlvo !== null}
-              titulo={`Excluir a justificativa ${excluirAlvo?.codigo ?? ""}?`}
-              descricao="A exclusão é aplicada ao salvar as configurações. Se houver faltas ou saídas usando o código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
-              rotuloConfirmar="Excluir"
-              destrutivo
-              onConfirmar={() => {
-                if (excluirAlvo) removerJustificativa(excluirAlvo);
-              }}
-              onCancelar={() => setExcluirAlvo(null)}
-            />
-          </Box>
-        </Acordeao>
-      </Box>
-
-      <Box data-secao="config-liberadores">
-        <Acordeao
-          titulo="Quem libera as saídas"
-          resumo={<Selo>{`${atual.liberadores.filter((item) => item.ativo).length} ativos`}</Selo>}
-          aberto={abertoLiberadores}
-          onChange={setAbertoLiberadores}
-        >
-          <Box
-            role="region"
-            aria-label="Quem libera as saídas"
-            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-          >
-            <Acordeao
-              titulo="Adicionar responsável"
-              nivelTitulo="h4"
-              resumo={
-                <Typography
-                  component="span"
-                  variant="body2"
-                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                >
-                  <AddRoundedIcon fontSize="inherit" aria-hidden="true" />
-                  Código e rótulo
-                </Typography>
-              }
-            >
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: { xs: "column", sm: "row" },
-                  alignItems: { sm: "flex-end" },
-                  gap: 2,
-                }}
-              >
-                <Box sx={ESTILO_CAMPO_CODIGO}>
-                  <Campo id="liberador-codigo" rotulo="Código">
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
                     <CampoTexto
-                      id="liberador-codigo"
-                      valor={novaCodigoLiberador}
-                      onValor={setNovaCodigoLiberador}
-                      maxLength={20}
-                      autoComplete="off"
-                      placeholder="Ex.: maria"
-                    />
-                  </Campo>
-                </Box>
-                <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Campo id="liberador-rotulo" rotulo="Rótulo">
-                    <CampoTexto
-                      id="liberador-rotulo"
-                      valor={novaRotuloLiberador}
-                      onValor={setNovaRotuloLiberador}
+                      id={`justificativa-rotulo-${item.codigo}`}
+                      valor={rotuloEdicao}
+                      onValor={setRotuloEdicao}
                       maxLength={60}
                       autoComplete="off"
-                      placeholder="Ex.: Coordenadora Maria"
+                      ariaLabel={`Rótulo de ${item.codigo}`}
                     />
-                  </Campo>
+                  </Box>
+                  <BotaoIcone
+                    rotulo={`Aplicar rótulo de ${item.codigo} ao rascunho`}
+                    variante="secundario"
+                    icone={<CheckRoundedIcon />}
+                    onClick={() => salvarRotulo(item.codigo)}
+                    disabled={rotuloEdicao.trim().length < 2}
+                  />
+                  <BotaoIcone
+                    rotulo={`Cancelar edição de ${item.codigo}`}
+                    variante="secundario"
+                    icone={<CloseRoundedIcon />}
+                    onClick={() => {
+                      setEditando(null);
+                      setRotuloEdicao("");
+                    }}
+                  />
                 </Box>
-                <Botao
-                  type="button"
-                  variante="primario"
-                  icone={<AddRoundedIcon />}
-                  onClick={criarLiberador}
-                  disabled={novaCodigoLiberador.trim() === "" || novaRotuloLiberador.trim() === ""}
-                >
-                  Adicionar
-                </Botao>
-              </Box>
-            </Acordeao>
+              ) : (
+                <>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
+                      {item.rotulo}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                    >
+                      {item.codigo}
+                      {item.ativo ? "" : " · desativada"}
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                    <Switch
+                      checked={item.ativo}
+                      slotProps={{
+                        input: {
+                          "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
+                        },
+                      }}
+                      onChange={() => alternarAtivo(item)}
+                    />
+                    <BotaoIcone
+                      rotulo={`Editar rótulo de ${item.codigo}`}
+                      variante="texto"
+                      icone={<TuneRoundedIcon />}
+                      onClick={() => {
+                        setEditando(item.codigo);
+                        setRotuloEdicao(item.rotulo);
+                      }}
+                    />
+                    <BotaoIcone
+                      rotulo={`Excluir ${item.codigo}`}
+                      variante="texto"
+                      icone={<DeleteOutlineRoundedIcon />}
+                      onClick={() => setExcluirAlvo(item)}
+                      sx={(tema) => ({ color: tema.vars.palette.falta.main })}
+                    />
+                  </Stack>
+                </>
+              )}
+            </Box>
+          ))}
+        </Box>
 
-            {erroLiberador ? (
-              <AlertaCompacto
-                variante="dados_invalidos"
-                descricao={erroLiberador}
-                tamanho="linha"
-              />
-            ) : null}
+        <DialogoConfirmacao
+          aberto={excluirAlvo !== null}
+          titulo={`Excluir a justificativa ${excluirAlvo?.codigo ?? ""}?`}
+          descricao="A exclusão é aplicada ao salvar as configurações. Se houver faltas ou saídas usando o código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
+          rotuloConfirmar="Excluir"
+          destrutivo
+          onConfirmar={() => {
+            if (excluirAlvo) removerJustificativa(excluirAlvo);
+          }}
+          onCancelar={() => setExcluirAlvo(null)}
+        />
+      </SecaoCatalogo>
 
-            {atual.liberadores.length === 0 ? (
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Nenhum nome cadastrado.
-              </Typography>
-            ) : null}
+      <Divider />
+      <SecaoCatalogo
+        id="config-liberadores"
+        titulo="Quem libera as saídas"
+        resumo={contagem(atual.liberadores.filter((item) => item.ativo).length, "ativo", "ativos")}
+        acao="Adicionar responsável"
+        editor={
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              alignItems: { sm: "flex-end" },
+              gap: 2,
+            }}
+          >
+            <Box sx={ESTILO_CAMPO_CODIGO}>
+              <Campo id="liberador-codigo" rotulo="Código">
+                <CampoTexto
+                  id="liberador-codigo"
+                  valor={novaCodigoLiberador}
+                  onValor={setNovaCodigoLiberador}
+                  maxLength={20}
+                  autoComplete="off"
+                  placeholder="Ex.: maria"
+                />
+              </Campo>
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Campo id="liberador-rotulo" rotulo="Rótulo">
+                <CampoTexto
+                  id="liberador-rotulo"
+                  valor={novaRotuloLiberador}
+                  onValor={setNovaRotuloLiberador}
+                  maxLength={60}
+                  autoComplete="off"
+                  placeholder="Ex.: Coordenadora Maria"
+                />
+              </Campo>
+            </Box>
+            <Botao
+              type="button"
+              variante="neutro"
+              icone={<AddRoundedIcon />}
+              onClick={criarLiberador}
+              disabled={novaCodigoLiberador.trim() === "" || novaRotuloLiberador.trim() === ""}
+            >
+              Adicionar ao rascunho
+            </Botao>
+          </Box>
+        }
+      >
+        {erroLiberador ? (
+          <AlertaCompacto variante="dados_invalidos" descricao={erroLiberador} tamanho="linha" />
+        ) : null}
 
+        {atual.liberadores.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Nenhum nome cadastrado.
+          </Typography>
+        ) : null}
+
+        <Box
+          component="ul"
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            margin: 0,
+            padding: 0,
+            listStyle: "none",
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 2,
+          }}
+        >
+          {atual.liberadores.map((item) => (
             <Box
-              component="ul"
+              component="li"
+              key={item.codigo}
               sx={{
-                display: "flex",
-                flexDirection: "column",
-                margin: 0,
-                padding: 0,
-                listStyle: "none",
-                border: 1,
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) auto",
+                alignItems: "center",
+                gap: 1,
+                minHeight: 56,
+                paddingX: 2,
+                paddingY: 1,
+                borderBottom: 1,
                 borderColor: "divider",
-                borderRadius: 2,
+                opacity: item.ativo ? 1 : 0.6,
+                "&:last-of-type": { borderBottom: 0 },
               }}
             >
-              {atual.liberadores.map((item) => (
+              {editandoLiberador === item.codigo ? (
                 <Box
-                  component="li"
-                  key={item.codigo}
                   sx={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1fr) auto",
+                    gridColumn: "1 / -1",
+                    display: "flex",
                     alignItems: "center",
                     gap: 1,
-                    minHeight: 56,
-                    paddingX: 2,
-                    paddingY: 1,
-                    borderBottom: 1,
-                    borderColor: "divider",
-                    opacity: item.ativo ? 1 : 0.6,
-                    "&:last-of-type": { borderBottom: 0 },
+                    minWidth: 0,
                   }}
                 >
-                  {editandoLiberador === item.codigo ? (
-                    <Box
-                      sx={{
-                        gridColumn: "1 / -1",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 1,
-                        minWidth: 0,
-                      }}
-                    >
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <CampoTexto
-                          id={`liberador-rotulo-${item.codigo}`}
-                          valor={rotuloEdicaoLiberador}
-                          onValor={setRotuloEdicaoLiberador}
-                          maxLength={60}
-                          autoComplete="off"
-                          ariaLabel={`Rótulo de ${item.codigo}`}
-                        />
-                      </Box>
-                      <BotaoIcone
-                        rotulo={`Salvar rótulo de ${item.codigo}`}
-                        variante="secundario"
-                        icone={<CheckRoundedIcon />}
-                        onClick={() => salvarRotuloLiberador(item.codigo)}
-                        disabled={rotuloEdicaoLiberador.trim().length < 2}
-                      />
-                      <BotaoIcone
-                        rotulo={`Cancelar edição de ${item.codigo}`}
-                        variante="secundario"
-                        icone={<CloseRoundedIcon />}
-                        onClick={() => {
-                          setEditandoLiberador(null);
-                          setRotuloEdicaoLiberador("");
-                        }}
-                      />
-                    </Box>
-                  ) : (
-                    <>
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography
-                          variant="body2"
-                          sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
-                        >
-                          {item.rotulo}
-                        </Typography>
-                        <Typography
-                          variant="caption"
-                          sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                        >
-                          {item.codigo}
-                          {item.ativo ? "" : " · desativado"}
-                        </Typography>
-                      </Box>
-                      <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-                        <Switch
-                          checked={item.ativo}
-                          slotProps={{
-                            input: {
-                              "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
-                            },
-                          }}
-                          onChange={() => alternarAtivoLiberador(item)}
-                        />
-                        <BotaoIcone
-                          rotulo={`Editar rótulo de ${item.codigo}`}
-                          variante="texto"
-                          icone={<TuneRoundedIcon />}
-                          onClick={() => {
-                            setEditandoLiberador(item.codigo);
-                            setRotuloEdicaoLiberador(item.rotulo);
-                          }}
-                        />
-                        <BotaoIcone
-                          rotulo={`Excluir ${item.codigo}`}
-                          variante="texto"
-                          icone={<DeleteOutlineRoundedIcon />}
-                          onClick={() => setExcluirAlvoLiberador(item)}
-                          sx={(tema) => ({ color: tema.vars.palette.falta.main })}
-                        />
-                      </Stack>
-                    </>
-                  )}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <CampoTexto
+                      id={`liberador-rotulo-${item.codigo}`}
+                      valor={rotuloEdicaoLiberador}
+                      onValor={setRotuloEdicaoLiberador}
+                      maxLength={60}
+                      autoComplete="off"
+                      ariaLabel={`Rótulo de ${item.codigo}`}
+                    />
+                  </Box>
+                  <BotaoIcone
+                    rotulo={`Aplicar rótulo de ${item.codigo} ao rascunho`}
+                    variante="secundario"
+                    icone={<CheckRoundedIcon />}
+                    onClick={() => salvarRotuloLiberador(item.codigo)}
+                    disabled={rotuloEdicaoLiberador.trim().length < 2}
+                  />
+                  <BotaoIcone
+                    rotulo={`Cancelar edição de ${item.codigo}`}
+                    variante="secundario"
+                    icone={<CloseRoundedIcon />}
+                    onClick={() => {
+                      setEditandoLiberador(null);
+                      setRotuloEdicaoLiberador("");
+                    }}
+                  />
                 </Box>
-              ))}
+              ) : (
+                <>
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
+                      {item.rotulo}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                    >
+                      {item.codigo}
+                      {item.ativo ? "" : " · desativado"}
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+                    <Switch
+                      checked={item.ativo}
+                      slotProps={{
+                        input: {
+                          "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
+                        },
+                      }}
+                      onChange={() => alternarAtivoLiberador(item)}
+                    />
+                    <BotaoIcone
+                      rotulo={`Editar rótulo de ${item.codigo}`}
+                      variante="texto"
+                      icone={<TuneRoundedIcon />}
+                      onClick={() => {
+                        setEditandoLiberador(item.codigo);
+                        setRotuloEdicaoLiberador(item.rotulo);
+                      }}
+                    />
+                    <BotaoIcone
+                      rotulo={`Excluir ${item.codigo}`}
+                      variante="texto"
+                      icone={<DeleteOutlineRoundedIcon />}
+                      onClick={() => setExcluirAlvoLiberador(item)}
+                      sx={(tema) => ({ color: tema.vars.palette.falta.main })}
+                    />
+                  </Stack>
+                </>
+              )}
             </Box>
+          ))}
+        </Box>
 
-            <DialogoConfirmacao
-              aberto={excluirAlvoLiberador !== null}
-              titulo={`Excluir ${excluirAlvoLiberador?.rotulo ?? ""}?`}
-              descricao="A exclusão é aplicada ao salvar as configurações. Se houver saídas com este código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
-              rotuloConfirmar="Excluir"
-              destrutivo
-              onConfirmar={() => {
-                if (excluirAlvoLiberador) removerLiberador(excluirAlvoLiberador);
-              }}
-              onCancelar={() => setExcluirAlvoLiberador(null)}
-            />
-          </Box>
-        </Acordeao>
-      </Box>
+        <DialogoConfirmacao
+          aberto={excluirAlvoLiberador !== null}
+          titulo={`Excluir ${excluirAlvoLiberador?.rotulo ?? ""}?`}
+          descricao="A exclusão é aplicada ao salvar as configurações. Se houver saídas com este código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
+          rotuloConfirmar="Excluir"
+          destrutivo
+          onConfirmar={() => {
+            if (excluirAlvoLiberador) removerLiberador(excluirAlvoLiberador);
+          }}
+          onCancelar={() => setExcluirAlvoLiberador(null)}
+        />
+      </SecaoCatalogo>
     </Stack>
   );
 
@@ -1486,7 +1498,13 @@ function ConteudoConfiguracoes({
       valor: "provas" as const,
       rotulo: "Provas",
       icone: <EventRepeatRoundedIcon />,
-      conteudo: <SecaoProvasBimestrais turmas={turmas} diaCorrente={diaCorrente} />,
+      conteudo: (
+        <SecaoProvasBimestrais
+          turmas={turmas}
+          diaCorrente={diaCorrente}
+          rascunhoPendente={alterado}
+        />
+      ),
     },
   ];
 
@@ -1519,61 +1537,22 @@ function ConteudoConfiguracoes({
         </Box>
       ) : null}
 
-      <Box
-        component="nav"
-        aria-label="Categorias de configurações"
-        sx={(tema) => ({
-          display: "grid",
-          gap: 1,
-          padding: 1,
-          borderRadius: 2,
-          border: `1px solid ${tema.vars.palette.divider}`,
-          backgroundColor: tema.vars.palette.background.paper,
-          gridTemplateColumns: { xs: "1fr 1fr", lg: "1fr" },
-          alignSelf: "start",
-        })}
-      >
-        {CATEGORIAS.map(({ valor, rotulo, icone: Icone }) => (
-          <Botao
-            key={valor}
-            id={`categoria-config-${valor}`}
-            type="button"
-            variante={categoria === valor ? "secundario" : "texto"}
-            aria-pressed={categoria === valor}
-            aria-controls={`config-grupo-${valor}`}
-            icone={<Icone />}
-            onClick={() => {
-              setCategoria(valor);
-              if (valor === "horarios") setHorariosAbertos(true);
-            }}
-            sx={{
-              minHeight: 56,
-              justifyContent: "flex-start",
-              textAlign: "left",
-              whiteSpace: "normal",
-              paddingX: 1.5,
-            }}
-          >
-            {rotulo}
-          </Botao>
-        ))}
-      </Box>
+      <NavegacaoConfiguracoes
+        categoria={categoria}
+        onChange={(valor) => {
+          setCategoria(valor);
+          if (valor === "horarios") setHorariosAbertos(true);
+        }}
+      />
 
-      <Box sx={{ minWidth: 0, paddingBottom: 12 }}>
-        <Box
-          component="section"
-          id="config-grupo-escola"
-          aria-labelledby="categoria-config-escola"
-          hidden={categoria !== "escola"}
-          inert={categoria !== "escola"}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            minWidth: 0,
-            "&[hidden]": { display: "none" },
-          }}
-        >
+      <Box
+        sx={{ minWidth: 0 }}
+        onFocusCapture={(evento) => {
+          if (rodapeRef.current) desobstruirFoco(evento.target, rodapeRef.current);
+        }}
+        ref={paineisRef}
+      >
+        <PainelCategoria valor="escola" titulo="Escola" atual={categoria}>
           <Abas<AcaoEscola>
             itens={itensEscola}
             ativo={acaoEscola}
@@ -1582,21 +1561,8 @@ function ConteudoConfiguracoes({
             variant="scrollable"
             dataPager="config-escola"
           />
-        </Box>
-        <Box
-          component="section"
-          id="config-grupo-horarios"
-          aria-labelledby="categoria-config-horarios"
-          hidden={categoria !== "horarios"}
-          inert={categoria !== "horarios"}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            minWidth: 0,
-            "&[hidden]": { display: "none" },
-          }}
-        >
+        </PainelCategoria>
+        <PainelCategoria valor="horarios" titulo="Horários" atual={categoria}>
           {horariosAbertos ? (
             <Abas<AcaoHorarios>
               itens={itensHorarios}
@@ -1607,21 +1573,8 @@ function ConteudoConfiguracoes({
               dataPager="config-horarios"
             />
           ) : null}
-        </Box>
-        <Box
-          component="section"
-          id="config-grupo-planilhas"
-          aria-labelledby="categoria-config-planilhas"
-          hidden={categoria !== "planilhas"}
-          inert={categoria !== "planilhas"}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            minWidth: 0,
-            "&[hidden]": { display: "none" },
-          }}
-        >
+        </PainelCategoria>
+        <PainelCategoria valor="planilhas" titulo="Planilhas" atual={categoria}>
           <IntegracaoPlanilha
             turmas={turmas}
             diaCorrente={diaCorrente}
@@ -1636,21 +1589,8 @@ function ConteudoConfiguracoes({
             abertoInicial={planilhaInicial === "PARCIAL"}
           />
           <SecaoFilaPlanilha />
-        </Box>
-        <Box
-          component="section"
-          id="config-grupo-acesso"
-          aria-labelledby="categoria-config-acesso"
-          hidden={categoria !== "acesso"}
-          inert={categoria !== "acesso"}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            minWidth: 0,
-            "&[hidden]": { display: "none" },
-          }}
-        >
+        </PainelCategoria>
+        <PainelCategoria valor="acesso" titulo="Acesso e avisos" atual={categoria}>
           <Abas<AcaoAcesso>
             itens={itensAcesso}
             ativo={acaoAcesso}
@@ -1659,109 +1599,67 @@ function ConteudoConfiguracoes({
             variant="scrollable"
             dataPager="config-acesso"
           />
-        </Box>
-        <Box
-          component="section"
-          id="config-grupo-dados"
-          aria-labelledby="categoria-config-dados"
-          hidden={categoria !== "dados"}
-          inert={categoria !== "dados"}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 2,
-            minWidth: 0,
-            "&[hidden]": { display: "none" },
-          }}
-        >
+        </PainelCategoria>
+        <PainelCategoria valor="dados" titulo="Dados" atual={categoria}>
           {dados}
-        </Box>
+        </PainelCategoria>
       </Box>
 
       {alterado ? (
-        <Box
+        <Paper
+          ref={rodapeRef}
           role="region"
-          aria-label="Salvar configurações"
+          aria-label="Rascunho de configurações"
           data-rodape-configuracoes=""
+          variant="outlined"
           sx={{
-            gridColumn: "1 / -1",
+            gridColumn: { xs: "1 / -1", lg: 2 },
             position: "sticky",
             bottom: "max(8px, env(safe-area-inset-bottom))",
             zIndex: 20,
-            width: "fit-content",
-            maxWidth: "100%",
-            mx: { xs: "auto", lg: 0 },
-            ml: { lg: "auto" },
-            borderRadius: 4,
-            border: 1,
-            borderColor: "divider",
-            boxShadow: 3,
-            backgroundColor: "background.paper",
+            minWidth: 0,
+            px: { xs: 1, sm: 2 },
+            py: 1,
           }}
         >
-          <PainelAcoes
-            rotulo="Salvar configurações"
-            sx={{
-              padding: 1,
-              paddingBottom: 1,
-              backgroundColor: "transparent",
-              borderTop: 0,
-              border: 0,
-              gap: 1,
-            }}
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}
           >
-            <Typography
-              variant="caption"
-              aria-live="polite"
-              title={`Alterações não salvas em ${secoesAlteradas.length} ${
-                secoesAlteradas.length === 1 ? "seção" : "seções"
-              }`}
-              sx={{
-                minWidth: 0,
-                maxWidth: { xs: 96, sm: 192 },
-                paddingX: 1,
-                color: "text.secondary",
-                fontWeight: 600,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-            >
-              Não salvo
+            <Typography variant="body2" aria-live="polite" sx={{ fontWeight: 600 }}>
+              {`Alterações em ${contagem(secoesAlteradas.length, "seção", "seções")}`}
             </Typography>
-            <Botao
-              type="button"
-              variante="texto"
-              aria-label="Descartar"
-              onClick={() => setConfirmarDescartar(true)}
-              disabled={salvando}
-              icone={<RestartAltRoundedIcon />}
+            <Stack
+              direction="row"
+              useFlexGap
+              spacing={1}
+              sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}
             >
-              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+              <Botao
+                type="button"
+                variante="texto"
+                onClick={() => setConfirmarDescartar(true)}
+                disabled={salvando}
+                sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+              >
                 Descartar
-              </Box>
-            </Botao>
-            <Botao
-              type="button"
-              variante="secundario"
-              aria-label="Salvar configurações"
-              onClick={() => {
-                setSenhaBi("");
-                setConfirmarSalvar(true);
-              }}
-              disabled={salvando}
-              carregando={salvando}
-              icone={<SaveRoundedIcon />}
-            >
-              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                Salvar configurações
-              </Box>
-              <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
-                Salvar
-              </Box>
-            </Botao>
-          </PainelAcoes>
-        </Box>
+              </Botao>
+              <Botao
+                type="button"
+                variante="principal"
+                onClick={() => {
+                  setSenhaBi("");
+                  setConfirmarSalvar(true);
+                }}
+                disabled={salvando}
+                sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+              >
+                Revisar alterações
+              </Botao>
+            </Stack>
+          </Stack>
+        </Paper>
       ) : null}
 
       <DialogoConfirmacao
@@ -1824,6 +1722,7 @@ function ConteudoConfiguracoes({
         rotuloCancelar="Continuar revisando"
         rotuloConfirmar="Salvar configurações"
         operacaoEmAndamento={salvando}
+        aposFechar={focarCategoriaSemRascunho}
         onConfirmar={() => void concluirSalvamento()}
         onCancelar={() => setConfirmarSalvar(false)}
       />
@@ -1834,6 +1733,7 @@ function ConteudoConfiguracoes({
         descricao="Todas as seções voltam ao estado salvo, inclusive catálogos, calendário e chaves."
         rotuloCancelar="Continuar editando"
         rotuloConfirmar="Descartar"
+        aposFechar={focarCategoriaSemRascunho}
         destrutivo
         onConfirmar={() => {
           descartar();

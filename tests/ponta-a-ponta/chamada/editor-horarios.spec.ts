@@ -1,4 +1,5 @@
 // Editor semanal: acesso por turma, confirmação da grade, cópia e recuperação de falhas.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -102,7 +103,7 @@ async function abrirHorarios(page: Page, turma = origem): Promise<Locator> {
   await aguardarHidratacao(page);
   await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
   await page.getByRole("tab", { name: "Configurações", exact: true }).click();
-  await page.locator("#categoria-config-horarios").click();
+  await selecionarCategoriaConfiguracoes(page, "Horários");
   const vista = page.getByRole("region", { name: "Edição de horários", exact: true });
   await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
   await page.getByRole("option", { name: turma, exact: true }).click();
@@ -357,6 +358,7 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
   await expect(page.locator("main").first()).toHaveAttribute("data-visao", "painel");
   await trocarVisao(page, "Gestão", "gestao");
   await expect(formulario).toBeVisible();
+  await page.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
   await page.getByRole("button", { name: `Horários de ${origem}`, exact: true }).click();
   const dialogo = dialogoDaTurma(page, origem);

@@ -4,6 +4,10 @@ import type { PaginaBi, RecursoBi } from "@/domain/bi";
 import { RECURSOS_BI } from "@/domain/bi";
 import { personalizacaoVaziaBi } from "@/domain/bi-personalizacao";
 import { massaDeDemonstracaoPresente } from "../helpers/banco";
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import {
   capturarTela,
@@ -311,20 +315,19 @@ async function prepararAlunos(page: Page, agrupamento?: "Turma atual" | "Turma d
 
 async function prepararGestao(page: Page, aba: string): Promise<void> {
   await trocarVisao(page, "Gestão", "gestao");
-  await selecionarAba(page, aba);
+  if (aba === "Configurações") {
+    await abrirConfiguracoesDaGestao(page);
+  } else {
+    const voltar = page.getByRole("button", { name: "Voltar para Gestão", exact: true });
+    if (await voltar.isVisible()) await voltar.click();
+    await selecionarAba(page, aba);
+  }
   await expect(page.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
 }
 
 async function prepararConfiguracoes(page: Page, categoria: string): Promise<void> {
   await prepararGestao(page, "Configurações");
-  const nav = page.getByRole("navigation", {
-    name: "Categorias de configurações",
-    exact: true,
-  });
-  await expect(nav).toBeVisible();
-  const botao = nav.getByRole("button", { name: categoria, exact: true });
-  await botao.click();
-  await expect(botao).toHaveAttribute("aria-pressed", "true");
+  await selecionarCategoriaConfiguracoes(page, categoria);
   if (categoria === "Horários") await escolherDiaDaSemana(page, "Segunda-feira");
 }
 
