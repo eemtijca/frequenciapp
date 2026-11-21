@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import { ProvedorAvisos } from "@/components/ui/mui/avisos";
+import { CORES_NAVEGADOR } from "@/theme/paleta";
 import { ProvedorTema } from "@/theme/provedor-tema";
 
 const fonteMaterial = Inter({
@@ -50,8 +51,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f6f6" },
-    { media: "(prefers-color-scheme: dark)", color: "#1c1b19" },
+    { media: "(prefers-color-scheme: light)", color: CORES_NAVEGADOR.claro },
+    { media: "(prefers-color-scheme: dark)", color: CORES_NAVEGADOR.escuro },
   ],
 };
 

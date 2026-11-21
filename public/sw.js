@@ -1,6 +1,6 @@
 // Service worker: casca offline e avisos push sem dados de estudantes.
 // A API nunca é cacheada; a navegação tenta a rede antes da página offline.
-const VERSAO = "frequenciapp-11";
+const VERSAO = "frequenciapp-12";
 const CACHE = `${VERSAO}-estatico`;
 const ATIVOS = [
   "/offline.html",
