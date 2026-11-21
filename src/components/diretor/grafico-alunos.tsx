@@ -109,7 +109,7 @@ export default function GraficoAlunos({ alunos, limiteRisco }: Props) {
           skipAnimation
           borderRadius={4}
           grid={{ vertical: true }}
-          margin={{ top: 24, right: 44, bottom: 4, left: 4 }}
+          margin={{ top: 24, right: 56, bottom: 4, left: 4 }}
           series={[
             {
               label: "Ausência",
@@ -145,7 +145,12 @@ export default function GraficoAlunos({ alunos, limiteRisco }: Props) {
           ]}
           slotProps={{ tooltip: { trigger: "item" } }}
           slots={{ tooltip: slotTooltip }}
-          sx={{ width: "100%" }}
+          sx={{
+            width: "100%",
+            // O rótulo externo da barra é desenhado no limite da área de plotagem.
+            // Sem remover o recorte, valores altos perdem a parte final do percentual.
+            "& svg > g[clip-path]": { clipPath: "none" },
+          }}
         >
           <ChartsReferenceLine
             x={limiteRisco}
