@@ -9,11 +9,11 @@ test.beforeAll(async () => {
 
 test("manifesto e viewport inicial usam a paleta aprovada", async ({ request }) => {
   const manifesto = await (await request.get("/manifest.webmanifest")).json();
-  expect(manifesto.background_color).toBe("#f6f6f6");
-  expect(manifesto.theme_color).toBe("#f6f6f6");
+  expect(manifesto.background_color).toBe("#fcfcfc");
+  expect(manifesto.theme_color).toBe("#fcfcfc");
   const html = await (await request.get("/")).text();
-  expect(html).toMatch(/name="theme-color"[^>]*content="#f6f6f6"/);
-  expect(html).toMatch(/name="theme-color"[^>]*content="#1c1b19"/);
+  expect(html).toMatch(/name="theme-color"[^>]*content="#fcfcfc"/);
+  expect(html).toMatch(/name="theme-color"[^>]*content="#05070a"/);
 });
 
 test("theme-color acompanha sistema e preferências manuais", async ({ page }) => {
@@ -31,9 +31,9 @@ test("theme-color acompanha sistema e preferências manuais", async ({ page }) =
       )
       .toEqual([cor]);
   };
-  await conferir("#f6f6f6");
+  await conferir("#fcfcfc");
   await page.emulateMedia({ colorScheme: "dark" });
-  await conferir("#1c1b19");
+  await conferir("#05070a");
   const escolher = async (rotulo: string) => {
     const seletor = page.getByRole("button", { name: /Tema: .* Alterar tema/ });
     if (!(await seletor.isVisible())) {
@@ -44,10 +44,10 @@ test("theme-color acompanha sistema e preferências manuais", async ({ page }) =
     await page.keyboard.press("Escape");
   };
   await escolher("Claro");
-  await conferir("#f6f6f6");
+  await conferir("#fcfcfc");
   await page.emulateMedia({ colorScheme: "light" });
   await escolher("Escuro");
-  await conferir("#1c1b19");
+  await conferir("#05070a");
   await escolher("Sistema");
-  await conferir("#f6f6f6");
+  await conferir("#fcfcfc");
 });
