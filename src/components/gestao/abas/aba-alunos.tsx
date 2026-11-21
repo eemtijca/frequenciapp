@@ -456,7 +456,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         useFlexGap
         sx={{ alignItems: { xs: "stretch", lg: "center" }, justifyContent: "space-between" }}
       >
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+        <Typography variant="body2" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>
           {modoSelecao
             ? `${selecionados.size} ${
                 selecionados.size === 1 ? "aluno selecionado" : "alunos selecionados"

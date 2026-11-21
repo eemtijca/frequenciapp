@@ -557,7 +557,7 @@ export default function PorAluno({
                 "emitir-relatorio-por-aluno",
               )
             }
-            sx={{ flex: 2, minWidth: 176 }}
+            sx={{ flex: 1, minWidth: 176 }}
           >
             Emitir relatório
           </Botao>
