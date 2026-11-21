@@ -29,7 +29,7 @@ export default function GraficoEvolucao({
         hideLegend
         skipAnimation
         grid={{ horizontal: true }}
-        margin={{ top: 12, right: 12, bottom: 0, left: 0 }}
+        margin={{ top: 12, right: 36, bottom: 0, left: 0 }}
         series={[
           {
             data: valores,

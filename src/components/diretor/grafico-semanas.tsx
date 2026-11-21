@@ -79,7 +79,7 @@ export default function GraficoSemanas({ semanas, limiteRisco, separarJustificad
             skipAnimation
             borderRadius={4}
             grid={{ horizontal: true }}
-            margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+            margin={{ top: 8, right: 36, bottom: 0, left: 0 }}
             series={[
               {
                 label: "Faltas",
@@ -164,7 +164,7 @@ export default function GraficoSemanas({ semanas, limiteRisco, separarJustificad
           hideLegend
           skipAnimation
           grid={{ horizontal: true }}
-          margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
+          margin={{ top: 8, right: 36, bottom: 0, left: 0 }}
           series={[
             {
               label: "Ausência",
