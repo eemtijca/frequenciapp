@@ -1026,7 +1026,7 @@ export default function Aplicacao({
           <Typography
             variant="subtitle1"
             noWrap
-            sx={{ minWidth: 0, flex: 1, fontWeight: 600, letterSpacing: "-0.01em" }}
+            sx={{ minWidth: 0, flex: 1, fontSize: 16, fontWeight: 600, letterSpacing: "-0.02em" }}
           >
             FrequenciApp
           </Typography>
@@ -1214,7 +1214,9 @@ export default function Aplicacao({
                     display: { xs: "block", md: "none" },
                     minWidth: 0,
                     flex: 1,
+                    fontSize: 16,
                     fontWeight: 600,
+                    letterSpacing: "-0.02em",
                   }}
                 >
                   FrequenciApp
@@ -1255,6 +1257,8 @@ export default function Aplicacao({
               display: "flex",
               flexDirection: "column",
               flex: 1,
+              ml: { md: `${TOKENS_LAYOUT.gaveta}px` },
+              boxSizing: "border-box",
               minWidth: 0,
               minHeight: 0,
               overflow: "hidden",
