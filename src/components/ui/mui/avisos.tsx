@@ -211,8 +211,8 @@ export function ProvedorAvisos() {
       }}
       sx={{
         bottom: {
-          xs: `calc(${DESLOCAMENTO_CELULAR}px + env(safe-area-inset-bottom, 0px))`,
-          sm: `${DESLOCAMENTO_DESKTOP}px`,
+          xs: `max(calc(${DESLOCAMENTO_CELULAR}px + env(safe-area-inset-bottom, 0px)), calc(var(--altura-rodape-configuracoes, 0px) + max(8px, env(safe-area-inset-bottom, 0px)) + 8px))`,
+          sm: `max(${DESLOCAMENTO_DESKTOP}px, calc(var(--altura-rodape-configuracoes, 0px) + max(8px, env(safe-area-inset-bottom, 0px)) + 8px))`,
         },
       }}
     >

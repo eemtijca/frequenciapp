@@ -255,6 +255,44 @@ it("mantém o interruptor focado visível quando o primeiro rascunho mostra o ro
   }
 });
 
+it("mantém o aviso de cadastro acima do rodapé sem bloquear a revisão", async () => {
+  const page = await browser.newPage({ viewport: { width: 320, height: 844 } });
+  try {
+    const gravacoes = await abrir(page, "light");
+    const justificativas = page.getByRole("region", { name: "Justificativas", exact: true });
+    await justificativas.getByRole("button", { name: "Adicionar justificativa" }).click();
+    await justificativas.getByLabel("Código", { exact: true }).fill("Ui");
+    await justificativas.getByLabel("Rótulo", { exact: true }).fill("Justificativa de teste");
+    await justificativas.getByRole("button", { name: "Adicionar ao rascunho" }).click();
+
+    const barra = page.getByRole("region", { name: "Rascunho de configurações", exact: true });
+    const aviso = page
+      .getByRole("status")
+      .filter({ hasText: "Justificativa adicionada ao rascunho" });
+    await verificarTela(aviso).toBeVisible();
+    await verificarTela
+      .poll(
+        async () => {
+          const mensagem = await aviso.boundingBox();
+          const rodape = await barra.boundingBox();
+          return (
+            mensagem !== null && rodape !== null && mensagem.y + mensagem.height + 7 <= rodape.y
+          );
+        },
+        { timeout: 1500 },
+      )
+      .toBe(true);
+
+    await barra.getByRole("button", { name: "Revisar alterações", exact: true }).click();
+    await verificarTela(
+      page.getByRole("alertdialog", { name: "Salvar configurações?" }),
+    ).toBeVisible();
+    expect(gravacoes).toEqual([]);
+  } finally {
+    await page.close();
+  }
+});
+
 async function abrirAlmoco(page: Page) {
   await selecionarCategoriaConfiguracoes(page, "Horários");
   await page

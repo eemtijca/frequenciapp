@@ -263,17 +263,28 @@ function ConteudoConfiguracoes({
   useLayoutEffect(() => {
     if (!alterado || !rodapeRef.current) return;
     const barra = rodapeRef.current;
-    function verificarFoco() {
+    const alturaRodape = "--altura-rodape-configuracoes";
+    function atualizarRodape() {
+      // Os avisos ficam no body. Um painel oculto não deve reservar espaço.
+      const altura = barra.getBoundingClientRect().height;
+      if (altura > 0) {
+        document.body.style.setProperty(alturaRodape, `${Math.ceil(altura)}px`);
+      } else {
+        document.body.style.removeProperty(alturaRodape);
+      }
       const foco = document.activeElement;
       if (foco instanceof HTMLElement && paineisRef.current?.contains(foco)) {
         desobstruirFoco(foco, barra);
       }
     }
     // O primeiro rascunho pode criar a barra sem que o controle perca o foco.
-    verificarFoco();
-    const observador = new ResizeObserver(verificarFoco);
-    observador.observe(barra);
-    return () => observador.disconnect();
+    atualizarRodape();
+    const observador = new ResizeObserver(atualizarRodape);
+    observador.observe(barra, { box: "border-box" });
+    return () => {
+      observador.disconnect();
+      document.body.style.removeProperty(alturaRodape);
+    };
   }, [alterado]);
 
   function focarCategoriaSemRascunho() {

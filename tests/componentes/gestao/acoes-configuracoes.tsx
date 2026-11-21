@@ -7,6 +7,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { ptBR } from "@mui/x-date-pickers/locales";
 import "dayjs/locale/pt-br";
 import AbaConfiguracoes from "../../../src/components/gestao/abas/aba-configuracoes";
+import { ProvedorAvisos } from "../../../src/components/ui/mui/avisos";
 import { CONFIGURACOES_PADRAO, type Turma } from "../../../src/domain/frequencia";
 import { tema } from "../../../src/theme/tema";
 
@@ -45,6 +46,7 @@ createRoot(root).render(
           onHorariosMudaram={() => {}}
         />
       </main>
+      <ProvedorAvisos />
     </LocalizationProvider>
   </ThemeProvider>,
 );
