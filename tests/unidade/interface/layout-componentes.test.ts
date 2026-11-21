@@ -106,11 +106,16 @@ describe("estrutura de página", () => {
 
   it("aplica padding responsivo de 16, 24 e 32", () => {
     const html = renderizar(criar(LayoutConteudo, {}, "Conteúdo"));
-    expect(html).toContain("padding:calc(2 * var(--template-spacing))");
-    expect(html).toContain("@media (min-width:600px)");
-    expect(html).toContain("padding:calc(3 * var(--template-spacing))");
-    expect(html).toContain("@media (min-width:1240px)");
-    expect(html).toContain("padding:calc(4 * var(--template-spacing))");
+    for (const [largura, passo] of [
+      [0, 2],
+      [600, 3],
+      [1240, 4],
+    ]) {
+      const bloco = html.split(`@media (min-width:${largura}px)`)[1]?.split("}}")[0];
+      for (const lado of ["left", "right", "top", "bottom"]) {
+        expect(bloco).toContain(`padding-${lado}:calc(${passo} * var(--template-spacing))`);
+      }
+    }
   });
 });
 
