@@ -201,7 +201,25 @@ describe("abas", () => {
     expect(html).toContain("Painel de resumo");
     expect(html).not.toContain("Painel de histórico");
     expect(html).toContain('data-pager="relatorios"');
-    expect(html).toContain("MuiTabs-scrollableX");
+    expect(html).toContain("MuiButtonBase-root");
+  });
+
+  it("expõe o nome completo quando o rótulo curto aparece no celular", () => {
+    const html = renderizarAbas({
+      itens: [
+        {
+          valor: "resumo",
+          rotulo: "Saídas e Entradas",
+          rotuloCurto: "Mov.",
+          conteudo: "Painel de movimentações",
+        },
+      ],
+      ativo: "resumo",
+      onChange: () => {},
+      rotuloAcessivel: "Seções do relatório",
+    });
+    expect(html).toContain('aria-label="Saídas e Entradas"');
+    expect(html).toContain("Mov.");
   });
 
   it("liga cada aba ao seu painel e usa o painel visitado como foco", () => {
@@ -227,7 +245,7 @@ describe("abas", () => {
       rotuloAcessivel: "Seções",
     });
     expect(html).not.toContain("data-pager");
-    expect(html).toContain("MuiTabs-scrollableX");
+    expect(html).toContain("MuiButtonBase-root");
   });
 
   it("preserva painéis visitados e os marca como inertes fora de foco", () => {

@@ -174,6 +174,7 @@ export default function VistaRelatorios({
     {
       valor: "movimentacoes",
       rotulo: "Saídas e Entradas",
+      rotuloCurto: "Mov.",
       icone: <SwapHorizRoundedIcon />,
       conteudo: (
         <ProvedorVisibilidadeGraficos visivel={aba === "movimentacoes"}>

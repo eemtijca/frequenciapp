@@ -78,17 +78,6 @@ const ESTILO_TITULO_OCULTO = {
   border: 0,
 } as const;
 
-const ROTULO_CONFIGURACOES = (
-  <>
-    <Box component="span" aria-hidden="true" sx={{ display: { xs: "inline", sm: "none" } }}>
-      Config.
-    </Box>
-    <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-      Configurações
-    </Box>
-  </>
-);
-
 export default function VistaGestao({
   abaInicial = "series",
   planilhaInicial,
@@ -199,7 +188,8 @@ export default function VistaGestao({
     },
     {
       valor: "configuracoes",
-      rotulo: ROTULO_CONFIGURACOES,
+      rotulo: "Configurações",
+      rotuloCurto: "Config.",
       icone: <SettingsRoundedIcon fontSize="small" aria-hidden="true" />,
       conteudo: (
         <AbaConfiguracoes

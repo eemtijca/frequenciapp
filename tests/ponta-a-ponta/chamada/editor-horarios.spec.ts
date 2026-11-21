@@ -3,6 +3,8 @@ import { expect, test, type Locator, type Page, type Request } from "@playwright
 import { comBanco } from "../helpers/banco";
 import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
+test.use({ serviceWorkers: "block" });
+
 const serie = "E2E Editor Horários";
 const origem = `${serie} A`;
 const destino = `${serie} B`;
@@ -196,7 +198,7 @@ test("abre o diálogo da turma selecionada e conta apenas aulas ativas na Gestã
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
-  const turma = page.getByRole("listitem").filter({ has: page.getByText(origem, { exact: true }) });
+  const turma = page.getByRole("row").filter({ has: page.getByText(origem, { exact: true }) });
   await expect(turma.getByText("2 aulas", { exact: true })).toBeVisible();
   await expect(turma.getByText("3 aulas", { exact: true })).toHaveCount(0);
   await turma.getByRole("button", { name: `Horários de ${origem}`, exact: true }).click();
@@ -408,9 +410,9 @@ test("a cópia exige confirmação e preserva dias, disciplinas e aulas desativa
   await expect(confirmacao).toBeVisible();
   expect(gravacoes).toHaveLength(0);
   await confirmacao.getByRole("button", { name: "Cancelar", exact: true }).click();
-  await expect(
-    dialogo.getByRole("combobox", { name: "Turma de origem", exact: true }),
-  ).toContainText(origem);
+  await expect(dialogo.getByRole("combobox", { name: "Turma de origem", exact: true })).toHaveValue(
+    origem,
+  );
   expect(await aulasDaTurma("B")).toEqual([]);
   await info.attach("editor-horarios-copia-previa", {
     body: await page.screenshot({ animations: "disabled" }),
@@ -459,9 +461,9 @@ test("um conflito de ordem recusa a grade inteira e mantém as duas turmas", asy
     }),
   ).toBeVisible();
   await expect(dialogo.getByRole("button", { name: "Copiar grade", exact: true })).toBeEnabled();
-  await expect(
-    dialogo.getByRole("combobox", { name: "Turma de origem", exact: true }),
-  ).toContainText(origem);
+  await expect(dialogo.getByRole("combobox", { name: "Turma de origem", exact: true })).toHaveValue(
+    origem,
+  );
   expect(await aulasDaTurma("C")).toEqual(antesDestino);
   expect(await aulasDaTurma("A")).toEqual(antesOrigem);
   await expect(dialogo.getByRole("button", { name: "Editar aula 1", exact: true })).toHaveCount(0);
@@ -550,7 +552,7 @@ test.describe("recuperação de falha de transporte", () => {
     ).toBeVisible();
     await expect(
       dialogo.getByRole("combobox", { name: "Turma de origem", exact: true }),
-    ).toContainText(origem);
+    ).toHaveValue(origem);
     expect(await aulasDaTurma("B")).toEqual([]);
     expect(gravacoes).toHaveLength(1);
     await page.unroute("**/api/horarios/copiar");
