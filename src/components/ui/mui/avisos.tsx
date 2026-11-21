@@ -9,6 +9,7 @@ import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Snackbar from "@mui/material/Snackbar";
 import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 export type SeveridadeAviso = "success" | "info" | "error";
@@ -170,7 +171,11 @@ export function AvisoAlerta({ aviso, aoFechar }: { aviso: Aviso; aoFechar: () =>
       }
     >
       <AlertTitle>{aviso.titulo}</AlertTitle>
-      {aviso.descricao}
+      {aviso.descricao ? (
+        <Typography component="p" variant="body2">
+          {aviso.descricao}
+        </Typography>
+      ) : null}
     </Alert>
   );
 }
