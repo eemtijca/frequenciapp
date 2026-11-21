@@ -76,15 +76,20 @@ for (const [nome, largura, altura] of [
     if (largura >= 1440) {
       const contexto = chamada.locator('[data-coluna="painel"]');
       const painel = await contexto.boundingBox();
-      const situacao = await chamada
-        .getByRole("region", { name: "Situação da chamada" })
-        .boundingBox();
+      const fimDosControles = await contexto.evaluate((elemento) =>
+        Math.max(
+          ...Array.from(elemento.children)
+            .filter((filho) => filho.tagName !== "FOOTER" && filho.getClientRects().length > 0)
+            .map((filho) => filho.getBoundingClientRect().bottom),
+        ),
+      );
       const alunos = await lista.boundingBox();
-      if (!painel || !situacao || !alunos) throw new Error("O contexto da Chamada não apareceu.");
+      if (!painel || !alunos) throw new Error("O contexto da Chamada não apareceu.");
+      expect(Number.isFinite(fimDosControles)).toBe(true);
       expect(caixaInicial.x).toBeGreaterThan(alunos.x + alunos.width);
       expect(Math.abs(caixaInicial.x - painel.x)).toBeLessThan(2);
       expect(Math.abs(caixaInicial.width - painel.width)).toBeLessThan(2);
-      expect(caixaInicial.y).toBeGreaterThanOrEqual(situacao.y + situacao.height + 7);
+      expect(caixaInicial.y - fimDosControles).toBeCloseTo(8, 0);
       expect(sexta.y + sexta.height).toBeLessThanOrEqual(altura);
     } else {
       expect(sexta.y + sexta.height).toBeLessThanOrEqual(caixaInicial.y);
@@ -98,6 +103,22 @@ for (const [nome, largura, altura] of [
     await expect(aluno).toHaveAttribute("aria-pressed", "true");
     const descartar = barra.getByRole("button", { name: "Descartar" });
     await expect(descartar).toBeVisible();
+
+    if (largura === 1440) {
+      const lateral = chamada.locator('[data-coluna="painel"] > footer');
+      await salvar.focus();
+      await page.setViewportSize({ width: 1439, height: altura });
+      await expect(lateral).toHaveCount(0);
+      await expect(salvar).toBeFocused();
+      await page.keyboard.press("Enter");
+      const revisao = page.getByRole("alertdialog", { name: "Salvar chamada?", exact: true });
+      await expect(revisao).toBeVisible();
+      await page.setViewportSize({ width: largura, height: altura });
+      await expect(chamada.locator('[data-coluna="painel"] > footer')).toHaveCount(1);
+      await revisao.getByRole("button", { name: "Continuar revisando" }).click();
+      await expect(salvar).toBeFocused();
+      await expect(aluno).toHaveAttribute("aria-pressed", "true");
+    }
 
     const ultima = linhas.last();
     const ultimoAluno = ultima.getByRole("button", { name: /presença|presente/i });

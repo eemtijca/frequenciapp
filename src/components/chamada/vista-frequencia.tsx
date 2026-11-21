@@ -269,6 +269,9 @@ export default function VistaFrequencia({
   const gradeDiariaRef = useRef<HTMLDivElement>(null);
   const colunaAlunosRef = useRef<HTMLDivElement>(null);
   const barraSalvamentoRef = useRef<HTMLElement>(null);
+  const focoDaBarraRef = useRef<string | null>(null);
+  const gatilhoDaRevisaoRef = useRef<HTMLButtonElement | null>(null);
+  const gatilhoDoDescarteRef = useRef<HTMLButtonElement | null>(null);
   const [revisaoSalva, setRevisaoSalva] = useState(0);
   const [edicaoLiberada, setEdicaoLiberada] = useState(false);
   // Lista gravada da chamada; nula enquanto o dia não foi salvo.
@@ -303,6 +306,39 @@ export default function VistaFrequencia({
   const [erroHistorico, setErroHistorico] = useState("");
   const semMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
   const painelLateral = useMediaQuery((tema: Theme) => tema.breakpoints.up("xl"));
+
+  const restaurarFocoDaBarra = useCallback((acao: string | null | undefined) => {
+    if (acao !== "salvar" && acao !== "descartar") return;
+    requestAnimationFrame(() => {
+      if (document.activeElement !== document.body) return;
+      barraSalvamentoRef.current
+        ?.querySelector<HTMLButtonElement>(`button[data-acao-barra="${acao}"]:not(:disabled)`)
+        ?.focus({ preventScroll: true });
+    });
+  }, []);
+
+  const registrarBarraSalvamento = useCallback(
+    (barra: HTMLElement | null) => {
+      if (!barra) {
+        const foco = document.activeElement;
+        focoDaBarraRef.current =
+          foco instanceof HTMLButtonElement && barraSalvamentoRef.current?.contains(foco)
+            ? (foco.dataset.acaoBarra ?? null)
+            : null;
+      }
+      barraSalvamentoRef.current = barra;
+      if (barra) {
+        restaurarFocoDaBarra(focoDaBarraRef.current);
+        focoDaBarraRef.current = null;
+      }
+    },
+    [restaurarFocoDaBarra],
+  );
+
+  function restaurarGatilhoSeMoveu(gatilho: HTMLButtonElement | null) {
+    // No mesmo layout, o diálogo do MUI já devolve o foco ao botão original.
+    if (gatilho && !gatilho.isConnected) restaurarFocoDaBarra(gatilho.dataset.acaoBarra);
+  }
 
   useEffect(() => {
     if (!ativo || nav.resumo || !temTurmas) return;
@@ -1158,7 +1194,7 @@ export default function VistaFrequencia({
   };
 
   const barraSalvamento = nav.resumo ? null : (
-    <BarraSalvamento ref={barraSalvamentoRef}>
+    <BarraSalvamento ref={registrarBarraSalvamento}>
       <Typography
         component="p"
         aria-live="polite"
@@ -1181,7 +1217,11 @@ export default function VistaFrequencia({
           variante="texto"
           icone={<RestartAltRoundedIcon fontSize="small" />}
           disabled={salvando}
-          onClick={() => setDescartarAberto(true)}
+          data-acao-barra="descartar"
+          onClick={(evento) => {
+            gatilhoDoDescarteRef.current = evento.currentTarget;
+            setDescartarAberto(true);
+          }}
           sx={{
             flexShrink: 0,
             width: TOKENS_LAYOUT.alvoToque,
@@ -1192,7 +1232,11 @@ export default function VistaFrequencia({
       <Botao
         variante="principal"
         tamanho="pequeno"
-        onClick={() => setConfirmarSalvamento(true)}
+        data-acao-barra="salvar"
+        onClick={(evento) => {
+          gatilhoDaRevisaoRef.current = evento.currentTarget;
+          setConfirmarSalvamento(true);
+        }}
         disabled={!podeSalvar}
         carregando={salvando}
         icone={
@@ -2346,7 +2390,10 @@ export default function VistaFrequencia({
           setConfirmarSalvamento(false);
           void salvar();
         }}
-        onCancelar={() => setConfirmarSalvamento(false)}
+        onCancelar={() => {
+          setConfirmarSalvamento(false);
+          restaurarGatilhoSeMoveu(gatilhoDaRevisaoRef.current);
+        }}
         rotuloConfirmar="Salvar chamada"
         rotuloCancelar="Continuar revisando"
         operacaoEmAndamento={salvando}
@@ -2360,7 +2407,10 @@ export default function VistaFrequencia({
           setDescartarAberto(false);
           descartar();
         }}
-        onCancelar={() => setDescartarAberto(false)}
+        onCancelar={() => {
+          setDescartarAberto(false);
+          restaurarGatilhoSeMoveu(gatilhoDoDescarteRef.current);
+        }}
         rotuloConfirmar="Descartar"
         rotuloCancelar="Continuar marcando"
         destrutivo
