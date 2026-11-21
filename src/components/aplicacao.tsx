@@ -69,7 +69,12 @@ import { BotaoAtualizar } from "@/components/ui/mui/botao-atualizar";
 import { BotaoIcone } from "@/components/ui/mui/botao";
 import { Logotipo } from "@/components/ui/mui/logotipo";
 import { SeletorTema } from "@/components/ui/mui/seletor-tema";
-import { LayoutConteudo, type LarguraConteudo } from "@/components/layout/layout-conteudo";
+import {
+  ESPACAMENTO_LATERAL_CONTEUDO,
+  LARGURAS_CONTEUDO,
+  LayoutConteudo,
+  type LarguraConteudo,
+} from "@/components/layout/layout-conteudo";
 import VistaFrequencia from "@/components/chamada/vista-frequencia";
 import VistaChamadaParcial from "@/components/chamada-parcial/vista-frequencia-parcial";
 import VistaHorarios from "@/components/horarios/vista-horarios";
@@ -115,6 +120,7 @@ interface Props {
 }
 
 const CHAVE_AVISO_ENTRADA = "frequenciapp:aviso-entrada";
+const TELA_ESTREITA = "@media (max-width:359px)";
 const VISOES: Visao[] = [
   "painel",
   "chamada",
@@ -207,13 +213,16 @@ function ItemNavegacao({ item, ativo, pendente, onTrocar }: ItemNavegacaoProps) 
         aria-current={ativo ? "page" : undefined}
         selected={ativo}
         onClick={() => onTrocar(item.visao)}
-        sx={{
+        sx={(theme) => ({
           minHeight: TOKENS_LAYOUT.navegacao,
           px: 1.5,
           gap: 1.25,
-          borderRadius: 2,
+          borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
           color: ativo ? "text.primary" : "text.secondary",
-        }}
+          "&.Mui-selected, &.Mui-selected:hover": {
+            bgcolor: `color-mix(in srgb, ${theme.vars.palette.primary.main} 14%, transparent)`,
+          },
+        })}
       >
         <ListItemIcon sx={{ minWidth: 0, color: "inherit" }}>
           <Icone fontSize="small" sx={{ fontSize: 20 }} />
@@ -1032,7 +1041,7 @@ export default function Aplicacao({
           >
             FrequenciApp
           </Typography>
-          {movel ? (
+          {movel && (
             <IconButton
               aria-label="Fechar menu"
               onClick={() => fecharMenu?.()}
@@ -1040,8 +1049,6 @@ export default function Aplicacao({
             >
               <CloseRoundedIcon />
             </IconButton>
-          ) : (
-            <BotaoAtualizar variante="texto" />
           )}
         </Toolbar>
         <Divider />
@@ -1098,6 +1105,21 @@ export default function Aplicacao({
           </Box>
           <Divider sx={{ mt: "auto" }} />
           <Box sx={{ pt: 1 }}>
+            {movel && (
+              <Box
+                sx={{
+                  display: "none",
+                  alignItems: "center",
+                  px: 0.5,
+                  [TELA_ESTREITA]: { display: "flex" },
+                }}
+              >
+                <BotaoAtualizar variante="texto" />
+                <Typography variant="body2" aria-hidden="true">
+                  Atualizar tela
+                </Typography>
+              </Box>
+            )}
             <MenuConta
               usuario={usuario}
               movel={movel}
@@ -1188,13 +1210,22 @@ export default function Aplicacao({
                 xs: "100%",
                 md: `calc(100% - ${TOKENS_LAYOUT.gaveta}px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px))`,
               },
-              ml: { md: `calc(${TOKENS_LAYOUT.gaveta}px + env(safe-area-inset-left, 0px))` },
               paddingTop: "env(safe-area-inset-top, 0px)",
               paddingLeft: { xs: "env(safe-area-inset-left, 0px)", md: 0 },
               paddingRight: "env(safe-area-inset-right, 0px)",
             }}
           >
-            <Toolbar sx={{ gap: { xs: 1, sm: 1.5 } }}>
+            <Toolbar
+              disableGutters
+              sx={{
+                boxSizing: "border-box",
+                width: "100%",
+                maxWidth: { md: LARGURAS_CONTEUDO[larguraDaVisao(visao)] },
+                px: { ...ESPACAMENTO_LATERAL_CONTEUDO, xs: 1 },
+                mx: "auto",
+                gap: { xs: 0.5, sm: 1.5 },
+              }}
+            >
               <Box sx={{ display: { xs: "flex", md: "none" }, flexShrink: 0 }}>
                 <MenuMovel
                   raizRef={raizRef}
@@ -1213,7 +1244,7 @@ export default function Aplicacao({
                     display: { xs: "block", md: "none" },
                     minWidth: 0,
                     flex: 1,
-                    fontSize: 18,
+                    fontSize: { xs: 16, sm: 18 },
                     fontWeight: 600,
                     letterSpacing: "-0.02em",
                   }}
@@ -1229,7 +1260,9 @@ export default function Aplicacao({
                   {tituloAtual}
                 </Typography>
               </Box>
-              <Box sx={{ display: { xs: "inline-flex", md: "none" }, flexShrink: 0 }}>
+              <Box
+                sx={{ display: "inline-flex", flexShrink: 0, [TELA_ESTREITA]: { display: "none" } }}
+              >
                 <BotaoAtualizar variante="texto" />
               </Box>
               <SeletorTema />
@@ -1256,7 +1289,6 @@ export default function Aplicacao({
               display: "flex",
               flexDirection: "column",
               flex: 1,
-              ml: { md: `${TOKENS_LAYOUT.gaveta}px` },
               boxSizing: "border-box",
               minWidth: 0,
               minHeight: 0,

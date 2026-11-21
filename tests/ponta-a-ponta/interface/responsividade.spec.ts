@@ -6,7 +6,7 @@ import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagi
 
 test.describe("responsividade", () => {
   test("no celular usa o menu lateral e centraliza os formulários", async ({ page }, info) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 320, height: 844 });
     await page.goto("/");
     await aguardarHidratacao(page);
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toHaveCount(0);
@@ -19,17 +19,13 @@ test.describe("responsividade", () => {
     });
     const atualizar = cabecalho.getByRole("button", { name: "Atualizar tela", exact: true });
     const caixaAbrir = await abrir.boundingBox();
-    const caixaAtualizar = await atualizar.boundingBox();
     const caixaNotificacoes = await notificacoes.boundingBox();
     expect(caixaAbrir).not.toBeNull();
-    expect(caixaAtualizar).not.toBeNull();
     expect(caixaNotificacoes).not.toBeNull();
-    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(
-      caixaAtualizar?.x ?? 0,
-    );
-    expect((caixaAtualizar?.x ?? 0) + (caixaAtualizar?.width ?? 0)).toBeLessThanOrEqual(
-      caixaNotificacoes?.x ?? 0,
-    );
+    await expect(atualizar).toHaveCount(0);
+    const marca = cabecalho.getByText("FrequenciApp", { exact: true });
+    await expect(marca).toBeVisible();
+    expect(await marca.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
 
     const semEstouro = await cabecalho.evaluate(
       (elemento) => elemento.scrollWidth <= elemento.clientWidth + 1,
@@ -38,21 +34,27 @@ test.describe("responsividade", () => {
     const tema = cabecalho.getByRole("button", { name: /tema/i });
     const caixaTema = await tema.boundingBox();
     expect(caixaTema).not.toBeNull();
-    expect((caixaAtualizar?.x ?? 0) + (caixaAtualizar?.width ?? 0)).toBeLessThanOrEqual(
+    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(
       caixaTema?.x ?? 0,
     );
     expect((caixaTema?.x ?? 0) + (caixaTema?.width ?? 0)).toBeLessThanOrEqual(
       caixaNotificacoes?.x ?? 0,
     );
-    await expect(cabecalho.getByRole("button")).toHaveCount(4);
+    await expect(cabecalho.getByRole("button")).toHaveCount(3);
     await expect(page.locator("main").first().locator("+ nav")).toHaveCount(0);
-    await info.attach("conteudo-mobile-390", {
+    await info.attach("conteudo-mobile-320", {
       body: await page.screenshot({ animations: "disabled" }),
       contentType: "image/png",
     });
     const navegacao = await abrirNavegacao(page);
     await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toBeVisible();
-    await info.attach("menu-mobile-390", {
+    await expect(
+      page.getByRole("dialog", { name: "Menu do aplicativo" }).getByRole("button", {
+        name: "Atualizar tela",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await info.attach("menu-mobile-320", {
       body: await page.screenshot({ animations: "disabled" }),
       contentType: "image/png",
     });
@@ -81,6 +83,11 @@ test.describe("responsividade", () => {
       .evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1);
     expect(semEstouro).toBe(true);
     const asideCaixa = await page.locator("aside").boundingBox();
+    const conteudoCaixa = await page.getByRole("main").boundingBox();
+    expect(asideCaixa).not.toBeNull();
+    expect(conteudoCaixa).not.toBeNull();
+    const fimDaGaveta = (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0);
+    expect(Math.abs((conteudoCaixa?.x ?? 0) - fimDaGaveta)).toBeLessThanOrEqual(1);
     const sairCaixa = await page.getByRole("button", { name: /^Conta de / }).boundingBox();
     expect((sairCaixa?.x ?? 0) + (sairCaixa?.width ?? 0)).toBeLessThanOrEqual(
       (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0) + 1,

@@ -13,6 +13,8 @@ export const LARGURAS_CONTEUDO = {
   larga: TOKENS_LAYOUT.largura.excepcional,
 } as const satisfies Record<LarguraConteudo, number>;
 
+export const ESPACAMENTO_LATERAL_CONTEUDO = { xs: 2, sm: 3, lg: 4 } as const;
+
 interface LayoutConteudoProps {
   children: ReactNode;
   largura?: LarguraConteudo;
@@ -26,7 +28,8 @@ export function LayoutConteudo({ children, largura = "gestao" }: LayoutConteudoP
         width: "100%",
         maxWidth: LARGURAS_CONTEUDO[largura],
         mx: "auto",
-        p: { xs: 2, sm: 3, lg: 4 },
+        px: ESPACAMENTO_LATERAL_CONTEUDO,
+        py: ESPACAMENTO_LATERAL_CONTEUDO,
       }}
     >
       {children}
