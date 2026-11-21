@@ -28,6 +28,10 @@ interface DialogoProps {
   tamanho?: TamanhoDialogo;
   /** Força tela cheia no celular independentemente do tamanho. */
   telaCheiaNoCelular?: boolean;
+  /** Confirmações destrutivas usam alertdialog; formulários usam dialog. */
+  papel?: "dialog" | "alertdialog";
+  /** Bloqueia o fechar enquanto uma gravação está em andamento. */
+  fecharDesabilitado?: boolean;
 }
 
 export function Dialogo({
@@ -40,6 +44,8 @@ export function Dialogo({
   alerta,
   tamanho = "medio",
   telaCheiaNoCelular,
+  papel = "dialog",
+  fecharDesabilitado = false,
 }: DialogoProps) {
   const tituloId = useId();
   const descricaoId = useId();
@@ -56,7 +62,7 @@ export function Dialogo({
       fullScreen={telaCheia}
       maxWidth="sm"
       scroll="paper"
-      role="dialog"
+      role={papel}
       aria-labelledby={tituloId}
       aria-describedby={descricao ? descricaoId : undefined}
       disableEnforceFocus={false}
@@ -83,6 +89,7 @@ export function Dialogo({
         </DialogTitle>
         <IconButton
           aria-label="Fechar"
+          disabled={fecharDesabilitado}
           onClick={onFechar}
           sx={{
             position: "absolute",

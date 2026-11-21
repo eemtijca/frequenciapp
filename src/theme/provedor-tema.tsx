@@ -2,7 +2,7 @@
 
 // Provedor do tema Material UI: cache do Emotion com camada e nonce, tema claro
 // e escuro, estilos globais, localização pt-BR e cor da barra do navegador.
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
 import CssBaseline from "@mui/material/CssBaseline";
 import GlobalStyles from "@mui/material/GlobalStyles";
@@ -76,6 +76,10 @@ const estilosGlobais = (temaAtual: Theme) => ({
       outline: "3px solid Highlight",
       outlineOffset: 2,
     },
+    'html[data-foco-teclado="true"] :focus-visible': {
+      outline: "3px solid Highlight",
+      outlineOffset: 2,
+    },
     ".MuiOutlinedInput-notchedOutline": {
       borderColor: "CanvasText",
     },
@@ -97,6 +101,24 @@ const estilosGlobais = (temaAtual: Theme) => ({
 });
 
 export function ProvedorTema({ children, nonce }: { children: ReactNode; nonce?: string }) {
+  // Cores forçadas: o anel global perde para o outline zerado dos campos do MUI.
+  // A modalidade de teclado restaura o foco visível sem contornar o autofoco por toque.
+  useEffect(() => {
+    const raiz = document.documentElement;
+    const aoTeclar = (evento: KeyboardEvent) => {
+      if (evento.key === "Tab") raiz.dataset.focoTeclado = "true";
+    };
+    const aoApontar = () => {
+      delete raiz.dataset.focoTeclado;
+    };
+    window.addEventListener("keydown", aoTeclar, true);
+    window.addEventListener("pointerdown", aoApontar, true);
+    return () => {
+      window.removeEventListener("keydown", aoTeclar, true);
+      window.removeEventListener("pointerdown", aoApontar, true);
+    };
+  }, []);
+
   return (
     <AppRouterCacheProvider options={{ nonce }}>
       <ThemeProvider

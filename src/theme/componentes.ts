@@ -40,6 +40,10 @@ const inputs: Components<Theme> = {
           outline: ANEL_FOCO(theme),
           outlineOffset: 2,
         },
+        "&[data-dia]:focus-visible": {
+          outline: ANEL_FOCO(theme),
+          outlineOffset: 2,
+        },
       }),
     },
   },
@@ -219,22 +223,13 @@ const inputs: Components<Theme> = {
         boxShadow: "none",
         borderRadius: theme.shape.borderRadius,
         color: theme.vars.palette.text.primary,
-        border: `1px solid ${cinza[200]}`,
-        backgroundColor: alpha(cinza[50], 0.3),
+        border: "1px solid transparent",
+        backgroundColor: "transparent",
         "&:hover": {
-          backgroundColor: cinza[100],
-          borderColor: cinza[300],
+          backgroundColor: theme.vars.palette.action.hover,
+          borderColor: "transparent",
         },
-        "&:active": { backgroundColor: cinza[200] },
-        ...theme.applyStyles("dark", {
-          backgroundColor: cinza[800],
-          borderColor: cinza[700],
-          "&:hover": {
-            backgroundColor: cinza[900],
-            borderColor: cinza[600],
-          },
-          "&:active": { backgroundColor: cinza[900] },
-        }),
+        "&:active": { backgroundColor: theme.vars.palette.action.selected },
         variants: [
           {
             props: { size: "small" },
@@ -250,6 +245,8 @@ const inputs: Components<Theme> = {
             style: {
               width: TOKENS_LAYOUT.botao.medio,
               height: TOKENS_LAYOUT.botao.medio,
+              minWidth: 44,
+              minHeight: 44,
             },
           },
         ],
@@ -765,6 +762,10 @@ const feedback: Components<Theme> = {
         borderRadius: TOKENS_LAYOUT.dialogo.raio,
         border: `1px solid ${theme.vars.palette.divider}`,
         backgroundImage: "none",
+        "&:focus-visible": {
+          outline: ANEL_FOCO(theme),
+          outlineOffset: 2,
+        },
       }),
     },
   },
@@ -822,6 +823,7 @@ const navigation: Components<Theme> = {
     styleOverrides: {
       root: ({ theme }) => ({
         minHeight: TOKENS_LAYOUT.botao.medio,
+        "@media (min-width: 600px)": { minHeight: TOKENS_LAYOUT.alvoToque },
         borderRadius: theme.shape.borderRadius,
         padding: "6px 8px",
         [`&.${menuItemClasses.focusVisible}`]: { backgroundColor: "transparent" },

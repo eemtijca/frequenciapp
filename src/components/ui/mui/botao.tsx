@@ -173,7 +173,20 @@ function estilosIcone(theme: Theme, variante: VarianteBotao) {
       };
     case "contorno":
     default:
-      return {};
+      return {
+        "&.MuiIconButton-root": {
+          backgroundColor: palette.background.paper,
+          borderColor: palette.grey[300],
+          "&:hover": {
+            backgroundColor: palette.action.hover,
+            borderColor: palette.grey[400],
+          },
+          ...theme.applyStyles("dark", {
+            borderColor: palette.grey[700],
+            "&:hover": { borderColor: palette.grey[600] },
+          }),
+        },
+      };
   }
 }
 

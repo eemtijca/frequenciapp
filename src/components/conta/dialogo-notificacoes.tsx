@@ -269,21 +269,31 @@ export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }:
         },
       }}
     >
-      <DialogTitle
-        id={tituloId}
-        sx={{ display: "flex", alignItems: "flex-start", gap: 2, padding, paddingBottom: 0 }}
-      >
-        <Box component="span" sx={{ flex: 1, minWidth: 0 }}>
+      <Box sx={{ position: "relative" }}>
+        <DialogTitle
+          id={tituloId}
+          sx={{
+            padding,
+            paddingBottom: 0,
+            paddingRight: `calc(${padding} + ${TOKENS_LAYOUT.alvoToque}px)`,
+          }}
+        >
           Notificações
-        </Box>
+        </DialogTitle>
         <IconButton
           aria-label="Fechar"
           onClick={fechar}
-          sx={{ flexShrink: 0, width: TOKENS_LAYOUT.alvoToque, height: TOKENS_LAYOUT.alvoToque }}
+          sx={{
+            position: "absolute",
+            top: padding,
+            right: padding,
+            width: TOKENS_LAYOUT.alvoToque,
+            height: TOKENS_LAYOUT.alvoToque,
+          }}
         >
           <CloseRoundedIcon />
         </IconButton>
-      </DialogTitle>
+      </Box>
       <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, padding }}>
         <DialogContentText id={descricaoId} sx={VISUALMENTE_OCULTO}>
           Escolher os avisos da conta e ativar o recebimento neste dispositivo.

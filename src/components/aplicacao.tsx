@@ -1022,7 +1022,9 @@ export default function Aplicacao({
         }}
       >
         <Toolbar sx={{ flexShrink: 0, gap: 1.5, px: { xs: 2, md: 2.5 } }}>
-          <Logotipo tamanho={26} alt="" />
+          <Box sx={{ display: "flex", alignItems: "center", ml: movel ? 0 : "7px" }}>
+            <Logotipo tamanho={26} alt="" />
+          </Box>
           <Typography
             variant="subtitle1"
             noWrap
@@ -1157,10 +1159,10 @@ export default function Aplicacao({
           <Drawer
             variant="permanent"
             open
-            slots={{ docked: "aside" }}
-            aria-label="Navegação do aplicativo"
             slotProps={{
               paper: {
+                component: "aside",
+                "aria-label": "Navegação do aplicativo",
                 sx: {
                   display: { xs: "none", md: "flex" },
                   visibility: { xs: "hidden", md: "visible" },

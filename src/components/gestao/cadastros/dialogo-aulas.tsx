@@ -419,6 +419,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
       }}
       titulo={`Horários de ${turma?.rotulo ?? "turma"}`}
       tamanho="grande"
+      fecharDesabilitado={ocupado}
     >
       <Stack spacing={2} sx={{ minWidth: 0 }}>
         {aulas.length === 0 ? (

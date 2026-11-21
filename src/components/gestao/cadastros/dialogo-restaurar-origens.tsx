@@ -120,6 +120,7 @@ export default function DialogoRestaurarOrigens({
           if (!executando) setAberto(false);
         }}
         titulo="Restaurar as turmas de origem?"
+        papel="alertdialog"
         descricao="Os alunos remanejados dentro da série, ativos e inativos, voltam para a turma de origem. Quem mudou de série não é alterado."
         tamanho="grande"
         acoes={

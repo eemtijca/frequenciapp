@@ -35,7 +35,7 @@ export interface EntradaAviso {
 }
 
 export const DURACOES_AVISO = {
-  success: 5000,
+  success: 8000,
   info: 6000,
   error: 8000,
 } as const satisfies Record<SeveridadeAviso, number>;
@@ -43,7 +43,7 @@ export const DURACOES_AVISO = {
 export const LIMITE_AVISOS = 3;
 
 const DESLOCAMENTO_CELULAR = 84;
-const DESLOCAMENTO_DESKTOP = 24;
+const DESLOCAMENTO_DESKTOP = 96;
 
 const ALVO_TOQUE = {
   position: "relative",

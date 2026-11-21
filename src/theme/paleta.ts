@@ -187,7 +187,7 @@ export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
       grey: {
         ...cinza,
       },
-      divider: "hsla(220, 20%, 80%, 0.4)",
+      divider: "hsla(220, 20%, 80%, 0.6)",
       background: {
         default: "hsl(0, 0%, 99%)",
         paper: cinza[50],
