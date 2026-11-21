@@ -99,14 +99,14 @@ describe("Campo e CampoTexto", () => {
     expect(html).toContain('aria-invalid="true"');
   });
 
-  it("renderiza o campo controlado com 56 dp, raio 8 e foco de 3 px", () => {
+  it("renderiza o campo controlado com 56 dp, raio 12 e contorno de foco", () => {
     expect(html).toContain("MuiOutlinedInput-root");
     expect(html).toContain('value="ana@escola.exemplo"');
     expect(html).toContain('type="email"');
     expect(html).toContain('disabled=""');
     expect(html).toContain("min-height:56px");
-    expect(html).toContain("border-radius:8px");
-    expect(html).toContain("0 0 0 3px");
+    expect(html).toContain("border-radius:12px");
+    expect(html).toContain("outline:3px solid");
   });
 
   it("aceita o tamanho pequeno de 40 dp", () => {
@@ -443,10 +443,8 @@ describe("guardrails da Fase 2.3", () => {
   });
 
   it("usa os tokens de layout nos tamanhos e alvos de toque", () => {
-    expect(TOKENS_LAYOUT.campo).toEqual({ medio: 56, pequeno: 40, raio: 8, foco: 3 });
+    expect(TOKENS_LAYOUT.campo).toEqual({ medio: 56, pequeno: 40, raio: 12, foco: 3 });
     expect(fonte("text-field.tsx")).toContain("TOKENS_LAYOUT.campo.medio");
     expect(fonte("text-field.tsx")).toContain("TOKENS_LAYOUT.campo.pequeno");
-    expect(fonte("text-field.tsx")).toContain("TOKENS_LAYOUT.campo.raio");
-    expect(fonte("text-field.tsx")).toContain("TOKENS_LAYOUT.campo.foco");
   });
 });

@@ -183,6 +183,10 @@ for (const tema of ["light", "dark"] as const) {
           "inválido: aria-invalid",
         ).toBe("true");
         expect(invalido.borda, "inválido: borda distinta").not.toEqual(normal.borda);
+        expect(
+          contraste(invalido.borda, invalido.preenchimento),
+          "inválido: contraste da borda",
+        ).toBeGreaterThanOrEqual(3);
 
         const foco = await medirFoco(page, `Texto ${superficie}`);
         expect(foco.ativo).toBe(true);

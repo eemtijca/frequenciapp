@@ -271,12 +271,13 @@ const inputs: Components<Theme> = {
         minHeight: TOKENS_LAYOUT.campo.medio,
         borderRadius: TOKENS_LAYOUT.campo.raio,
         backgroundColor: theme.vars.palette.background.paper,
-        transition: theme.transitions.create(["border-color", "box-shadow"], { duration: 120 }),
         [`& .${outlinedInputClasses.notchedOutline}`]: {
           borderColor: theme.vars.palette.bordaControle,
           borderRadius: TOKENS_LAYOUT.campo.raio,
         },
-        "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: cinza[600] },
+        "&:hover:not(.Mui-error, .Mui-focused, .Mui-disabled) .MuiOutlinedInput-notchedOutline": {
+          borderColor: cinza[600],
+        },
         [`&.${outlinedInputClasses.focused}`]: {
           outline: ANEL_FOCO(theme),
           outlineOffset: 2,
@@ -295,7 +296,12 @@ const inputs: Components<Theme> = {
           padding: "9px 12px",
         },
         ...theme.applyStyles("dark", {
-          "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: cinza[400] },
+          "&:hover:not(.Mui-error, .Mui-focused, .Mui-disabled) .MuiOutlinedInput-notchedOutline": {
+            borderColor: cinza[400],
+          },
+          [`&.${outlinedInputClasses.error} .${outlinedInputClasses.notchedOutline}`]: {
+            borderColor: theme.vars.palette.error.light,
+          },
         }),
         variants: [
           {

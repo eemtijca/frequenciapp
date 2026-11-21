@@ -79,17 +79,7 @@ export function CampoTexto({
           maxLength,
         },
       }}
-      sx={(tema) => ({
-        width: "100%",
-        minHeight: altura,
-        borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
-        "& .MuiOutlinedInput-notchedOutline": {
-          borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
-        },
-        "&.Mui-focused": {
-          boxShadow: `0 0 0 ${TOKENS_LAYOUT.campo.foco}px color-mix(in srgb, ${tema.vars.palette.primary.main} 24%, transparent)`,
-        },
-      })}
+      sx={{ width: "100%", minHeight: altura }}
     />
   );
 }
