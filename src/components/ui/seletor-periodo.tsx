@@ -762,7 +762,7 @@ export function SeletorPeriodo({
           rowGap: 0,
           px: 1.5,
           py: 0.5,
-          border: `1px solid ${paletaDoTema(theme).divider}`,
+          border: `1px solid ${paletaDoTema(theme).bordaControle}`,
           borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
           backgroundColor: "transparent",
           color: paletaDoTema(theme).text.primary,
@@ -774,7 +774,6 @@ export function SeletorPeriodo({
           }),
           "&:hover": {
             backgroundColor: paletaDoTema(theme).action.hover,
-            borderColor: paletaDoTema(theme).grey[400],
           },
           "&.Mui-focusVisible": {
             outline: `${TOKENS_LAYOUT.campo.foco}px solid ${paletaDoTema(theme).primary.main}`,

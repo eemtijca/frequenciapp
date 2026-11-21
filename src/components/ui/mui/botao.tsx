@@ -173,15 +173,10 @@ function estilosIcone(theme: Theme, variante: VarianteBotao) {
       return {
         "&.MuiIconButton-root": {
           backgroundColor: "transparent",
-          borderColor: palette.grey[300],
+          borderColor: palette.bordaControle,
           "&:hover": {
             backgroundColor: palette.action.hover,
-            borderColor: palette.grey[400],
           },
-          ...theme.applyStyles("dark", {
-            borderColor: palette.grey[700],
-            "&:hover": { borderColor: palette.grey[600] },
-          }),
         },
       };
   }
