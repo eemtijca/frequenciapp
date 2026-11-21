@@ -20,7 +20,7 @@ export function GradeCartoes({ children, spacing = 2, dupla = false }: GradeCart
   return (
     <Grid container spacing={spacing} columns={COLUNAS_GRADE}>
       {Children.map(children, (filho) => (
-        <Grid size={dupla ? { xs: 2, sm: 4, md: 6 } : TAMANHO_CARTAO}>{filho}</Grid>
+        <Grid size={dupla ? { xs: 4, sm: 8, md: 6 } : TAMANHO_CARTAO}>{filho}</Grid>
       ))}
     </Grid>
   );

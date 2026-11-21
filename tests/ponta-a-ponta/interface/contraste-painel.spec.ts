@@ -1,4 +1,4 @@
-// Verifica a visibilidade e o contraste dos controles de data do painel.
+// Verifica a disposição dos indicadores e o contraste dos controles do Painel.
 import { expect, test, type Locator } from "@playwright/test";
 import { contraste, type Rgb } from "../../helpers/cor";
 import { aguardarHidratacao } from "../helpers/pagina";
@@ -52,6 +52,37 @@ async function cores(elemento: Locator) {
 function rgb(cor: number[]): Rgb {
   return [(cor[0] ?? 0) / 255, (cor[1] ?? 0) / 255, (cor[2] ?? 0) / 255];
 }
+
+test("os indicadores do dia empilham no celular e ficam lado a lado no desktop", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  const periodo = page.getByRole("button", { name: /^(Dia do painel|Resumo da semana):/ });
+  await expect(periodo).toBeVisible();
+  if ((await periodo.getAttribute("aria-label"))?.startsWith("Resumo da semana")) {
+    await page.getByRole("button", { name: "Dia anterior", exact: true }).click();
+  }
+  const cartao = page.getByRole("region", { name: "Indicadores do dia", exact: true });
+  const infrequencia = cartao.getByRole("group", { name: "Resumo do dia", exact: true });
+  const cobertura = cartao.getByRole("group", { name: "Cobertura do dia", exact: true });
+  await expect(infrequencia).toBeVisible();
+  await expect(cobertura).toBeVisible();
+
+  for (const largura of [320, 390, 768, 904, 905, 1440]) {
+    await page.setViewportSize({ width: largura, height: 900 });
+    await expect
+      .poll(async () => {
+        const [a, b] = await Promise.all([infrequencia.boundingBox(), cobertura.boundingBox()]);
+        if (!a || !b || Math.abs(a.width - b.width) > 1) return "indefinido";
+        if (Math.abs(a.x - b.x) < 1 && b.y >= a.y + a.height) return "empilhados";
+        if (Math.abs(a.y - b.y) < 1 && b.x >= a.x + a.width) return "lado a lado";
+        return "indefinido";
+      })
+      .toBe(largura < 905 ? "empilhados" : "lado a lado");
+  }
+});
 
 test("as setas de data do painel têm fundo neutro transparente e contorno legível", async ({
   page,
