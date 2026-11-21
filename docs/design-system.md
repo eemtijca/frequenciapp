@@ -99,22 +99,22 @@ Regras:
 
 ### Papéis semânticos
 
-| Papel         | Cor                  | Uso                            |
-| ------------- | -------------------- | ------------------------------ |
-| `primary`     | verde institucional  | marca, seleção e foco          |
-| `secondary`   | verde institucional  | ação principal de cada tela    |
-| `falta`       | vermelho             | falta sem justificativa        |
-| `justificada` | azul próprio         | falta justificada e informação |
-| `alerta`      | âmbar                | atenção, limite e benefício    |
-| `success`     | verde do template    | confirmação e conclusão        |
-| `info`        | azul separado        | informação neutra              |
-| `warning`     | laranja do template  | aviso e atenção                |
-| `error`       | vermelho do template | erro e ação destrutiva         |
+| Papel         | Cor                  | Uso                                   |
+| ------------- | -------------------- | ------------------------------------- |
+| `primary`     | verde institucional  | marca, seleção e foco                 |
+| `secondary`   | verde institucional  | compatibilidade com ações já migradas |
+| `falta`       | vermelho             | falta sem justificativa               |
+| `justificada` | azul próprio         | falta justificada e informação        |
+| `alerta`      | âmbar                | atenção, limite e benefício           |
+| `success`     | verde do template    | confirmação e conclusão               |
+| `info`        | azul separado        | informação neutra                     |
+| `warning`     | laranja do template  | aviso e atenção                       |
+| `error`       | vermelho do template | erro e ação destrutiva                |
 
 Regras:
 
-- O tema claro usa fundo `hsl(0, 0%, 99%)`, papel `hsl(220, 35%, 97%)`, texto primário `gray.800` e secundário `gray.600`.
-- O tema escuro usa fundo `gray.900`, papel `hsl(220, 30%, 7%)`, texto primário branco e secundário `gray.400`.
+- O tema claro usa fundo `#f6f6f6`, papel branco e texto grafite. O escuro usa fundo `#141413`, papel `#1f1e1d` e texto claro.
+- `divider` separa superfícies e seções. `bordaControle` delimita campos: precisa de contraste suficiente mesmo em repouso.
 - `secondary` usa a mesma família verde, com contraste validado.
 - `justificada` e `info` usam azul próprio e nunca o verde da marca.
 - `success` usa a escala verde do template e precisa ser distinguível de `primary` em ambos os temas.
@@ -126,7 +126,7 @@ Regras:
 
 - Texto normal tem no mínimo 4,5:1.
 - Texto grande, componentes, bordas funcionais, ícones e foco têm no mínimo 3:1.
-- `brand.600` com branco fica em torno de 4,25:1. O botão verde do tema claro usa `brand.700` com texto `brand.50`. No tema escuro, o botão verde usa `brand.300` com texto escuro.
+- A ação principal usa o verde sólido `brand.700` com texto `brand.50` nos dois temas. O anel de foco é independente do preenchimento.
 - `success` é comparado com `primary`, não com um passo isolado da escala.
 - `justificada` é comparada com `primary` e com `falta` nos dois temas, inclusive sob simulação de daltonismo.
 - O anel de foco translúcido é validado em 3:1 contra o fundo adjacente.
@@ -134,17 +134,17 @@ Regras:
 
 ## Botões
 
-| Variante            | Aparência                         | Uso                                                     |
-| ------------------- | --------------------------------- | ------------------------------------------------------- |
-| `primary` contido   | grafite com gradiente do template | ação genérica, como Voltar, Fechar e ações de navegação |
-| `secondary` contido | verde institucional               | ação principal da tela, como Salvar e Confirmar         |
-| `error` contido     | vermelho semântico                | ação destrutiva, como Excluir e Descartar               |
-| `outlined`          | contorno e fundo do papel         | ação secundária                                         |
-| `text`              | sem fundo em repouso              | ação terciária                                          |
+| Variante MUI      | Aparência                  | Uso                                               |
+| ----------------- | -------------------------- | ------------------------------------------------- |
+| `primary` contido | verde institucional sólido | ação principal, como Entrar ou Salvar             |
+| `inherit` contido | fundo e contorno neutros   | ação de apoio que precisa de ênfase intermediária |
+| `error` contido   | vermelho semântico         | ação destrutiva, como Excluir                     |
+| `outlined`        | contorno e fundo do papel  | ação secundária                                   |
+| `text`            | sem fundo em repouso       | ação discreta, como Voltar ou Fechar              |
 
 Regras:
 
-- O token `primary` do tema continua verde. O grafite vem da customização do botão primário do template e não muda a cor de marca.
+- Nas primitivas compartilhadas, use `principal` ou `neutro` para explicitar a função. Os nomes `primario` e `secundario` mantêm a compatibilidade dos chamadores que ainda serão revisados.
 - Altura pequena de 36 px e altura média de 40 px.
 - O alvo de toque é de 48 dp, mesmo quando a caixa visual tem 36 dp.
 - O foco visível tem 3 px, com o primário translúcido e deslocamento de 2 px.
@@ -159,7 +159,7 @@ Regras:
 
 - `TextField` usa `variant="outlined"`.
 - Altura média de 56 px e pequena de 40 px.
-- Fundo do papel, borda de 1 px e raio de 8 px.
+- Fundo do papel, borda funcional de 1 px e raio de 12 px. Cartões usam raio de 16 px.
 - O rótulo fica acima do campo, com `FormLabel`. O placeholder é exemplo, não rótulo.
 - Texto de apoio e erro ficam abaixo, com `FormHelperText`.
 - O foco tem contorno de 3 px.
@@ -218,7 +218,7 @@ Regras:
 
 Regras:
 
-- A gaveta é permanente a partir de 905 px e modal abaixo disso.
+- A gaveta é permanente a partir de 905 px e modal abaixo disso. No desktop, ela reserva seus 256 px uma vez, ao lado do conteúdo.
 - A barra superior tem `Toolbar` com a altura da faixa.
 - O item ativo usa `aria-current="page"` e o destaque verde suave.
 - O menu móvel prende o foco, fecha com Escape e devolve o foco ao botão que o abriu.
@@ -408,7 +408,7 @@ Regras de composição:
 - `position: absolute` ou `fixed` fora de overlays, barras fixas e elementos previstos.
 - Margem, padding ou altura fora da grade de 8 dp.
 - Cor hexadecimal, `oklch` ou `rgb` fixa no componente.
-- Sombra em controles e gradiente fora dos botões definidos pelo template.
+- Sombra em controles e gradientes nos botões.
 - Posicionamento, largura ou animação própria de diálogo.
 - Recharts fora de `src/components/bi/**`.
 - Pacotes Data Grid Pro, Tree View Pro e Charts Pro.
