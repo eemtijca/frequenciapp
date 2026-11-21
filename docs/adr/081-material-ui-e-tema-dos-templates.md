@@ -48,7 +48,7 @@ O resultado era inconsistência visual entre telas, revisão mais difícil, cust
 - Cartões usam padding de 16 px e raio de 8 px. Não existe cartão dentro de cartão.
 - Campos médios têm 56 px e campos pequenos têm 40 px. Botões pequenos têm 36 px e botões médios têm 40 px.
 - Todo alvo de toque tem no mínimo 48 dp, mesmo quando a caixa visual é menor.
-- O espaçamento segue a grade de 8 dp, com valores permitidos de 4, 8, 16, 24, 32, 40 e 48 dp. `theme.spacing(1)` continua 8 px.
+- O espaçamento segue a grade de 8 dp, com valores de composição de 4, 8, 12, 16, 24, 32, 40 e 48 dp. `theme.spacing(1)` continua 8 px. Os 12 px separam blocos da interface sem mudar a densidade interna dos controles.
 - Toda tela usa `LayoutPagina` e `LayoutConteudo`. Cabeçalho, seções, cartões, formulários, tabelas e diálogos usam os componentes compartilhados de `src/components/layout/`.
 - Cores, espaçamentos e variantes vêm de `theme.vars`, `sx` e dos tokens de `src/theme/layout.ts`. Nenhuma tela define largura máxima própria, grid próprio, margem arbitrária ou `position: absolute` fora de overlays.
 - O foco visível usa contorno sólido de 3 px na cor primária, com deslocamento de 2 px.

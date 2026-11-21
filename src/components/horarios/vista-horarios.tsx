@@ -405,7 +405,12 @@ function TurnosDoDia({
       <Cartao
         component="section"
         aria-label={`Aulas de ${rotuloDia(dia)} · ${nome}`}
-        sx={{ mt: 2, padding: 0, overflow: "hidden" }}
+        sx={{
+          // Completa os 16 px já usados na grade diária; Abas fornece os primeiros 12 px.
+          mt: 0.5,
+          padding: 0,
+          overflow: "hidden",
+        }}
       >
         <Box sx={ESTILO_CABECALHO_CARTAO}>
           <Typography component="h2" variant="subtitle2">

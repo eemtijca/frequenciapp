@@ -1845,7 +1845,7 @@ export default function VistaFrequencia({
                           sx={{ color: "primary.main", flexShrink: 0 }}
                         />
                       )}
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Stack spacing={0.5} useFlexGap sx={{ minWidth: 0, flex: 1 }}>
                         <Typography component="h2" variant="subtitle2" sx={{ fontWeight: 600 }}>
                           {salvando ? "Salvando..." : tituloSituacao}
                         </Typography>
@@ -1856,7 +1856,7 @@ export default function VistaFrequencia({
                               : "Salve para confirmar."}
                           </Typography>
                         )}
-                      </Box>
+                      </Stack>
                       {chamadaNaoIniciada && (
                         <Botao
                           variante="texto"

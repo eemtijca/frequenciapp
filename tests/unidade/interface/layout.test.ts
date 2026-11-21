@@ -35,6 +35,6 @@ describe("tokens de layout", () => {
 
   it("fixa as alturas de lista e a grade de espaçamento", () => {
     expect(TOKENS_LAYOUT.lista).toEqual({ umaLinha: 48, duasLinhas: 64, tresLinhas: 72 });
-    expect(TOKENS_LAYOUT.espacamentos).toEqual([4, 8, 16, 24, 32, 40, 48]);
+    expect(TOKENS_LAYOUT.espacamentos).toEqual([4, 8, 12, 16, 24, 32, 40, 48]);
   });
 });

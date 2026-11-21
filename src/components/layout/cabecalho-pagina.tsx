@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 
 interface CabecalhoPaginaProps {
   titulo: string;
@@ -23,7 +24,7 @@ export function CabecalhoPagina({ titulo, descricao, acoes }: CabecalhoPaginaPro
         mb: { xs: 2, sm: 3 },
       }}
     >
-      <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+      <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
         <Typography component="h1" variant="h4">
           {titulo}
         </Typography>

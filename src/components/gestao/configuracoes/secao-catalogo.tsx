@@ -7,7 +7,7 @@ import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { Botao } from "@/components/ui/mui/botao";
-import { TOKENS_LAYOUT } from "@/theme/layout";
+import { ESPACO_COMPOSICAO, TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   id: string;
@@ -25,17 +25,18 @@ export default function SecaoCatalogo({ id, titulo, resumo, acao, editor, childr
     <Stack component="section" aria-labelledby={`${id}-titulo`} data-secao={id} spacing={2}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        spacing={1}
+        spacing={{ xs: ESPACO_COMPOSICAO.textoAcaoEmpilhada, sm: 1 }}
+        useFlexGap
         sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" } }}
       >
-        <Box sx={{ minWidth: 0 }}>
+        <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
           <Typography component="h3" id={`${id}-titulo`} variant="h6">
             {titulo}
           </Typography>
           <Typography variant="body2" color="text.secondary">
             {resumo}
           </Typography>
-        </Box>
+        </Stack>
         <Botao
           type="button"
           variante="contorno"

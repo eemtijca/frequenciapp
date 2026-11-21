@@ -16,6 +16,7 @@ import Divider from "@mui/material/Divider";
 import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -379,18 +380,18 @@ export function VistaResumoMovimentacoes({
           >
             <CalendarMonthRoundedIcon fontSize="small" aria-hidden="true" />
           </Box>
-          <Box sx={{ minWidth: 0 }}>
+          <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
             <Typography component="h2" variant="h6">
               {titulo}
             </Typography>
-            <Typography variant="body2" sx={{ mt: 0.5, color: "text.secondary" }}>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
               {de && ate ? `${rotuloDataCurta(de)} a ${rotuloDataCurta(ate)}` : ""}
               {domingo ? `, encerrada em ${rotuloData(domingo)}` : ""}
             </Typography>
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
               {titulo} de todas as turmas da área.
             </Typography>
-          </Box>
+          </Stack>
         </Stack>
         <Stack
           spacing={0.5}

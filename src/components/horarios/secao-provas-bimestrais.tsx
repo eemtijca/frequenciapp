@@ -47,7 +47,7 @@ import { CampoTexto } from "@/components/ui/mui/text-field";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { SeletorHorario } from "@/components/ui/mui/seletor-horario";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
-import { TOKENS_LAYOUT } from "@/theme/layout";
+import { ESPACO_COMPOSICAO, TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   turmas: Turma[];
@@ -322,14 +322,14 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente, rascunhoPen
           minWidth: 0,
         }}
       >
-        <Box>
+        <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap>
           <Typography id={`${base}-titulo`} component="h3" variant="h6">
             Nova prova
           </Typography>
           <Typography id={`${base}-descricao`} variant="body2" color="text.secondary">
             Adicionar prova grava o horário na hora, fora do rascunho de configurações.
           </Typography>
-        </Box>
+        </Stack>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, sm: 4 }}>
             <Campo id={`${base}-dia`} rotulo="Data">
@@ -458,10 +458,11 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente, rascunhoPen
       <Stack component="section" aria-labelledby={`${base}-cadastradas`} spacing={2}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
-          spacing={1}
+          spacing={{ xs: ESPACO_COMPOSICAO.textoAcaoEmpilhada, sm: 1 }}
+          useFlexGap
           sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" } }}
         >
-          <Box>
+          <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
             <Typography id={`${base}-cadastradas`} component="h3" variant="h6">
               Provas cadastradas
             </Typography>
@@ -469,7 +470,7 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente, rascunhoPen
               A aba Horários mostra as provas de hoje em diante. Encerrar o período apaga todo o
               horário de provas.
             </Typography>
-          </Box>
+          </Stack>
           {dias.length > 0 ? (
             <Botao
               variante="contorno"

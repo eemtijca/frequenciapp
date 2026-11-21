@@ -26,7 +26,8 @@ A grade segue o Material Design 2, com 4, 8 ou 12 colunas, margens laterais e gu
 Regras:
 
 - A grade-base é de 8 dp.
-- Os espaçamentos permitidos são 4, 8, 16, 24, 32, 40 e 48 dp. `theme.spacing(1)` vale 8 px.
+- Os espaçamentos de composição são 4, 8, 12, 16, 24, 32, 40 e 48 dp. `theme.spacing(1)` vale 8 px.
+- Reserve pelo menos 12 px entre um trilho de abas visível e o início do painel. A grade diária de Horários mantém 16 px entre as abas Manhã/Tarde e o cartão de aulas para separar a navegação da grade. Cabeçalhos de página e seção têm 8 px entre o título e a descrição. Em um cabeçalho compacto empilhado, reserve 12 px entre o texto e sua ação. Essas folgas não alteram a altura dos controles, as linhas de tabela nem a relação entre rótulo e campo.
 - O gutter é 16 px no celular e 24 px nas demais faixas.
 - A margem lateral é 16 px no celular, 32 px no tablet e flexível até 200 px no desktop.
 - O conteúdo não acompanha a largura da janela sem limite. Ele usa uma das larguras de conteúdo.

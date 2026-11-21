@@ -52,7 +52,14 @@ export const TOKENS_LAYOUT = {
     duasLinhas: 64,
     tresLinhas: 72,
   },
-  espacamentos: [4, 8, 16, 24, 32, 40, 48],
+  espacamentos: [4, 8, 12, 16, 24, 32, 40, 48],
+} as const;
+
+// Folgas em pixels entre blocos, sem alterar a escala interna dos controles.
+export const ESPACO_COMPOSICAO = {
+  tituloDescricao: "8px",
+  aposAbas: "12px",
+  textoAcaoEmpilhada: "12px",
 } as const;
 
 export const RAIOS = {

@@ -13,6 +13,7 @@ import {
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import { alpha, type Theme } from "@mui/material/styles";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 import { brand } from "@/theme/paleta";
 
 export type VarianteAbas = "scrollable" | "standard" | "fullWidth";
@@ -184,7 +185,10 @@ export function Abas<T extends string>({
           );
         })}
       </Box>
-      <Box data-pager={dataPager} sx={{ minWidth: 0 }}>
+      <Box
+        data-pager={dataPager}
+        sx={{ minWidth: 0, pt: ocultarTrilho ? undefined : ESPACO_COMPOSICAO.aposAbas }}
+      >
         {itens.map((item) => {
           const selecionado = item.valor === ativo;
           if (!selecionado && !visitados.has(item.valor)) return null;

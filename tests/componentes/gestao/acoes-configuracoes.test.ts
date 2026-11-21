@@ -144,6 +144,46 @@ async function abrir(page: Page, tema: "light" | "dark", simularGravacao = false
   return gravacoes;
 }
 
+it.each([
+  { largura: 320, tema: "light" },
+  { largura: 390, tema: "dark" },
+  { largura: 1440, tema: "light" },
+  { largura: 1440, tema: "dark" },
+] as const)(
+  "separa abas, títulos e textos de apoio em $largura px ($tema)",
+  async ({ largura, tema }) => {
+    const page = await browser.newPage({ viewport: { width: largura, height: 900 } });
+    try {
+      await abrir(page, tema);
+      async function espaco(antes: Locator, depois: Locator) {
+        await verificarTela(antes).toBeVisible();
+        await verificarTela(depois).toBeVisible();
+        const [a, b] = await Promise.all([antes.boundingBox(), depois.boundingBox()]);
+        if (!a || !b) throw new Error("Não foi possível medir os blocos visíveis.");
+        return b.y - (a.y + a.height);
+      }
+      await expect(
+        espaco(
+          page.getByRole("tablist", { name: "Ações da escola" }),
+          page.getByText(/^As mudanças dos cadastros entram no rascunho/),
+        ),
+      ).resolves.toBeCloseTo(12, 0);
+
+      await selecionarCategoriaConfiguracoes(page, "Horários");
+      await page.getByRole("tab", { name: "Provas", exact: true }).click();
+      const titulo = page.getByRole("heading", { name: "Nova prova", exact: true });
+      const descricao = page.getByText(/^Adicionar prova grava o horário na hora/);
+      await expect(
+        espaco(page.getByRole("tablist", { name: "Ações dos horários" }), titulo),
+      ).resolves.toBeCloseTo(12, 0);
+      await expect(espaco(titulo, descricao)).resolves.toBeCloseTo(8, 0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(largura);
+    } finally {
+      await page.close();
+    }
+  },
+);
+
 it("grava a prova sem enviar o catálogo e só envia o lote na confirmação", async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   try {
@@ -172,10 +212,19 @@ it("grava a prova sem enviar o catálogo e só envia o lote na confirmação", a
     await formulario.getByLabel("Disciplina").fill("Matemática");
     await formulario.getByRole("checkbox", { name: "1º ano A", exact: true }).check();
     await formulario.getByRole("button", { name: "Adicionar prova", exact: true }).click();
-    await verificarTela(page.getByRole("region", { name: "Provas cadastradas" })).toContainText(
-      "Matemática",
-    );
+    const cadastradas = page.getByRole("region", { name: "Provas cadastradas" });
+    await verificarTela(cadastradas).toContainText("Matemática");
     expect(gravacoes).toEqual(["POST /api/provas-bimestrais"]);
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    const [titulo, descricao, acao] = await Promise.all([
+      cadastradas.getByRole("heading", { name: "Provas cadastradas" }).boundingBox(),
+      cadastradas.getByText(/^A aba Horários mostra/).boundingBox(),
+      cadastradas.getByRole("button", { name: "Encerrar período de provas" }).boundingBox(),
+    ]);
+    if (!titulo || !descricao || !acao) throw new Error("Cabeçalho das provas indisponível.");
+    expect(descricao.y - (titulo.y + titulo.height)).toBeCloseTo(8, 0);
+    expect(acao.y - (descricao.y + descricao.height)).toBeCloseTo(12, 0);
 
     const rodape = page.getByRole("region", { name: "Rascunho de configurações" });
     await verificarTela(rodape).toHaveCount(1);

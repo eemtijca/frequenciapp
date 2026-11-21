@@ -12,6 +12,7 @@ import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import Fade from "@mui/material/Fade";
 import Stack from "@mui/material/Stack";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
@@ -224,14 +225,14 @@ export default function VistaGrade({
         spacing={2}
         sx={{ alignItems: { xs: "stretch", sm: "center" }, justifyContent: "space-between" }}
       >
-        <Box>
+        <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap>
           <Typography component="h2" variant="h4">
             Grade
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Frequência por turma de origem.
           </Typography>
-        </Box>
+        </Stack>
         <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
           {estadoPlanilha?.podeEnviar ? (
             <Botao

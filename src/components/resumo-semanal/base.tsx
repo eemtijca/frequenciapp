@@ -8,6 +8,7 @@ import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import Card from "@mui/material/Card";
 import Stack from "@mui/material/Stack";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 import Typography from "@mui/material/Typography";
 import type { Theme } from "@mui/material/styles";
 import { rotuloData, rotuloDataCurta } from "@/domain/frequencia";
@@ -63,11 +64,11 @@ export function CabecalhoResumo({
         >
           <CalendarMonthRoundedIcon fontSize="small" />
         </Box>
-        <Box sx={{ minWidth: 0 }}>
+        <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
           <Typography component="h2" variant="h6" sx={{ fontWeight: 600 }}>
             {titulo}
           </Typography>
-          <Typography variant="body2" sx={{ mt: 0.25, color: "text.secondary" }}>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             {de && ate ? `${rotuloDataCurta(de)} a ${rotuloDataCurta(ate)}` : ""}
             {domingo ? `, encerrada em ${rotuloData(domingo)}` : ""}
           </Typography>
@@ -76,7 +77,7 @@ export function CabecalhoResumo({
               {descricao}
             </Typography>
           ) : null}
-        </Box>
+        </Stack>
       </Stack>
       <Stack
         spacing={0.5}

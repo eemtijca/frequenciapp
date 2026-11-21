@@ -13,6 +13,7 @@ import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 import Typography from "@mui/material/Typography";
 import type { Frequencia, Serie, Turma } from "@/domain/frequencia";
 import {
@@ -90,7 +91,7 @@ export default function VistaHistorico({
       aria-label="Histórico de frequências"
       sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 3, minWidth: 0 }}
     >
-      <Box>
+      <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap>
         <Typography component="h1" variant="h4">
           Histórico
         </Typography>
@@ -99,7 +100,7 @@ export default function VistaHistorico({
             ? "Frequências salvas do mês"
             : `${frequencias.length} ${frequencias.length === 1 ? "frequência salva" : "frequências salvas"}`}
         </Typography>
-      </Box>
+      </Stack>
 
       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
         <BotaoIcone

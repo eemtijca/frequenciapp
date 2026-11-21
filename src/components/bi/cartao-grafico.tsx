@@ -209,7 +209,7 @@ export function CartaoGrafico({
           spacing={1}
           sx={{ alignItems: "flex-start", justifyContent: "space-between", minWidth: 0 }}
         >
-          <Box sx={{ minWidth: 0 }}>
+          <Stack spacing={0.5} useFlexGap sx={{ minWidth: 0 }}>
             <Typography
               component="h3"
               variant="subtitle1"
@@ -220,7 +220,7 @@ export function CartaoGrafico({
             <Typography variant="caption" sx={{ color: "text.secondary" }}>
               {NOMES_MEDIDAS[config.medida]}
             </Typography>
-          </Box>
+          </Stack>
           {acoes ? <Box data-acoes-grafico>{acoes}</Box> : null}
         </Stack>
         {indisponivel ? (

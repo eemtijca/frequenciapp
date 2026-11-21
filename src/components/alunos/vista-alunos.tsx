@@ -10,6 +10,7 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 import Typography from "@mui/material/Typography";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
@@ -189,14 +190,14 @@ export default function VistaAlunos({ alunos, turmas, fuso, onAtualizar }: Props
         spacing={2}
         sx={{ alignItems: "flex-end", justifyContent: "space-between" }}
       >
-        <Box>
+        <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap>
           <Typography component="h1" variant="h4">
             Alunos
           </Typography>
           <Typography variant="body2" sx={{ color: "text.secondary" }}>
             {alunos.length} no total · {ativos} ativos
           </Typography>
-        </Box>
+        </Stack>
         <GroupsRoundedIcon aria-hidden="true" sx={{ color: "text.secondary" }} />
       </Stack>
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}>

@@ -7,6 +7,7 @@ import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 
 export type EstadoEtapa = "pendente" | "atual" | "concluida";
 
@@ -31,7 +32,8 @@ export function EtapaPlanilha({
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
       <Stack
         direction={{ xs: "column", sm: "row" }}
-        spacing={{ xs: 1, sm: 2 }}
+        spacing={{ xs: ESPACO_COMPOSICAO.textoAcaoEmpilhada, sm: 2 }}
+        useFlexGap
         sx={{ alignItems: { sm: "flex-start" }, minWidth: 0 }}
       >
         <Stack
@@ -72,7 +74,11 @@ export function EtapaPlanilha({
               {concluida ? <CheckRoundedIcon sx={{ fontSize: 16 }} /> : numero}
             </Box>
           ) : null}
-          <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, minWidth: 0, flex: 1 }}>
+          <Stack
+            spacing={ESPACO_COMPOSICAO.tituloDescricao}
+            useFlexGap
+            sx={{ minWidth: 0, flex: 1 }}
+          >
             <Typography
               variant="body2"
               sx={{ fontWeight: 600, color: estado === "pendente" ? "text.secondary" : undefined }}
@@ -89,7 +95,7 @@ export function EtapaPlanilha({
                 {resumo}
               </Stack>
             ) : null}
-          </Box>
+          </Stack>
         </Stack>
         {acoes ? (
           <Stack

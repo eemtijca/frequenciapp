@@ -5,6 +5,7 @@ import { useId, type ReactNode } from "react";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 
 interface SecaoConteudoProps {
   titulo?: string;
@@ -34,7 +35,7 @@ export function SecaoConteudo({ titulo, descricao, acoes, children }: SecaoConte
             mb: 2,
           }}
         >
-          <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+          <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
             {titulo ? (
               <Typography id={tituloId} component="h2" variant="h6">
                 {titulo}
