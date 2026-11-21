@@ -1203,9 +1203,6 @@ export default function Aplicacao({
                 />
               </Box>
               <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 0, flex: 1 }}>
-                <Box sx={{ display: { xs: "flex", md: "none" }, flexShrink: 0 }}>
-                  <Logotipo tamanho={24} alt="" />
-                </Box>
                 <Typography
                   variant="subtitle1"
                   noWrap
@@ -1214,7 +1211,7 @@ export default function Aplicacao({
                     display: { xs: "block", md: "none" },
                     minWidth: 0,
                     flex: 1,
-                    fontSize: 16,
+                    fontSize: 18,
                     fontWeight: 600,
                     letterSpacing: "-0.02em",
                   }}
