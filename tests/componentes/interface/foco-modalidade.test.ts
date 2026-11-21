@@ -48,7 +48,8 @@ function estiloDoCampo(campo: Locator) {
     return {
       ativo: el === document.activeElement,
       focoVisivel: el.matches(":focus-visible"),
-      sombra: css.boxShadow,
+      contorno: css.outlineStyle,
+      larguraContorno: css.outlineWidth,
       raio: css.borderRadius,
       borda: borda ? getComputedStyle(borda).borderTopColor : "",
       bordaLargura: borda ? getComputedStyle(borda).borderTopWidth : "",
@@ -96,7 +97,8 @@ it("foco por teclado mostra o anel de 3 px do tema no botão e no campo", async 
     expect(focoCampo.focoVisivel).toBe(true);
     expect(focoCampo.raio).toBe(`${TOKENS_LAYOUT.campo.raio}px`);
     expect(focoCampo.bordaLargura).toBe("1px");
-    expect(focoCampo.sombra).toContain(`0px 0px 0px ${TOKENS_LAYOUT.campo.foco}px`);
+    expect(focoCampo.contorno).toBe("solid");
+    expect(focoCampo.larguraContorno).toBe(`${TOKENS_LAYOUT.campo.foco}px`);
   } finally {
     await pagina.close();
   }

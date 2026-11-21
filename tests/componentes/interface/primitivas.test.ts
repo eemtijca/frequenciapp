@@ -133,7 +133,8 @@ async function medirFoco(page: Page, rotulo: string): Promise<MedidaFoco> {
     return {
       ativo: elemento === document.activeElement,
       focoVisivel: elemento.matches(":focus-visible"),
-      sombra: getComputedStyle(campo).boxShadow,
+      contorno: getComputedStyle(campo).outlineStyle,
+      larguraContorno: getComputedStyle(campo).outlineWidth,
       bordaPx: estiloBorda.borderTopWidth,
       bordaFoco: compor(estiloBorda.borderTopColor, preenchimento),
       tokenFoco: cor(tokenFoco),
@@ -158,12 +159,11 @@ for (const tema of ["light", "dark"] as const) {
             contraste(medida.texto, medida.preenchimento),
             `${tipo}: contraste do texto`,
           ).toBeGreaterThanOrEqual(4.5);
-          // O fio de repouso usa o token divider do tema; o critério 3:1 é
-          // aplicado à borda de foco, que delimita o controle em uso.
+          // O contorno identifica o campo mesmo antes do foco.
           expect(
             contraste(medida.borda, medida.preenchimento),
             `${tipo}: fio do campo`,
-          ).toBeGreaterThanOrEqual(1.1);
+          ).toBeGreaterThanOrEqual(3);
         }
 
         const normal = await medir(page, `Texto ${superficie}`);
@@ -188,7 +188,8 @@ for (const tema of ["light", "dark"] as const) {
         expect(foco.ativo).toBe(true);
         expect(foco.focoVisivel).toBe(true);
         expect(foco.bordaPx).toBe("1px");
-        expect(foco.sombra).toContain(`0px 0px 0px ${TOKENS_LAYOUT.campo.foco}px`);
+        expect(foco.contorno).toBe("solid");
+        expect(foco.larguraContorno).toBe(`${TOKENS_LAYOUT.campo.foco}px`);
         expect(
           contraste(foco.bordaFoco, normal.preenchimento),
           "borda de foco: contraste",
