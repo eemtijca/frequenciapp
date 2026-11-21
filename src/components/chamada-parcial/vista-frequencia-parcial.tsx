@@ -785,6 +785,7 @@ export default function VistaFrequenciaParcial({
       component="section"
       ref={registrar}
       aria-label="Chamada Parcial"
+      aria-busy={carregando}
       data-testid="chamada-parcial"
       data-layout={tabela ? "tabela" : "cartoes"}
       sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}

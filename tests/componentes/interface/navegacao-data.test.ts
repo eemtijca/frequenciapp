@@ -654,7 +654,12 @@ for (const tela of ["por-aluno", "resumo", "historico", "diretor"]) {
           expect(b.x + b.width).toBeLessThanOrEqual(c.x);
           expect(await seguinte.isDisabled()).toBe(true);
           const medida = await periodo.evaluate((el) => {
-            if (el.matches(":disabled") || el.getAttribute("aria-disabled") === "true") return null;
+            if (
+              el.matches(":disabled") ||
+              el.getAttribute("aria-disabled") === "true" ||
+              el.closest(".Mui-disabled, [aria-disabled=true]")
+            )
+              return null;
             const contexto = document.createElement("canvas").getContext("2d");
             if (!contexto) throw new Error("Canvas indisponível");
             const luminancia = (cor: string) => {

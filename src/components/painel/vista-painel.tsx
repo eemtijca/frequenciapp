@@ -164,7 +164,7 @@ export default function VistaPainel({
     feriado?: Feriado | null;
     nomeFeriadoNoCadastro: string;
   } | null>(null);
-  const [carregando, setCarregando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [recarregar, setRecarregar] = useState(0);
@@ -411,7 +411,12 @@ export default function VistaPainel({
   }
 
   return (
-    <Box component="section" aria-label="Painel de frequência" sx={{ pb: 3 }}>
+    <Box
+      component="section"
+      aria-label="Painel de frequência"
+      aria-busy={carregando}
+      sx={{ pb: 3 }}
+    >
       <CabecalhoPagina
         titulo="Painel"
         acoes={nav.resumo ? undefined : <AtualizadoDaVisao fuso={fuso} />}

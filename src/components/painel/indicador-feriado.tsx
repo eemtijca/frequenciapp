@@ -9,7 +9,7 @@ interface Props {
 
 export function IndicadorFeriado({ nome }: Props) {
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+    <Box data-feriado="" sx={{ display: "flex", alignItems: "center", gap: 2 }}>
       <Box
         sx={(theme) => ({
           display: "flex",

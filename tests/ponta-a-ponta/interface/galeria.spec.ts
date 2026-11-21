@@ -146,11 +146,11 @@ async function prepararPainel(page: Page): Promise<void> {
   await trocarVisao(page, "Painel", "painel");
   const secao = page.getByRole("region", { name: "Painel de frequência", exact: true });
   await expect(secao).toBeVisible();
-  await expect(secao.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
+  await expect(secao).toHaveAttribute("aria-busy", "false", { timeout: 15_000 });
   // Feriado e dia sem chamada não representam a rotina do Painel na galeria.
   const dia = secao.locator("#dia-painel");
   for (let tentativa = 0; tentativa < 8; tentativa += 1) {
-    const feriado = await secao.getByText(/^Feriado$/).count();
+    const feriado = await secao.locator("[data-feriado]").count();
     const semChamada = await secao.getByText("Nenhuma chamada salva neste dia").count();
     if (feriado === 0 && semChamada === 0) return;
     const rotuloAnterior = await dia.getAttribute("aria-label");
@@ -190,7 +190,10 @@ async function prepararChamada(page: Page): Promise<void> {
         });
         await expect(dialogo).toBeVisible();
         await dialogo.getByRole("button", { name: "Desbloquear", exact: true }).click();
-        await expect(dialogo).toBeHidden();
+        await expect(dialogo).toBeHidden({ timeout: 15_000 });
+        await expect(page.getByRole("alertdialog", { name: /^Desbloquear chamada\?/ })).toHaveCount(
+          0,
+        );
       }
       return;
     }
@@ -204,8 +207,21 @@ async function prepararChamada(page: Page): Promise<void> {
 
 async function prepararChamadaParcial(page: Page): Promise<void> {
   await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
-  await expect(page.getByRole("region", { name: "Chamada Parcial", exact: true })).toBeVisible();
+  const secao = page.getByRole("region", { name: "Chamada Parcial", exact: true });
+  await expect(secao).toBeVisible();
+  await expect(secao).toHaveAttribute("aria-busy", "false", { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "Chamada parcial", exact: true })).toBeVisible();
+  for (let tentativa = 0; tentativa < 3; tentativa += 1) {
+    const feriado = await secao.getByText(/^Feriado ·/).count();
+    if (feriado === 0) return;
+    const dia = secao.getByRole("button", { name: /^Data da chamada parcial:/ });
+    const anterior = await dia.getAttribute("aria-label");
+    await secao
+      .getByRole("button", { name: "Dia anterior da chamada parcial", exact: true })
+      .click();
+    await expect.poll(async () => dia.getAttribute("aria-label")).not.toBe(anterior);
+    await expect(secao.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
+  }
 }
 
 async function prepararHorarios(page: Page): Promise<void> {
@@ -246,6 +262,7 @@ async function selecionarAba(page: Page, aba: string): Promise<void> {
 async function prepararRelatorios(page: Page, aba: string): Promise<void> {
   await trocarVisao(page, "Relatórios", "relatorios");
   await selecionarAba(page, aba);
+  await expect(page.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
 }
 
 async function prepararAlunos(page: Page, agrupamento?: "Turma atual" | "Turma de origem") {
@@ -258,11 +275,13 @@ async function prepararAlunos(page: Page, agrupamento?: "Turma atual" | "Turma d
     .getByRole("button", { name: agrupamento, exact: true });
   await botao.click();
   await expect(botao).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByText(/^Carregando configurações/)).toBeHidden({ timeout: 15_000 });
 }
 
 async function prepararGestao(page: Page, aba: string): Promise<void> {
   await trocarVisao(page, "Gestão", "gestao");
   await selecionarAba(page, aba);
+  await expect(page.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
 }
 
 async function prepararConfiguracoes(page: Page, categoria: string): Promise<void> {
@@ -299,6 +318,9 @@ async function prepararMinhasTurmas(page: Page): Promise<void> {
   const resumo = page.getByLabel("Resumo do período", { exact: true });
   await expect(resumo).toBeVisible();
   await expect(resumo).toHaveAttribute("aria-busy", "false");
+  const grafico = page.getByRole("img", { name: /^Ausência por aluno/ });
+  await grafico.scrollIntoViewIfNeeded();
+  await expect(grafico).toBeVisible({ timeout: 15_000 });
 }
 
 async function prepararBiPortao(page: Page): Promise<void> {

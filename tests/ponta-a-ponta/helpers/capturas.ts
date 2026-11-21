@@ -175,6 +175,8 @@ export async function capturarTela(page: Page, captura: Captura): Promise<string
   if (captura.preparar) await captura.preparar(page);
   await aguardarFontes(page);
   await aguardarTema(page, captura.tema);
+  await expect(page.getByText("Carregando gráfico").first()).toBeHidden({ timeout: 15_000 });
+  await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0, { timeout: 10_000 });
   await conferirGraficos(page);
   await limparFoco(page);
   await conferirSemRolagemHorizontal(page);
