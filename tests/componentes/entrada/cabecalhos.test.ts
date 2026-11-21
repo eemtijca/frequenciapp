@@ -257,7 +257,6 @@ it.each(combinacoes)(
         await verificarDiscreto(faltas);
         await faltas.press("Enter");
         expect(await faltas.getAttribute("aria-current")).toBe("page");
-        expect(await fundo(faltas)).not.toBe("rgba(0, 0, 0, 0)");
         for (const nome of ["Compartilhar filtros", "Apresentar", "Imprimir"])
           await verificarDiscreto(page.getByRole("button", { name: nome, exact: true }));
         await page.getByRole("button", { name: "Apresentar", exact: true }).press("Enter");

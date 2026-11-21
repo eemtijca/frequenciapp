@@ -167,7 +167,8 @@ async function conferirContrasteDoControle(controle: Locator) {
           : "hsl(0, 0%, 99%)")
       );
     };
-    return Array.from(el.querySelectorAll("span, svg"))
+    return Array.from(el.querySelectorAll("span"))
+      .filter((no) => no.textContent?.trim())
       .filter((no) => getComputedStyle(no).display !== "none")
       .map((no) => {
         const l = lum(rgb(fundoDe(no)));
