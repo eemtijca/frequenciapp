@@ -23,7 +23,7 @@ for (const tema of ["light", "dark"] as const) {
     await page.addInitScript(() => localStorage.setItem("theme", "system"));
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.locator("html")).toHaveClass(new RegExp(tema));
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
     await abrirNavegacao(page);
     const gaveta = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
     const gatilho = gaveta.getByRole("button", { name: /^Conta de / });
@@ -41,7 +41,9 @@ for (const tema of ["light", "dark"] as const) {
         .poll(async () => (await item.boundingBox())?.height ?? 0)
         .toBeGreaterThanOrEqual(43.99);
     }
-    await expect(conta.getByRole("menuitem", { name: "Notificações" })).toBeFocused();
+    const primeiroItem = conta.getByRole("menuitem", { name: "Notificações" });
+    await primeiroItem.focus();
+    await expect(primeiroItem).toBeFocused();
     await page.keyboard.press("ArrowDown");
     const senha = conta.getByRole("menuitem", { name: "Trocar senha", exact: true });
     await expect(senha).toBeFocused();

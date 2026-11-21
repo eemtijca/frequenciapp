@@ -6,7 +6,7 @@ export async function selecionarAcaoPlanilha(
   acao: "Enviar" | "Editar" | "Organizar" | "Configurar",
 ) {
   await cartao
-    .getByRole("navigation", { name: /^Ações da planilha/ })
-    .getByRole("button", { name: acao, exact: true })
+    .getByRole("tablist", { name: /^Ações da planilha/ })
+    .getByRole("tab", { name: acao, exact: true })
     .click();
 }

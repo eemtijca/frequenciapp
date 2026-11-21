@@ -2,24 +2,35 @@
 
 // Conferência guiada por mês, somente de leitura, com acesso às etapas de correção.
 import { useRef, useState } from "react";
-import { CheckCircle2, CircleAlert, FileSearch, LoaderCircle, ShieldCheck } from "lucide-react";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import FindInPageRoundedIcon from "@mui/icons-material/FindInPageRounded";
+import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type { DiagnosticoPlanilha } from "@/domain/planilha-diagnostico";
 import { rotuloMes } from "@/domain/frequencia";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import { Selo } from "@/components/ui/selo";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { Selo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 
 export type EtapaConfiguracaoPlanilha = "conexao" | "estrutura" | "envio";
+
+const CAIXA = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 1,
+  padding: 2,
+  border: 1,
+  borderColor: "divider",
+  borderRadius: 2,
+  minWidth: 0,
+} as const;
 
 export function DialogoConfigurarPlanilha({
   mes,
@@ -36,7 +47,6 @@ export function DialogoConfigurarPlanilha({
   const [diagnostico, setDiagnostico] = useState<DiagnosticoPlanilha | null>(null);
   const [erro, setErro] = useState("");
   const versao = useRef(0);
-  const proximaEtapa = useRef<EtapaConfiguracaoPlanilha | null>(null);
   const { executar, executando } = useAcaoUnica(async () => {
     const atual = ++versao.current;
     setErro("");
@@ -56,44 +66,37 @@ export function DialogoConfigurarPlanilha({
     }
   });
 
-  function irPara(etapa: EtapaConfiguracaoPlanilha) {
-    proximaEtapa.current = etapa;
+  function fechar() {
+    ++versao.current;
     setAberto(false);
+    setDiagnostico(null);
+    setErro("");
+  }
+
+  function irPara(etapa: EtapaConfiguracaoPlanilha) {
+    fechar();
+    onEtapa(etapa);
   }
 
   return (
-    <Dialog
-      open={aberto}
-      onOpenChange={(valor) => {
-        ++versao.current;
-        setAberto(valor);
-        setDiagnostico(null);
-        setErro("");
-      }}
-    >
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline" className="min-h-11 self-start">
-          <ShieldCheck size={18} aria-hidden="true" />
-          Configuração assistida
-        </Button>
-      </DialogTrigger>
-      <DialogContent
-        className="sm:max-w-xl"
-        folha
-        onCloseAutoFocus={(evento) => {
-          if (proximaEtapa.current) {
-            evento.preventDefault();
-            const etapa = proximaEtapa.current;
-            proximaEtapa.current = null;
-            onEtapa(etapa);
-          }
-        }}
+    <>
+      <Botao
+        type="button"
+        variante="contorno"
+        icone={<ShieldRoundedIcon />}
+        onClick={() => setAberto(true)}
+        sx={{ alignSelf: "flex-start" }}
       >
-        <DialogHeader>
-          <DialogTitle>Configuração assistida</DialogTitle>
-          <DialogDescription>Confira o destino e as turmas antes de sincronizar.</DialogDescription>
-        </DialogHeader>
-        <div className="flex min-w-0 flex-col gap-3">
+        Configuração assistida
+      </Botao>
+      <Dialogo
+        aberto={aberto}
+        onFechar={fechar}
+        titulo="Configuração assistida"
+        descricao="Confira o destino e as turmas antes de sincronizar."
+        tamanho="grande"
+      >
+        <Stack spacing={2}>
           <SeletorPeriodo
             id="mes-diagnostico-planilha"
             modo="mes"
@@ -108,106 +111,146 @@ export function DialogoConfigurarPlanilha({
               onMes(valor);
             }}
           />
-          <Button type="button" disabled={executando} onClick={() => void executar()}>
-            {executando ? (
-              <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <FileSearch size={18} aria-hidden="true" />
-            )}
+          <Botao
+            type="button"
+            variante="primario"
+            disabled={executando}
+            carregando={executando}
+            icone={<FindInPageRoundedIcon />}
+            onClick={() => void executar()}
+            sx={{ alignSelf: "flex-start" }}
+          >
             {executando ? "Conferindo..." : "Conferir configuração"}
-          </Button>
-          <p className="text-muted-foreground text-xs">Esta conferência apenas lê a planilha.</p>
-        </div>
-        {erro && (
-          <p role="alert" className="text-falta-texto text-sm">
-            {erro}
-          </p>
-        )}
-        {diagnostico && (
-          <div className="flex min-w-0 flex-col gap-4" aria-live="polite">
-            <section
-              className="superficie flex flex-col gap-2 p-3"
-              aria-label="Conexão da planilha"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-medium">1. Arquivo e conexão</h3>
-                <Selo variante={diagnostico.conexao.verificada ? "sucesso" : "atencao"}>
+          </Botao>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Esta conferência apenas lê a planilha.
+          </Typography>
+        </Stack>
+        {erro ? (
+          <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
+        ) : null}
+        {diagnostico ? (
+          <Box aria-live="polite" sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box component="section" aria-label="Conexão da planilha" sx={CAIXA}>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}
+              >
+                <Typography variant="subtitle2">1. Arquivo e conexão</Typography>
+                <Selo tom={diagnostico.conexao.verificada ? "sucesso" : "atencao"}>
                   {diagnostico.conexao.verificada ? "Acesso conferido" : "Conferir conexão"}
                 </Selo>
-              </div>
-              {diagnostico.conexao.erro && (
-                <p className="text-falta-texto text-sm">{diagnostico.conexao.erro}</p>
-              )}
-              <Button
+              </Stack>
+              {diagnostico.conexao.erro ? (
+                <Typography variant="body2" color="error">
+                  {diagnostico.conexao.erro}
+                </Typography>
+              ) : null}
+              <Botao
                 type="button"
-                variant="outline"
-                className="self-start"
+                variante="contorno"
                 onClick={() => irPara("conexao")}
+                sx={{ alignSelf: "flex-start" }}
               >
                 Revisar conexão
-              </Button>
-            </section>
-            <section className="superficie flex flex-col gap-3 p-3" aria-label="Turmas do mês">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-medium">2. Turmas e mês</h3>
-                <Selo variante={diagnostico.estruturaPronta ? "sucesso" : "atencao"}>
+              </Botao>
+            </Box>
+            <Box component="section" aria-label="Turmas do mês" sx={CAIXA}>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}
+              >
+                <Typography variant="subtitle2">2. Turmas e mês</Typography>
+                <Selo tom={diagnostico.estruturaPronta ? "sucesso" : "atencao"}>
                   {diagnostico.resumo.prontas}/{diagnostico.resumo.total} conferidas
                 </Selo>
-              </div>
-              <ul className="flex flex-col gap-2" aria-label="Conferência por turma">
+              </Stack>
+              <Box
+                component="ul"
+                aria-label="Conferência por turma"
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 1,
+                  margin: 0,
+                  padding: 0,
+                  listStyle: "none",
+                }}
+              >
                 {diagnostico.turmas.map((turma) => (
-                  <li key={turma.id} className="flex min-w-0 gap-2 border-t pt-2">
+                  <Stack
+                    component="li"
+                    key={turma.id}
+                    direction="row"
+                    spacing={1}
+                    sx={{ minWidth: 0, borderTop: 1, borderColor: "divider", paddingTop: 1 }}
+                  >
                     {turma.situacao === "pronta" ? (
-                      <CheckCircle2
-                        size={18}
-                        className="text-primary mt-0.5 shrink-0"
+                      <CheckCircleRoundedIcon
+                        fontSize="small"
+                        sx={{ marginTop: 0.25, flexShrink: 0 }}
+                        color="primary"
                         aria-hidden="true"
                       />
                     ) : (
-                      <CircleAlert
-                        size={18}
-                        className="text-falta-texto mt-0.5 shrink-0"
+                      <ErrorOutlineRoundedIcon
+                        fontSize="small"
+                        sx={{ marginTop: 0.25, flexShrink: 0 }}
+                        color="error"
                         aria-hidden="true"
                       />
                     )}
-                    <div className="min-w-0 flex-1 text-sm">
-                      <p className="font-medium wrap-anywhere">{turma.rotulo}</p>
-                      <p className="text-muted-foreground text-xs wrap-anywhere">
+                    <Box sx={{ minWidth: 0, flex: 1 }}>
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
+                      >
+                        {turma.rotulo}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ display: "block", color: "text.secondary", overflowWrap: "anywhere" }}
+                      >
                         {turma.aba ?? "Sem aba para este mês"}
-                      </p>
-                      <p
-                        className={
-                          turma.situacao === "pronta"
-                            ? "text-muted-foreground text-xs"
-                            : "text-falta-texto text-xs"
-                        }
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          display: "block",
+                          color: turma.situacao === "pronta" ? "text.secondary" : "error",
+                        }}
                       >
                         {turma.mensagem ?? "Estrutura conferida"}
-                      </p>
-                    </div>
-                  </li>
+                      </Typography>
+                    </Box>
+                  </Stack>
                 ))}
-              </ul>
-              {diagnostico.resumo.total === 0 && (
-                <p className="text-muted-foreground text-sm">Cadastre as turmas na Gestão.</p>
-              )}
-              <Button
+              </Box>
+              {diagnostico.resumo.total === 0 ? (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Cadastre as turmas na Gestão.
+                </Typography>
+              ) : null}
+              <Botao
                 type="button"
-                variant="outline"
-                className="self-start"
+                variante="contorno"
                 onClick={() => irPara("estrutura")}
+                sx={{ alignSelf: "flex-start" }}
               >
                 Revisar turmas e mês
-              </Button>
-            </section>
-            <section
-              className="superficie flex flex-col gap-3 p-3"
-              aria-label="Situação dos envios"
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h3 className="text-sm font-medium">3. Sincronização</h3>
+              </Botao>
+            </Box>
+            <Box component="section" aria-label="Situação dos envios" sx={CAIXA}>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}
+              >
+                <Typography variant="subtitle2">3. Sincronização</Typography>
                 <Selo
-                  variante={
+                  tom={
                     diagnostico.envioAutomatico &&
                     diagnostico.ativa &&
                     diagnostico.modo === "conservador"
@@ -221,40 +264,40 @@ export function DialogoConfigurarPlanilha({
                     ? "Automação ligada"
                     : "Automação pausada"}
                 </Selo>
-              </div>
-              <p className="text-muted-foreground text-xs">
+              </Stack>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 {diagnostico.alteradasDepois} chamadas sem envio confirmado no arquivo.
-              </p>
-              {!diagnostico.ativa && (
-                <p className="text-muted-foreground text-xs">
+              </Typography>
+              {!diagnostico.ativa ? (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Ative a integração após conferir o arquivo.
-                </p>
-              )}
-              {diagnostico.modo === "completo" && (
-                <p className="text-falta-texto text-xs">
+                </Typography>
+              ) : null}
+              {diagnostico.modo === "completo" ? (
+                <Typography variant="caption" color="error">
                   Modo completo ativo. Encerre a janela para retomar a automação.
-                </p>
-              )}
-              {diagnostico.ultimoErro && (
-                <p className="text-falta-texto text-sm">
+                </Typography>
+              ) : null}
+              {diagnostico.ultimoErro ? (
+                <Typography variant="body2" color="error">
                   {diagnostico.ultimoErro.erro ?? "Há envios que precisam de conferência manual."}
-                </p>
-              )}
-              <p className="text-muted-foreground text-xs">
+                </Typography>
+              ) : null}
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 A prévia do envio confere os alunos, as marcas e as divergências antes de gravar.
-              </p>
-              <Button
+              </Typography>
+              <Botao
                 type="button"
-                variant="outline"
-                className="self-start"
+                variante="contorno"
                 onClick={() => irPara("envio")}
+                sx={{ alignSelf: "flex-start" }}
               >
                 Revisar envio e automação
-              </Button>
-            </section>
-          </div>
-        )}
-      </DialogContent>
-    </Dialog>
+              </Botao>
+            </Box>
+          </Box>
+        ) : null}
+      </Dialogo>
+    </>
   );
 }

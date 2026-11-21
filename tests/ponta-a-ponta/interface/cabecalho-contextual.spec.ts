@@ -21,7 +21,7 @@ for (const tema of ["light", "dark"] as const) {
     await page.addInitScript(() => localStorage.setItem("theme", "system"));
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.locator("html")).toHaveClass(new RegExp(tema));
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
     await page.mouse.move(389, 843);
     const cabecalho = page.getByRole("banner");
     for (const nome of [

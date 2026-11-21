@@ -86,10 +86,10 @@ test.describe("diretores de turma na Gestão", () => {
     await expect(item.getByText("Aguardando primeiro acesso")).toBeVisible();
 
     await item.getByRole("button", { name: "Revogar a palavra-chave de E2E Diretora" }).click();
-    const revogar = page.getByRole("alertdialog");
-    await expect(revogar.getByRole("button", { name: "Revogar" })).toBeDisabled();
+    const revogar = page.getByRole("dialog", { name: /Revogar a palavra-chave/ });
+    await expect(revogar.getByRole("button", { name: "Revogar", exact: true })).toBeDisabled();
     await revogar.getByLabel("Motivo").fill("Teste de ponta a ponta");
-    await revogar.getByRole("button", { name: "Revogar" }).click();
+    await revogar.getByRole("button", { name: "Revogar", exact: true }).click();
     await expect(page.getByText("Palavra-chave revogada.")).toBeVisible();
     await expect(item.getByText("Revogada", { exact: true })).toBeVisible();
     await expect(item.getByText(/revogada: Teste de ponta a ponta/)).toBeVisible();
@@ -239,7 +239,7 @@ test.describe("diretores de turma na Gestão", () => {
         }
       }
     }
-    await expect(diretor.locator("main")).toHaveAttribute("data-visao", "diretor");
+    await expect(diretor.locator('[data-visao="diretor"]')).toBeVisible();
     await expect(diretor.getByText("E2E Ano A").first()).toBeVisible();
     // No primeiro dia do mês, um domingo consulta a chamada do mês anterior.
     if (dia.slice(0, 7) !== diaCorrente().slice(0, 7)) {

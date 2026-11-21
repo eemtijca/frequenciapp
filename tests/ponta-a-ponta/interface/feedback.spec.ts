@@ -21,17 +21,21 @@ test.describe("toasts e toque duplo", () => {
     await trocarVisao(page, "Chamada", "chamada");
     const chamada = page.locator('section[aria-label="Fazer chamada"]');
     const pilula = chamada.getByRole("button", { name: /E2E Ano A/ });
-    if (await pilula.isVisible().catch(() => false)) await pilula.click();
+    if (await pilula.isVisible().catch(() => false))
+      await pilula.evaluate((elemento: HTMLElement) => elemento.click());
     await liberarSabadoSeNecessario(chamada);
-    await chamada.locator("ul.divide-y li").first().waitFor();
-    await chamada.locator("ul.divide-y li button[aria-pressed]").first().click();
+    const lista = chamada.getByRole("list", { name: "Alunos da chamada", exact: true });
+    await lista.getByRole("listitem").first().waitFor();
+    await lista.getByRole("listitem").first().locator("button[aria-pressed]").first().click();
     await chamada.getByRole("button", { name: "Salvar" }).click({ clickCount: 2, delay: 30 });
     const confirmar = page.getByRole("alertdialog", { name: /^Salvar chamada\?$/ });
     await expect(confirmar).toBeVisible();
     await confirmar
       .getByRole("button", { name: "Salvar chamada", exact: true })
       .click({ clickCount: 2, delay: 30 });
-    const avisos = page.locator("[data-sonner-toast]").filter({ hasText: "Chamada salva" });
+    const avisos = page.locator(".MuiSnackbar-root .MuiAlert-root").filter({
+      hasText: "Chamada salva",
+    });
     await expect(avisos).toHaveCount(1);
     await page.waitForTimeout(1200);
     await expect(avisos).toHaveCount(1);
@@ -44,13 +48,11 @@ test.describe("toasts e toque duplo", () => {
     await page.getByLabel("Nome").fill("E2E Feedback");
     await page.getByLabel("Ordem de exibição").fill("42");
     await page.getByRole("button", { name: "Criar" }).click({ clickCount: 2, delay: 30 });
-    const avisos = page.locator("[data-sonner-toast]").filter({ hasText: "Série criada." });
+    const avisos = page
+      .locator(".MuiSnackbar-root .MuiAlert-root")
+      .filter({ hasText: "Série criada." });
     await expect(avisos).toHaveCount(1);
-    await expect(
-      page
-        .locator('section[aria-label="Gestão da escola"] ul.divide-y > li')
-        .filter({ hasText: "E2E Feedback" }),
-    ).toHaveCount(1);
+    await expect(page.getByRole("row").filter({ hasText: "E2E Feedback" })).toHaveCount(1);
   });
 
   test("a exportação CSV avisa com um toast", async ({ page }) => {
@@ -59,7 +61,8 @@ test.describe("toasts e toque duplo", () => {
     const painel = page.locator('section[aria-label="Relatórios"]');
     await painel.getByRole("tab", { name: "Grade" }).click();
     const pilula = painel.getByRole("button", { name: /E2E Ano A/ });
-    if (await pilula.isVisible().catch(() => false)) await pilula.click();
+    if (await pilula.isVisible().catch(() => false))
+      await pilula.evaluate((elemento: HTMLElement) => elemento.click());
     await painel
       .getByRole("tabpanel", { name: "Grade", exact: true })
       .locator("table")

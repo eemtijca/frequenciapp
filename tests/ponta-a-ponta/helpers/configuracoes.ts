@@ -116,7 +116,7 @@ export async function selecionarAcaoConfiguracoes(
     .getByRole("button", { name: categoria, exact: true })
     .click();
   await page
-    .getByRole("navigation", { name: navegacoes[categoria], exact: true })
-    .getByRole("button", { name: acao, exact: true })
+    .getByRole("tablist", { name: navegacoes[categoria], exact: true })
+    .getByRole("tab", { name: acao, exact: true })
     .click();
 }

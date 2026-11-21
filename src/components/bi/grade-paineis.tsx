@@ -1,16 +1,24 @@
 "use client";
 
 // Painéis com puxadores de toque, arraste, tamanho e alternativas completas por teclado.
-import { useRef } from "react";
-import { GripVertical, MoveDown, MoveUp, Expand, Copy, Trash2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useRef, type CSSProperties, type PointerEvent as EventoPonteiro } from "react";
+import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
+import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
+import OpenInFullRoundedIcon from "@mui/icons-material/OpenInFullRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 import { CartaoGrafico, type CalcularBi, type ConfirmarExportacaoBi } from "./cartao-grafico";
 import type { GraficoBi, PontoBi } from "@/domain/bi-analise";
 import type { PainelBi } from "@/domain/bi-personalizacao";
 import type { LinhaBi, RecursoBi } from "@/domain/bi";
 import type { RecorteBi } from "@/domain/bi-recortes";
-import estilos from "./grade-paineis.module.css";
 const LINHAS_VAZIAS: LinhaBi[] = [];
+const ALVO = { width: TOKENS_LAYOUT.alvoToque, height: TOKENS_LAYOUT.alvoToque } as const;
 export function GradePaineisBi({
   painel,
   onAlterar,
@@ -55,7 +63,7 @@ export function GradePaineisBi({
     onAlterar({ ...painel, graficos: painel.graficos.map((v) => (v.id === g.id ? g : v)) });
   }
   const iniciar = (
-    e: React.PointerEvent<HTMLButtonElement>,
+    e: EventoPonteiro<HTMLButtonElement>,
     g: GraficoBi,
     modo: "mover" | "tamanho",
   ) => {
@@ -73,7 +81,7 @@ export function GradePaineisBi({
       movido: false,
     };
   };
-  const acompanhar = (e: React.PointerEvent<HTMLButtonElement>) => {
+  const acompanhar = (e: EventoPonteiro<HTMLButtonElement>) => {
     const g = gesto.current;
     if (!g) return;
     if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 8) g.movido = true;
@@ -94,7 +102,7 @@ export function GradePaineisBi({
     item?.style.setProperty("--largura", String(g.novaLargura));
     item?.style.setProperty("--altura", `${g.novaAltura}px`);
   };
-  const terminar = (e: React.PointerEvent<HTMLButtonElement>, cancelado = false) => {
+  const terminar = (e: EventoPonteiro<HTMLButtonElement>, cancelado = false) => {
     const g = gesto.current;
     gesto.current = null;
     if (!g) return;
@@ -130,13 +138,28 @@ export function GradePaineisBi({
       } satisfies RecorteBi),
   }));
   return (
-    <div ref={grade} className={estilos.grade} aria-label="Gráficos do painel">
+    <Box
+      ref={grade}
+      role="group"
+      aria-label="Gráficos do painel"
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "repeat(12, minmax(0, 1fr))" },
+        gap: 2,
+        "@media print": { display: "block" },
+      }}
+    >
       {graficos.map(({ grafico: g, recorte }, i) => (
-        <div
+        <Box
           key={g.id}
-          className={estilos.item}
           data-painel-item={g.id}
-          style={{ "--largura": g.largura, "--altura": `${g.altura}px` } as React.CSSProperties}
+          style={{ "--largura": g.largura, "--altura": `${g.altura}px` } as CSSProperties}
+          sx={{
+            minWidth: 0,
+            minHeight: "var(--altura, 360px)",
+            gridColumn: { xs: "auto", md: "span var(--largura, 6)" },
+            "@media print": { breakInside: "avoid", mb: 2, minHeight: 0 },
+          }}
         >
           <CartaoGrafico
             config={g}
@@ -149,13 +172,19 @@ export function GradePaineisBi({
             onFiltrar={onFiltrar}
             confirmar={confirmar}
             acoes={
-              <div className="flex flex-wrap gap-1 print:hidden">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className={estilos.puxador}
-                  aria-label={`Mover ${g.titulo}`}
+              <Stack
+                direction="row"
+                useFlexGap
+                spacing={0.5}
+                data-acoes-grafico
+                sx={{ flexWrap: "wrap", "@media print": { display: "none" } }}
+              >
+                <BotaoIcone
+                  rotulo={`Mover ${g.titulo}`}
                   title="Arrastar ou usar as setas do teclado"
+                  icone={<DragIndicatorRoundedIcon />}
+                  variante="texto"
+                  sx={{ ...ALVO, touchAction: "none", cursor: "grab" }}
                   onPointerDown={(e) => iniciar(e, g, "mover")}
                   onPointerMove={acompanhar}
                   onPointerUp={(e) => terminar(e)}
@@ -170,33 +199,29 @@ export function GradePaineisBi({
                       mover(g.id, i + 1);
                     }
                   }}
-                >
-                  <GripVertical size={16} />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={`Subir ${g.titulo}`}
+                />
+                <BotaoIcone
+                  rotulo={`Subir ${g.titulo}`}
+                  icone={<ArrowUpwardRoundedIcon />}
+                  variante="texto"
                   disabled={!i}
+                  sx={ALVO}
                   onClick={() => mover(g.id, i - 1)}
-                >
-                  <MoveUp size={15} />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={`Descer ${g.titulo}`}
+                />
+                <BotaoIcone
+                  rotulo={`Descer ${g.titulo}`}
+                  icone={<ArrowDownwardRoundedIcon />}
+                  variante="texto"
                   disabled={i === painel.graficos.length - 1}
+                  sx={ALVO}
                   onClick={() => mover(g.id, i + 1)}
-                >
-                  <MoveDown size={15} />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className={estilos.redimensionar}
-                  aria-label={`Redimensionar ${g.titulo}`}
+                />
+                <BotaoIcone
+                  rotulo={`Redimensionar ${g.titulo}`}
                   title="Arrastar; setas alteram largura e altura"
+                  icone={<OpenInFullRoundedIcon />}
+                  variante="texto"
+                  sx={{ ...ALVO, touchAction: "none", cursor: "nwse-resize" }}
                   onPointerDown={(e) => iniciar(e, g, "tamanho")}
                   onPointerMove={acompanhar}
                   onPointerUp={(e) => terminar(e)}
@@ -213,17 +238,21 @@ export function GradePaineisBi({
                       alterar({ ...g, ...ajuste[e.key] });
                     }
                   }}
+                />
+                <Botao
+                  variante="secundario"
+                  tamanho="pequeno"
+                  sx={{ height: 48 }}
+                  onClick={() => onEditar(g)}
                 >
-                  <Expand size={15} />
-                </Button>
-                <Button size="sm" className="h-11" variant="secondary" onClick={() => onEditar(g)}>
                   Editar
-                </Button>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  aria-label={`Duplicar ${g.titulo}`}
+                </Botao>
+                <BotaoIcone
+                  rotulo={`Duplicar ${g.titulo}`}
+                  icone={<ContentCopyRoundedIcon />}
+                  variante="texto"
                   disabled={painel.graficos.length >= 40}
+                  sx={ALVO}
                   onClick={() =>
                     onAlterar({
                       ...painel,
@@ -237,27 +266,24 @@ export function GradePaineisBi({
                       ],
                     })
                   }
-                >
-                  <Copy size={15} />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  aria-label={`Excluir ${g.titulo}`}
+                />
+                <BotaoIcone
+                  rotulo={`Excluir ${g.titulo}`}
+                  icone={<DeleteOutlineRoundedIcon />}
+                  variante="destrutivo"
+                  sx={ALVO}
                   onClick={() =>
                     onAlterar({
                       ...painel,
                       graficos: painel.graficos.filter((v) => v.id !== g.id),
                     })
                   }
-                >
-                  <Trash2 size={15} />
-                </Button>
-              </div>
+                />
+              </Stack>
             }
           />
-        </div>
+        </Box>
       ))}
-    </div>
+    </Box>
   );
 }

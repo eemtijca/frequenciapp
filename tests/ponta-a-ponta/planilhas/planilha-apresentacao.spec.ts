@@ -76,7 +76,7 @@ test("admin confere, cancela e aplica a apresentação com rolagem das colunas",
     exact: true,
   });
   await botao.click();
-  const dialogo = page.getByRole("alertdialog");
+  const dialogo = page.getByRole("dialog");
   await expect(dialogo.getByRole("columnheader", { name: "Aluno", exact: true })).toBeVisible();
   const previa = dialogo.getByRole("region", { name: "Prévia da apresentação" });
   expect(await previa.evaluate((elemento) => elemento.scrollWidth > elemento.clientWidth)).toBe(

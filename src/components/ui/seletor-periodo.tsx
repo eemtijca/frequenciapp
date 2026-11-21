@@ -1,10 +1,26 @@
 "use client";
 
-// Seletor de período próprio: gatilho com rótulo amigável e painel com a
-// grade do mês (dia) ou a grade de meses, sem campo nativo. Abre em popover
-// ancorado em qualquer largura.
-import { useEffect, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+// Seletor de período próprio em MUI: gatilho com rótulo amigável e popover
+// ancorado com a grade do mês (dia) ou a grade de meses, sem campo nativo.
+import {
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
+import Box from "@mui/material/Box";
+import ButtonBase from "@mui/material/ButtonBase";
+import Chip from "@mui/material/Chip";
+import IconButton from "@mui/material/IconButton";
+import Popover from "@mui/material/Popover";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import type { Theme } from "@mui/material/styles";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import {
   celulasDoMes,
   celulasDoMesSegundaDomingo,
@@ -19,8 +35,7 @@ import {
   rotuloMes,
   ultimoDiaDeChamada,
 } from "@/domain/frequencia";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   id: string;
@@ -64,12 +79,42 @@ const DIAS = [
   ["sábado", "sáb."],
 ] as const;
 
+const ALTURA_GATILHO = 44;
+const ALTURA_CELULA = 44;
+const LARGURA_PAINEL = "min(24rem, calc(100vw - 2rem))";
+
+const ALVO_TOQUE = {
+  position: "relative",
+  "&::after": {
+    content: '""',
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+    width: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
+    height: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
+    transform: "translate(-50%, -50%)",
+  },
+} as const;
+
 /** Mesmo dia em outro mês, limitado ao último dia do mês de destino. */
 function mesmoDiaNoMes(dia: string, deslocamento: number): string {
   const alvo = mesSeguinte(dia.slice(0, 7), deslocamento);
   const ultimo = diasDoMes(alvo).length;
   const numero = Math.min(Number(dia.slice(8)), ultimo);
   return `${alvo}-${String(numero).padStart(2, "0")}`;
+}
+
+function colunas(semDomingo: boolean): string {
+  return semDomingo ? "repeat(6, minmax(0, 1fr))" : "repeat(7, minmax(0, 1fr))";
+}
+
+function paletaDoTema(theme: Theme) {
+  return (theme.vars ?? theme).palette;
+}
+
+function corDoDia(theme: Theme, bloqueado: boolean) {
+  const palette = paletaDoTema(theme);
+  return bloqueado ? palette.text.disabled : palette.text.primary;
 }
 
 export function SeletorPeriodo({
@@ -92,6 +137,7 @@ export function SeletorPeriodo({
   onValor,
 }: Props) {
   const [aberto, setAberto] = useState(false);
+  const [ancora, setAncora] = useState<HTMLButtonElement | null>(null);
   const semanal = calendarioSemanal && !semDomingo;
   // Sem valor, o painel abre no dia de referência, mas nenhum dia fica marcado.
   const corrente = atual ?? max;
@@ -101,6 +147,17 @@ export function SeletorPeriodo({
   const [foco, setFoco] = useState(inicial);
   const botoes = useRef(new Map<string, HTMLButtonElement>());
   const focoPendente = useRef(false);
+  const gatilho = useRef<HTMLButtonElement | null>(null);
+  const portal = useRef<HTMLDivElement | null>(null);
+
+  // O popover usa um contêiner próprio no body para não esconder o restante da
+  // tela do leitor de tela, já que este seletor é não modal.
+  useEffect(() => {
+    return () => {
+      portal.current?.remove();
+      portal.current = null;
+    };
+  }, []);
 
   // Sem domingo, a grade e o limite ignoram o dia: se o máximo é domingo,
   // o último dia escolhível continua sendo o sábado. O atalho Hoje não faz
@@ -118,16 +175,6 @@ export function SeletorPeriodo({
     ([nome]) => detalhe === nome || detalhe === nome.replace("-feira", ""),
   );
 
-  // Ao abrir, a visão volta para o valor selecionado e o foco vai para ele.
-  function aoAbrir(abertoNovo: boolean) {
-    setAberto(abertoNovo);
-    if (!abertoNovo) return;
-    focoPendente.current = true;
-    setMesVisivel(referencia.slice(0, 7));
-    setAnoVisivel(referencia.slice(0, 4));
-    setFoco(referencia);
-  }
-
   useEffect(() => {
     if (!aberto) return;
     botoes.current.get(foco)?.focus();
@@ -136,6 +183,29 @@ export function SeletorPeriodo({
   useEffect(() => {
     onAbertoChange?.(aberto);
   }, [aberto, onAbertoChange]);
+
+  // O popover do MUI é modal por padrão. Aqui ele é não modal: o clique e o
+  // foco fora fecham o painel sem devolver o foco, como o restante da tela.
+  useEffect(() => {
+    if (!aberto) return;
+    function foraDoPainel(alvo: EventTarget | null): boolean {
+      if (!(alvo instanceof Element)) return true;
+      const dentroDoPainel = alvo.closest("[data-seletor-periodo-painel]") !== null;
+      return !(dentroDoPainel || gatilho.current?.contains(alvo));
+    }
+    function aoApontar(evento: PointerEvent) {
+      if (foraDoPainel(evento.target)) setAberto(false);
+    }
+    function aoFocar(evento: FocusEvent) {
+      if (foraDoPainel(evento.target)) setAberto(false);
+    }
+    document.addEventListener("pointerdown", aoApontar, true);
+    document.addEventListener("focusin", aoFocar, true);
+    return () => {
+      document.removeEventListener("pointerdown", aoApontar, true);
+      document.removeEventListener("focusin", aoFocar, true);
+    };
+  }, [aberto]);
 
   function registrar(chave: string, elemento: HTMLButtonElement | null) {
     if (!elemento) {
@@ -150,13 +220,37 @@ export function SeletorPeriodo({
     }
   }
 
+  function fechar(devolverFoco: boolean) {
+    setAberto(false);
+    if (devolverFoco) gatilho.current?.focus();
+  }
+
+  function alternar(evento: MouseEvent<HTMLButtonElement>) {
+    if (aberto) {
+      setAberto(false);
+      return;
+    }
+    if (!portal.current) {
+      const elemento = document.createElement("div");
+      elemento.dataset.seletorPeriodoPortal = "true";
+      document.body.appendChild(elemento);
+      portal.current = elemento;
+    }
+    focoPendente.current = true;
+    setAncora(evento.currentTarget);
+    setMesVisivel(referencia.slice(0, 7));
+    setAnoVisivel(referencia.slice(0, 4));
+    setFoco(referencia);
+    setAberto(true);
+  }
+
   function escolher(proximo: string) {
     if (piso && proximo < piso) return;
     onValor(proximo);
-    setAberto(false);
+    fechar(true);
   }
 
-  function aoTeclarDia(evento: React.KeyboardEvent) {
+  function aoTeclarDia(evento: KeyboardEvent<HTMLElement>) {
     let proximo: string | null = null;
     if (evento.key === "ArrowLeft")
       proximo = semDomingo ? diaDeChamadaVizinho(foco, -1) : diaSeguinte(foco, -1);
@@ -189,7 +283,7 @@ export function SeletorPeriodo({
     setMesVisivel(proximo.slice(0, 7));
   }
 
-  function aoTeclarMes(evento: React.KeyboardEvent) {
+  function aoTeclarMes(evento: KeyboardEvent<HTMLElement>) {
     const indice = Number(foco.slice(5)) - 1;
     let proximoIndice: number | null = null;
     if (evento.key === "ArrowLeft") proximoIndice = indice - 1;
@@ -230,100 +324,201 @@ export function SeletorPeriodo({
     setFoco(proximo);
   }
 
-  function classeCelula(
+  function estilosCelula(
+    theme: Theme,
     selecionado: boolean,
-    futuro: boolean,
-    corrente: boolean,
-    foraDoMes = false,
-    domingoResumo = false,
+    bloqueado: boolean,
+    noDiaAtual: boolean,
+    foraDoMes: boolean,
+    domingoResumo: boolean,
   ) {
-    return cn(
-      "pressionavel focus-visible:ring-ring/50 relative flex items-center justify-center text-sm transition-colors focus-visible:ring-[3px] focus-visible:outline-none",
-      futuro && "text-muted-foreground/40 cursor-not-allowed",
-      foraDoMes && !selecionado && !corrente && "text-muted-foreground/55",
-      domingoResumo && !selecionado && "bg-primary/5",
-      selecionado && "selecionado font-semibold",
-      !selecionado && corrente && "controle text-accent-foreground font-semibold",
-      !selecionado && !corrente && "discreto",
-    );
+    const palette = paletaDoTema(theme);
+    const base = {
+      position: "relative",
+      aspectRatio: "1 / 1",
+      width: "100%",
+      minWidth: 0,
+      minHeight: ALTURA_CELULA,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      border: "1px solid transparent",
+      borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
+      backgroundColor: "transparent",
+      color: corDoDia(theme, bloqueado),
+      fontSize: theme.typography.body2.fontSize ?? "0.875rem",
+      fontWeight: selecionado || noDiaAtual ? 600 : 400,
+      lineHeight: 1,
+      transition: theme.transitions.create(["background-color", "border-color", "color"], {
+        duration: 100,
+      }),
+      "&:hover": bloqueado ? {} : { backgroundColor: palette.action.hover },
+      "&.Mui-focusVisible": {
+        outline: `${TOKENS_LAYOUT.campo.foco}px solid ${palette.primary.main}`,
+        outlineOffset: 2,
+      },
+      "&.Mui-disabled": { color: palette.text.disabled, opacity: 1 },
+    };
+    return {
+      ...base,
+      ...(foraDoMes && !selecionado && !noDiaAtual && { color: palette.text.secondary }),
+      ...(domingoResumo &&
+        !selecionado && {
+          backgroundColor: palette.action.selected,
+        }),
+      ...(!selecionado &&
+        noDiaAtual && {
+          borderColor: palette.primary.main,
+          backgroundColor: palette.action.selected,
+          color: palette.text.primary,
+        }),
+      ...(selecionado && {
+        borderColor: palette.primary.main,
+        backgroundColor: palette.primary.main,
+        color: palette.primary.contrastText,
+        "&:hover": { backgroundColor: palette.primary.dark },
+      }),
+    };
   }
 
+  function estilosMes(theme: Theme, selecionado: boolean, bloqueado: boolean, noMesAtual: boolean) {
+    const palette = paletaDoTema(theme);
+    return {
+      width: "100%",
+      minHeight: ALTURA_CELULA,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      border: "1px solid transparent",
+      borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
+      backgroundColor: "transparent",
+      color: corDoDia(theme, bloqueado),
+      fontSize: theme.typography.body2.fontSize ?? "0.875rem",
+      fontWeight: selecionado || noMesAtual ? 600 : 400,
+      transition: theme.transitions.create(["background-color", "border-color", "color"], {
+        duration: 100,
+      }),
+      "&:hover": bloqueado ? {} : { backgroundColor: palette.action.hover },
+      "&.Mui-focusVisible": {
+        outline: `${TOKENS_LAYOUT.campo.foco}px solid ${palette.primary.main}`,
+        outlineOffset: 2,
+      },
+      "&.Mui-disabled": { color: palette.text.disabled, opacity: 1 },
+      ...(!selecionado &&
+        noMesAtual && {
+          borderColor: palette.primary.main,
+          backgroundColor: palette.action.selected,
+          color: palette.text.primary,
+        }),
+      ...(selecionado && {
+        borderColor: palette.primary.main,
+        backgroundColor: palette.primary.main,
+        color: palette.primary.contrastText,
+        "&:hover": { backgroundColor: palette.primary.dark },
+      }),
+    };
+  }
+
+  const semanaVisivel = semDomingo
+    ? SEMANAS_SEM_DOMINGO
+    : semanal
+      ? SEMANAS_SEGUNDA_DOMINGO
+      : SEMANAS;
+  const celulas = semanal
+    ? celulasDoMesSegundaDomingo(mesVisivel)
+    : semDomingo
+      ? celulasDoMesSemDomingo(mesVisivel)
+      : celulasDoMes(mesVisivel);
+
   const painel = (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-2">
-        <button
+    <Stack data-seletor-periodo-painel="true" spacing={1.5} sx={{ p: 1.5 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{ alignItems: "center", justifyContent: "space-between" }}
+      >
+        <IconButton
           type="button"
+          size="small"
           aria-label={modo === "dia" ? "Mês anterior" : "Ano anterior"}
           onClick={() => (modo === "dia" ? mudarMes(-1) : mudarAno(-1))}
-          className={cn(
-            "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none",
-          )}
+          sx={ALVO_TOQUE}
         >
-          <ChevronLeft size={18} />
-        </button>
-        <p aria-live="polite" className="text-sm font-semibold">
+          <ChevronLeftRoundedIcon fontSize="small" />
+        </IconButton>
+        <Typography
+          component="p"
+          variant="body2"
+          aria-live="polite"
+          sx={{ fontWeight: 600, textAlign: "center" }}
+        >
           {modo === "dia" ? rotuloMes(mesVisivel) : anoVisivel}
-        </p>
-        <button
+        </Typography>
+        <IconButton
           type="button"
+          size="small"
           aria-label={modo === "dia" ? "Mês seguinte" : "Ano seguinte"}
           disabled={modo === "dia" ? mesVisivel >= max.slice(0, 7) : anoVisivel >= max.slice(0, 4)}
           onClick={() => (modo === "dia" ? mudarMes(1) : mudarAno(1))}
-          className={cn(
-            "controle focus-visible:ring-ring pressionavel flex size-11 shrink-0 items-center justify-center transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed",
-          )}
+          sx={ALVO_TOQUE}
         >
-          <ChevronRight size={18} />
-        </button>
-      </div>
+          <ChevronRightRoundedIcon fontSize="small" />
+        </IconButton>
+      </Stack>
 
       {modo === "dia" ? (
-        <div
+        <Stack
           role="group"
           aria-label={`Dias de ${rotuloMes(mesVisivel)}`}
-          className="flex flex-col gap-1"
+          spacing={0.5}
           onKeyDown={aoTeclarDia}
         >
-          <div
-            className={cn("grid gap-1", semDomingo ? "grid-cols-6" : "grid-cols-7")}
+          <Box
             aria-hidden="true"
+            sx={{ display: "grid", gridTemplateColumns: colunas(semDomingo), gap: 0.5 }}
           >
-            {(semDomingo ? SEMANAS_SEM_DOMINGO : semanal ? SEMANAS_SEGUNDA_DOMINGO : SEMANAS).map(
-              (letra, indice) => {
-                const domingoResumo = semanal && indice === 6;
-                return (
-                  <span
-                    key={`${letra}-${indice}`}
-                    className={cn(
-                      "text-muted-foreground flex w-full flex-col items-center justify-center gap-0.5 text-[11px] font-medium",
-                      semanal ? "h-9" : "h-7",
-                    )}
-                  >
-                    <span>{letra}</span>
-                    {domingoResumo && (
-                      <span className="text-primary text-[9px] leading-none font-semibold">
-                        Resumo
-                      </span>
-                    )}
-                  </span>
-                );
-              },
-            )}
-          </div>
-          <div className={cn("grid gap-1", semDomingo ? "grid-cols-6" : "grid-cols-7")}>
-            {(semanal
-              ? celulasDoMesSegundaDomingo(mesVisivel)
-              : semDomingo
-                ? celulasDoMesSemDomingo(mesVisivel)
-                : celulasDoMes(mesVisivel)
-            ).map((dia, indice) => {
+            {semanaVisivel.map((letra, indice) => {
+              const domingoResumo = semanal && indice === 6;
+              return (
+                <Box
+                  key={`${letra}-${indice}`}
+                  component="span"
+                  sx={{
+                    display: "flex",
+                    width: "100%",
+                    height: semanal ? 36 : 28,
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: 0.25,
+                    color: "text.secondary",
+                    fontSize: 11,
+                    fontWeight: 500,
+                  }}
+                >
+                  <Box component="span">{letra}</Box>
+                  {domingoResumo && (
+                    <Box
+                      component="span"
+                      sx={{
+                        color: "primary.main",
+                        fontSize: 9,
+                        fontWeight: 600,
+                        lineHeight: 1,
+                      }}
+                    >
+                      Resumo
+                    </Box>
+                  )}
+                </Box>
+              );
+            })}
+          </Box>
+          <Box sx={{ display: "grid", gridTemplateColumns: colunas(semDomingo), gap: 0.5 }}>
+            {celulas.map((dia, indice) => {
               if (!dia)
                 return (
-                  <span
-                    key={`vazio-${indice}`}
-                    aria-hidden="true"
-                    className="aspect-square w-full"
-                  />
+                  <Box key={`vazio-${indice}`} aria-hidden="true" sx={{ aspectRatio: "1 / 1" }} />
                 );
               const selecionado = dia === valor;
               const futuro = dia > max;
@@ -334,7 +529,7 @@ export function SeletorPeriodo({
               const noDiaAtual = dia === corrente;
               const numero = Number(dia.slice(8));
               return (
-                <button
+                <ButtonBase
                   key={dia}
                   ref={(elemento) => registrar(dia, elemento)}
                   type="button"
@@ -346,37 +541,52 @@ export function SeletorPeriodo({
                   data-dia={dia}
                   data-fora-do-mes={foraDoMes ? "true" : undefined}
                   data-domingo-resumo={domingoResumo ? "true" : undefined}
-                  className={cn(
-                    "aspect-square w-full",
-                    classeCelula(selecionado, bloqueado, noDiaAtual, foraDoMes, domingoResumo),
-                  )}
+                  sx={(theme) =>
+                    estilosCelula(
+                      theme,
+                      selecionado,
+                      bloqueado,
+                      noDiaAtual,
+                      foraDoMes,
+                      domingoResumo,
+                    )
+                  }
                 >
                   {numero}
                   {domingoResumo && (
-                    <span
+                    <Box
+                      component="span"
                       aria-hidden="true"
-                      className={cn(
-                        "absolute bottom-1.5 size-1 rounded-full",
-                        bloqueado ? "bg-muted-foreground/40" : "bg-primary",
-                      )}
+                      sx={{
+                        position: "absolute",
+                        bottom: 6,
+                        width: 4,
+                        height: 4,
+                        borderRadius: "50%",
+                        backgroundColor: bloqueado ? "text.disabled" : "primary.main",
+                      }}
                     />
                   )}
-                </button>
+                </ButtonBase>
               );
             })}
-          </div>
+          </Box>
           {semanal && (
-            <p className="text-muted-foreground text-xs">
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
               Domingos, na última coluna, abrem o resumo da semana anterior.
-            </p>
+            </Typography>
           )}
-        </div>
+        </Stack>
       ) : (
-        <div
+        <Box
           role="group"
           aria-label={`Meses de ${anoVisivel}`}
-          className="grid grid-cols-3 gap-1"
           onKeyDown={aoTeclarMes}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+            gap: 0.5,
+          }}
         >
           {MESES.map((numero) => {
             const mes = `${anoVisivel}-${String(numero).padStart(2, "0")}`;
@@ -385,7 +595,7 @@ export function SeletorPeriodo({
             const bloqueado = futuro || Boolean(piso && mes < piso.slice(0, 7));
             const noMesAtual = mes === corrente;
             return (
-              <button
+              <ButtonBase
                 key={mes}
                 ref={(elemento) => registrar(mes, elemento)}
                 type="button"
@@ -393,96 +603,227 @@ export function SeletorPeriodo({
                 disabled={bloqueado}
                 aria-pressed={selecionado}
                 onClick={() => escolher(mes)}
-                className={cn("h-11 w-full", classeCelula(selecionado, bloqueado, noMesAtual))}
+                sx={(theme) => estilosMes(theme, selecionado, bloqueado, noMesAtual)}
               >
                 {nomeDoMes(mes)}
-              </button>
+              </ButtonBase>
             );
           })}
-        </div>
+        </Box>
       )}
 
-      <div className="flex items-center justify-between gap-2 border-t pt-3">
-        <button
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderTop: 1,
+          borderColor: "divider",
+          pt: 1.5,
+        }}
+      >
+        <ButtonBase
           type="button"
           disabled={hojeDesabilitado}
           onClick={() => {
             if (hojeDesabilitado) return;
             if (aoHoje) {
               aoHoje();
-              setAberto(false);
+              fechar(true);
               return;
             }
             escolher(aprumar(corrente));
           }}
-          className="discreto text-primary disabled:text-muted-foreground pressionavel min-h-11 px-3 text-sm font-semibold disabled:pointer-events-none"
+          sx={(theme) => ({
+            minHeight: ALTURA_GATILHO,
+            px: 1.5,
+            borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
+            color: paletaDoTema(theme).primary.main,
+            fontSize: theme.typography.body2.fontSize ?? "0.875rem",
+            fontWeight: 600,
+            "&:hover": { backgroundColor: paletaDoTema(theme).action.hover },
+            "&.Mui-disabled": { color: paletaDoTema(theme).text.disabled, opacity: 1 },
+          })}
         >
           {modo === "dia" ? "Hoje" : "Este mês"}
-        </button>
-        <button
+        </ButtonBase>
+        <ButtonBase
           type="button"
-          onClick={() => setAberto(false)}
-          className="discreto text-muted-foreground hover:text-foreground pressionavel min-h-11 px-3 text-sm font-medium"
+          onClick={() => fechar(true)}
+          sx={(theme) => ({
+            minHeight: ALTURA_GATILHO,
+            px: 1.5,
+            borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
+            color: paletaDoTema(theme).text.secondary,
+            fontSize: theme.typography.body2.fontSize ?? "0.875rem",
+            "&:hover": {
+              color: paletaDoTema(theme).text.primary,
+              backgroundColor: paletaDoTema(theme).action.hover,
+            },
+          })}
         >
           Fechar
-        </button>
-      </div>
-    </div>
+        </ButtonBase>
+      </Stack>
+    </Stack>
   );
 
-  const gatilho = (
-    <button
-      id={id}
-      type="button"
-      disabled={disabled}
-      aria-haspopup="dialog"
-      aria-expanded={aberto}
-      aria-label={`${rotuloAcessivel}: ${rotulo}${diaDaSemana ? `, ${diaDaSemana[0]}` : ""}${selo ? `, ${selo}` : ""}`}
-      className={cn(
-        "campo pressionavel @container flex min-h-11 w-full flex-wrap items-center justify-center gap-x-2 gap-y-0 px-3 py-1 text-sm font-medium transition-colors disabled:cursor-not-allowed",
-      )}
-    >
-      <CalendarDays
-        size={16}
-        className="text-secondary-foreground hidden shrink-0 @min-[11rem]:block"
+  const conteudoGatilho: ReactNode = (
+    <>
+      <CalendarMonthRoundedIcon
         aria-hidden="true"
+        sx={{
+          display: { "@": "none", "@176": "block" },
+          flexShrink: 0,
+          fontSize: 18,
+          color: "inherit",
+          opacity: 0.8,
+        }}
       />
-      <span className="numerais-tabulares max-w-full min-w-0 shrink-0 font-semibold break-words">
+      <Box
+        component="span"
+        className="numerais-tabulares"
+        sx={{
+          maxWidth: "100%",
+          minWidth: 0,
+          flexShrink: 0,
+          fontWeight: 600,
+          overflowWrap: "anywhere",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
         {rotulo}
-      </span>
+      </Box>
       {detalhe && (
-        <span className="detalhe-data text-secondary-foreground max-w-full min-w-0 shrink-0 break-words">
+        <Box
+          component="span"
+          className="detalhe-data"
+          data-detalhe="true"
+          sx={{
+            maxWidth: "100%",
+            minWidth: 0,
+            flexShrink: 0,
+            color: "text.secondary",
+            overflowWrap: "anywhere",
+          }}
+        >
           {diaDaSemana ? (
             <>
-              <span className="@min-[14rem]:hidden">{diaDaSemana[1]}</span>
-              <span className="hidden @min-[14rem]:inline">{detalhe}</span>
+              <Box component="span" sx={{ display: { "@224": "none" } }}>
+                {diaDaSemana[1]}
+              </Box>
+              <Box component="span" sx={{ display: { "@": "none", "@224": "inline" } }}>
+                {detalhe}
+              </Box>
             </>
           ) : (
             detalhe
           )}
-        </span>
+        </Box>
       )}
       {selo && (
-        <span className="bg-primary/15 text-primary max-w-full shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold">
-          {selo}
-        </span>
+        <Chip
+          data-selo="true"
+          label={selo}
+          color="primary"
+          size="small"
+          sx={{
+            maxWidth: "100%",
+            height: 24,
+            flexShrink: 0,
+            "& .MuiChip-label": { px: 1, fontSize: 11 },
+          }}
+        />
       )}
-    </button>
+    </>
   );
 
   return (
-    <Popover open={aberto} onOpenChange={aoAbrir}>
-      <PopoverTrigger asChild>{gatilho}</PopoverTrigger>
-      <PopoverContent
-        role="dialog"
-        aria-label={rotuloAcessivel}
-        align="center"
-        collisionPadding={8}
-        className="max-h-[var(--radix-popover-content-available-height)] w-[min(24rem,calc(100vw-1.5rem))] overflow-y-auto p-3"
-        onOpenAutoFocus={(evento) => evento.preventDefault()}
+    <>
+      <ButtonBase
+        ref={gatilho}
+        id={id}
+        type="button"
+        disabled={disabled}
+        aria-haspopup="dialog"
+        aria-expanded={aberto}
+        aria-label={`${rotuloAcessivel}: ${rotulo}${diaDaSemana ? `, ${diaDaSemana[0]}` : ""}${selo ? `, ${selo}` : ""}`}
+        onClick={alternar}
+        sx={(theme) => ({
+          containerType: "inline-size",
+          display: "flex",
+          width: "100%",
+          minHeight: ALTURA_GATILHO,
+          flexWrap: "wrap",
+          alignItems: "center",
+          justifyContent: "center",
+          columnGap: 1,
+          rowGap: 0,
+          px: 1.5,
+          py: 0.5,
+          border: `1px solid ${paletaDoTema(theme).divider}`,
+          borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
+          backgroundColor: paletaDoTema(theme).background.paper,
+          color: paletaDoTema(theme).text.primary,
+          fontFamily: theme.typography.fontFamily,
+          fontSize: theme.typography.body2.fontSize ?? "0.875rem",
+          fontWeight: 500,
+          transition: theme.transitions.create(["background-color", "border-color", "color"], {
+            duration: 100,
+          }),
+          "&:hover": {
+            backgroundColor: paletaDoTema(theme).action.hover,
+            borderColor: paletaDoTema(theme).grey[400],
+          },
+          "&.Mui-focusVisible": {
+            outline: `${TOKENS_LAYOUT.campo.foco}px solid ${paletaDoTema(theme).primary.main}`,
+            outlineOffset: 2,
+          },
+          "&.Mui-disabled": {
+            color: paletaDoTema(theme).text.disabled,
+            cursor: "not-allowed",
+            opacity: 0.7,
+          },
+        })}
+      >
+        {conteudoGatilho}
+      </ButtonBase>
+
+      <Popover
+        open={aberto}
+        anchorEl={ancora}
+        container={() => portal.current}
+        onClose={(_evento, motivo) => fechar(motivo === "escapeKeyDown")}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        transformOrigin={{ vertical: "top", horizontal: "center" }}
+        marginThreshold={8}
+        hideBackdrop
+        disableAutoFocus
+        disableEnforceFocus
+        disableRestoreFocus
+        disableScrollLock
+        slotProps={{
+          root: { sx: { pointerEvents: "none" } },
+          paper: {
+            role: "dialog",
+            "aria-label": rotuloAcessivel,
+            sx: (theme) => ({
+              width: LARGURA_PAINEL,
+              maxWidth: "calc(100vw - 32px)",
+              maxHeight: "calc(100dvh - 32px)",
+              overflowY: "auto",
+              pointerEvents: "auto",
+              borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
+              border: `1px solid ${paletaDoTema(theme).divider}`,
+              backgroundImage: "none",
+              boxShadow: theme.shadows[1],
+            }),
+          },
+        }}
       >
         {painel}
-      </PopoverContent>
-    </Popover>
+      </Popover>
+    </>
   );
 }

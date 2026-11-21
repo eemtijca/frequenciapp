@@ -76,7 +76,10 @@ test.describe("Google Planilhas de saídas", () => {
     await expect(cartao.getByText("Conta Google conectada", { exact: true })).toBeVisible();
 
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
-    await expect(cartao.getByText(ABA, { exact: true }).first()).toBeVisible();
+    const campoAba = cartao.getByRole("combobox", { name: "Aba do registro de saídas" });
+    await campoAba.click();
+    await page.getByRole("option", { name: ABA, exact: true }).click();
+    await expect(campoAba).toHaveValue(ABA);
     await cartao.getByRole("button", { name: "Salvar estrutura" }).click();
     await expect(page.getByText("Estrutura salva.")).toBeVisible();
 

@@ -2,10 +2,15 @@
 
 // Registro do service worker e aviso de atualização. Também detecta
 // perda de conexão para orientar enquanto o aplicativo está offline.
-import { useEffect } from "react";
-import { toast } from "sonner";
+import { useEffect, useState } from "react";
+import Alert from "@mui/material/Alert";
+import Button from "@mui/material/Button";
+import Snackbar from "@mui/material/Snackbar";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 
 export default function RegistroPwa() {
+  const [atualizacao, setAtualizacao] = useState<ServiceWorker | null>(null);
+
   useEffect(() => {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
 
@@ -23,15 +28,7 @@ export default function RegistroPwa() {
           if (!novo) return;
           novo.addEventListener("statechange", () => {
             if (novo.state === "installed" && navigator.serviceWorker.controller) {
-              toast("Versão nova do aplicativo disponível.", {
-                description: "Toque em Atualizar para recarregar.",
-                action: {
-                  label: "Atualizar",
-                  onClick: () => {
-                    novo.postMessage({ tipo: "pular-espera" });
-                  },
-                },
-              });
+              setAtualizacao(novo);
             }
           });
         });
@@ -47,13 +44,15 @@ export default function RegistroPwa() {
     }
 
     function aoFicarOnline() {
-      toast.success("Conexão de volta.");
+      avisarSucesso("Conexão de volta.", undefined, "pwa-online");
     }
 
     function aoFicarOffline() {
-      toast.warning(
-        "Você está sem conexão. As marcações não salvas precisam de internet para sincronizar.",
-      );
+      avisarErro(new Error("Você está sem conexão."), {
+        contexto: "Você está sem conexão.",
+        descricao: "As marcações não salvas precisam de internet para sincronizar.",
+        id: "pwa-offline",
+      });
     }
 
     void registrar();
@@ -68,5 +67,31 @@ export default function RegistroPwa() {
     };
   }, []);
 
-  return null;
+  function aplicarAtualizacao() {
+    atualizacao?.postMessage({ tipo: "pular-espera" });
+    setAtualizacao(null);
+  }
+
+  return (
+    <Snackbar
+      open={atualizacao !== null}
+      anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      onClose={() => setAtualizacao(null)}
+    >
+      <Alert
+        severity="info"
+        variant="standard"
+        role="status"
+        onClose={() => setAtualizacao(null)}
+        action={
+          <Button color="inherit" size="small" onClick={aplicarAtualizacao}>
+            Atualizar
+          </Button>
+        }
+        sx={{ width: "100%" }}
+      >
+        Versão nova do aplicativo disponível. Toque em Atualizar para recarregar.
+      </Alert>
+    </Snackbar>
+  );
 }

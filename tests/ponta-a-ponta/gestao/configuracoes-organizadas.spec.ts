@@ -21,8 +21,8 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
     return rota.fulfill({ status: 500, json: { error: "E2E Gravação inesperada." } });
   });
   await abrir(page);
-  const escola = page.getByRole("navigation", { name: "Ações da escola", exact: true });
-  await escola.getByRole("button", { name: "Cadastros", exact: true }).tap();
+  const escola = page.getByRole("tablist", { name: "Ações da escola", exact: true });
+  await escola.getByRole("tab", { name: "Cadastros", exact: true }).tap();
   const justificativas = page.locator('[data-secao="config-justificativas"]');
   await justificativas.getByRole("button", { name: /^Justificativas/ }).tap();
   await expect(justificativas.getByLabel("Código", { exact: true })).toBeHidden();
@@ -31,10 +31,10 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
   await justificativas.getByLabel("Rótulo", { exact: true }).fill("E2E Cadastro em revisão");
   await justificativas.getByRole("button", { name: "Adicionar", exact: true }).tap();
   await expect(justificativas.getByText("E2E Cadastro em revisão", { exact: true })).toBeVisible();
-  const frequencia = escola.getByRole("button", { name: "Frequência", exact: true });
+  const frequencia = escola.getByRole("tab", { name: "Frequência", exact: true });
   await frequencia.focus();
   await page.keyboard.press("Enter");
-  await expect(frequencia).toHaveAttribute("aria-pressed", "true");
+  await expect(frequencia).toHaveAttribute("aria-selected", "true");
   await expect(justificativas).toBeHidden();
   await page
     .getByRole("navigation", { name: "Categorias de configurações" })
@@ -80,17 +80,17 @@ test("as tarefas das categorias cabem no celular e seus painéis ficam acessíve
       .getByRole("navigation", { name: "Categorias de configurações" })
       .getByRole("button", { name: grupo.categoria, exact: true })
       .tap();
-    const navegacao = page.getByRole("navigation", { name: grupo.nome, exact: true });
+    const navegacao = page.getByRole("tablist", { name: grupo.nome, exact: true });
     for (const acao of grupo.acoes) {
-      const botao = navegacao.getByRole("button", { name: acao, exact: true });
+      const botao = navegacao.getByRole("tab", { name: acao, exact: true });
       await botao.tap();
-      await expect(botao).toHaveAttribute("aria-pressed", "true");
+      await expect(botao).toHaveAttribute("aria-selected", "true");
       const painelId = await botao.getAttribute("aria-controls");
       expect(painelId).toBeTruthy();
       const painel = page.locator(`[id="${painelId}"]`);
       await expect(painel).toBeVisible();
       for (const gatilho of await painel
-        .locator('[data-secao] > div:first-child > button[aria-expanded="false"]')
+        .locator('[data-secao] button[aria-expanded="false"]')
         .all()) {
         if (await gatilho.isVisible()) await gatilho.tap();
       }

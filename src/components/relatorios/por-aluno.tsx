@@ -1,7 +1,6 @@
 "use client";
 
-// Relatório por aluno no mês: faltas, faltas justificadas, saídas e dias com registro,
-// com o acumulado de todo o histórico. A lista se agrupa em séries e turmas recolhíveis.
+// Relatório por aluno no mês, com acumulado do histórico e grupos recolhíveis por turma.
 import {
   memo,
   useDeferredValue,
@@ -10,15 +9,18 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsDownUp,
-  ChevronsUpDown,
-  FileText,
-  UserRound,
-} from "lucide-react";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import PersonSearchRoundedIcon from "@mui/icons-material/PersonSearchRounded";
+import UnfoldLessRoundedIcon from "@mui/icons-material/UnfoldLessRounded";
+import UnfoldMoreRoundedIcon from "@mui/icons-material/UnfoldMoreRounded";
+import Box from "@mui/material/Box";
+import ButtonBase from "@mui/material/ButtonBase";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type {
   Aluno,
   Frequencia,
@@ -37,13 +39,14 @@ import {
   rotuloMes,
   rotuloMomento,
 } from "@/domain/frequencia";
-import { CirculosAcumulado } from "@/components/ui/circulo-contagem";
+import { CirculosAcumulado } from "@/components/ui/mui/circulo-contagem";
 import { indexarPorDia, resumoPorAluno, type ResumoAlunoPeriodo } from "@/domain/relatorios";
-import { Button } from "@/components/ui/button";
-import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
-import { BarraBusca } from "@/components/ui/barra-busca";
-import { avisarInfo } from "@/lib/avisos";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { avisarInfo } from "@/lib/avisos";
 
 interface Props {
   alunos: Aluno[];
@@ -72,54 +75,89 @@ function DetalheAluno({ aluno, dias, porDia, horarios, saidas }: DetalheProps) {
     .filter((item) => item.marca !== null);
   const saidasDoAluno = saidas.filter((saida) => saida.alunoId === aluno.id);
   if (marcas.length === 0 && saidasDoAluno.length === 0) {
-    return <p className="text-muted-foreground text-sm">Nenhum registro neste mês.</p>;
+    return (
+      <Typography variant="body2" sx={{ color: "text.secondary" }}>
+        Nenhum registro neste mês.
+      </Typography>
+    );
   }
   return (
-    <div className="flex flex-col gap-3">
-      {marcas.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
+    <Stack spacing={2}>
+      {marcas.length > 0 ? (
+        <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
           {marcas.map(({ dia, marca }) => (
-            <span
+            <Box
+              component="span"
               key={dia}
-              className={`numerais-tabulares inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium ${
+              sx={[
+                (tema) => ({
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  border: 1,
+                  borderColor: "divider",
+                  borderRadius: 1,
+                  px: 0.75,
+                  py: 0.25,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  fontVariantNumeric: "tabular-nums",
+                  color: tema.vars.palette.text.secondary,
+                }),
                 marca === "F"
-                  ? "border-falta/40 bg-falta-fraca text-falta-texto"
+                  ? (tema) => ({
+                      borderColor: tema.vars.palette.falta.main,
+                      backgroundColor: tema.vars.palette.falta.fraco,
+                      color: tema.vars.palette.falta.texto,
+                    })
                   : marca === "FJ"
-                    ? "border-justificada/40 bg-justificada-fraca text-justificada-texto"
+                    ? (tema) => ({
+                        borderColor: tema.vars.palette.justificada.main,
+                        backgroundColor: tema.vars.palette.justificada.fraco,
+                        color: tema.vars.palette.justificada.texto,
+                      })
                     : marca === "S"
-                      ? "border-falta/40 text-falta-texto"
-                      : "text-muted-foreground"
-              }`}
+                      ? (tema) => ({
+                          borderColor: tema.vars.palette.falta.main,
+                          color: tema.vars.palette.falta.texto,
+                        })
+                      : null,
+              ]}
             >
-              {dia.slice(8)}/{dia.slice(5, 7)}
-              <strong>{marca}</strong>
-            </span>
+              <Box component="span">
+                {`${dia.slice(8)}/${dia.slice(5, 7)}`}
+                <Box component="strong">{marca}</Box>
+              </Box>
+            </Box>
           ))}
-        </div>
-      )}
-      {saidasDoAluno.length > 0 && (
-        <ul className="flex flex-col gap-1 text-xs">
+        </Stack>
+      ) : null}
+      {saidasDoAluno.length > 0 ? (
+        <Stack component="ul" spacing={1} sx={{ listStyle: "none", m: 0, p: 0 }}>
           {saidasDoAluno.map((saida) => {
             const partes = partesJustificativaSaida(saida);
             return (
-              <li key={saida.id} className="text-muted-foreground flex flex-col gap-1">
-                <span className="numerais-tabulares text-foreground font-medium">
+              <Box component="li" key={saida.id}>
+                <Typography
+                  variant="caption"
+                  sx={{ display: "block", fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+                >
                   {saida.dia.split("-").reverse().join("/")}
-                </span>
+                </Typography>
                 <CaixasDeInfo
-                  partes={[
+                  itens={[
                     rotuloMomento(saida.momento),
                     partes.motivo,
                     partes.complemento,
                     saida.liberadoPorNome ? `Liberado por ${saida.liberadoPorNome}` : "",
                   ]}
                 />
-              </li>
+              </Box>
             );
           })}
-        </ul>
-      )}
-    </div>
+        </Stack>
+      ) : null}
+    </Stack>
   );
 }
 
@@ -156,33 +194,53 @@ interface CabecalhoGrupoProps {
 /** Cabeçalho de série ou turma: recolhe e expande os alunos abaixo dele. */
 function CabecalhoGrupo({ titulo, total, aberto, nivel, linhas, onAlternar }: CabecalhoGrupoProps) {
   return (
-    <button
-      type="button"
+    <ButtonBase
       aria-expanded={aberto}
       onClick={onAlternar}
-      className={`pressionavel hover:bg-secondary/60 flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left transition-colors ${
-        nivel === "serie" ? "bg-secondary/50 font-semibold" : "font-medium"
-      }`}
+      sx={[
+        {
+          display: "flex",
+          width: "100%",
+          minHeight: 48,
+          alignItems: "center",
+          gap: 2,
+          px: 2,
+          py: 1,
+          textAlign: "left",
+          justifyContent: "flex-start",
+          "&:hover": { bgcolor: "action.hover" },
+        },
+        nivel === "serie" ? { bgcolor: "action.hover", fontWeight: 600 } : { fontWeight: 500 },
+      ]}
     >
-      <ChevronDown
-        size={18}
+      <ExpandMoreRoundedIcon
         aria-hidden="true"
-        className={`text-muted-foreground shrink-0 transition-transform ${aberto ? "" : "-rotate-90"}`}
+        sx={{
+          flexShrink: 0,
+          color: "text.secondary",
+          transform: aberto ? "none" : "rotate(-90deg)",
+          transition: (tema) => tema.transitions.create("transform", { duration: 150 }),
+        }}
       />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate">{titulo}</span>
-        <span className="text-muted-foreground block text-xs font-normal">
+      <Box sx={{ minWidth: 0, flex: 1 }}>
+        <Typography noWrap sx={{ fontWeight: "inherit" }}>
+          {titulo}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{ display: "block", color: "text.secondary", fontWeight: 400 }}
+        >
           {contagemDeAlunos(total)}
-        </span>
-      </span>
-      {linhas && (
+        </Typography>
+      </Box>
+      {linhas ? (
         <CirculosAcumulado
           faltas={linhas.reduce((soma, { resumo }) => soma + resumo.faltas, 0)}
           justificadas={linhas.reduce((soma, { resumo }) => soma + resumo.justificadas, 0)}
           saidas={linhas.reduce((soma, { resumo }) => soma + resumo.saidas, 0)}
         />
-      )}
-    </button>
+      ) : null}
+    </ButtonBase>
   );
 }
 
@@ -213,66 +271,96 @@ const ListaAlunos = memo(function ListaAlunos({
   saidas,
 }: ListaAlunosProps) {
   return (
-    <ul className="divide-y border-t">
+    <Box
+      component="ul"
+      sx={{ listStyle: "none", m: 0, p: 0, borderTop: 1, borderColor: "divider" }}
+    >
       {linhas.map(({ aluno, resumo: doAluno }) => {
         const acumulado = acumuladoDe(aluno.id);
         const aberto = expandido === aluno.id;
         return (
-          <li key={aluno.id}>
-            <button
-              type="button"
+          <Box
+            component="li"
+            key={aluno.id}
+            sx={{ borderBottom: 1, borderColor: "divider", "&:last-of-type": { borderBottom: 0 } }}
+          >
+            <ButtonBase
               aria-expanded={aberto}
               onClick={() => setExpandido((atual) => (atual === aluno.id ? null : aluno.id))}
-              className="hover:bg-secondary/60 active:bg-secondary/80 pressionavel flex min-h-14 w-full items-center gap-3 px-4 py-2.5 text-left transition-colors"
+              sx={{
+                display: "flex",
+                width: "100%",
+                minHeight: 56,
+                alignItems: "center",
+                gap: 2,
+                px: 2,
+                py: 1,
+                textAlign: "left",
+                justifyContent: "flex-start",
+                "&:hover": { bgcolor: "action.hover" },
+              }}
             >
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{aluno.nome}</span>
-                <span className="text-muted-foreground block truncate text-xs">
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <Typography noWrap sx={{ fontWeight: 500 }}>
+                  {aluno.nome}
+                </Typography>
+                <Typography noWrap variant="caption" sx={{ color: "text.secondary" }}>
                   {rotuloTurma(aluno.turmaId)}
                   {aluno.turmaOriginalId !== aluno.turmaId
                     ? ` · origem ${rotuloTurma(aluno.turmaOriginalId)}`
                     : ""}
-                </span>
-              </span>
+                </Typography>
+              </Box>
               <CirculosAcumulado
                 faltas={doAluno.faltas}
                 justificadas={doAluno.justificadas}
                 saidas={doAluno.saidas}
               />
-            </button>
-            {aberto && (
-              <div className="bg-secondary/30 border-t px-4 py-3">
-                <p className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
-                  <span>
+            </ButtonBase>
+            {aberto ? (
+              <Box
+                sx={{
+                  bgcolor: "action.hover",
+                  borderTop: 1,
+                  borderColor: "divider",
+                  px: 2,
+                  py: 1.5,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  sx={{ alignItems: "center", flexWrap: "wrap", mb: 1 }}
+                >
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
                     Acumulado desde{" "}
                     {resumo?.primeiroDia
                       ? resumo.primeiroDia.split("-").reverse().join("/")
                       : "a primeira chamada"}
-                  </span>
+                  </Typography>
                   <CirculosAcumulado
                     faltas={acumulado?.faltas ?? 0}
                     justificadas={acumulado?.faltasJustificadas ?? 0}
                   />
-                  <span>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
                     em {resumo?.diasLetivos ?? 0}{" "}
                     {resumo?.diasLetivos === 1 ? "dia letivo" : "dias letivos"}
-                  </span>
-                </p>
-                <div className="mt-2">
-                  <DetalheAluno
-                    aluno={aluno}
-                    dias={dias}
-                    porDia={porDia}
-                    horarios={horarios}
-                    saidas={saidas}
-                  />
-                </div>
-              </div>
-            )}
-          </li>
+                  </Typography>
+                </Stack>
+                <DetalheAluno
+                  aluno={aluno}
+                  dias={dias}
+                  porDia={porDia}
+                  horarios={horarios}
+                  saidas={saidas}
+                />
+              </Box>
+            ) : null}
+          </Box>
         );
       })}
-    </ul>
+    </Box>
   );
 });
 
@@ -392,20 +480,24 @@ export default function PorAluno({
   }
 
   return (
-    <section aria-label="Relatório por aluno" className="flex flex-col gap-4 pb-6">
-      <h1 className="text-xl font-semibold tracking-tight">Por aluno</h1>
+    <Box
+      component="section"
+      aria-label="Relatório por aluno"
+      sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 3, minWidth: 0 }}
+    >
+      <Typography component="h1" variant="h4">
+        Por aluno
+      </Typography>
 
-      <div className="navegacao-dia flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Mês anterior"
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <BotaoIcone
+          rotulo="Mês anterior"
+          variante="contorno"
+          icone={<ChevronLeftRoundedIcon />}
           onClick={() => onMes(mesSeguinte(mes, -1))}
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="min-w-0 flex-1">
+          sx={{ width: 48, height: 48 }}
+        />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <SeletorPeriodo
             id="mes-por-aluno"
             modo="mes"
@@ -415,62 +507,49 @@ export default function PorAluno({
             rotulo={rotuloMes(mes)}
             onValor={onMes}
           />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Mês seguinte"
+        </Box>
+        <BotaoIcone
+          rotulo="Mês seguinte"
+          variante="contorno"
+          icone={<ChevronRightRoundedIcon />}
           disabled={mes >= mesCorrente}
           onClick={() => onMes(mesSeguinte(mes, 1))}
-        >
-          <ChevronRight size={18} />
-        </Button>
-      </div>
+          sx={{ width: 48, height: 48 }}
+        />
+      </Stack>
 
-      <div className="flex flex-col gap-3">
+      <Stack spacing={2}>
         <BarraBusca
           id="busca-por-aluno"
           valor={busca}
           onValor={setBusca}
           placeholder="Buscar aluno"
         />
-        <div className="flex flex-wrap gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-11 min-w-28 flex-1"
+        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+          <Botao
+            variante="contorno"
+            icone={todasSeriesAbertas ? <UnfoldLessRoundedIcon /> : <UnfoldMoreRoundedIcon />}
             aria-expanded={todasSeriesAbertas}
             aria-label={`${todasSeriesAbertas ? "Recolher" : "Expandir"} todas as séries`}
             disabled={buscando || grupos.length === 0}
             onClick={alternarSeries}
+            sx={{ flex: 1, minWidth: 112 }}
           >
-            {todasSeriesAbertas ? (
-              <ChevronsDownUp size={16} aria-hidden="true" />
-            ) : (
-              <ChevronsUpDown size={16} aria-hidden="true" />
-            )}
             Série
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-11 min-w-28 flex-1"
+          </Botao>
+          <Botao
+            variante="contorno"
+            icone={todasTurmasAbertas ? <UnfoldLessRoundedIcon /> : <UnfoldMoreRoundedIcon />}
             aria-expanded={todasTurmasAbertas}
             aria-label={`${todasTurmasAbertas ? "Recolher" : "Expandir"} todas as turmas`}
             disabled={buscando || grupos.length === 0}
             onClick={alternarTurmas}
+            sx={{ flex: 1, minWidth: 112 }}
           >
-            {todasTurmasAbertas ? (
-              <ChevronsDownUp size={16} aria-hidden="true" />
-            ) : (
-              <ChevronsUpDown size={16} aria-hidden="true" />
-            )}
             Turma
-          </Button>
-          <Button
-            type="button"
-            className="min-h-11 min-w-44 flex-[2]"
+          </Botao>
+          <Botao
+            icone={<DescriptionRoundedIcon />}
             onClick={() =>
               avisarInfo(
                 "Emissão de relatório em preparação",
@@ -478,25 +557,25 @@ export default function PorAluno({
                 "emitir-relatorio-por-aluno",
               )
             }
+            sx={{ flex: 1, minWidth: 176 }}
           >
-            <FileText size={16} aria-hidden="true" />
             Emitir relatório
-          </Button>
-        </div>
-      </div>
+          </Botao>
+        </Stack>
+      </Stack>
 
       {linhas.length === 0 ? (
-        <div className="superficie flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
-          <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Nenhum aluno encontrado</p>
-          <p className="text-muted-foreground text-sm">Ajuste a busca.</p>
-        </div>
+        <EstadoVazio
+          icone={<PersonSearchRoundedIcon />}
+          titulo="Nenhum aluno encontrado"
+          descricao="Ajuste a busca."
+        />
       ) : (
-        <div className="superficie divide-y overflow-hidden">
+        <Paper variant="outlined" sx={{ overflow: "hidden", boxShadow: "none" }}>
           {grupos.map(({ serie, turmas: gruposTurma, alunos: totalSerie }) => {
             const serieAberta = buscando || !seriesFechadas.has(serie.id);
             return (
-              <section key={serie.id} aria-label={serie.nome}>
+              <Box component="section" key={serie.id} aria-label={serie.nome}>
                 <CabecalhoGrupo
                   nivel="serie"
                   titulo={serie.nome}
@@ -504,51 +583,53 @@ export default function PorAluno({
                   aberto={serieAberta}
                   onAlternar={() => alternarGrupo(seriesFechadas, setSeriesFechadas, serie.id)}
                 />
-                {serieAberta &&
-                  gruposTurma.map(({ turma, linhas: linhasTurma }) => {
-                    const turmaAberta = buscando || !turmasFechadas.has(turma.id);
-                    return (
-                      <section
-                        key={turma.id}
-                        aria-label={turma.rotulo}
-                        className="grupo-distante border-t"
-                      >
-                        <CabecalhoGrupo
-                          nivel="turma"
-                          titulo={turma.rotulo}
-                          total={linhasTurma.length}
-                          linhas={linhasTurma}
-                          aberto={turmaAberta}
-                          onAlternar={() =>
-                            alternarGrupo(turmasFechadas, setTurmasFechadas, turma.id)
-                          }
-                        />
-                        {turmaAberta && (
-                          <ListaAlunos
+                {serieAberta
+                  ? gruposTurma.map(({ turma, linhas: linhasTurma }) => {
+                      const turmaAberta = buscando || !turmasFechadas.has(turma.id);
+                      return (
+                        <Box
+                          component="section"
+                          key={turma.id}
+                          aria-label={turma.rotulo}
+                          sx={{ borderTop: 1, borderColor: "divider" }}
+                        >
+                          <CabecalhoGrupo
+                            nivel="turma"
+                            titulo={turma.rotulo}
+                            total={linhasTurma.length}
                             linhas={linhasTurma}
-                            expandido={
-                              linhasTurma.some(({ aluno }) => aluno.id === expandido)
-                                ? expandido
-                                : null
+                            aberto={turmaAberta}
+                            onAlternar={() =>
+                              alternarGrupo(turmasFechadas, setTurmasFechadas, turma.id)
                             }
-                            setExpandido={setExpandido}
-                            rotuloTurma={rotuloTurma}
-                            acumuladoDe={acumuladoDe}
-                            resumo={resumo}
-                            dias={dias}
-                            porDia={porDia}
-                            horarios={horarios}
-                            saidas={saidas}
                           />
-                        )}
-                      </section>
-                    );
-                  })}
-              </section>
+                          {turmaAberta ? (
+                            <ListaAlunos
+                              linhas={linhasTurma}
+                              expandido={
+                                linhasTurma.some(({ aluno }) => aluno.id === expandido)
+                                  ? expandido
+                                  : null
+                              }
+                              setExpandido={setExpandido}
+                              rotuloTurma={rotuloTurma}
+                              acumuladoDe={acumuladoDe}
+                              resumo={resumo}
+                              dias={dias}
+                              porDia={porDia}
+                              horarios={horarios}
+                              saidas={saidas}
+                            />
+                          ) : null}
+                        </Box>
+                      );
+                    })
+                  : null}
+              </Box>
             );
           })}
-        </div>
+        </Paper>
       )}
-    </section>
+    </Box>
   );
 }

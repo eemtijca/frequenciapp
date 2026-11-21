@@ -90,8 +90,7 @@ test.describe("Google Planilhas", () => {
 
     // Estrutura e mapa sugeridos.
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
-    const painelConfig = page.locator("#painel-configuracoes");
-    await expect(painelConfig.getByText("E2E Ano A", { exact: true }).first()).toBeVisible();
+    await expect(cartao.getByText("E2E Ano A", { exact: true }).first()).toBeVisible();
     await cartao.getByRole("button", { name: "Salvar estrutura" }).click();
     await expect(page.getByText("Estrutura salva.", { exact: true })).toBeVisible();
 
@@ -101,7 +100,7 @@ test.describe("Google Planilhas", () => {
     await page.getByRole("option", { name: "E2E Ano A", exact: true }).click();
     const organizar = cartao.getByRole("button", { name: "Organizar apresentação de E2E Ano A" });
     await organizar.click();
-    const apresentacao = page.getByRole("alertdialog");
+    const apresentacao = page.getByRole("dialog");
     await expect(
       apresentacao.getByRole("heading", { name: "Organizar apresentação da aba E2E Ano A?" }),
     ).toBeVisible();
@@ -135,7 +134,7 @@ test.describe("Google Planilhas", () => {
       apresentacao.getByRole("heading", { name: "Resultado da organização" }),
     ).toBeVisible();
     await expect(apresentacao.getByText(/Concluídas: 2 de 2. Pendências: 0/)).toBeVisible();
-    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).click();
+    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).last().click();
     const corrigir = cartao.getByRole("button", {
       name: "Corrigir cabeçalho e datas de todas as turmas",
       exact: true,
@@ -184,7 +183,7 @@ test.describe("Google Planilhas", () => {
         false,
       );
     await apresentacao.screenshot({ path: "test-results/planilha-todas-resultado.png" });
-    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).click();
+    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).last().click();
 
     // O envio ao salvar permanece desligado e o mapa continua disponível.
     await selecionarAcaoPlanilha(cartao, "Enviar");
@@ -238,7 +237,7 @@ test.describe("Google Planilhas", () => {
 
     // Sem conexão, o envio fica bloqueado.
     await page.context().setOffline(true);
-    await expect(dialogo.getByText(/Sem conexão/)).toBeVisible();
+    await expect(dialogo.getByText("Sem conexão", { exact: true })).toBeVisible();
     await expect(dialogo.getByRole("button", { name: "Enviar" })).toBeDisabled();
     await page.context().setOffline(false);
     await dialogo.getByRole("button", { name: "Cancelar" }).click();

@@ -1,13 +1,21 @@
 "use client";
 
 // Componentes visuais compartilhados pelos resumos semanais das quatro telas.
-import type { ReactNode } from "react";
-import { CalendarDays, ChevronRight, type LucideIcon } from "lucide-react";
+import { createElement, type ElementType, type ReactNode } from "react";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import Box from "@mui/material/Box";
+import ButtonBase from "@mui/material/ButtonBase";
+import Card from "@mui/material/Card";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import type { Theme } from "@mui/material/styles";
 import { rotuloData, rotuloDataCurta } from "@/domain/frequencia";
-import { AtualizadoEm } from "@/components/ui/atualizado-em";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
-import { Selo } from "@/components/ui/selo";
-import { cn } from "@/lib/utils";
+import { Acordeao, type NivelTituloAcordeao } from "@/components/ui/mui/acordeao";
+import { AtualizadoEm } from "@/components/ui/mui/atualizado-em";
+import { Selo, type TomSelo } from "@/components/ui/mui/selo";
+
+type IconeResumo = ElementType;
 
 export function CabecalhoResumo({
   dias,
@@ -27,32 +35,79 @@ export function CabecalhoResumo({
   const de = dias[0] ?? "";
   const ate = dias[dias.length - 1] ?? "";
   return (
-    <header className="flex flex-wrap items-start justify-between gap-3 p-3 sm:p-4">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <span className="controle text-secondary-foreground mt-0.5 flex size-9 shrink-0 items-center justify-center">
-          <CalendarDays size={16} aria-hidden="true" />
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-lg font-semibold tracking-tight">{titulo}</h2>
-          <p className="text-muted-foreground mt-0.5 text-sm">
+    <Box
+      component="header"
+      sx={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 2,
+        p: { xs: 1.5, sm: 2 },
+      }}
+    >
+      <Stack direction="row" spacing={1.5} sx={{ minWidth: 0, flex: 1, alignItems: "flex-start" }}>
+        <Box
+          aria-hidden="true"
+          sx={(theme) => ({
+            display: "flex",
+            width: 36,
+            height: 36,
+            flexShrink: 0,
+            alignItems: "center",
+            justifyContent: "center",
+            borderRadius: 2,
+            backgroundColor: theme.vars.palette.action.hover,
+            color: theme.vars.palette.text.secondary,
+          })}
+        >
+          <CalendarMonthRoundedIcon fontSize="small" />
+        </Box>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h2" variant="h6" sx={{ fontWeight: 600 }}>
+            {titulo}
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 0.25, color: "text.secondary" }}>
             {de && ate ? `${rotuloDataCurta(de)} a ${rotuloDataCurta(ate)}` : ""}
             {domingo ? `, encerrada em ${rotuloData(domingo)}` : ""}
-          </p>
-          {descricao && <p className="text-muted-foreground text-xs">{descricao}</p>}
-        </div>
-      </div>
-      <div className="flex w-full shrink-0 flex-col items-start gap-1 sm:w-auto sm:items-end">
-        <span className="shrink-0">
-          <Selo>Somente leitura</Selo>
-        </span>
+          </Typography>
+          {descricao ? (
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {descricao}
+            </Typography>
+          ) : null}
+        </Box>
+      </Stack>
+      <Stack
+        spacing={0.5}
+        sx={{
+          flexShrink: 0,
+          alignItems: { xs: "flex-start", sm: "flex-end" },
+          width: { xs: "100%", sm: "auto" },
+        }}
+      >
+        <Selo rotulo="Somente leitura" tom="neutro" tamanho="pequeno" />
         <AtualizadoEm instante={atualizadoEm ?? undefined} fuso={fuso} />
-      </div>
-    </header>
+      </Stack>
+    </Box>
   );
 }
 
 export function CorpoResumo({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col gap-5 border-t px-3 pt-4 pb-4 sm:px-4">{children}</div>;
+  return (
+    <Stack
+      spacing={2.5}
+      sx={{
+        borderTop: 1,
+        borderColor: "divider",
+        px: { xs: 1.5, sm: 2 },
+        pt: 2,
+        pb: 2,
+      }}
+    >
+      {children}
+    </Stack>
+  );
 }
 
 export function SecaoResumo({
@@ -69,39 +124,95 @@ export function SecaoResumo({
   id: string;
   titulo: string;
   descricao?: string;
-  icone: LucideIcon;
+  icone: IconeResumo;
   resumo?: ReactNode;
   aberto: boolean;
   onAbertoChange: (aberto: boolean) => void;
   nivel?: "raiz" | "interna";
   children: ReactNode;
 }) {
+  const nivelTitulo: NivelTituloAcordeao = nivel === "raiz" ? "h3" : "h4";
+
   return (
-    <SecaoRecolhivel
-      dataSecao={`resumo-${id}`}
-      titulo={titulo}
-      descricao={descricao}
-      icone={icone}
-      resumo={resumo}
-      aberto={aberto}
-      onAbertoChange={onAbertoChange}
-      nivel={nivel}
-    >
-      {aberto ? children : null}
-    </SecaoRecolhivel>
+    <Box data-secao={`resumo-${id}`} data-state={aberto ? "open" : "closed"}>
+      <Acordeao
+        titulo={titulo}
+        aberto={aberto}
+        onChange={onAbertoChange}
+        nivelTitulo={nivelTitulo}
+        resumo={
+          <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start", minWidth: 0 }}>
+            <Box
+              aria-hidden="true"
+              sx={(theme) => ({
+                display: "flex",
+                width: 28,
+                height: 28,
+                flexShrink: 0,
+                alignItems: "center",
+                justifyContent: "center",
+                borderRadius: 1.5,
+                backgroundColor:
+                  nivel === "raiz"
+                    ? theme.vars.palette.primary.main
+                    : theme.vars.palette.action.hover,
+                color:
+                  nivel === "raiz"
+                    ? theme.vars.palette.primary.contrastText
+                    : theme.vars.palette.text.secondary,
+                "& svg": { width: 16, height: 16 },
+              })}
+            >
+              {createElement(icone, { size: 16, "aria-hidden": true })}
+            </Box>
+            <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+              {descricao ? (
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  {descricao}
+                </Typography>
+              ) : null}
+              {resumo ? (
+                <Stack direction="row" spacing={0.75} useFlexGap sx={{ flexWrap: "wrap" }}>
+                  {resumo}
+                </Stack>
+              ) : null}
+            </Stack>
+          </Stack>
+        }
+      >
+        <Stack spacing={2}>{children}</Stack>
+      </Acordeao>
+    </Box>
   );
 }
 
-const TONS = {
-  salva: "border-primary/30 bg-primary/10 text-primary",
-  pendente: "border-alerta/40 bg-alerta-fraca text-alerta-texto",
-  falta: "border-falta/40 bg-falta-fraca text-falta-texto",
-  ajuste: "border-justificada/40 bg-justificada-fraca text-justificada-texto",
-  registrado: "border-primary/30 bg-primary/10 text-primary",
-  neutro: "border-border bg-secondary text-muted-foreground",
-} as const;
+export type TomCartaoDia = "salva" | "pendente" | "falta" | "ajuste" | "registrado" | "neutro";
 
-export type TomCartaoDia = keyof typeof TONS;
+const TONS_SELO = {
+  salva: "sucesso",
+  pendente: "atencao",
+  falta: "perigo",
+  ajuste: "neutro",
+  registrado: "sucesso",
+  neutro: "neutro",
+} as const satisfies Record<TomCartaoDia, TomSelo>;
+
+function estiloCartao(theme: Theme, destaque: boolean) {
+  return {
+    display: "flex",
+    width: "100%",
+    minHeight: 128,
+    flexDirection: "column" as const,
+    alignItems: "stretch",
+    gap: 1,
+    p: 1.5,
+    textAlign: "left" as const,
+    borderRadius: "inherit",
+    color: "inherit",
+    backgroundColor: destaque ? theme.vars.palette.action.hover : "transparent",
+    "&:hover": destaque ? { backgroundColor: theme.vars.palette.action.selected } : {},
+  };
+}
 
 export function CartaoDia({
   dia,
@@ -126,53 +237,100 @@ export function CartaoDia({
 }) {
   const conteudo = (
     <>
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="truncate text-xs font-semibold tracking-wide uppercase">{rotulo}</p>
-          <p className="text-muted-foreground text-xs">{rotuloDataCurta(dia)}</p>
-        </div>
-        {abrir && <ChevronRight size={15} aria-hidden="true" className="text-muted-foreground" />}
-      </div>
-      <span
-        className={cn(
-          "inline-flex w-fit items-center rounded-full border px-2 py-0.5 text-[11px] leading-tight font-medium",
-          TONS[tom],
-        )}
+      <Box
+        sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}
       >
-        {status}
-      </span>
-      <div className="mt-auto flex min-h-8 flex-wrap items-center gap-1.5">
-        {contagens ?? <span className="text-muted-foreground text-xs">Sem registro</span>}
-      </div>
-      {detalhe && <p className="text-muted-foreground text-[11px]">{detalhe}</p>}
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            component="p"
+            variant="caption"
+            noWrap
+            sx={{ fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase" }}
+          >
+            {rotulo}
+          </Typography>
+          <Typography component="p" variant="caption" sx={{ color: "text.secondary" }}>
+            {rotuloDataCurta(dia)}
+          </Typography>
+        </Box>
+        {abrir ? (
+          <ChevronRightRoundedIcon
+            aria-hidden="true"
+            fontSize="small"
+            sx={{ color: "text.secondary", flexShrink: 0 }}
+          />
+        ) : null}
+      </Box>
+      <Selo
+        component="span"
+        rotulo={status}
+        tom={TONS_SELO[tom]}
+        tamanho="pequeno"
+        sx={(theme) => ({
+          alignSelf: "flex-start",
+          ...(tom === "ajuste"
+            ? {
+                backgroundColor: theme.vars.palette.justificada.fraco,
+                color: theme.vars.palette.justificada.texto,
+              }
+            : {}),
+        })}
+      />
+      <Box
+        sx={{
+          mt: "auto",
+          display: "flex",
+          minHeight: 32,
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: 0.75,
+        }}
+      >
+        {contagens ?? (
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Sem registro
+          </Typography>
+        )}
+      </Box>
+      {detalhe ? (
+        <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
+          {detalhe}
+        </Typography>
+      ) : null}
     </>
   );
 
-  if (abrir)
-    return (
-      <li>
-        <button
+  return (
+    <Card
+      component="li"
+      variant="outlined"
+      elevation={0}
+      sx={{ p: 0, minWidth: 0, backgroundColor: "background.paper" }}
+    >
+      {abrir ? (
+        <ButtonBase
           type="button"
           onClick={onAbrir}
           aria-label={ariaLabel}
           data-dia={dia}
-          className="controle pressionavel focus-visible:ring-ring/50 flex min-h-32 w-full flex-col gap-2 rounded-[14px] p-3 text-left transition-colors focus-visible:ring-[3px] focus-visible:outline-none"
+          sx={(theme) => estiloCartao(theme, true)}
         >
           {conteudo}
-        </button>
-      </li>
-    );
-  return (
-    <li>
-      <div
-        role="group"
-        aria-label={ariaLabel}
-        data-dia={dia}
-        className="bg-secondary/40 text-muted-foreground flex min-h-32 flex-col gap-2 rounded-[14px] border p-3"
-      >
-        {conteudo}
-      </div>
-    </li>
+        </ButtonBase>
+      ) : (
+        <Box
+          role="group"
+          aria-label={ariaLabel}
+          data-dia={dia}
+          sx={(theme) => ({
+            ...estiloCartao(theme, false),
+            color: theme.vars.palette.text.secondary,
+          })}
+        >
+          {conteudo}
+        </Box>
+      )}
+    </Card>
   );
 }
 
@@ -191,40 +349,78 @@ export function BarrasDia({
     .map((item) => `${item.rotulo}: ${item.valor} ${item.valor === 1 ? unidade[0] : unidade[1]}`)
     .join("; ");
   return (
-    <figure className="flex flex-col gap-2">
-      <figcaption className="text-muted-foreground text-xs">
+    <Box component="figure" sx={{ display: "flex", flexDirection: "column", gap: 1, m: 0 }}>
+      <Typography component="figcaption" variant="caption" sx={{ color: "text.secondary" }}>
         {titulo}: {total} {total === 1 ? unidade[0] : unidade[1]} na semana
-      </figcaption>
-      <ul
+      </Typography>
+      <Box
+        component="ul"
         role="img"
         aria-label={`${titulo}. ${resumo}.`}
-        className="grid grid-cols-3 gap-2 sm:grid-cols-6"
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "repeat(3, minmax(0, 1fr))", sm: "repeat(6, minmax(0, 1fr))" },
+          gap: 1,
+          listStyle: "none",
+          m: 0,
+          p: 0,
+        }}
       >
         {dias.map((item) => (
-          <li key={item.dia} className="flex min-w-0 flex-col items-center gap-1">
-            <div className="bg-secondary flex h-24 w-full items-end overflow-hidden rounded-lg">
-              <div
+          <Box
+            component="li"
+            key={item.dia}
+            sx={{
+              display: "flex",
+              minWidth: 0,
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 0.5,
+            }}
+          >
+            <Box
+              sx={(theme) => ({
+                display: "flex",
+                width: "100%",
+                height: 96,
+                alignItems: "flex-end",
+                overflow: "hidden",
+                borderRadius: 1.5,
+                backgroundColor: theme.vars.palette.action.hover,
+              })}
+            >
+              <Box
                 aria-hidden="true"
-                className="bg-primary w-full rounded-t-lg"
-                style={{ height: `${Math.max(4, (item.valor / maior) * 100)}%` }}
+                sx={(theme) => ({
+                  width: "100%",
+                  height: `${Math.max(4, (item.valor / maior) * 100)}%`,
+                  borderTopLeftRadius: 6,
+                  borderTopRightRadius: 6,
+                  backgroundColor: theme.vars.palette.primary.main,
+                })}
               />
-            </div>
-            <span className="text-muted-foreground text-[11px]">{item.rotulo}</span>
-            <span className="numerais-tabulares text-xs font-semibold">{item.valor}</span>
-          </li>
+            </Box>
+            <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
+              {item.rotulo}
+            </Typography>
+            <Typography
+              variant="caption"
+              sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+            >
+              {item.valor}
+            </Typography>
+          </Box>
         ))}
-      </ul>
-    </figure>
+      </Box>
+    </Box>
   );
 }
 
 export function ResumoVazio({ texto }: { texto: string }) {
   return (
-    <p className="text-muted-foreground flex items-center gap-2 text-sm">
-      <CalendarDays size={16} aria-hidden="true" />
-      {texto}
-    </p>
+    <Stack direction="row" spacing={1} sx={{ alignItems: "center", color: "text.secondary" }}>
+      <CalendarMonthRoundedIcon fontSize="small" aria-hidden="true" />
+      <Typography variant="body2">{texto}</Typography>
+    </Stack>
   );
 }
-
-export { TONS };

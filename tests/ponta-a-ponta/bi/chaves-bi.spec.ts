@@ -2,7 +2,7 @@
 // confirmação com senha no lote, segredo único e desfazer antes de salvar.
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco, ADMIN_E2E } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { aguardarHidratacao, escolherHorario, trocarVisao } from "../helpers/pagina";
 import { selecionarAcaoConfiguracoes, salvarConfiguracoes } from "../helpers/configuracoes";
 
 test.use({ serviceWorkers: "block" });
@@ -86,9 +86,12 @@ test("validade usa data e hora próprias lado a lado e o escopo abre pelo botão
   const data = dialogo.locator("#bi-validade");
   const hora = dialogo.locator("#bi-validade-hora");
   await expect(data).toHaveAccessibleName(/Sem prazo$/);
-  await expect(hora).toHaveAccessibleName(/23:59$/);
+  await expect(hora).toHaveValue("23:59");
   const caixaData = await data.boundingBox();
-  const caixaHora = await hora.boundingBox();
+  const caixaHora = await hora.evaluate((elemento) => {
+    const caixa = elemento.closest(".MuiFormControl-root")?.getBoundingClientRect();
+    return caixa ? { x: caixa.x, y: caixa.y, width: caixa.width, height: caixa.height } : null;
+  });
   expect(caixaData).not.toBeNull();
   expect(caixaHora).not.toBeNull();
   expect(Math.abs((caixaData?.y ?? 0) - (caixaHora?.y ?? 0))).toBeLessThanOrEqual(1);
@@ -107,17 +110,8 @@ test("validade usa data e hora próprias lado a lado e o escopo abre pelo botão
     .click();
   await expect(hora).toBeEnabled();
 
-  await hora.click();
-  const relogio = page.getByRole("dialog", { name: "Hora de validade da chave", exact: true });
-  await relogio
-    .getByRole("listbox", { name: "Horas" })
-    .getByRole("option", { name: "18", exact: true })
-    .click();
-  await relogio
-    .getByRole("listbox", { name: "Minutos" })
-    .getByRole("option", { name: "30", exact: true })
-    .click();
-  await expect(hora).toHaveAccessibleName(/18:30$/);
+  await escolherHorario(page, "#bi-validade-hora", "18:30");
+  await expect(hora).toHaveValue("18:30");
 
   const escopo = dialogo.getByRole("button", { name: /^Escopo/ });
   await expect(escopo).toHaveAttribute("aria-expanded", "false");

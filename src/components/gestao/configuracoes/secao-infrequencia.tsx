@@ -2,12 +2,21 @@
 
 // Limites percentuais do card de Infrequência do Painel, no rascunho da Gestão.
 import { useState } from "react";
-import { CheckCircle2, CircleAlert, HelpCircle, Percent, TriangleAlert } from "lucide-react";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import PercentRoundedIcon from "@mui/icons-material/PercentRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import Box from "@mui/material/Box";
+import InputAdornment from "@mui/material/InputAdornment";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type { Configuracoes } from "@/domain/frequencia";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
-import { Selo } from "@/components/ui/selo";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Selo } from "@/components/ui/mui/selo";
 
 interface Props {
   configuracoes: Configuracoes;
@@ -19,6 +28,14 @@ function inteiroValido(texto: string): number | null {
   const valor = Number(texto);
   return valor >= 0 && valor <= 100 ? valor : null;
 }
+
+const CAIXA_FAIXA = {
+  paddingX: 2,
+  paddingY: 1,
+  border: 1,
+  borderColor: "divider",
+  borderRadius: 2,
+} as const;
 
 export default function SecaoInfrequencia({ configuracoes, onMudar }: Props) {
   const [aberto, setAberto] = useState(false);
@@ -65,102 +82,133 @@ export default function SecaoInfrequencia({ configuracoes, onMudar }: Props) {
   }
 
   return (
-    <SecaoRecolhivel
-      dataSecao="config-infrequencia"
-      titulo="Infrequência do Painel"
-      icone={Percent}
-      aberto={aberto}
-      onAbertoChange={setAberto}
-      resumo={
-        <>
-          <Selo>Esperado até {configuracoes.infrequenciaAtencaoPercentual}%</Selo>
-          <Selo>Atenção até {configuracoes.infrequenciaCriticaPercentual}%</Selo>
-        </>
-      }
-    >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="infrequencia-atencao">Dentro do esperado até</Label>
-          <div className="relative">
-            <Input
-              id="infrequencia-atencao"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={100}
-              step={1}
-              value={atencaoTexto}
-              onChange={(evento) => {
-                setAtencaoTexto(evento.target.value);
-                aplicar(evento.target.value, criticaTexto);
-              }}
-              className="h-11 pr-8"
-            />
-            <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm">
-              %
-            </span>
-          </div>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="infrequencia-critica">Atenção até</Label>
-          <div className="relative">
-            <Input
-              id="infrequencia-critica"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              max={100}
-              step={1}
-              value={criticaTexto}
-              onChange={(evento) => {
-                setCriticaTexto(evento.target.value);
-                aplicar(atencaoTexto, evento.target.value);
-              }}
-              className="h-11 pr-8"
-            />
-            <span className="text-muted-foreground pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm">
-              %
-            </span>
-          </div>
-        </div>
-      </div>
-      {erro && (
-        <p role="alert" className="text-falta-texto text-sm">
-          {erro}
-        </p>
-      )}
-      <div className="grid gap-2 text-xs sm:grid-cols-3">
-        <div className="bg-primary/10 text-primary rounded-xl border px-3 py-2">
-          <p className="flex items-center gap-2 font-semibold">
-            <CheckCircle2 size={16} aria-hidden="true" /> Dentro do esperado
-          </p>
-          <p>até {configuracoes.infrequenciaAtencaoPercentual}%</p>
-        </div>
-        <div className="bg-alerta-fraca text-alerta-texto rounded-xl border px-3 py-2">
-          <p className="flex items-center gap-2 font-semibold">
-            <TriangleAlert size={16} aria-hidden="true" /> Atenção
-          </p>
-          <p>
-            acima de {configuracoes.infrequenciaAtencaoPercentual}% até{" "}
-            {configuracoes.infrequenciaCriticaPercentual}%
-          </p>
-        </div>
-        <div className="bg-falta-fraca text-falta-texto rounded-xl border px-3 py-2">
-          <p className="flex items-center gap-2 font-semibold">
-            <CircleAlert size={16} aria-hidden="true" /> Acima do limite
-          </p>
-          <p>acima de {configuracoes.infrequenciaCriticaPercentual}%</p>
-        </div>
-      </div>
-      <details className="text-muted-foreground text-xs">
-        <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
-          <HelpCircle size={16} aria-hidden="true" /> Como ler as faixas
-        </summary>
-        <p className="mt-1 leading-relaxed">
-          Os percentuais representam faltas nos dias de segunda a sábado. O primeiro limite deve ser
-          menor que o segundo.
-        </p>
-      </details>
-    </SecaoRecolhivel>
+    <Box data-secao="config-infrequencia">
+      <Acordeao
+        titulo="Infrequência do Painel"
+        resumo={
+          <>
+            <Selo>{`Esperado até ${configuracoes.infrequenciaAtencaoPercentual}%`}</Selo>
+            <Selo>{`Atenção até ${configuracoes.infrequenciaCriticaPercentual}%`}</Selo>
+          </>
+        }
+        aberto={aberto}
+        onChange={setAberto}
+      >
+        <Stack spacing={2}>
+          <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
+            <Campo id="infrequencia-atencao" rotulo="Dentro do esperado até">
+              <CampoTexto
+                id="infrequencia-atencao"
+                valor={atencaoTexto}
+                onValor={(valor) => {
+                  setAtencaoTexto(valor);
+                  aplicar(valor, criticaTexto);
+                }}
+                inputMode="numeric"
+                maxLength={3}
+                endAdornment={
+                  <InputAdornment position="end">
+                    <PercentRoundedIcon fontSize="small" aria-hidden="true" />
+                  </InputAdornment>
+                }
+              />
+            </Campo>
+            <Campo id="infrequencia-critica" rotulo="Atenção até">
+              <CampoTexto
+                id="infrequencia-critica"
+                valor={criticaTexto}
+                onValor={(valor) => {
+                  setCriticaTexto(valor);
+                  aplicar(atencaoTexto, valor);
+                }}
+                inputMode="numeric"
+                maxLength={3}
+                endAdornment={
+                  <InputAdornment position="end">
+                    <PercentRoundedIcon fontSize="small" aria-hidden="true" />
+                  </InputAdornment>
+                }
+              />
+            </Campo>
+          </Box>
+          {erro ? (
+            <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
+          ) : null}
+          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { sm: "repeat(3, 1fr)" } }}>
+            <Box
+              sx={(tema) => ({
+                ...CAIXA_FAIXA,
+                color: tema.vars.palette.primary.main,
+                backgroundColor: `color-mix(in srgb, ${tema.vars.palette.primary.main} 10%, transparent)`,
+              })}
+            >
+              <Typography
+                variant="subtitle2"
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <CheckCircleRoundedIcon fontSize="small" aria-hidden="true" /> Dentro do esperado
+              </Typography>
+              <Typography variant="body2">
+                até {configuracoes.infrequenciaAtencaoPercentual}%
+              </Typography>
+            </Box>
+            <Box
+              sx={(tema) => ({
+                ...CAIXA_FAIXA,
+                color: tema.vars.palette.alerta.main,
+                backgroundColor: `color-mix(in srgb, ${tema.vars.palette.alerta.main} 12%, transparent)`,
+              })}
+            >
+              <Typography
+                variant="subtitle2"
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <WarningAmberRoundedIcon fontSize="small" aria-hidden="true" /> Atenção
+              </Typography>
+              <Typography variant="body2">
+                acima de {configuracoes.infrequenciaAtencaoPercentual}% até{" "}
+                {configuracoes.infrequenciaCriticaPercentual}%
+              </Typography>
+            </Box>
+            <Box
+              sx={(tema) => ({
+                ...CAIXA_FAIXA,
+                color: tema.vars.palette.falta.main,
+                backgroundColor: `color-mix(in srgb, ${tema.vars.palette.falta.main} 10%, transparent)`,
+              })}
+            >
+              <Typography
+                variant="subtitle2"
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <ErrorOutlineRoundedIcon fontSize="small" aria-hidden="true" /> Acima do limite
+              </Typography>
+              <Typography variant="body2">
+                acima de {configuracoes.infrequenciaCriticaPercentual}%
+              </Typography>
+            </Box>
+          </Box>
+          <Acordeao
+            titulo="Como ler as faixas"
+            nivelTitulo="h4"
+            resumo={
+              <Typography
+                component="span"
+                variant="body2"
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />
+                Os limites valem de segunda a sábado
+              </Typography>
+            }
+          >
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Os percentuais representam faltas nos dias de segunda a sábado. O primeiro limite deve
+              ser menor que o segundo.
+            </Typography>
+          </Acordeao>
+        </Stack>
+      </Acordeao>
+    </Box>
   );
 }

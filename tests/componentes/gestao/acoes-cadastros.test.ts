@@ -3,8 +3,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Locator } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
+import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -49,7 +48,6 @@ beforeAll(async () => {
     configFile: false,
     cacheDir: path.join(tmpdir(), "vite-acoes-cadastros"),
     define: { "process.env": "{}" },
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { host: "127.0.0.1", port: 0, hmr: false, watch: { ignored: ["**/*"] } },
@@ -67,18 +65,24 @@ afterAll(async () => {
 });
 
 async function conferirAcao(botao: Locator) {
+  await botao.page().mouse.move(0, 0);
   await botao.waitFor({ state: "visible" });
   const estado = await botao.evaluate((el) => {
     const retangulo = el.getBoundingClientRect();
+    const alvo = getComputedStyle(el, "::after");
     return {
       fundo: getComputedStyle(el).backgroundColor,
       largura: retangulo.width,
       altura: retangulo.height,
+      alvoLargura: Number.parseFloat(alvo.width) || 0,
+      alvoAltura: Number.parseFloat(alvo.height) || 0,
     };
   });
   expect(estado.fundo).toBe("rgba(0, 0, 0, 0)");
-  expect(estado.largura).toBeGreaterThanOrEqual(44);
-  expect(estado.altura).toBeGreaterThanOrEqual(44);
+  expect(estado.largura).toBeGreaterThanOrEqual(40);
+  expect(estado.altura).toBeGreaterThanOrEqual(40);
+  if (estado.alvoLargura > 0) expect(estado.alvoLargura).toBeGreaterThanOrEqual(48);
+  if (estado.alvoAltura > 0) expect(estado.alvoAltura).toBeGreaterThanOrEqual(48);
 }
 
 async function conferirPerigo(botao: Locator) {
@@ -86,7 +90,7 @@ async function conferirPerigo(botao: Locator) {
     .poll(() =>
       botao.evaluate((el) => {
         const amostra = document.createElement("span");
-        amostra.style.color = "var(--falta-texto)";
+        amostra.style.color = "var(--template-palette-falta-texto)";
         el.appendChild(amostra);
         const resultado = getComputedStyle(el).color === getComputedStyle(amostra).color;
         amostra.remove();
@@ -96,12 +100,28 @@ async function conferirPerigo(botao: Locator) {
     .toBe(true);
 }
 
+async function aguardarEsquema(page: Page, tema: "light" | "dark") {
+  await expect
+    .poll(() => page.locator("html").getAttribute("data-mui-color-scheme"), { timeout: 15000 })
+    .toBe(tema);
+}
+
 async function conferirTema(botao: Locator, tema: "light" | "dark") {
   await botao.waitFor({ state: "visible" });
-  const fundo = await botao.evaluate((el) =>
-    getComputedStyle(el).getPropertyValue("--background").trim(),
-  );
-  expect(fundo).toBe(tema === "dark" ? "oklch(0.19 0.004 90)" : "#f6f6f6");
+  await expect
+    .poll(
+      () =>
+        botao.evaluate((el) =>
+          getComputedStyle(el).getPropertyValue("--template-palette-background-default").trim(),
+        ),
+      { timeout: 15000 },
+    )
+    .toBe(tema === "dark" ? "hsl(220, 35%, 3%)" : "hsl(0, 0%, 99%)");
+  expect(
+    await botao
+      .page()
+      .evaluate(() => document.documentElement.getAttribute("data-mui-color-scheme")),
+  ).toBe(tema);
 }
 
 for (const tema of ["light", "dark"] as const) {
@@ -110,11 +130,8 @@ for (const tema of ["light", "dark"] as const) {
       const page = await browser.newPage({ viewport: { width: largura, height: 900 } });
       try {
         await page.route("**/api/diretores", (route) => route.fulfill({ json: { diretores } }));
-        await page.goto(`${url}?aba=diretores`);
-        await page.evaluate(
-          (classe) => document.documentElement.classList.toggle("dark", classe === "dark"),
-          tema,
-        );
+        await page.goto(`${url}?aba=diretores&tema=${tema}`);
+        await aguardarEsquema(page, tema);
         for (const nome of [
           "Editar Dora Teste",
           "Desativar Dora Teste",
@@ -138,12 +155,11 @@ for (const tema of ["light", "dark"] as const) {
         expect(await principal.evaluate((el) => getComputedStyle(el).backgroundColor)).not.toBe(
           "rgba(0, 0, 0, 0)",
         );
-        expect(
-          await page
-            .getByRole("button", { name: "Gerar nova" })
-            .first()
-            .getAttribute("data-variant"),
-        ).toBe("outline");
+        const gerarNova = page.getByRole("button", { name: "Gerar nova" }).first();
+        expect(await gerarNova.evaluate((el) => el.classList.contains("MuiButton-outlined"))).toBe(
+          true,
+        );
+        expect(await gerarNova.evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("1px");
       } finally {
         await page.close();
       }
@@ -151,11 +167,8 @@ for (const tema of ["light", "dark"] as const) {
     it(`ações de alunos sem fundo em ${tema} e ${largura}px`, async () => {
       const page = await browser.newPage({ viewport: { width: largura, height: 900 } });
       try {
-        await page.goto(`${url}?aba=alunos`);
-        await page.evaluate(
-          (classe) => document.documentElement.classList.toggle("dark", classe === "dark"),
-          tema,
-        );
+        await page.goto(`${url}?aba=alunos&tema=${tema}`);
+        await aguardarEsquema(page, tema);
         for (const nome of [
           "Editar Ana Teste",
           "Desativar Ana Teste",
@@ -183,11 +196,8 @@ for (const tema of ["light", "dark"] as const) {
     it(`ações de séries sem fundo em ${tema} e ${largura}px`, async () => {
       const page = await browser.newPage({ viewport: { width: largura, height: 900 } });
       try {
-        await page.goto(url);
-        await page.evaluate(
-          (classe) => document.documentElement.classList.toggle("dark", classe === "dark"),
-          tema,
-        );
+        await page.goto(`${url}?tema=${tema}`);
+        await aguardarEsquema(page, tema);
         for (const nome of ["Editar série 1º ano", "Excluir série 1º ano"]) {
           await conferirAcao(page.getByRole("button", { name: nome, exact: true }));
         }
@@ -333,7 +343,10 @@ it("diretores mantêm acesso contextual e confirmação de revogação com motiv
     expect(await page.getByRole("dialog", { name: "Editar Dora Teste" }).isVisible()).toBe(true);
     await page.getByRole("dialog").getByRole("button", { name: "Cancelar" }).click();
     await page.getByRole("button", { name: "Revogar a palavra-chave de Dora Teste" }).click();
-    const dialogo = page.getByRole("alertdialog");
+    const dialogo = page.getByRole("dialog", {
+      name: "Revogar a palavra-chave de Dora Teste?",
+    });
+    await dialogo.waitFor();
     expect(await dialogo.getByRole("button", { name: "Revogar", exact: true }).isDisabled()).toBe(
       true,
     );

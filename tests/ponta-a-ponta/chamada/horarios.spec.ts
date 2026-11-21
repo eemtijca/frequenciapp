@@ -73,7 +73,9 @@ async function abrirGestaoDaTurma(page: Page): Promise<Locator> {
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
   await page.getByRole("button", { name: `Horários de ${rotulo}`, exact: true }).click();
-  return page.getByRole("dialog", { name: `Horários de ${rotulo}`, exact: true });
+  return page.getByRole("dialog", {
+    name: new RegExp(`^Horários de ${rotulo}(?: Fechar)?$`),
+  });
 }
 
 test("no celular, a consulta termina com folga abaixo do último cartão", async ({ page }) => {
@@ -92,7 +94,7 @@ test("no celular, a consulta termina com folga abaixo do último cartão", async
   await aguardarHidratacao(page);
   const vista = await abrirHorarios(page);
   await escolherDia(page, vista, "Segunda-feira");
-  const pagina = vista.locator("xpath=ancestor::section[contains(@class,'pagina-painel')]");
+  const pagina = vista.locator("xpath=ancestor::section[@role='group'][1]");
   await pagina.evaluate((elemento) => elemento.scrollTo(0, elemento.scrollHeight));
   const cartao = vista.getByRole("region", { name: "Aulas de Segunda-feira · Manhã", exact: true });
   await expect(cartao).toBeInViewport({ ratio: 1 });
@@ -411,7 +413,7 @@ test.describe("consulta da coordenação", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/?visao=horarios");
     await aguardarHidratacao(page);
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "horarios");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "horarios");
     await expect(
       page.getByRole("region", { name: "Horários semanais", exact: true }),
     ).toBeVisible();

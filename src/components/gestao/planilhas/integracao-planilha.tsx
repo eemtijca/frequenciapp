@@ -1,49 +1,46 @@
 "use client";
 
 // Ações da planilha de frequência organizadas por envio, edição e configuração.
-import {
-  DialogoConfigurarPlanilha,
-  type EtapaConfiguracaoPlanilha,
-} from "@/components/gestao/planilhas/dialogo-configurar-planilha";
-import { OrganizarPlanilha } from "@/components/gestao/planilhas/dialogo-organizar-planilha";
-import { DialogoMostrarMes } from "@/components/gestao/planilhas/dialogo-mostrar-mes";
-import { DialogoPrepararMes } from "@/components/gestao/planilhas/dialogo-preparar-mes";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  FileSpreadsheet,
-  History,
-  LayoutGrid,
-  LoaderCircle,
-  PencilLine,
-  RotateCcw,
-  Save,
-  Send,
-  Settings2,
-} from "lucide-react";
-import { toast } from "sonner";
+import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import ViewQuiltRoundedIcon from "@mui/icons-material/ViewQuiltRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useRascunhoConfiguracoes } from "@/components/gestao/configuracoes/rascunho-configuracoes";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import { rotuloInstante, type AbaEsquema } from "@/domain/planilha";
 import { diasDoMes, rotuloData, rotuloMes } from "@/domain/frequencia";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Selecionar } from "@/components/ui/selecionar";
+import { mesValido } from "@/domain/planilha-mensal";
+import { Abas } from "@/components/ui/mui/abas";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { Interruptor } from "@/components/ui/mui/interruptor";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { Selo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { Selo } from "@/components/ui/selo";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
 import { EtapaPlanilha } from "@/components/gestao/planilhas/planilha-etapa";
 import {
   BlocoModoCompletoPlanilha,
   BlocoRiscoPlanilha,
 } from "@/components/gestao/planilhas/planilha-blocos";
-import { PainelAcoesPlanilha } from "./painel-acoes-planilha";
 import { EditorPlanilhaChamada } from "./editor-planilha-chamada";
+import { DialogoConfigurarPlanilha } from "./dialogo-configurar-planilha";
+import { DialogoMostrarMes } from "./dialogo-mostrar-mes";
+import { DialogoPrepararMes } from "./dialogo-preparar-mes";
+import { OrganizarPlanilha } from "./dialogo-organizar-planilha";
+import { SeletorPlanilhaGoogle } from "./seletor-planilha-google";
 import DialogoEnvio from "@/components/grade/dialogo-envio";
-import { SeletorPlanilhaGoogle } from "@/components/gestao/planilhas/seletor-planilha-google";
 
 interface Sugestao {
   aba: string;
@@ -102,6 +99,19 @@ interface MapaAba {
   destino?: string;
 }
 
+type PainelFrequencia = "enviar" | "editar" | "organizar" | "configurar";
+
+const CAIXA = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  padding: 2,
+  border: 1,
+  borderColor: "divider",
+  borderRadius: 2,
+  minWidth: 0,
+} as const;
+
 export default function IntegracaoPlanilha({
   turmas,
   diaCorrente,
@@ -114,14 +124,16 @@ export default function IntegracaoPlanilha({
   const [integracao, setIntegracao] = useState<IntegracaoAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [aberto, setAberto] = useState(abertoInicial);
-  const [acao, setAcao] = useState<string | null>(abertoInicial ? "configurar" : null);
+  const [acao, setAcao] = useState<PainelFrequencia | null>(abertoInicial ? "configurar" : null);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [salvando, setSalvando] = useState(false);
   const [lendo, setLendo] = useState(false);
   const [conferenciaHash, setConferenciaHash] = useState("");
   const [problemas, setProblemas] = useState<{ aba: string; erro: string }[]>([]);
-  const etapas = useRef<Partial<Record<EtapaConfiguracaoPlanilha, HTMLDivElement | null>>>({});
+  const etapas = useRef<Partial<Record<"conexao" | "estrutura" | "envio", HTMLDivElement | null>>>(
+    {},
+  );
   const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [abas, setAbas] = useState<AbaEsquema[]>([]);
   const [planilha, setPlanilha] = useState<{
@@ -137,7 +149,23 @@ export default function IntegracaoPlanilha({
   const ativaRascunho = rascunho?.planilhas.frequencia.ativa ?? ativaServidor;
   const envioRascunho =
     rascunho?.planilhas.frequencia.envioAutomatico ?? integracao?.envioAutomatico ?? false;
-  const [mesEnvio, setMesEnvio] = useState(diaCorrente.slice(0, 7));
+  // O retorno do OAuth traz o mês a retomar; o parâmetro não deve sobreviver à navegação.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const retorno = url.searchParams.get("googleMes");
+    if (!retorno) return;
+    if (mesValido(retorno) && retorno <= diaCorrente.slice(0, 7)) setMesEnvio(retorno);
+    url.searchParams.delete("googleMes");
+    window.history.replaceState(null, "", url);
+  }, [diaCorrente]);
+
+  const [mesEnvio, setMesEnvio] = useState(() => {
+    if (typeof window === "undefined") return diaCorrente.slice(0, 7);
+    const retorno = new URLSearchParams(window.location.search).get("googleMes");
+    return retorno && mesValido(retorno) && retorno <= diaCorrente.slice(0, 7)
+      ? retorno
+      : diaCorrente.slice(0, 7);
+  });
   const [envioAberto, setEnvioAberto] = useState(false);
   const [abaApresentacao, setAbaApresentacao] = useState("");
   const acoesOrganizacao = useAcoesPorChave();
@@ -206,14 +234,16 @@ export default function IntegracaoPlanilha({
   const vinculosNaoLidos = Object.values(mapa).filter(
     (item) => item.turmaOriginalId && !abas.some((aba) => aba.nome === item.aba),
   );
+  const painelAtivo = acao ?? (conectada && estruturaSalva ? "enviar" : "configurar");
 
-  function irParaEtapa(etapa: EtapaConfiguracaoPlanilha) {
+  function irParaEtapa(etapa: "conexao" | "estrutura" | "envio") {
     setAcao(etapa === "envio" ? "enviar" : "configurar");
     if (etapa === "estrutura") setEditandoEstrutura(true);
-    requestAnimationFrame(() => {
+    // O diálogo devolve o foco ao gatilho ao fechar; o atraso espera a transição.
+    window.setTimeout(() => {
       etapas.current[etapa]?.focus({ preventScroll: true });
       etapas.current[etapa]?.scrollIntoView({ block: "start" });
-    });
+    }, 300);
   }
 
   function alternarAtiva(valor: boolean) {
@@ -231,7 +261,6 @@ export default function IntegracaoPlanilha({
     await executarPorChave(aviso, async () => {
       setLendo(true);
       setConferenciaHash("");
-      toast.loading("Lendo as abas da planilha...", { id: aviso });
       try {
         const dados = await pedir<{
           planilha: { nome: string; url: string; fuso: string };
@@ -293,13 +322,14 @@ export default function IntegracaoPlanilha({
     if (!planilha || !conferenciaHash || vinculosNaoLidos.length > 0) return;
     const itens = Object.values(mapa).filter((item) => item.turmaOriginalId !== "");
     if (itens.length === 0) {
-      toast.error("Escolha ao menos uma aba.");
+      avisarErro(new Error("Escolha ao menos uma aba."), {
+        contexto: "Escolha ao menos uma aba.",
+      });
       return;
     }
     const aviso = "planilha-mapa";
     await executarPorChave(aviso, async () => {
       setSalvando(true);
-      toast.loading("Salvando a estrutura...", { id: aviso });
       try {
         const dados = await pedir<{ integracao: IntegracaoAdmin }>(
           "/api/planilha/mapa",
@@ -334,522 +364,607 @@ export default function IntegracaoPlanilha({
           "A nova aba recebe a estrutura no próximo envio.",
         );
       } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível criar a aba.");
+        avisarErro(excecao, { contexto: "Não foi possível criar a aba." });
       }
     });
   }
 
   if (carregando) {
     return (
-      <section
+      <Box
+        component="section"
         data-secao="planilha-frequencia"
         aria-label="Planilha de frequência"
-        className="superficie flex flex-col gap-4 p-4"
+        sx={{ display: "flex", flexDirection: "column", gap: 2 }}
       >
-        <h2 className="font-medium">Planilha de frequência</h2>
-        <p className="text-muted-foreground text-sm">Conferindo a integração...</p>
-      </section>
+        <Typography component="h2" variant="subtitle1">
+          Planilha de frequência
+        </Typography>
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          Conferindo a integração...
+        </Typography>
+      </Box>
     );
   }
 
-  return (
-    <SecaoRecolhivel
-      dataSecao="planilha-frequencia"
-      titulo="Planilha de frequência"
-      icone={FileSpreadsheet}
-      aberto={aberto}
-      onAbertoChange={setAberto}
-      resumo={
-        <>
-          <Selo variante={ativaRascunho ? "sucesso" : "neutro"}>
-            {ativaRascunho ? "Ligada" : "Desligada"}
-          </Selo>
-          <Selo variante={conectada && estruturaSalva ? "sucesso" : "atencao"}>
-            {!conectada ? "Sem conexão" : estruturaSalva ? "Google conectado" : "Configurar abas"}
-          </Selo>
-          {completoAtivo && <Selo variante="atencao">Modo completo</Selo>}
-          {(integracao?.alteradasDepois ?? 0) > 0 && (
-            <Selo>{integracao?.alteradasDepois} chamadas alteradas</Selo>
-          )}
-          {integracao?.ultimoErro && <Selo variante="perigo">Último envio com erro</Selo>}
-        </>
-      }
-      acoes={
-        <Switch
-          checked={ativaRascunho}
-          disabled={salvando || !conectada}
-          onCheckedChange={(valor) => void alternarAtiva(valor)}
-          aria-label="Integração ativa"
-        />
-      }
+  const conteudoEnviar = (
+    <Box
+      ref={(elemento: HTMLDivElement | null) => {
+        etapas.current.envio = elemento;
+      }}
+      tabIndex={-1}
+      sx={{
+        scrollMarginTop: 16,
+        outline: "none",
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+      }}
     >
-      <PainelAcoesPlanilha
-        rotulo="Ações da planilha de frequência"
-        valor={acao ?? (conectada && estruturaSalva ? "enviar" : "configurar")}
-        onValor={setAcao}
-        itens={[
-          {
-            valor: "enviar",
-            rotulo: "Enviar",
-            icone: Send,
-            conteudo: (
-              <>
-                <div
-                  ref={(elemento) => {
-                    etapas.current.envio = elemento;
-                  }}
-                  tabIndex={-1}
-                  className="scroll-mt-4 outline-none"
+      <EtapaPlanilha
+        titulo="Enviar chamadas"
+        estado={estruturaSalva ? "atual" : "pendente"}
+        resumo={
+          estruturaSalva
+            ? "Todas as turmas, com prévia antes de enviar."
+            : "Salve a estrutura antes de enviar."
+        }
+      >
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={2}
+          sx={{ alignItems: { sm: "flex-end" } }}
+        >
+          <Box sx={{ width: { xs: "100%", sm: 256 } }}>
+            <SeletorPeriodo
+              id="planilha-mes-envio"
+              modo="mes"
+              valor={mesEnvio}
+              max={diaCorrente.slice(0, 7)}
+              rotuloAcessivel="Mês do envio para a planilha"
+              rotulo={rotuloMes(mesEnvio)}
+              onValor={setMesEnvio}
+            />
+          </Box>
+          <Botao
+            type="button"
+            variante="primario"
+            disabled={!estruturaSalva || !podeEnviar}
+            title={estruturaSalva ? undefined : "Salve a estrutura antes de enviar."}
+            onClick={() => setEnvioAberto(true)}
+            icone={<SendRoundedIcon />}
+          >
+            Enviar todas as turmas
+          </Botao>
+        </Stack>
+        <Box sx={CAIXA}>
+          <Interruptor
+            id="planilha-envio-automatico"
+            rotulo="Enviar ao salvar a chamada"
+            descricao="Preenche somente células vazias."
+            checked={envioRascunho}
+            disabled={
+              salvando ||
+              (!envioRascunho && (!ativaRascunho || !conectada || !estruturaSalva || completoAtivo))
+            }
+            onChange={(valor) => void alternarEnvioAutomatico(valor)}
+          />
+        </Box>
+        <Stack spacing={1}>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {integracao?.alteradasDepois ?? 0}{" "}
+            {integracao?.alteradasDepois === 1
+              ? "chamada pendente de envio"
+              : "chamadas pendentes de envio"}
+          </Typography>
+          {integracao?.ultimoErro ? (
+            <Typography variant="caption" color="error">
+              {integracao.ultimoErro.resultado === "PARCIAL" ? "Envio parcial" : "Falha"}
+              {integracao.ultimoErro.turma ? ` em ${integracao.ultimoErro.turma}` : ""}:{" "}
+              {integracao.ultimoErro.erro ?? "sem detalhe"}
+            </Typography>
+          ) : null}
+          {integracao && integracao.sincronizacoes.length > 0 ? (
+            <Acordeao
+              titulo="Histórico de envios"
+              nivelTitulo="h4"
+              resumo={
+                <Typography
+                  component="span"
+                  variant="body2"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
                 >
-                  <EtapaPlanilha
-                    titulo="Enviar chamadas"
-                    estado={estruturaSalva ? "atual" : "pendente"}
-                    resumo={
-                      estruturaSalva
-                        ? "Todas as turmas, com prévia antes de enviar."
-                        : "Salve a estrutura antes de enviar."
-                    }
-                  >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                      <div className="w-full sm:w-64">
-                        <SeletorPeriodo
-                          id="planilha-mes-envio"
-                          modo="mes"
-                          valor={mesEnvio}
-                          max={diaCorrente.slice(0, 7)}
-                          rotuloAcessivel="Mês do envio para a planilha"
-                          rotulo={rotuloMes(mesEnvio)}
-                          onValor={setMesEnvio}
-                        />
-                      </div>
-                      <Button
-                        type="button"
-                        className="h-11"
-                        disabled={!estruturaSalva || !podeEnviar}
-                        title={estruturaSalva ? undefined : "Salve a estrutura antes de enviar."}
-                        onClick={() => setEnvioAberto(true)}
+                  <HistoryRoundedIcon fontSize="inherit" aria-hidden="true" />
+                  Últimos cinco envios
+                </Typography>
+              }
+            >
+              <Box
+                component="ul"
+                sx={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 0.5,
+                  margin: 0,
+                  paddingLeft: 2,
+                  color: "text.secondary",
+                }}
+              >
+                {integracao.sincronizacoes.slice(0, 5).map((item) => (
+                  <Typography component="li" key={item.id} variant="caption">
+                    {rotuloData(item.de)} a {rotuloData(item.ate)} · {item.modalidade.toLowerCase()}{" "}
+                    · {item.preenchidas} células · {rotuloResultadoEnvio(item)}
+                  </Typography>
+                ))}
+              </Box>
+            </Acordeao>
+          ) : null}
+        </Stack>
+      </EtapaPlanilha>
+    </Box>
+  );
+
+  const conteudoEditar = (
+    <Stack spacing={2}>
+      <EditorPlanilhaChamada
+        turmas={turmas}
+        mapa={integracao?.esquema?.mapa ?? []}
+        diaCorrente={diaCorrente}
+        modoCompleto={completoAtivo}
+        disponivel={podeEnviar && estruturaSalva}
+        aoConcluir={() => void carregar()}
+      />
+      <BlocoModoCompletoPlanilha
+        idPrefixo="planilha"
+        urlBase="/api/planilha"
+        ativo={completoAtivo}
+        ate={integracao?.modoCompletoAte ?? null}
+        onMudou={carregar}
+      />
+    </Stack>
+  );
+
+  const conteudoOrganizar = (
+    <Stack spacing={2}>
+      <Typography component="h3" variant="subtitle2">
+        Meses da chamada
+      </Typography>
+      <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1fr 1fr" }}>
+        <DialogoPrepararMes
+          turmas={turmas}
+          mes={mesEnvio}
+          onMes={setMesEnvio}
+          mesMaximo={diaCorrente.slice(0, 7)}
+          disabled={!podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null}
+          onAtualizar={carregar}
+        />
+        <DialogoMostrarMes
+          mesAtual={diaCorrente.slice(0, 7)}
+          disabled={!podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null}
+          onAtualizar={carregar}
+        />
+      </Box>
+      {!podeEnviar ? (
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          Conecte e ative a planilha em Configurar.
+        </Typography>
+      ) : null}
+      {conectada && abas.some((aba) => !aba.oculta) ? (
+        <Box sx={CAIXA}>
+          <Campo id="frequencia-apresentacao" rotulo="Aba para organizar a apresentação">
+            <Selecionar
+              buscavel
+              id="frequencia-apresentacao"
+              valor={abaApresentacao}
+              onValor={setAbaApresentacao}
+              placeholder="Escolha a aba para organizar"
+              ariaLabel="Aba para organizar a apresentação"
+              disabled={acoesOrganizacao.chaveAtiva !== null}
+              opcoes={[
+                ...(abasMapeadas.length ? [{ valor: "todas", rotulo: "Todas as turmas" }] : []),
+                ...abas
+                  .filter((aba) => !aba.oculta)
+                  .map((aba) => ({ valor: `aba:${aba.nome}`, rotulo: aba.nome })),
+              ]}
+            />
+          </Campo>
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
+            <OrganizarPlanilha
+              rota="/api/planilha/organizar"
+              aba={abaOrganizar}
+              todasTurmas={todasTurmas}
+              abas={abasMapeadas}
+              acoes={acoesOrganizacao}
+              disabled={!podeEnviar}
+            />
+            <OrganizarPlanilha
+              rota="/api/planilha/organizar"
+              aba={abaOrganizar}
+              todasTurmas={todasTurmas}
+              abas={abasMapeadas}
+              acoes={acoesOrganizacao}
+              disabled={!podeEnviar}
+              ajustarCabecalho
+              onAtualizar={carregar}
+            />
+          </Stack>
+        </Box>
+      ) : null}
+    </Stack>
+  );
+
+  const conteudoConfigurar = (
+    <Stack spacing={2}>
+      <DialogoConfigurarPlanilha
+        mes={mesEnvio}
+        mesMaximo={diaCorrente.slice(0, 7)}
+        onMes={setMesEnvio}
+        onEtapa={irParaEtapa}
+      />
+      <Box
+        ref={(elemento: HTMLDivElement | null) => {
+          etapas.current.conexao = elemento;
+        }}
+        tabIndex={-1}
+        sx={{ scrollMarginTop: 16, outline: "none" }}
+      >
+        <EtapaPlanilha numero={1} titulo="Conexão" estado={conectada ? "concluida" : "atual"}>
+          <SeletorPlanilhaGoogle
+            conectado={integracao?.googleConectado ?? false}
+            planilha={integracao?.googlePlanilha ?? null}
+            mes={mesEnvio}
+            onAtualizar={carregar}
+          />
+        </EtapaPlanilha>
+      </Box>
+      <Box
+        ref={(elemento: HTMLDivElement | null) => {
+          etapas.current.estrutura = elemento;
+        }}
+        tabIndex={-1}
+        sx={{ scrollMarginTop: 16, outline: "none" }}
+      >
+        <EtapaPlanilha
+          numero={2}
+          titulo="Abas e turmas"
+          estado={estruturaSalva ? "concluida" : podeEnviar ? "atual" : "pendente"}
+          resumo={
+            estruturaSalva && !estruturaEmEdicao
+              ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
+              : podeEnviar
+                ? "Vincule cada aba a uma turma."
+                : "Conecte e ative a integração."
+          }
+          acoes={
+            estruturaEmEdicao ? (
+              <Botao
+                type="button"
+                variante="contorno"
+                tamanho="pequeno"
+                onClick={() => void lerEstrutura()}
+                disabled={lendo || salvando || !podeEnviar}
+                carregando={lendo}
+                icone={<RestartAltRoundedIcon />}
+                title={podeEnviar ? undefined : "Conecte e ligue a integração antes de ler."}
+              >
+                Conferir estrutura
+              </Botao>
+            ) : (
+              <Botao
+                type="button"
+                variante="contorno"
+                tamanho="pequeno"
+                onClick={() => setEditandoEstrutura(true)}
+                icone={<SettingsRoundedIcon />}
+              >
+                Revisar estrutura
+              </Botao>
+            )
+          }
+        >
+          {estruturaEmEdicao ? (
+            <>
+              {planilha ? (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  {planilha.nome} · fuso {planilha.fuso}
+                </Typography>
+              ) : null}
+              {problemas.length > 0 ? (
+                <Box
+                  component="ul"
+                  aria-label="Problemas na leitura das abas"
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 1,
+                    margin: 0,
+                    padding: 0,
+                    listStyle: "none",
+                  }}
+                >
+                  {problemas.map((item) => (
+                    <Box
+                      component="li"
+                      key={item.aba}
+                      sx={(tema) => ({
+                        padding: 2,
+                        border: `1px solid ${tema.vars.palette.error.main}`,
+                        borderRadius: 2,
+                        backgroundColor: `color-mix(in srgb, ${tema.vars.palette.error.main} 8%, transparent)`,
+                      })}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
                       >
-                        <Send size={16} aria-hidden="true" />
-                        Enviar todas as turmas
-                      </Button>
-                    </div>
-                    <div className="superficie mt-3 flex items-start justify-between gap-3 p-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">Enviar ao salvar a chamada</p>
-                        <p className="text-muted-foreground text-xs">
-                          Preenche somente células vazias.
-                        </p>
-                      </div>
-                      <Switch
-                        checked={envioRascunho}
-                        disabled={
-                          salvando ||
-                          (!envioRascunho &&
-                            (!ativaRascunho || !conectada || !estruturaSalva || completoAtivo))
-                        }
-                        onCheckedChange={(valor) => void alternarEnvioAutomatico(valor)}
-                        aria-label="Enviar ao salvar a chamada"
-                      />
-                    </div>
-
-                    <div className="flex flex-col gap-1 text-xs">
-                      <p className="text-muted-foreground">
-                        {integracao?.alteradasDepois ?? 0}{" "}
-                        {integracao?.alteradasDepois === 1
-                          ? "chamada pendente de envio"
-                          : "chamadas pendentes de envio"}
-                      </p>
-                      {integracao?.ultimoErro && (
-                        <p className="text-falta-texto">
-                          {integracao.ultimoErro.resultado === "PARCIAL"
-                            ? "Envio parcial"
-                            : "Falha"}
-                          {integracao.ultimoErro.turma ? ` em ${integracao.ultimoErro.turma}` : ""}:{" "}
-                          {integracao.ultimoErro.erro ?? "sem detalhe"}
-                        </p>
-                      )}
-                      {integracao && integracao.sincronizacoes.length > 0 && (
-                        <details>
-                          <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
-                            <History size={16} aria-hidden="true" /> Histórico de envios
-                          </summary>
-                          <ul className="text-muted-foreground flex flex-col gap-0.5">
-                            {integracao.sincronizacoes.slice(0, 5).map((item) => (
-                              <li key={item.id}>
-                                {rotuloData(item.de)} a {rotuloData(item.ate)} ·{" "}
-                                {item.modalidade.toLowerCase()} · {item.preenchidas} células ·{" "}
-                                {rotuloResultadoEnvio(item)}
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
-                      )}
-                    </div>
-                  </EtapaPlanilha>
-                </div>
-              </>
-            ),
-          },
-          {
-            valor: "editar",
-            rotulo: "Editar",
-            icone: PencilLine,
-            conteudo: (
-              <>
-                <EditorPlanilhaChamada
-                  turmas={turmas}
-                  mapa={integracao?.esquema?.mapa ?? []}
-                  diaCorrente={diaCorrente}
-                  modoCompleto={completoAtivo}
-                  disponivel={podeEnviar && estruturaSalva}
-                  aoConcluir={() => void carregar()}
+                        {item.aba}
+                      </Typography>
+                      <Typography variant="caption" color="error">
+                        {item.erro}
+                      </Typography>
+                    </Box>
+                  ))}
+                </Box>
+              ) : null}
+              {vinculosNaoLidos.length > 0 ? (
+                <AlertaCompacto
+                  variante="dados_invalidos"
+                  titulo="Vínculos fora da leitura atual"
+                  descricao="Confira novamente antes de salvar. Ignorar retira o vínculo da configuração; a aba e seus dados permanecem no Google."
+                  tamanho="bloco"
                 />
-
-                <BlocoModoCompletoPlanilha
-                  idPrefixo="planilha"
-                  urlBase="/api/planilha"
-                  ativo={completoAtivo}
-                  ate={integracao?.modoCompletoAte ?? null}
-                  onMudou={carregar}
-                />
-              </>
-            ),
-          },
-          {
-            valor: "organizar",
-            rotulo: "Organizar",
-            icone: LayoutGrid,
-            conteudo: (
-              <>
-                <h3 className="text-sm font-medium">Meses da chamada</h3>
-                <div className="grid grid-cols-2 gap-2 [&>button]:h-auto [&>button]:min-h-14 [&>button]:min-w-0 [&>button]:px-2 [&>button]:whitespace-normal">
-                  <DialogoPrepararMes
-                    turmas={turmas}
-                    mes={mesEnvio}
-                    onMes={setMesEnvio}
-                    mesMaximo={diaCorrente.slice(0, 7)}
-                    disabled={
-                      !podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null
-                    }
-                    onAtualizar={carregar}
-                  />
-                  <DialogoMostrarMes
-                    mesAtual={diaCorrente.slice(0, 7)}
-                    disabled={
-                      !podeEnviar || lendo || salvando || acoesOrganizacao.chaveAtiva !== null
-                    }
-                    onAtualizar={carregar}
-                  />
-                </div>
-                {!podeEnviar && (
-                  <p className="text-muted-foreground text-sm">
-                    Conecte e ative a planilha em Configurar.
-                  </p>
-                )}
-                {conectada && abas.some((aba) => !aba.oculta) && (
-                  <div className="superficie flex flex-col gap-2 p-3">
-                    <Selecionar
-                      buscavel
-                      id="frequencia-apresentacao"
-                      value={abaApresentacao}
-                      onValueChange={setAbaApresentacao}
-                      placeholder="Escolha a aba para organizar"
-                      ariaLabel="Aba para organizar a apresentação"
-                      disabled={acoesOrganizacao.chaveAtiva !== null}
-                      opcoes={[
-                        ...(abasMapeadas.length
-                          ? [{ valor: "todas", rotulo: "Todas as turmas" }]
-                          : []),
-                        ...abas
-                          .filter((aba) => !aba.oculta)
-                          .map((aba) => ({ valor: `aba:${aba.nome}`, rotulo: aba.nome })),
-                      ]}
-                    />
-                    <div className="flex flex-wrap items-center gap-2">
-                      <OrganizarPlanilha
-                        rota="/api/planilha/organizar"
-                        aba={abaOrganizar}
-                        todasTurmas={todasTurmas}
-                        abas={abasMapeadas}
-                        acoes={acoesOrganizacao}
-                        disabled={!podeEnviar}
-                      />
-                      <OrganizarPlanilha
-                        rota="/api/planilha/organizar"
-                        aba={abaOrganizar}
-                        todasTurmas={todasTurmas}
-                        abas={abasMapeadas}
-                        acoes={acoesOrganizacao}
-                        disabled={!podeEnviar}
-                        ajustarCabecalho
-                        onAtualizar={carregar}
-                      />
-                    </div>
-                  </div>
-                )}
-              </>
-            ),
-          },
-          {
-            valor: "configurar",
-            rotulo: "Configurar",
-            icone: Settings2,
-            conteudo: (
-              <>
-                <DialogoConfigurarPlanilha
-                  mes={mesEnvio}
-                  mesMaximo={diaCorrente.slice(0, 7)}
-                  onMes={setMesEnvio}
-                  onEtapa={irParaEtapa}
-                />
-                <div
-                  ref={(elemento) => {
-                    etapas.current.conexao = elemento;
-                  }}
-                  tabIndex={-1}
-                  className="scroll-mt-4 outline-none"
-                >
-                  <EtapaPlanilha
-                    numero={1}
-                    titulo="Conexão"
-                    estado={conectada ? "concluida" : "atual"}
-                  >
-                    <SeletorPlanilhaGoogle
-                      conectado={integracao?.googleConectado ?? false}
-                      planilha={integracao?.googlePlanilha ?? null}
-                      mes={mesEnvio}
-                      onAtualizar={carregar}
-                    />
-                  </EtapaPlanilha>
-                </div>
-
-                <div
-                  ref={(elemento) => {
-                    etapas.current.estrutura = elemento;
-                  }}
-                  tabIndex={-1}
-                  className="scroll-mt-4 outline-none"
-                >
-                  <EtapaPlanilha
-                    numero={2}
-                    titulo="Abas e turmas"
-                    estado={estruturaSalva ? "concluida" : podeEnviar ? "atual" : "pendente"}
-                    resumo={
-                      estruturaSalva && !estruturaEmEdicao
-                        ? `Salva em ${rotuloInstante(integracao?.esquemaEm, integracao?.fuso ?? "")}`
-                        : podeEnviar
-                          ? "Vincule cada aba a uma turma."
-                          : "Conecte e ative a integração."
-                    }
-                    acoes={
-                      estruturaEmEdicao ? (
-                        <Button
+              ) : null}
+              {vinculosNaoLidos.length > 0 ? (
+                <Stack spacing={1}>
+                  {vinculosNaoLidos.map((item) => (
+                    <Stack
+                      key={item.aba}
+                      direction="row"
+                      spacing={1}
+                      sx={{
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
+                        {item.aba}
+                      </Typography>
+                      {!item.mes ? (
+                        <Botao
                           type="button"
-                          variant="outline"
-                          className="h-10"
-                          onClick={() => void lerEstrutura()}
-                          disabled={lendo || salvando || !podeEnviar}
-                          title={
-                            podeEnviar ? undefined : "Conecte e ligue a integração antes de ler."
+                          variante="contorno"
+                          tamanho="pequeno"
+                          disabled={lendo || salvando}
+                          onClick={() =>
+                            setMapa((atual) => ({
+                              ...atual,
+                              [item.aba]: { ...item, turmaOriginalId: "" },
+                            }))
                           }
                         >
-                          {lendo ? (
-                            <LoaderCircle size={16} className="animate-spin" />
-                          ) : (
-                            <RotateCcw size={16} />
-                          )}
-                          Conferir estrutura
-                        </Button>
-                      ) : (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-10"
-                          onClick={() => setEditandoEstrutura(true)}
+                          Ignorar vínculo
+                        </Botao>
+                      ) : null}
+                    </Stack>
+                  ))}
+                </Stack>
+              ) : null}
+              {abas.length > 0 ? (
+                <Stack spacing={2}>
+                  {abas.map((aba) => {
+                    const vinculo = mapa[aba.nome];
+                    const mensal = aba.mensal ?? (vinculo?.mes ? vinculo : undefined);
+                    return (
+                      <Box
+                        key={aba.nome}
+                        sx={{
+                          display: "flex",
+                          flexDirection: { xs: "column", sm: "row" },
+                          alignItems: { sm: "center" },
+                          gap: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            flex: 1,
+                            minWidth: 0,
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            whiteSpace: "nowrap",
+                          }}
                         >
-                          <Settings2 size={16} aria-hidden="true" />
-                          Revisar estrutura
-                        </Button>
-                      )
-                    }
-                  >
-                    {estruturaEmEdicao ? (
-                      <>
-                        {planilha && (
-                          <p className="text-muted-foreground text-xs">
-                            {planilha.nome} · fuso {planilha.fuso}
-                          </p>
-                        )}
-                        {problemas.length > 0 && (
-                          <ul
-                            aria-label="Problemas na leitura das abas"
-                            className="flex flex-col gap-2"
-                          >
-                            {problemas.map((item) => (
-                              <li
-                                key={item.aba}
-                                className="border-falta/30 bg-falta-fraca rounded-xl border p-3 text-sm"
-                              >
-                                <p className="font-medium wrap-anywhere">{item.aba}</p>
-                                <p className="text-falta-texto">{item.erro}</p>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                        {vinculosNaoLidos.length > 0 && (
-                          <div
-                            role="alert"
-                            className="border-falta/30 rounded-xl border p-3 text-sm"
-                          >
-                            <p>
-                              Há vínculos fora da leitura atual. Confira novamente antes de salvar.
-                            </p>
-                            <ul className="text-muted-foreground mt-2 flex flex-col gap-2">
-                              {vinculosNaoLidos.map((item) => (
-                                <li
-                                  key={item.aba}
-                                  className="flex flex-wrap items-center justify-between gap-2"
-                                >
-                                  <span className="wrap-anywhere">{item.aba}</span>
-                                  {!item.mes && (
-                                    <Button
-                                      type="button"
-                                      variant="outline"
-                                      disabled={lendo || salvando}
-                                      onClick={() =>
-                                        setMapa((atual) => ({
-                                          ...atual,
-                                          [item.aba]: { ...item, turmaOriginalId: "" },
-                                        }))
-                                      }
-                                    >
-                                      Ignorar vínculo
-                                    </Button>
-                                  )}
-                                </li>
-                              ))}
-                            </ul>
-                            <p className="text-muted-foreground mt-2 text-xs">
-                              Ignorar retira o vínculo da configuração. A aba e seus dados
-                              permanecem no Google.
-                            </p>
-                          </div>
-                        )}
-                        {abas.length > 0 && (
-                          <div className="flex flex-col gap-2">
-                            {abas.map((aba) => {
-                              const vinculo = mapa[aba.nome];
-                              const mensal = aba.mensal ?? (vinculo?.mes ? vinculo : undefined);
-                              return (
-                                <div
-                                  key={aba.nome}
-                                  className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-3"
-                                >
-                                  <span className="min-w-0 flex-1 truncate text-sm">
-                                    {aba.nome}
-                                  </span>
-                                  <span className="text-muted-foreground shrink-0 text-xs">
-                                    cabeçalho {aba.cabecalho} ·{" "}
-                                    {aba.colunas.filter((coluna) => coluna.tipo === "dia").length}{" "}
-                                    dias
-                                  </span>
-                                  <div className="w-full sm:w-56">
-                                    {mensal ? (
-                                      <p className="text-muted-foreground text-sm">
-                                        {turmas.find((turma) => turma.id === mensal.turmaOriginalId)
-                                          ?.rotulo ?? "Turma de origem"}
-                                        {" · "}
-                                        {rotuloMes(mensal.mes ?? "")}
-                                      </p>
-                                    ) : (
-                                      <Selecionar
-                                        buscavel
-                                        id={`mapa-${aba.nome}`}
-                                        value={vinculo?.turmaOriginalId ?? ""}
-                                        onValueChange={(valor) =>
-                                          setMapa((atual) => ({
-                                            ...atual,
-                                            [aba.nome]: { aba: aba.nome, turmaOriginalId: valor },
-                                          }))
-                                        }
-                                        disabled={lendo || salvando}
-                                        placeholder="Ignorar aba"
-                                        ariaLabel={`Turma de origem da aba ${aba.nome}`}
-                                        opcoes={turmas.map((turma) => ({
-                                          valor: turma.id,
-                                          rotulo: turma.rotulo,
-                                        }))}
-                                      />
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                            <Button
-                              type="button"
-                              className="h-11 self-start"
-                              onClick={() => void salvarMapa()}
-                              disabled={
-                                salvando ||
-                                lendo ||
-                                !temMapa ||
-                                !conferenciaHash ||
-                                vinculosNaoLidos.length > 0
-                              }
+                          {aba.nome}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary", flexShrink: 0 }}
+                        >
+                          cabeçalho {aba.cabecalho} ·{" "}
+                          {aba.colunas.filter((coluna) => coluna.tipo === "dia").length} dias
+                        </Typography>
+                        <Box sx={{ width: { xs: "100%", sm: 224 } }}>
+                          {mensal ? (
+                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                              {turmas.find((turma) => turma.id === mensal.turmaOriginalId)
+                                ?.rotulo ?? "Turma de origem"}
+                              {" · "}
+                              {rotuloMes(mensal.mes ?? "")}
+                            </Typography>
+                          ) : (
+                            <Campo
+                              id={`mapa-${aba.nome}`}
+                              rotulo={`Turma de origem da aba ${aba.nome}`}
                             >
-                              <Save size={16} aria-hidden="true" />
-                              Salvar estrutura
-                            </Button>
-                          </div>
-                        )}
-                        {planilha && turmasSemAba.length > 0 && (
-                          <div className="flex flex-col gap-1 text-xs">
-                            <span className="text-muted-foreground">Turmas sem aba mapeada:</span>
-                            {turmasSemAba.map((turma) => (
-                              <div
-                                key={turma.id}
-                                className="flex items-center justify-between gap-2"
-                              >
-                                <span className="min-w-0 truncate">{turma.rotulo}</span>
-                                <Button
-                                  type="button"
-                                  variant="secondary"
-                                  className="h-11"
-                                  onClick={() => void criarAba(turma.rotulo)}
-                                  disabled={chaveAtiva === `criar-aba-${turma.rotulo}`}
-                                >
-                                  {chaveAtiva === `criar-aba-${turma.rotulo}`
-                                    ? "Criando..."
-                                    : "Criar aba"}
-                                </Button>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {sugestoes.length > 0 && (
-                          <p className="text-muted-foreground text-xs">
-                            Confira os vínculos sugeridos antes de salvar.
-                          </p>
-                        )}
-                      </>
-                    ) : null}
-                  </EtapaPlanilha>
-                </div>
-
-                <BlocoRiscoPlanilha
-                  idPrefixo="planilha"
-                  urlBase="/api/planilha"
-                  copiasDe={(integracao?.esquema?.mapa ?? []).map((item) => item.aba)}
-                  abasCriadas={(integracao?.esquema?.abas ?? [])
-                    .filter((aba) => aba.criada)
-                    .map((aba) => aba.nome)}
-                  onMudou={carregar}
-                />
-              </>
-            ),
-          },
-        ]}
+                              <Selecionar
+                                buscavel
+                                id={`mapa-${aba.nome}`}
+                                valor={vinculo?.turmaOriginalId ?? ""}
+                                onValor={(valor) =>
+                                  setMapa((atual) => ({
+                                    ...atual,
+                                    [aba.nome]: { aba: aba.nome, turmaOriginalId: valor },
+                                  }))
+                                }
+                                disabled={lendo || salvando}
+                                placeholder="Ignorar aba"
+                                ariaLabel={`Turma de origem da aba ${aba.nome}`}
+                                opcoes={turmas.map((turma) => ({
+                                  valor: turma.id,
+                                  rotulo: turma.rotulo,
+                                }))}
+                              />
+                            </Campo>
+                          )}
+                        </Box>
+                      </Box>
+                    );
+                  })}
+                  <Botao
+                    type="button"
+                    variante="secundario"
+                    onClick={() => void salvarMapa()}
+                    disabled={
+                      salvando ||
+                      lendo ||
+                      !temMapa ||
+                      !conferenciaHash ||
+                      vinculosNaoLidos.length > 0
+                    }
+                    carregando={salvando}
+                    icone={<SaveRoundedIcon />}
+                    sx={{ alignSelf: "flex-start" }}
+                  >
+                    Salvar estrutura
+                  </Botao>
+                </Stack>
+              ) : null}
+              {planilha && turmasSemAba.length > 0 ? (
+                <Stack spacing={1}>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Turmas sem aba mapeada:
+                  </Typography>
+                  {turmasSemAba.map((turma) => (
+                    <Stack
+                      key={turma.id}
+                      direction="row"
+                      spacing={1}
+                      sx={{ alignItems: "center", justifyContent: "space-between" }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {turma.rotulo}
+                      </Typography>
+                      <Botao
+                        type="button"
+                        variante="secundario"
+                        tamanho="pequeno"
+                        onClick={() => void criarAba(turma.rotulo)}
+                        disabled={chaveAtiva === `criar-aba-${turma.rotulo}`}
+                        carregando={chaveAtiva === `criar-aba-${turma.rotulo}`}
+                      >
+                        Criar aba
+                      </Botao>
+                    </Stack>
+                  ))}
+                </Stack>
+              ) : null}
+              {sugestoes.length > 0 ? (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Confira os vínculos sugeridos antes de salvar.
+                </Typography>
+              ) : null}
+            </>
+          ) : null}
+        </EtapaPlanilha>
+      </Box>
+      <BlocoRiscoPlanilha
+        idPrefixo="planilha"
+        urlBase="/api/planilha"
+        copiasDe={(integracao?.esquema?.mapa ?? []).map((item) => item.aba)}
+        abasCriadas={(integracao?.esquema?.abas ?? [])
+          .filter((aba) => aba.criada)
+          .map((aba) => aba.nome)}
+        onMudou={carregar}
       />
+    </Stack>
+  );
+
+  return (
+    <Box data-secao="planilha-frequencia">
+      <Acordeao
+        titulo="Planilha de frequência"
+        resumo={
+          <>
+            <Selo tom={ativaRascunho ? "sucesso" : "neutro"}>
+              {ativaRascunho ? "Ligada" : "Desligada"}
+            </Selo>
+            <Selo tom={conectada && estruturaSalva ? "sucesso" : "atencao"}>
+              {!conectada ? "Sem conexão" : estruturaSalva ? "Google conectado" : "Configurar abas"}
+            </Selo>
+            {completoAtivo ? <Selo tom="atencao">Modo completo</Selo> : null}
+            {(integracao?.alteradasDepois ?? 0) > 0 ? (
+              <Selo>{integracao?.alteradasDepois} chamadas alteradas</Selo>
+            ) : null}
+            {integracao?.ultimoErro ? <Selo tom="perigo">Último envio com erro</Selo> : null}
+          </>
+        }
+        aberto={aberto}
+        onChange={setAberto}
+      >
+        <Stack spacing={2}>
+          <Interruptor
+            id="planilha-ativa"
+            rotulo="Integração ativa"
+            checked={ativaRascunho}
+            disabled={salvando || !conectada}
+            onChange={(valor) => void alternarAtiva(valor)}
+          />
+          <Abas<PainelFrequencia>
+            itens={[
+              {
+                valor: "enviar",
+                rotulo: "Enviar",
+                icone: <SendRoundedIcon />,
+                conteudo: conteudoEnviar,
+              },
+              {
+                valor: "editar",
+                rotulo: "Editar",
+                icone: <EditNoteRoundedIcon />,
+                conteudo: conteudoEditar,
+              },
+              {
+                valor: "organizar",
+                rotulo: "Organizar",
+                icone: <ViewQuiltRoundedIcon />,
+                conteudo: conteudoOrganizar,
+              },
+              {
+                valor: "configurar",
+                rotulo: "Configurar",
+                icone: <SettingsRoundedIcon />,
+                conteudo: conteudoConfigurar,
+              },
+            ]}
+            ativo={painelAtivo}
+            onChange={setAcao}
+            rotuloAcessivel="Ações da planilha de frequência"
+            variant="scrollable"
+          />
+          {erro ? (
+            <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+          ) : null}
+        </Stack>
+      </Acordeao>
 
       <DialogoEnvio
         aberto={envioAberto}
@@ -863,8 +978,6 @@ export default function IntegracaoPlanilha({
           void carregar();
         }}
       />
-
-      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-    </SecaoRecolhivel>
+    </Box>
   );
 }

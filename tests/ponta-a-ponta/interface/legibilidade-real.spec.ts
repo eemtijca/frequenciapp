@@ -53,7 +53,7 @@ async function fonteReal(page: Page, alvo: Locator, placeholder = false) {
       carregada: document.fonts.check(consulta, texto),
     };
   }, placeholder);
-  // A fallback gerada pelo Next também contém Jakarta no nome; não aceitá-la.
+  // A fallback gerada pelo Next também contém o nome da fonte; não aceitá-la.
   expect(resultado.primeira, JSON.stringify(resultado)).toMatch(/jakarta/i);
   expect(resultado.primeira, JSON.stringify(resultado)).not.toMatch(/fallback/i);
   expect(resultado.texto.trim(), JSON.stringify(resultado)).not.toBe("");
@@ -82,7 +82,7 @@ test.describe("login real sem sessão", () => {
       await somenteLeitura(page);
       await page.goto("/");
       await aguardarHidratacao(page);
-      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${cor}\\b`));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", cor);
       const campo = page.getByLabel("E-mail ou identificador");
       await expect(campo).toBeVisible();
       await expect(campo).toHaveValue("");
@@ -281,7 +281,7 @@ test.describe("seletor real com massa sintética", () => {
       await page.goto("/");
       await aguardarHidratacao(page);
       await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
-      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${cor}\\b`));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", cor);
       const secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
       const gatilho = secao.locator("#dia-frequencia");
       await expect(gatilho).toBeEnabled();
@@ -353,7 +353,7 @@ test.describe("seletor real com massa sintética", () => {
       await page.goto("/");
       await aguardarHidratacao(page);
       await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
-      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${cor}\\b`));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", cor);
       const secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
       const gatilho = secao.locator("#dia-frequencia");
       const anterior = secao.getByRole("button", { name: "Dia anterior", exact: true });
@@ -414,7 +414,7 @@ test.describe("seletor real com massa sintética", () => {
       await page.goto("/");
       await aguardarHidratacao(page);
       await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
-      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${cor}\\b`));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", cor);
       const gatilho = page.locator("#dia-frequencia");
       await expect(gatilho).toBeEnabled();
       const hoje = diaCorrente();

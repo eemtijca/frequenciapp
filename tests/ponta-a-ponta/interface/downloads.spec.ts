@@ -23,7 +23,8 @@ async function abrirDownload(
     await page.getByRole("tab", { name: "Grade" }).click();
     const grade = page.locator('section[aria-label="Grade de frequência"]');
     const turma = grade.getByRole("button", { name: /E2E Ano A/ });
-    if (await turma.isVisible().catch(() => false)) await turma.click();
+    if (await turma.isVisible().catch(() => false))
+      await turma.evaluate((elemento: HTMLElement) => elemento.click());
     if (perfilImagem) {
       await expect(grade.getByRole("button", { name: "Baixar planilha (CSV)" })).toBeEnabled();
       await mkdir("docs/imagens/locais", { recursive: true });

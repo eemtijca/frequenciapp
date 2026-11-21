@@ -3,7 +3,6 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -18,7 +17,6 @@ beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
     define: { "process.env": "{}" },
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { port: 0, hmr: false, watch: { ignored: ["**/*"] } },
@@ -62,7 +60,10 @@ for (const tema of ["light", "dark"] as const) {
         });
       });
       await page.goto(url);
-      await page.evaluate((valor) => document.documentElement.classList.add(valor), tema);
+      await page.evaluate(
+        (valor) => document.documentElement.setAttribute("data-mui-color-scheme", valor),
+        tema,
+      );
       const excluir = page.getByRole("button", { name: "Excluir conta de Demo" });
       await excluir.waitFor({ timeout: 90000 });
       await page.mouse.move(0, 0);

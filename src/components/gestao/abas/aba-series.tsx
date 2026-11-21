@@ -2,37 +2,33 @@
 
 // Aba de séries: criar, renomear, reordenar e excluir.
 import { useState } from "react";
-import { GraduationCap, LoaderCircle, Pencil, Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
+import SearchOffRoundedIcon from "@mui/icons-material/SearchOffRounded";
+import Stack from "@mui/material/Stack";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
+import { TabelaPadrao } from "@/components/layout/tabela-padrao";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import type { Serie } from "@/domain/frequencia";
+import { normalizar } from "@/domain/frequencia";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import type { Serie } from "@/domain/frequencia";
-import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { BarraBusca } from "@/components/ui/barra-busca";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   series: Serie[];
@@ -46,6 +42,11 @@ interface Formulario {
 
 const VAZIO: Formulario = { nome: "", ordem: "1" };
 
+const ALVO_ACAO = {
+  width: TOKENS_LAYOUT.alvoToque,
+  height: TOKENS_LAYOUT.alvoToque,
+} as const;
+
 export default function AbaSeries({ series, onMudanca }: Props) {
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<Serie | null>(null);
@@ -55,6 +56,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [busca, setBusca] = useState("");
+  const [excluirAlvo, setExcluirAlvo] = useState<Serie | null>(null);
   const termo = normalizar(busca);
   const filtradas = series.filter(
     (serie) => termo === "" || normalizar(serie.nome).includes(termo),
@@ -106,169 +108,168 @@ export default function AbaSeries({ series, onMudanca }: Props) {
     void executar(serie.id, async () => {
       try {
         await pedir<{ ok: boolean }>(`/api/series/${serie.id}`, corpoAlteracao("DELETE"));
-        toast.success(`Série ${serie.nome} excluída.`);
+        avisarSucesso(`Série ${serie.nome} excluída.`);
         await onMudanca();
       } catch (excecao) {
-        const mensagem =
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a série.";
-        toast.error(mensagem);
+        avisarErro(excecao, { contexto: "Não foi possível excluir a série." });
       }
     });
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm">
+    <Stack spacing={2}>
+      <Stack
+        direction="row"
+        spacing={2}
+        useFlexGap
+        sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}
+      >
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {series.length} {series.length === 1 ? "série" : "séries"}
-        </p>
-        <Button size="lg" className="h-11" onClick={abrirNovo}>
-          <Plus size={16} />
+        </Typography>
+        <Botao variante="secundario" icone={<AddRoundedIcon />} onClick={abrirNovo}>
           Nova série
-        </Button>
-      </div>
+        </Botao>
+      </Stack>
 
-      {series.length > 0 && (
+      {series.length > 0 ? (
         <BarraBusca id="busca-series" valor={busca} onValor={setBusca} placeholder="Buscar série" />
-      )}
+      ) : null}
 
       {series.length === 0 ? (
-        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
-          <GraduationCap size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Nenhuma série cadastrada</p>
-          <p className="text-muted-foreground text-sm">
-            Comece pelas séries (por exemplo, 1º ano) e depois crie as turmas.
-          </p>
-          <Button variant="outline" className="mt-2" onClick={abrirNovo}>
-            <Plus size={16} />
-            Criar série
-          </Button>
-        </div>
+        <EstadoVazio
+          icone={<SchoolRoundedIcon />}
+          titulo="Nenhuma série cadastrada"
+          descricao="Comece pelas séries (por exemplo, 1º ano) e depois crie as turmas."
+          acao={
+            <Botao variante="contorno" icone={<AddRoundedIcon />} onClick={abrirNovo}>
+              Criar série
+            </Botao>
+          }
+        />
       ) : filtradas.length === 0 ? (
-        <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-          <p className="font-medium">Nenhuma série encontrada</p>
-          <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
-        </div>
+        <EstadoVazio
+          icone={<SearchOffRoundedIcon />}
+          titulo="Nenhuma série encontrada"
+          descricao="Tente outro termo de busca."
+        />
       ) : (
-        <ul className="superficie divide-y overflow-hidden">
-          {filtradas.map((serie) => (
-            <li
-              key={serie.id}
-              className="flex items-center gap-3 px-4 py-3 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
-            >
-              <span className="numerais-tabulares text-muted-foreground w-8 shrink-0 text-sm">
-                <span className="sr-only">Ordem de exibição </span>
-                {String(serie.ordem).padStart(2, "0")}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium">{serie.nome}</p>
-              </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-11"
-                  aria-label={`Editar série ${serie.nome}`}
-                  onClick={() => abrirEdicao(serie)}
-                >
-                  <Pencil size={16} />
-                </Button>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-falta-texto size-11"
-                      aria-label={`Excluir série ${serie.nome}`}
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Excluir a série {serie.nome}?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        A exclusão só é possível quando a série não tem turmas.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                      <AlertDialogAction
-                        variant="destructive"
-                        onClick={() => excluir(serie)}
-                        disabled={chaveAtiva === serie.id}
-                      >
-                        Excluir
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <TabelaPadrao caption="Séries cadastradas, na ordem de exibição.">
+          <TableHead>
+            <TableRow>
+              <TableCell scope="col">Série</TableCell>
+              <TableCell scope="col">Ordem</TableCell>
+              <TableCell scope="col" align="right">
+                Ações
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {filtradas.map((serie) => (
+              <TableRow key={serie.id}>
+                <TableCell component="th" scope="row">
+                  <Typography component="span" variant="body1" sx={{ fontWeight: 500 }}>
+                    {serie.nome}
+                  </Typography>
+                </TableCell>
+                <TableCell data-numero="true">{String(serie.ordem).padStart(2, "0")}</TableCell>
+                <TableCell align="right">
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}
+                  >
+                    <BotaoIcone
+                      rotulo={`Editar série ${serie.nome}`}
+                      icone={<EditRoundedIcon fontSize="small" />}
+                      variante="texto"
+                      sx={ALVO_ACAO}
+                      onClick={() => abrirEdicao(serie)}
+                    />
+                    <BotaoIcone
+                      rotulo={`Excluir série ${serie.nome}`}
+                      icone={<DeleteRoundedIcon fontSize="small" />}
+                      variante="texto"
+                      sx={[ALVO_ACAO, (tema) => ({ color: tema.vars.palette.falta.texto })]}
+                      disabled={chaveAtiva === serie.id}
+                      onClick={() => setExcluirAlvo(serie)}
+                    />
+                  </Stack>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </TabelaPadrao>
       )}
 
-      <Dialog open={dialogoAberto} onOpenChange={setDialogoAberto}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{emEdicao ? "Editar série" : "Nova série"}</DialogTitle>
-          </DialogHeader>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(evento) => {
-              evento.preventDefault();
-              void submeter();
-            }}
-            noValidate
-          >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="nome-serie">Nome</Label>
-              <Input
-                id="nome-serie"
-                value={formulario.nome}
+      <Dialogo
+        aberto={dialogoAberto}
+        onFechar={() => setDialogoAberto(false)}
+        titulo={emEdicao ? "Editar série" : "Nova série"}
+        acoes={
+          <>
+            <Botao variante="texto" onClick={() => setDialogoAberto(false)}>
+              Cancelar
+            </Botao>
+            <Botao variante="secundario" carregando={enviando} onClick={() => void submeter()}>
+              {emEdicao ? "Salvar" : "Criar"}
+            </Botao>
+          </>
+        }
+      >
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            void submeter();
+          }}
+          noValidate
+        >
+          <Stack spacing={2}>
+            <Campo id="nome-serie" rotulo="Nome">
+              <CampoTexto
+                valor={formulario.nome}
+                onValor={(nome) => setFormulario((atual) => ({ ...atual, nome }))}
                 required
                 maxLength={40}
                 autoComplete="off"
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, nome: evento.target.value }))
-                }
+                autoFocus
                 placeholder="Por exemplo: 1º ano"
-                className="h-11"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="ordem-serie">Ordem de exibição</Label>
-              <Input
-                id="ordem-serie"
-                type="number"
-                min={1}
-                max={999}
-                value={formulario.ordem}
+            </Campo>
+            <Campo
+              id="ordem-serie"
+              rotulo="Ordem de exibição"
+              descricao="Menor número aparece primeiro na listagem."
+            >
+              <CampoTexto
+                valor={formulario.ordem}
+                onValor={(ordem) => setFormulario((atual) => ({ ...atual, ordem }))}
                 required
                 inputMode="numeric"
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, ordem: evento.target.value }))
-                }
-                className="numerais-tabulares h-11"
+                maxLength={3}
               />
-              <p className="text-muted-foreground text-xs">
-                Menor número aparece primeiro na listagem.
-              </p>
-            </div>
-            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={enviando}>
-                {enviando && <LoaderCircle size={16} className="animate-spin" />}
-                {emEdicao ? "Salvar" : "Criar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+            </Campo>
+            {erro ? (
+              <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+            ) : null}
+          </Stack>
+        </form>
+      </Dialogo>
+
+      <DialogoConfirmacao
+        aberto={excluirAlvo !== null}
+        titulo={`Excluir a série ${excluirAlvo?.nome ?? ""}?`}
+        descricao="A exclusão só é possível quando a série não tem turmas."
+        rotuloConfirmar="Excluir"
+        destrutivo
+        operacaoEmAndamento={excluirAlvo !== null && chaveAtiva === excluirAlvo.id}
+        onConfirmar={() => {
+          const alvo = excluirAlvo;
+          setExcluirAlvo(null);
+          if (alvo) excluir(alvo);
+        }}
+        onCancelar={() => setExcluirAlvo(null)}
+      />
+    </Stack>
   );
 }

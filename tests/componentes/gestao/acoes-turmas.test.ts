@@ -3,7 +3,6 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser, type Locator } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { conferirSuperficieAcao } from "../superficie-acao";
 
@@ -19,7 +18,6 @@ beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
     define: { "process.env": "{}" },
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { host: "127.0.0.1", port: 0, hmr: false, watch: { ignored: ["**/*"] } },
@@ -59,12 +57,18 @@ for (const tema of ["light", "dark"] as const) {
         await page.goto(url);
         await page.getByRole("button", { name: "Horários de 1º ano A" }).waitFor();
         await page.evaluate(
-          (escuro) => document.documentElement.classList.toggle("dark", escuro),
+          (escuro) =>
+            document.documentElement.setAttribute(
+              "data-mui-color-scheme",
+              escuro ? "dark" : "light",
+            ),
           tema === "dark",
         );
-        expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(
-          tema === "dark",
-        );
+        expect(
+          await page.evaluate(
+            () => document.documentElement.getAttribute("data-mui-color-scheme") === "dark",
+          ),
+        ).toBe(tema === "dark");
         for (const nome of [
           "Horários de 1º ano A",
           "Editar turma 1º ano A",
@@ -90,12 +94,18 @@ for (const tema of ["light", "dark"] as const) {
         await page.goto(url);
         await page.getByRole("button", { name: "Horários de 1º ano A" }).waitFor();
         await page.evaluate(
-          (escuro) => document.documentElement.classList.toggle("dark", escuro),
+          (escuro) =>
+            document.documentElement.setAttribute(
+              "data-mui-color-scheme",
+              escuro ? "dark" : "light",
+            ),
           tema === "dark",
         );
-        expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(
-          tema === "dark",
-        );
+        expect(
+          await page.evaluate(
+            () => document.documentElement.getAttribute("data-mui-color-scheme") === "dark",
+          ),
+        ).toBe(tema === "dark");
         await page.getByRole("button", { name: "Horários de 1º ano A" }).click();
         await page.mouse.move(0, 0);
         for (const nome of ["Editar aula 1", "Desativar aula 1", "Excluir aula 1"]) {
@@ -104,7 +114,7 @@ for (const tema of ["light", "dark"] as const) {
         const excluir = page.getByRole("button", { name: "Excluir aula 1" });
         const cores = await excluir.evaluate((el) => {
           const amostra = document.createElement("span");
-          amostra.style.color = "var(--falta-texto)";
+          amostra.style.color = "var(--template-palette-falta-texto)";
           el.appendChild(amostra);
           const resultado = [getComputedStyle(el).color, getComputedStyle(amostra).color];
           amostra.remove();

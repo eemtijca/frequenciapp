@@ -58,15 +58,16 @@ for (const tema of ["light", "dark"] as const) {
           bordaEstilo: secundaria.borderTopStyle,
         };
       });
-      expect(cores.fundo).toBe(tema === "light" ? "rgb(246, 246, 246)" : "rgb(28, 27, 25)");
-      expect(cores.primaria).toBe("rgb(23, 120, 77)");
+      expect(cores.fundo).toBe(tema === "light" ? "rgb(252, 252, 252)" : "rgb(5, 7, 10)");
+      expect(cores.primaria).toBe(tema === "light" ? "rgb(29, 114, 83)" : "rgb(129, 207, 179)");
       if (tema === "light") {
         expect(cores.secundaria).toBe("rgba(0, 0, 0, 0)");
-        expect(cores.borda).toBe("rgb(217, 221, 218)");
+        expect(cores.borda).toBe("rgb(218, 222, 231)");
         expect(cores.bordaEstilo).toBe("solid");
       } else {
-        expect(cores.secundaria).toBe("rgb(43, 41, 37)");
-        expect(cores.borda).toBe("rgba(0, 0, 0, 0)");
+        expect(cores.secundaria).toBe("rgba(0, 0, 0, 0)");
+        expect(cores.borda).toBe("rgb(51, 59, 76)");
+        expect(cores.bordaEstilo).toBe("solid");
       }
       await page.keyboard.press("Tab");
       const botao = page.getByRole("button", { name: "Tentar novamente" });

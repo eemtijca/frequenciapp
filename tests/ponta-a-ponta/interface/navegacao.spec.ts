@@ -1,12 +1,7 @@
 // Fumaça do shell: troca de visão pela navegação e tema.
 import { expect, test } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import {
-  abrirNavegacao,
-  abrirSeletorTema,
-  aguardarHidratacao,
-  trocarVisao,
-} from "../helpers/pagina";
+import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 test.describe("navegação", () => {
   test("troca de visão pela navegação", async ({ page }) => {
@@ -14,7 +9,7 @@ test.describe("navegação", () => {
     await aguardarHidratacao(page);
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
     await trocarVisao(page, "Chamada", "chamada");
-    await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Fazer chamada", exact: true })).toBeVisible();
     await trocarVisao(page, "Horários", "horarios");
     await expect(
       page.getByRole("region", { name: "Horários semanais", exact: true }),
@@ -32,7 +27,7 @@ test.describe("navegação", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Chamada", "chamada");
-    await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Fazer chamada", exact: true })).toBeVisible();
     await trocarVisao(page, "Painel", "painel");
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
   });
@@ -42,8 +37,8 @@ test.describe("navegação", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await page.getByRole("button", { name: "Chamada", exact: true }).click();
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
-    await expect(page.getByRole("heading", { name: "Chamada" })).toBeVisible();
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "chamada");
+    await expect(page.getByRole("region", { name: "Fazer chamada", exact: true })).toBeVisible();
   });
 
   test("alterna o tema pelo menu de três opções", async ({ page }, info) => {
@@ -52,12 +47,21 @@ test.describe("navegação", () => {
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
     // O seletor fica no cabeçalho no celular e no cartão da barra lateral no desktop.
     await aguardarHidratacao(page, 'button[aria-label*="tema" i]');
-    const inicioEscuro = await page.locator("html").evaluate((el) => el.classList.contains("dark"));
+    const inicioEscuro = await page
+      .locator("html")
+      .evaluate((el) => el.getAttribute("data-mui-color-scheme") === "dark");
     const alvo = inicioEscuro ? "Claro" : "Escuro";
-    const temas = await abrirSeletorTema(page);
+    const botaoTema = page.getByRole("banner").getByRole("button", { name: /tema/i });
+    await expect(botaoTema).toBeVisible();
+    await botaoTema.click();
+    const temas = page.getByRole("radiogroup");
+    await expect(temas).toBeVisible();
     await expect(temas.getByRole("radio")).toHaveCount(3);
     await temas.getByRole("radio", { name: alvo, exact: true }).click();
-    await expect(page.locator("html")).toHaveClass(new RegExp(inicioEscuro ? "light" : "dark"));
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-mui-color-scheme",
+      inicioEscuro ? "light" : "dark",
+    );
     await page.keyboard.press("Escape");
     await expect(temas).toBeHidden();
     await info.attach(`menu-tema-${alvo.toLocaleLowerCase("pt-BR")}`, {
@@ -88,7 +92,7 @@ test.describe("navegação", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/?visao=gestao");
     await aguardarHidratacao(page);
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
     await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
     const navegacao = await abrirNavegacao(page);
     await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toHaveAttribute(

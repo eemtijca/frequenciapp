@@ -1,14 +1,19 @@
 "use client";
 
 // Localiza diferenças entre abas e registra escolhas locais para uma nova conferência, sem escrever.
+import Box from "@mui/material/Box";
+import Link from "@mui/material/Link";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { rotuloData } from "@/domain/frequencia";
 import {
   chaveResolucaoAntiga,
   type PendenciaAntiga,
   type ResolucaoAntiga,
 } from "@/domain/planilha-legado";
-import { Button } from "@/components/ui/button";
-import { Selecionar } from "@/components/ui/selecionar";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { Botao } from "@/components/ui/mui/botao";
+import { Selecionar } from "@/components/ui/mui/selecionar";
 
 export function PendenciasAbaAntiga({
   pendencias,
@@ -26,22 +31,27 @@ export function PendenciasAbaAntiga({
   const escolhas = new Map(resolucoes.map((item) => [chaveResolucaoAntiga(item), item]));
   const divergencias = pendencias.filter((item) => item.tipo === "frequencia");
   return (
-    <details className="bg-secondary/30 mt-2 rounded-xl p-3">
-      <summary className="text-falta-texto cursor-pointer font-medium">
-        Resolver {total === 1 ? "1 pendência" : `${total} pendências`}
-      </summary>
-      <div className="mt-3 flex min-w-0 flex-col gap-3">
-        <p className="text-muted-foreground">
+    <Acordeao
+      titulo={`Resolver ${total === 1 ? "1 pendência" : `${total} pendências`}`}
+      nivelTitulo="h4"
+      resumo={
+        <Typography component="span" variant="body2" sx={{ color: "error" }}>
+          Escolhas aplicadas em uma nova conferência
+        </Typography>
+      }
+    >
+      <Stack spacing={2}>
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
           As escolhas só serão aplicadas após nova conferência e confirmação.
-        </p>
-        {divergencias.length > 1 && (
-          <div className="flex flex-wrap gap-2">
+        </Typography>
+        {divergencias.length > 1 ? (
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
             {(["mensal", "antiga"] as const).map((manter) => (
-              <Button
+              <Botao
                 key={manter}
                 type="button"
-                size="sm"
-                variant="outline"
+                tamanho="pequeno"
+                variante="contorno"
                 disabled={disabled}
                 onClick={() =>
                   onEscolher(
@@ -55,46 +65,64 @@ export function PendenciasAbaAntiga({
                 }
               >
                 Usar marcas {manter === "mensal" ? "mensais" : "antigas"} exibidas
-              </Button>
+              </Botao>
             ))}
-          </div>
-        )}
+          </Stack>
+        ) : null}
         {pendencias.map((item) => {
           const escolha = escolhas.get(item.id);
           return (
-            <div key={item.id} className="flex min-w-0 flex-col gap-2 rounded-lg border p-3">
-              <p className="font-medium wrap-anywhere">{item.aluno}</p>
-              {item.tipo === "frequencia" && (
-                <p>
+            <Box
+              key={item.id}
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1,
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 2,
+                padding: 2,
+                minWidth: 0,
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
+                {item.aluno}
+              </Typography>
+              {item.tipo === "frequencia" ? (
+                <Typography variant="body2">
                   {rotuloData(item.dia)} · Antiga: <strong>{item.antiga}</strong> · Mensal:{" "}
                   <strong>{item.mensal}</strong>
-                </p>
-              )}
-              <p className="text-muted-foreground">{item.mensagem}</p>
-              <div className="flex flex-wrap gap-3">
-                <a
+                </Typography>
+              ) : null}
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                {item.mensagem}
+              </Typography>
+              <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
+                <Link
                   href={item.origem.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary inline-flex min-h-11 items-center underline"
+                  underline="hover"
+                  sx={{ display: "inline-flex", alignItems: "center", minHeight: 48 }}
                 >
                   Antiga: {item.origem.celula}
-                </a>
-                <a
+                </Link>
+                <Link
                   href={item.destino.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary inline-flex min-h-11 items-center underline"
+                  underline="hover"
+                  sx={{ display: "inline-flex", alignItems: "center", minHeight: 48 }}
                 >
                   Mensal: {item.destino.celula}
-                </a>
-              </div>
+                </Link>
+              </Stack>
               {item.tipo === "frequencia" ? (
                 <Selecionar
                   ariaLabel={`Marca para ${item.aluno}, ${item.origem.celula}, ${item.mes}`}
-                  value={escolha?.tipo === "frequencia" ? escolha.manter : "conferir"}
+                  valor={escolha?.tipo === "frequencia" ? escolha.manter : "conferir"}
                   disabled={disabled}
-                  onValueChange={(valor) => {
+                  onValor={(valor) => {
                     if (valor === "mensal" || valor === "antiga")
                       onEscolher([
                         {
@@ -116,9 +144,9 @@ export function PendenciasAbaAntiga({
                 <>
                   <Selecionar
                     ariaLabel={`Destino de ${item.aluno}, linha ${item.linhaAntiga}, ${item.mes}`}
-                    value={escolha?.tipo === "aluno" ? String(escolha.linhaMensal) : "conferir"}
+                    valor={escolha?.tipo === "aluno" ? String(escolha.linhaMensal) : "conferir"}
                     disabled={disabled}
-                    onValueChange={(valor) => {
+                    onValor={(valor) => {
                       if (valor !== "conferir")
                         onEscolher([
                           {
@@ -138,31 +166,32 @@ export function PendenciasAbaAntiga({
                       })),
                     ]}
                   />
-                  <div className="flex flex-wrap gap-3">
+                  <Stack direction="row" spacing={2} sx={{ flexWrap: "wrap" }}>
                     {item.opcoes.map((opcao) => (
-                      <a
+                      <Link
                         key={opcao.linha}
                         href={opcao.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary inline-flex min-h-11 items-center underline"
+                        underline="hover"
+                        sx={{ display: "inline-flex", alignItems: "center", minHeight: 48 }}
                       >
                         Conferir linha {opcao.linha}
-                      </a>
+                      </Link>
                     ))}
-                  </div>
+                  </Stack>
                 </>
               ) : (
                 <>
-                  <p className="text-muted-foreground">
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
                     Se o aluno pertencer a este histórico, inclua uma linha no mês para preservar
                     suas marcas. O cadastro escolar não será alterado.
-                  </p>
+                  </Typography>
                   <Selecionar
                     ariaLabel={`Inclusão de ${item.aluno}, linha ${item.linhaAntiga}, ${item.mes}`}
-                    value={escolha?.tipo === "adicionar-aluno" ? "adicionar" : "conferir"}
+                    valor={escolha?.tipo === "adicionar-aluno" ? "adicionar" : "conferir"}
                     disabled={disabled}
-                    onValueChange={(valor) => {
+                    onValor={(valor) => {
                       if (valor === "adicionar")
                         onEscolher([
                           { tipo: "adicionar-aluno", mes: item.mes, linhaAntiga: item.linhaAntiga },
@@ -176,16 +205,16 @@ export function PendenciasAbaAntiga({
                   />
                 </>
               )}
-            </div>
+            </Box>
           );
         })}
-        {total > pendencias.length && (
-          <p className="text-muted-foreground">
+        {total > pendencias.length ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
             Exibidas as primeiras {pendencias.length} pendências. Após conferir as escolhas, a
             próxima parte será exibida.
-          </p>
-        )}
-      </div>
-    </details>
+          </Typography>
+        ) : null}
+      </Stack>
+    </Acordeao>
   );
 }

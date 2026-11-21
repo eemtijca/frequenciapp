@@ -38,9 +38,9 @@ test.describe("abas da Gestão", () => {
         if (secao === retorno.secao) {
           await expect(
             cartao
-              .getByRole("navigation", { name: /^Ações da planilha/ })
-              .getByRole("button", { name: "Configurar", exact: true }),
-          ).toHaveAttribute("aria-pressed", "true");
+              .getByRole("tablist", { name: /^Ações da planilha/ })
+              .getByRole("tab", { name: "Configurar", exact: true }),
+          ).toHaveAttribute("aria-selected", "true");
         }
       }
     });
@@ -149,7 +149,7 @@ test.describe("abas da Gestão", () => {
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Equipe" }).click();
-    const propria = page.locator(".superficie").filter({ hasText: "Você" });
+    const propria = page.getByRole("row").filter({ hasText: "Você" });
     await propria.getByRole("button", { name: /^Editar conta de / }).click();
 
     const dialogo = page.getByRole("dialog");

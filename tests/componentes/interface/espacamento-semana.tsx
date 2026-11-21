@@ -1,9 +1,12 @@
 // Reproduz as dimensões da página de chamada com dados sintéticos e o resumo real.
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
+import Box from "@mui/material/Box";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ThemeProvider } from "@mui/material/styles";
 import { VistaResumoSemana } from "../../../src/components/chamada/resumo-semana";
 import { CONFIGURACOES_PADRAO, type Aluno, type Turma } from "../../../src/domain/frequencia";
-import "../../../src/app/globals.css";
+import { tema } from "../../../src/theme/tema";
 
 const dias = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31"];
 const turma: Turma = {
@@ -34,15 +37,51 @@ const alunos: Aluno[] = Array.from({ length: 20 }, (_, i) => ({
 function Exemplo() {
   const [aberto, setAberto] = useState("");
   return (
-    <div className="flex min-h-screen w-full flex-col lg:flex-row">
-      <aside className="hidden w-60 shrink-0 border-r lg:block">Menu</aside>
-      <main className="min-w-0 flex-1 px-4 pt-4 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-2xl xl:max-w-6xl">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
-            <div className="flex min-w-0 flex-col gap-4 xl:order-2">
-              <div className="superficie p-4">Turmas e navegação</div>
-            </div>
-            <div className="min-w-0 xl:order-1">
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        width: "100%",
+        flexDirection: { xs: "column", lg: "row" },
+      }}
+    >
+      <Box
+        component="aside"
+        sx={{
+          display: { xs: "none", lg: "block" },
+          width: 240,
+          flexShrink: 0,
+          borderRight: 1,
+          borderColor: "divider",
+        }}
+      >
+        Menu
+      </Box>
+      <Box component="main" sx={{ minWidth: 0, flex: 1, px: { xs: 2, sm: 3, lg: 4 }, pt: 2 }}>
+        <Box sx={{ mx: "auto", width: "100%", maxWidth: { xs: 672, xl: 1152 } }}>
+          <Box
+            sx={{
+              display: { xs: "flex", xl: "grid" },
+              flexDirection: "column",
+              gap: 2,
+              gridTemplateColumns: { xl: "minmax(0, 1fr) 320px" },
+              alignItems: { xl: "flex-start" },
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                minWidth: 0,
+                flexDirection: "column",
+                gap: 2,
+                order: { xl: 2 },
+              }}
+            >
+              <Box sx={{ border: 1, borderColor: "divider", borderRadius: 2, p: 2 }}>
+                Turmas e navegação
+              </Box>
+            </Box>
+            <Box sx={{ minWidth: 0, order: { xl: 1 } }}>
               <VistaResumoSemana
                 turmas={[turma]}
                 alunos={alunos}
@@ -56,13 +95,24 @@ function Exemplo() {
                 onAbrirDia={setAberto}
               />
               <output aria-label="Dia aberto">{aberto}</output>
-            </div>
-          </div>
-        </div>
-      </main>
-    </div>
+            </Box>
+          </Box>
+        </Box>
+      </Box>
+    </Box>
   );
 }
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Elemento raiz ausente");
-createRoot(raiz).render(<Exemplo />);
+const temaInicial = new URLSearchParams(location.search).get("tema") === "dark" ? "dark" : "light";
+createRoot(raiz).render(
+  <ThemeProvider
+    theme={tema}
+    defaultMode={temaInicial}
+    modeStorageKey="theme"
+    disableTransitionOnChange
+  >
+    <CssBaseline enableColorScheme />
+    <Exemplo />
+  </ThemeProvider>,
+);

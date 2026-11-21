@@ -2,12 +2,15 @@
 
 // Campos comuns de Saídas e Entradas, mantendo rótulos e estados no chamador.
 import { horaNoFuso } from "@/domain/frequencia";
-import { cn } from "@/lib/utils";
-import { Campo } from "@/components/ui/campo";
-import { GrupoOpcoes } from "@/components/ui/grupo-opcoes";
-import { Input } from "@/components/ui/input";
-import { Selecionar } from "@/components/ui/selecionar";
-import { SeletorHorario } from "@/components/ui/seletor-horario";
+import Box from "@mui/material/Box";
+import FormControl from "@mui/material/FormControl";
+import FormLabel from "@mui/material/FormLabel";
+import Grid from "@mui/material/Grid";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { GrupoOpcoes } from "@/components/ui/mui/grupo-opcoes";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { SeletorHorario } from "@/components/ui/mui/seletor-horario";
 
 interface Opcao {
   valor: string;
@@ -99,8 +102,8 @@ export function CamposMovimentacao({
     >
       <Selecionar
         id={`${tipo}-responsavel`}
-        value={responsavel}
-        onValueChange={onResponsavel}
+        valor={responsavel}
+        onValor={onResponsavel}
         disabled={enviando}
         placeholder={saida ? "Selecione quem liberou" : "Selecione quem registrou"}
         opcoes={opcoesResponsavel}
@@ -109,117 +112,137 @@ export function CamposMovimentacao({
   );
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      <Campo id={`${tipo}-turma`} rotulo="Turma" descricao={descricaoTurma}>
-        <Selecionar
-          id={`${tipo}-turma`}
-          value={turma || "todas"}
+    <Grid container spacing={2}>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <Campo id={`${tipo}-turma`} rotulo="Turma" descricao={descricaoTurma}>
+          <Selecionar
+            id={`${tipo}-turma`}
+            valor={turma || "todas"}
+            disabled={enviando}
+            onValor={(valor) => onTurma(valor === "todas" ? "" : valor)}
+            placeholder="Todas as turmas"
+            opcoes={opcoesTurma}
+          />
+        </Campo>
+      </Grid>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <Campo id={`${tipo}-aluno`} rotulo="Aluno">
+          <Selecionar
+            id={`${tipo}-aluno`}
+            valor={alunoId}
+            onValor={onAluno}
+            disabled={enviando}
+            buscavel
+            placeholder="Selecione o aluno"
+            opcoes={opcoesAluno}
+          />
+        </Campo>
+      </Grid>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <Campo id={`${tipo}-momento`} rotulo={saida ? "Momento da saída" : "Momento da entrada"}>
+          <Selecionar
+            id={`${tipo}-momento`}
+            valor={momento}
+            onValor={onMomento}
+            disabled={enviando}
+            placeholder="Selecione a aula ou pausa"
+            opcoes={opcoesMomento}
+          />
+        </Campo>
+      </Grid>
+      <Grid size={{ xs: 12, md: 6 }}>
+        <Campo id={`${tipo}-horario`} rotulo={saida ? "Horário da saída" : "Horário da chegada"}>
+          <SeletorHorario
+            id={`${tipo}-horario`}
+            valor={horario}
+            onValor={onHorario}
+            rotuloAcessivel={saida ? "Horário da saída" : "Horário da chegada"}
+            agora={horaNoFuso(new Date().toISOString(), fuso)}
+            disabled={enviando}
+          />
+        </Campo>
+      </Grid>
+      {responsavelDepois ? null : <Grid size={{ xs: 12, md: 6 }}>{campoResponsavel}</Grid>}
+      <Grid size={12}>
+        <FormControl
+          component="fieldset"
           disabled={enviando}
-          onValueChange={(valor) => onTurma(valor === "todas" ? "" : valor)}
-          placeholder="Todas as turmas"
-          opcoes={opcoesTurma}
-        />
-      </Campo>
-      <Campo id={`${tipo}-aluno`} rotulo="Aluno" className="md:col-span-1 xl:col-span-2">
-        <Selecionar
-          id={`${tipo}-aluno`}
-          value={alunoId}
-          onValueChange={onAluno}
-          disabled={enviando}
-          buscavel
-          placeholder="Selecione o aluno"
-          opcoes={opcoesAluno}
-        />
-      </Campo>
-      <Campo id={`${tipo}-momento`} rotulo={saida ? "Momento da saída" : "Momento da entrada"}>
-        <Selecionar
-          id={`${tipo}-momento`}
-          value={momento}
-          onValueChange={onMomento}
-          disabled={enviando}
-          placeholder="Selecione a aula ou pausa"
-          opcoes={opcoesMomento}
-        />
-      </Campo>
-      <Campo id={`${tipo}-horario`} rotulo={saida ? "Horário da saída" : "Horário da chegada"}>
-        <SeletorHorario
-          id={`${tipo}-horario`}
-          valor={horario}
-          onValor={onHorario}
-          rotuloAcessivel={saida ? "Horário da saída" : "Horário da chegada"}
-          agora={horaNoFuso(new Date().toISOString(), fuso)}
-          disabled={enviando}
-        />
-      </Campo>
-      {responsavelDepois ? null : campoResponsavel}
-      <fieldset className="flex flex-col gap-2 md:col-span-2 xl:col-span-3">
-        <legend className="text-sm font-medium">Justificativa</legend>
-        <GrupoOpcoes
-          rotulo="Forma da justificativa"
-          valor={forma}
-          disabled={enviando}
-          onValor={onForma}
-          opcoes={[
-            { valor: "texto", rotulo: "Escrever" },
-            { valor: "catalogo", rotulo: "Selecionar tipo" },
-          ]}
-        />
-        {forma === "texto" ? (
-          <Campo id={idTexto} rotulo="Texto da justificativa" contador={contador}>
-            <Input
-              id={idTexto}
-              value={texto}
-              required={textoObrigatorio}
-              minLength={textoObrigatorio ? 2 : undefined}
-              maxLength={100}
+          sx={{ border: 0, m: 0, p: 0, minWidth: 0, width: "100%" }}
+        >
+          <FormLabel component="legend" sx={{ mb: 1 }}>
+            Justificativa
+          </FormLabel>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <GrupoOpcoes
+              rotulo="Forma da justificativa"
+              valor={forma}
               disabled={enviando}
-              onChange={(evento) => onTexto(evento.target.value)}
-              placeholder="Descreva o motivo"
-              className="h-11"
+              onValor={onForma}
+              opcoes={[
+                { valor: "texto", rotulo: "Escrever" },
+                { valor: "catalogo", rotulo: "Selecionar tipo" },
+              ]}
             />
-          </Campo>
-        ) : (
-          <div className={cn("grid gap-3", catalogoEmDuasColunas && "sm:grid-cols-2")}>
-            <Campo id={`${tipo}-justificativa`} rotulo="Tipo">
-              <Selecionar
-                id={`${tipo}-justificativa`}
-                value={justificativa}
-                onValueChange={onJustificativa}
-                disabled={enviando}
-                placeholder="Selecione a justificativa"
-                opcoes={opcoesJustificativa}
-              />
-            </Campo>
-            {mostrarTextoCatalogo ? (
+            {forma === "texto" ? (
               <Campo id={idTexto} rotulo="Texto da justificativa" contador={contador}>
-                <Input
+                <CampoTexto
                   id={idTexto}
-                  value={texto}
+                  valor={texto}
+                  onValor={onTexto}
+                  required={textoObrigatorio}
                   maxLength={100}
                   disabled={enviando}
-                  onChange={(evento) => onTexto(evento.target.value)}
-                  placeholder="Opcional"
-                  className="h-11"
+                  placeholder="Descreva o motivo"
                 />
               </Campo>
-            ) : null}
-            {mostrarObservacao ? (
-              <Campo id={idObservacao} rotulo="Observação">
-                <Input
-                  id={idObservacao}
-                  value={observacao}
-                  maxLength={100}
-                  disabled={enviando}
-                  onChange={(evento) => onObservacao(evento.target.value)}
-                  placeholder="Opcional: descreva brevemente o motivo"
-                  className="h-11"
-                />
-              </Campo>
-            ) : null}
-          </div>
-        )}
-      </fieldset>
-      {responsavelDepois ? campoResponsavel : null}
-    </div>
+            ) : (
+              <Grid container spacing={2}>
+                <Grid size={{ xs: 12, md: catalogoEmDuasColunas ? 6 : 12 }}>
+                  <Campo id={`${tipo}-justificativa`} rotulo="Tipo">
+                    <Selecionar
+                      id={`${tipo}-justificativa`}
+                      valor={justificativa}
+                      onValor={onJustificativa}
+                      disabled={enviando}
+                      placeholder="Selecione a justificativa"
+                      opcoes={opcoesJustificativa}
+                    />
+                  </Campo>
+                </Grid>
+                {mostrarTextoCatalogo ? (
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Campo id={idTexto} rotulo="Texto da justificativa" contador={contador}>
+                      <CampoTexto
+                        id={idTexto}
+                        valor={texto}
+                        onValor={onTexto}
+                        maxLength={100}
+                        disabled={enviando}
+                        placeholder="Opcional"
+                      />
+                    </Campo>
+                  </Grid>
+                ) : null}
+                {mostrarObservacao ? (
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Campo id={idObservacao} rotulo="Observação">
+                      <CampoTexto
+                        id={idObservacao}
+                        valor={observacao}
+                        onValor={onObservacao}
+                        maxLength={100}
+                        disabled={enviando}
+                        placeholder="Opcional: descreva brevemente o motivo"
+                      />
+                    </Campo>
+                  </Grid>
+                ) : null}
+              </Grid>
+            )}
+          </Box>
+        </FormControl>
+      </Grid>
+      {responsavelDepois ? <Grid size={{ xs: 12, md: 6 }}>{campoResponsavel}</Grid> : null}
+    </Grid>
   );
 }

@@ -1,5 +1,5 @@
 // Mapa de status HTTP para a variante visual de estado.
-import type { VarianteEstado } from "@/components/ui/tela-estado";
+import type { VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { ErroApi } from "@/lib/api-cliente";
 
 export function estadoDeErro(excecao: unknown): VarianteEstado {

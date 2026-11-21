@@ -3,10 +3,22 @@
 // Importação da relação de alunos em CSV: escolhe ou cola o arquivo, confere
 // o schema na hora, vê a prévia do que muda no cadastro e só então aplica.
 import { useMemo, useRef, useState } from "react";
-import { CircleCheck, FileUp, LoaderCircle, TriangleAlert } from "lucide-react";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import FileUploadRoundedIcon from "@mui/icons-material/FileUploadRounded";
+import Box from "@mui/material/Box";
+import OutlinedInput from "@mui/material/OutlinedInput";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { Alerta } from "@/components/ui/mui/alerta";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { Dialogo } from "@/components/ui/mui/dialogo";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
+import { FAMILIA_MONO } from "@/theme/tipografia";
 import type { Turma } from "@/domain/frequencia";
 import {
   AJUDA_COLUNAS_RELACAO,
@@ -16,17 +28,6 @@ import {
   type ItemDoPlano,
   type PlanoDeImportacao,
 } from "@/domain/importacao-alunos";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface Props {
   aberto: boolean;
@@ -50,25 +51,22 @@ function plural(valor: number, singular: string, varios: string): string {
 function ListaDeProblemas({ titulo, itens }: { titulo: string; itens: string[] }) {
   const visiveis = itens.slice(0, ERROS_VISIVEIS);
   return (
-    <div
-      role="alert"
-      className="border-falta/40 bg-falta-fraca text-falta-texto flex gap-2.5 rounded-lg border px-3 py-2 text-sm"
-    >
-      <TriangleAlert size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
-      <div className="min-w-0">
-        <p className="font-medium">{titulo}</p>
-        <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs">
-          {visiveis.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-        {itens.length > visiveis.length && (
-          <p className="mt-1 text-xs">
-            E mais {plural(itens.length - visiveis.length, "problema", "problemas")}.
-          </p>
-        )}
-      </div>
-    </div>
+    <Alerta severity="error" titulo={titulo}>
+      <Box component="ul" sx={{ margin: 0, paddingLeft: 2 }}>
+        {visiveis.map((item) => (
+          <li key={item}>
+            <Typography component="span" variant="body2">
+              {item}
+            </Typography>
+          </li>
+        ))}
+      </Box>
+      {itens.length > visiveis.length ? (
+        <Typography variant="body2" sx={{ mt: 0.5 }}>
+          E mais {plural(itens.length - visiveis.length, "problema", "problemas")}.
+        </Typography>
+      ) : null}
+    </Alerta>
   );
 }
 
@@ -169,53 +167,77 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
     plano !== null && plano.bloqueios.length === 0 && conferido === texto && !conferindo;
 
   return (
-    <Dialog open={aberto} onOpenChange={onAbrir}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Importar relação em CSV</DialogTitle>
-          <DialogDescription>
-            Uma linha por aluno, com o cabeçalho abaixo. A Chamada passa a seguir a relação na ordem
-            do arquivo, e o histórico de cada aluno é mantido. Use Exportar relação para baixar um
-            arquivo já no padrão.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="bg-secondary/50 flex flex-col gap-2 rounded-lg px-3 py-2 text-xs">
-          <code className="font-mono text-[13px] break-all">{CABECALHO_RELACAO}</code>
-          <details>
-            <summary className="text-muted-foreground cursor-pointer">
-              Como montar o arquivo
-            </summary>
-            <ul className="text-muted-foreground mt-1.5 space-y-1">
+    <Dialogo
+      aberto={aberto}
+      onFechar={() => onAbrir(false)}
+      titulo="Importar relação em CSV"
+      descricao="Uma linha por aluno, com o cabeçalho abaixo. A Chamada passa a seguir a relação na ordem do arquivo, e o histórico de cada aluno é mantido. Use Exportar relação para baixar um arquivo já no padrão."
+      tamanho="grande"
+      acoes={
+        <>
+          <Botao variante="texto" onClick={() => onAbrir(false)}>
+            Cancelar
+          </Botao>
+          <Botao
+            variante="contorno"
+            carregando={conferindo}
+            disabled={!leitura || foraDoPadrao || aplicando}
+            onClick={() => void conferir()}
+          >
+            Conferir
+          </Botao>
+          <Botao
+            variante="secundario"
+            carregando={aplicando}
+            disabled={!podeAplicar}
+            onClick={() => void aplicar()}
+          >
+            Aplicar
+          </Botao>
+        </>
+      }
+    >
+      <Stack spacing={2}>
+        <Box sx={{ backgroundColor: "action.hover", borderRadius: 1, p: 2 }}>
+          <Typography
+            component="code"
+            variant="body2"
+            sx={{ display: "block", fontFamily: FAMILIA_MONO, overflowWrap: "anywhere" }}
+          >
+            {CABECALHO_RELACAO}
+          </Typography>
+          <Acordeao titulo="Como montar o arquivo">
+            <Box component="ul" sx={{ margin: 0, paddingLeft: 2 }}>
               {COLUNAS_RELACAO.map((coluna) => (
                 <li key={coluna}>
-                  <span className="text-foreground font-mono">{coluna}</span>:{" "}
-                  {AJUDA_COLUNAS_RELACAO[coluna]}.
+                  <Typography component="span" variant="body2">
+                    <Box component="span" sx={{ fontFamily: FAMILIA_MONO }}>
+                      {coluna}
+                    </Box>
+                    : {AJUDA_COLUNAS_RELACAO[coluna]}.
+                  </Typography>
                 </li>
               ))}
               <li>
-                Separador ponto e vírgula, codificação UTF-8. Alunos ativos das turmas do arquivo
-                que não estiverem nele são desativados, sem perder o histórico.
+                <Typography component="span" variant="body2">
+                  Separador ponto e vírgula, codificação UTF-8. Alunos ativos das turmas do arquivo
+                  que não estiverem nele são desativados, sem perder o histórico.
+                </Typography>
               </li>
-            </ul>
-          </details>
-        </div>
+            </Box>
+          </Acordeao>
+        </Box>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <Label htmlFor="texto-relacao" className="whitespace-nowrap">
-              Conteúdo do CSV
-            </Label>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-9"
+        <Stack spacing={1}>
+          <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+            <Botao
+              variante="contorno"
+              tamanho="pequeno"
+              icone={<FileUploadRoundedIcon />}
               onClick={() => seletor.current?.click()}
             >
-              <FileUp size={16} />
               Escolher .csv
-            </Button>
+            </Botao>
             <input
               ref={seletor}
               type="file"
@@ -223,23 +245,35 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
               hidden
               onChange={(evento) => void lerArquivo(evento.target.files)}
             />
-          </div>
-          <textarea
-            id="texto-relacao"
-            value={texto}
-            onChange={(evento) => {
-              setErroArquivo("");
-              setArquivo("");
-              trocarTexto(evento.target.value);
-            }}
-            rows={7}
-            spellCheck={false}
-            aria-invalid={foraDoPadrao || undefined}
-            aria-describedby="situacao-relacao"
-            className="campo min-h-36 w-full px-3 py-2 font-mono text-xs"
-            placeholder={`${CABECALHO_RELACAO}\n3º ano A;1;Nome do aluno;3º ano B`}
-          />
-          <div id="situacao-relacao">
+          </Stack>
+          <Campo id="texto-relacao" rotulo="Conteúdo do CSV">
+            <OutlinedInput
+              id="texto-relacao"
+              multiline
+              minRows={7}
+              fullWidth
+              value={texto}
+              onChange={(evento) => {
+                setErroArquivo("");
+                setArquivo("");
+                trocarTexto(evento.target.value);
+              }}
+              placeholder={`${CABECALHO_RELACAO}\n3º ano A;1;Nome do aluno;3º ano B`}
+              slotProps={{
+                input: {
+                  "aria-invalid": foraDoPadrao || undefined,
+                  "aria-describedby": "situacao-relacao",
+                  spellCheck: false,
+                },
+              }}
+              sx={{
+                alignItems: "flex-start",
+                fontFamily: FAMILIA_MONO,
+                fontSize: "0.8125rem",
+              }}
+            />
+          </Campo>
+          <Box id="situacao-relacao">
             {erroArquivo ? (
               <ListaDeProblemas titulo="Arquivo fora do padrão" itens={[erroArquivo]} />
             ) : leitura && leitura.erros.length > 0 ? (
@@ -248,97 +282,122 @@ export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImpo
                 itens={leitura.erros}
               />
             ) : leitura ? (
-              <p className="text-primary flex items-center gap-1.5 text-xs font-medium">
-                <CircleCheck size={14} aria-hidden="true" />
-                {arquivo ? `${arquivo}: ` : ""}
-                {plural(alunosLidos, "aluno", "alunos")} em{" "}
-                {plural(leitura.relacoes.length, "turma", "turmas")}, no padrão. Toque em Conferir.
-              </p>
+              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                <CheckCircleRoundedIcon fontSize="small" color="primary" aria-hidden="true" />
+                <Typography variant="body2" color="primary">
+                  {arquivo ? `${arquivo}: ` : ""}
+                  {plural(alunosLidos, "aluno", "alunos")} em{" "}
+                  {plural(leitura.relacoes.length, "turma", "turmas")}, no padrão. Toque em
+                  Conferir.
+                </Typography>
+              </Stack>
             ) : null}
-          </div>
-        </div>
+          </Box>
+        </Stack>
 
-        {erro && <AvisoCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />}
+        {erro ? (
+          <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
+        ) : null}
 
-        {plano && (
-          <div className="flex flex-col gap-3" aria-live="polite">
-            {plano.bloqueios.length > 0 && (
+        {plano ? (
+          <Stack spacing={2} aria-live="polite">
+            {plano.bloqueios.length > 0 ? (
               <ListaDeProblemas titulo="Corrija antes de aplicar" itens={plano.bloqueios} />
-            )}
-            {plano.avisos.length > 0 && (
-              <AvisoCompacto
+            ) : null}
+            {plano.avisos.length > 0 ? (
+              <AlertaCompacto
                 variante="conflito"
                 titulo="Confira"
                 descricao={plano.avisos.join(" ")}
                 tamanho="linha"
               />
-            )}
-            <ul className="grid gap-2 sm:grid-cols-3" aria-label="Alunos por turma">
+            ) : null}
+            <Box
+              component="ul"
+              aria-label="Alunos por turma"
+              sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 1,
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+              }}
+            >
               {plano.turmas.map((turma) => (
-                <li key={turma.turmaId} className="superficie px-3 py-2">
-                  <p className="text-sm font-medium">{turma.rotulo}</p>
-                  <p className="text-muted-foreground numerais-tabulares text-xs">
+                <Box
+                  component="li"
+                  key={turma.turmaId}
+                  sx={(tema) => ({
+                    flex: "1 1 160px",
+                    p: 1.5,
+                    border: `1px solid ${tema.vars.palette.divider}`,
+                    borderRadius: 1,
+                  })}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {turma.rotulo}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "text.secondary", fontVariantNumeric: "tabular-nums" }}
+                  >
                     {plural(turma.alunos, "aluno", "alunos")}
-                  </p>
-                </li>
+                  </Typography>
+                </Box>
               ))}
-            </ul>
-            <div className="superficie divide-y overflow-hidden">
+            </Box>
+            <Box>
               {grupos.map((grupo) => (
-                <details key={grupo.titulo} className="px-3 py-2">
-                  <summary className="flex cursor-pointer items-center justify-between gap-2 text-sm">
-                    {grupo.titulo}
-                    <span className="numerais-tabulares text-muted-foreground">
-                      {grupo.itens.length}
-                    </span>
-                  </summary>
-                  <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
-                    {grupo.itens.map((item) => (
-                      <li key={`${item.alunoId ?? item.nome}-${item.turmaId}`}>
-                        {item.nome}: {rotulo(item.turmaId)}, origem {rotulo(item.turmaOriginalId)}
+                <Acordeao
+                  key={grupo.titulo}
+                  titulo={grupo.titulo}
+                  resumo={`${grupo.itens.length}`}
+                  nivelTitulo="h4"
+                >
+                  {grupo.itens.length === 0 ? (
+                    <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                      Nenhum aluno neste grupo.
+                    </Typography>
+                  ) : (
+                    <Box component="ul" sx={{ margin: 0, paddingLeft: 2 }}>
+                      {grupo.itens.map((item) => (
+                        <li key={`${item.alunoId ?? item.nome}-${item.turmaId}`}>
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                            {item.nome}: {rotulo(item.turmaId)}, origem{" "}
+                            {rotulo(item.turmaOriginalId)}
+                          </Typography>
+                        </li>
+                      ))}
+                    </Box>
+                  )}
+                </Acordeao>
+              ))}
+              <Acordeao
+                titulo="Desativados por não estarem na relação"
+                resumo={`${plano.desativar.length}`}
+                nivelTitulo="h4"
+              >
+                {plano.desativar.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    Nenhum aluno será desativado.
+                  </Typography>
+                ) : (
+                  <Box component="ul" sx={{ margin: 0, paddingLeft: 2 }}>
+                    {plano.desativar.map((aluno) => (
+                      <li key={aluno.alunoId}>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          {aluno.nome}: {rotulo(aluno.turmaId)}
+                        </Typography>
                       </li>
                     ))}
-                  </ul>
-                </details>
-              ))}
-              <details className="px-3 py-2">
-                <summary className="flex cursor-pointer items-center justify-between gap-2 text-sm">
-                  Desativados por não estarem na relação
-                  <span className="numerais-tabulares text-muted-foreground">
-                    {plano.desativar.length}
-                  </span>
-                </summary>
-                <ul className="text-muted-foreground mt-2 space-y-1 text-xs">
-                  {plano.desativar.map((aluno) => (
-                    <li key={aluno.alunoId}>
-                      {aluno.nome}: {rotulo(aluno.turmaId)}
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            </div>
-          </div>
-        )}
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onAbrir(false)}>
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            variant={podeAplicar ? "outline" : "default"}
-            disabled={!leitura || foraDoPadrao || conferindo || aplicando}
-            onClick={() => void conferir()}
-          >
-            {conferindo && <LoaderCircle size={16} className="animate-spin" />}
-            Conferir
-          </Button>
-          <Button type="button" disabled={!podeAplicar || aplicando} onClick={() => void aplicar()}>
-            {aplicando && <LoaderCircle size={16} className="animate-spin" />}
-            Aplicar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+                  </Box>
+                )}
+              </Acordeao>
+            </Box>
+          </Stack>
+        ) : null}
+      </Stack>
+    </Dialogo>
   );
 }

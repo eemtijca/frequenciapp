@@ -55,7 +55,7 @@ async function pedirSalvamento(page: Page, secao: Locator) {
   const resumo = page.getByRole("alertdialog", { name: "Salvar chamada?", exact: true });
   await expect(resumo).toBeVisible();
   await resumo.getByRole("button", { name: "Salvar chamada", exact: true }).click();
-  const historica = page.getByRole("alertdialog", {
+  const historica = page.getByRole("dialog", {
     name: "Confirmar chamada histórica?",
     exact: true,
   });

@@ -3,6 +3,8 @@ import { expect, test, type Locator, type Page, type Request } from "@playwright
 import { comBanco } from "../helpers/banco";
 import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
+test.use({ serviceWorkers: "block" });
+
 const serie = "E2E Editor Horários";
 const origem = `${serie} A`;
 const destino = `${serie} B`;
@@ -98,7 +100,7 @@ function observarGravacoes(page: Page): Request[] {
 async function abrirHorarios(page: Page, turma = origem): Promise<Locator> {
   await page.goto("/?visao=gestao");
   await aguardarHidratacao(page);
-  await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
   await page.getByRole("tab", { name: "Configurações", exact: true }).click();
   await page.locator("#categoria-config-horarios").click();
   const vista = page.getByRole("region", { name: "Edição de horários", exact: true });
@@ -113,7 +115,7 @@ async function abrirHorarios(page: Page, turma = origem): Promise<Locator> {
 async function abrirConsulta(page: Page, turma = origem): Promise<Locator> {
   await page.goto("/?visao=horarios");
   await aguardarHidratacao(page);
-  await expect(page.locator("main")).toHaveAttribute("data-visao", "horarios");
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", "horarios");
   const vista = page.getByRole("region", { name: "Horários semanais", exact: true });
   await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
   await page.getByRole("option", { name: turma, exact: true }).click();
@@ -124,9 +126,16 @@ async function abrirConsulta(page: Page, turma = origem): Promise<Locator> {
 
 async function abrirDialogo(page: Page, vista: Locator, turma = origem): Promise<Locator> {
   await vista.getByRole("button", { name: `Editar horários de ${turma}`, exact: true }).click();
-  const dialogo = page.getByRole("dialog", { name: `Horários de ${turma}`, exact: true });
+  const dialogo = dialogoDaTurma(page, turma);
   await expect(dialogo).toBeVisible();
   return dialogo;
+}
+
+function dialogoDaTurma(page: Page, turma: string): Locator {
+  // O MUI inclui o botão Fechar no nome acessível do título em algumas versões.
+  return page.getByRole("dialog", {
+    name: new RegExp(`^Horários de ${turma}(?: Fechar)?$`),
+  });
 }
 
 async function selecionarOrigem(page: Page, dialogo: Locator): Promise<void> {
@@ -147,25 +156,25 @@ async function pedirConfirmacao(page: Page, formulario: Locator): Promise<Locato
   return confirmacao;
 }
 
-async function mudarHorario(page: Page, formulario: Locator, nome: string, valor: string) {
-  const [hora, minuto] = valor.split(":");
-  const rotulo = nome.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  await formulario.getByRole("button", { name: new RegExp(`^${rotulo}:`) }).click();
-  const painel = page
-    .getByRole("dialog")
-    .filter({ has: page.getByRole("listbox", { name: "Horas", exact: true }) });
-  await painel
-    .getByRole("listbox", { name: "Horas", exact: true })
-    .getByRole("option", { name: hora ?? "", exact: true })
-    .click();
-  await painel
-    .getByRole("listbox", { name: "Minutos", exact: true })
-    .getByRole("option", { name: minuto ?? "", exact: true })
-    .click();
-  await expect(painel).toHaveCount(0);
-  await expect(formulario.getByRole("button", { name: new RegExp(`^${rotulo}:`) })).toContainText(
-    valor,
+async function conferirHorario(formulario: Locator, nome: string, valor: string): Promise<void> {
+  const [hora = "", minuto = ""] = valor.split(":");
+  const grupo = formulario.getByRole("group", { name: nome, exact: true });
+  await expect(grupo.getByRole("spinbutton", { name: "Horas", exact: true })).toHaveAttribute(
+    "aria-valuenow",
+    String(Number(hora)),
   );
+  await expect(grupo.getByRole("spinbutton", { name: "Minutos", exact: true })).toHaveAttribute(
+    "aria-valuenow",
+    String(Number(minuto)),
+  );
+}
+
+async function mudarHorario(formulario: Locator, nome: string, valor: string): Promise<void> {
+  const [hora = "", minuto = ""] = valor.split(":");
+  const grupo = formulario.getByRole("group", { name: nome, exact: true });
+  await grupo.getByRole("spinbutton", { name: "Horas", exact: true }).fill(hora);
+  await grupo.getByRole("spinbutton", { name: "Minutos", exact: true }).fill(minuto);
+  await conferirHorario(formulario, nome, valor);
 }
 
 test("abre o diálogo da turma selecionada e conta apenas aulas ativas na Gestão", async ({
@@ -189,11 +198,11 @@ test("abre o diálogo da turma selecionada e conta apenas aulas ativas na Gestã
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
   await trocarVisao(page, "Gestão", "gestao");
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
-  const turma = page.getByRole("listitem").filter({ has: page.getByText(origem, { exact: true }) });
+  const turma = page.getByRole("row").filter({ has: page.getByText(origem, { exact: true }) });
   await expect(turma.getByText("2 aulas", { exact: true })).toBeVisible();
   await expect(turma.getByText("3 aulas", { exact: true })).toHaveCount(0);
   await turma.getByRole("button", { name: `Horários de ${origem}`, exact: true }).click();
-  dialogo = page.getByRole("dialog", { name: `Horários de ${origem}`, exact: true });
+  dialogo = dialogoDaTurma(page, origem);
   await dialogo.getByRole("button", { name: "Desativar aula 2", exact: true }).click();
   const confirmacao = page.getByRole("alertdialog");
   await expect(confirmacao).toBeVisible();
@@ -266,12 +275,12 @@ test("a janela da aula no desktop só muda depois da confirmação", async ({ pa
   const vista = await abrirHorarios(page);
   await vista.getByRole("button", { name: "Editar horário da 1ª aula", exact: true }).click();
   const formulario = vista.getByRole("form", { name: "Editar 1ª aula", exact: true });
-  await mudarHorario(page, formulario, "Início da aula", "07:10");
-  await mudarHorario(page, formulario, "Fim da aula", "07:55");
+  await mudarHorario(formulario, "Início da aula", "07:10");
+  await mudarHorario(formulario, "Fim da aula", "07:55");
   await page.setViewportSize({ width: 360, height: 740 });
   await expect(formulario).toBeVisible();
-  await expect(formulario.getByRole("button", { name: /^Início da aula:/ })).toContainText("07:10");
-  await expect(formulario.getByRole("button", { name: /^Fim da aula:/ })).toContainText("07:55");
+  await conferirHorario(formulario, "Início da aula", "07:10");
+  await conferirHorario(formulario, "Fim da aula", "07:55");
   expect(gravacoes).toHaveLength(0);
   expect(await aulasDaTurma("A")).toEqual(antes);
   const confirmacao = await pedirConfirmacao(page, formulario);
@@ -299,7 +308,7 @@ test("os cartões do celular editam disciplina e janela com campos e confirmaç�
   await disciplina.fill("Ciências");
   await page.setViewportSize({ width: 360, height: 480 });
   await expect(disciplina).toBeFocused();
-  await mudarHorario(page, formulario, "Início da aula", "07:10");
+  await mudarHorario(formulario, "Início da aula", "07:10");
   expect(gravacoes).toHaveLength(0);
   const salvar = formulario.getByRole("button", { name: "Salvar alterações", exact: true });
   await salvar.scrollIntoViewIfNeeded();
@@ -345,12 +354,12 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
   await expect(avisoSaida).toBeVisible();
   expect(gravacoes).toHaveLength(0);
   await avisoSaida.getByRole("button", { name: "Mudar de tela", exact: true }).click();
-  await expect(page.locator("main")).toHaveAttribute("data-visao", "painel");
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", "painel");
   await trocarVisao(page, "Gestão", "gestao");
   await expect(formulario).toBeVisible();
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
   await page.getByRole("button", { name: `Horários de ${origem}`, exact: true }).click();
-  const dialogo = page.getByRole("dialog", { name: `Horários de ${origem}`, exact: true });
+  const dialogo = dialogoDaTurma(page, origem);
   await dialogo.getByRole("button", { name: "Desativar aula 1", exact: true }).click();
   await page
     .getByRole("alertdialog")
@@ -401,9 +410,9 @@ test("a cópia exige confirmação e preserva dias, disciplinas e aulas desativa
   await expect(confirmacao).toBeVisible();
   expect(gravacoes).toHaveLength(0);
   await confirmacao.getByRole("button", { name: "Cancelar", exact: true }).click();
-  await expect(
-    dialogo.getByRole("combobox", { name: "Turma de origem", exact: true }),
-  ).toContainText(origem);
+  await expect(dialogo.getByRole("combobox", { name: "Turma de origem", exact: true })).toHaveValue(
+    origem,
+  );
   expect(await aulasDaTurma("B")).toEqual([]);
   await info.attach("editor-horarios-copia-previa", {
     body: await page.screenshot({ animations: "disabled" }),
@@ -452,9 +461,9 @@ test("um conflito de ordem recusa a grade inteira e mantém as duas turmas", asy
     }),
   ).toBeVisible();
   await expect(dialogo.getByRole("button", { name: "Copiar grade", exact: true })).toBeEnabled();
-  await expect(
-    dialogo.getByRole("combobox", { name: "Turma de origem", exact: true }),
-  ).toContainText(origem);
+  await expect(dialogo.getByRole("combobox", { name: "Turma de origem", exact: true })).toHaveValue(
+    origem,
+  );
   expect(await aulasDaTurma("C")).toEqual(antesDestino);
   expect(await aulasDaTurma("A")).toEqual(antesOrigem);
   await expect(dialogo.getByRole("button", { name: "Editar aula 1", exact: true })).toHaveCount(0);
@@ -480,7 +489,7 @@ test.describe("recuperação de falha de transporte", () => {
     });
     const disciplina = formulario.getByRole("textbox", { name: "Disciplina", exact: true });
     await disciplina.fill("Ciências");
-    await mudarHorario(page, formulario, "Fim da aula", "07:55");
+    await mudarHorario(formulario, "Fim da aula", "07:55");
     await page.route("**/api/horarios/*", (rota) =>
       rota.request().method() === "PATCH"
         ? rota.fulfill({
@@ -496,7 +505,7 @@ test.describe("recuperação de falha de transporte", () => {
       formulario.getByText("Não foi possível salvar a aula.", { exact: true }),
     ).toBeVisible();
     await expect(disciplina).toHaveValue("Ciências");
-    await expect(formulario.getByRole("button", { name: /^Fim da aula:/ })).toContainText("07:55");
+    await conferirHorario(formulario, "Fim da aula", "07:55");
     expect(await aulasDaTurma("A")).toEqual(antes);
     expect(gravacoes).toHaveLength(1);
     await page.unroute("**/api/horarios/*");
@@ -543,7 +552,7 @@ test.describe("recuperação de falha de transporte", () => {
     ).toBeVisible();
     await expect(
       dialogo.getByRole("combobox", { name: "Turma de origem", exact: true }),
-    ).toContainText(origem);
+    ).toHaveValue(origem);
     expect(await aulasDaTurma("B")).toEqual([]);
     expect(gravacoes).toHaveLength(1);
     await page.unroute("**/api/horarios/copiar");
@@ -677,8 +686,6 @@ test.describe("consulta pela coordenação", () => {
     await expect(vista.getByText("História", { exact: true })).toHaveCount(0);
     await expect(vista.getByRole("button", { name: /editar|copiar|salvar/i })).toHaveCount(0);
     await expect(vista.getByRole("textbox")).toHaveCount(0);
-    await expect(
-      page.getByRole("dialog", { name: `Horários de ${origem}`, exact: true }),
-    ).toHaveCount(0);
+    await expect(dialogoDaTurma(page, origem)).toHaveCount(0);
   });
 });

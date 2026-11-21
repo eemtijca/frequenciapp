@@ -1,18 +1,16 @@
 // Paleta de falta e falta justificada: separação para daltonismo e contraste,
-// lidos do globals.css nos dois temas, para uma troca de cor não regredir.
-import { readFileSync } from "node:fs";
-import path from "node:path";
+// lidos do tema Material UI nos dois esquemas para uma troca de cor não regredir.
 import { describe, expect, it } from "vitest";
+import { tema } from "@/theme/tema";
 import {
   contraste,
   deltaE,
-  lerOklch,
+  hslParaRgb,
+  lerHsl,
   oklchParaRgb,
   piorSeparacao,
   type Rgb,
 } from "../../helpers/cor";
-
-const CSS = readFileSync(path.resolve("src/app/globals.css"), "utf8");
 
 /** Separação mínima sob daltonismo simulado, em ΔE OKLab ×100. */
 const SEPARACAO_DALTONISMO = 8;
@@ -23,45 +21,48 @@ const CONTRASTE_MARCA = 3;
 /** Texto pequeno (WCAG AA). */
 const CONTRASTE_TEXTO = 4.5;
 
-function bloco(seletor: string): string {
-  const inicio = CSS.indexOf(`${seletor} {`);
-  if (inicio < 0) throw new Error(`Bloco ${seletor} ausente no globals.css`);
-  return CSS.slice(inicio, CSS.indexOf("}", inicio));
+function paleta(esquema: "light" | "dark") {
+  const atual = tema.colorSchemes[esquema]?.palette;
+  if (!atual) throw new Error(`Esquema ${esquema} ausente no tema`);
+  return atual;
 }
 
-function token(tema: string, nome: string): Rgb {
-  const achado = new RegExp(`--${nome}:\\s*([^;]+);`).exec(bloco(tema));
-  if (!achado?.[1]) throw new Error(`Token --${nome} ausente em ${tema}`);
-  return oklchParaRgb(...lerOklch(achado[1]));
+function cor(valor: string | undefined, rotulo: string): Rgb {
+  if (!valor) throw new Error(`Cor ${rotulo} ausente no tema`);
+  return hslParaRgb(...lerHsl(valor));
 }
 
 describe.each([
-  { tema: ":root", nome: "claro" },
-  { tema: ".dark", nome: "escuro" },
-])("paleta de faltas no tema $nome", ({ tema }) => {
-  const falta = token(tema, "falta");
-  const justificada = token(tema, "justificada");
-  const card = token(tema, "card");
+  { tema: "light", nome: "claro" },
+  { tema: "dark", nome: "escuro" },
+] as const)("paleta de faltas no tema $nome", ({ tema: esquema }) => {
+  const atual = paleta(esquema);
+  const falta = cor(atual.falta.main, "falta.main");
+  const justificada = cor(atual.justificada.main, "justificada.main");
+  const papel = cor(atual.background.paper, "background.paper");
 
   it("separa falta e falta justificada também para daltonismo", () => {
     expect(piorSeparacao(falta, justificada).valor).toBeGreaterThanOrEqual(SEPARACAO_DALTONISMO);
     expect(deltaE(falta, justificada)).toBeGreaterThanOrEqual(SEPARACAO_NORMAL);
   });
 
-  it("destaca as duas marcas da superfície do card", () => {
-    expect(contraste(falta, card)).toBeGreaterThanOrEqual(CONTRASTE_MARCA);
-    expect(contraste(justificada, card)).toBeGreaterThanOrEqual(CONTRASTE_MARCA);
+  it("destaca as marcas da superfície do papel", () => {
+    expect(contraste(falta, papel)).toBeGreaterThanOrEqual(CONTRASTE_MARCA);
+    expect(contraste(justificada, papel)).toBeGreaterThanOrEqual(CONTRASTE_MARCA);
+    expect(contraste(cor(atual.alerta.main, "alerta.main"), papel)).toBeGreaterThanOrEqual(
+      CONTRASTE_MARCA,
+    );
   });
 
   it("mantém o texto da falta justificada legível", () => {
-    const texto = token(tema, "justificada-texto");
-    expect(contraste(texto, card)).toBeGreaterThanOrEqual(CONTRASTE_TEXTO);
-    expect(contraste(texto, token(tema, "justificada-fraca"))).toBeGreaterThanOrEqual(
-      CONTRASTE_TEXTO,
-    );
-    expect(contraste(token(tema, "justificada-foreground"), justificada)).toBeGreaterThanOrEqual(
-      CONTRASTE_TEXTO,
-    );
+    const texto = cor(atual.justificada.texto, "justificada.texto");
+    expect(contraste(texto, papel)).toBeGreaterThanOrEqual(CONTRASTE_TEXTO);
+    expect(
+      contraste(texto, cor(atual.justificada.fraco, "justificada.fraco")),
+    ).toBeGreaterThanOrEqual(CONTRASTE_TEXTO);
+    expect(
+      contraste(cor(atual.justificada.contrastText, "justificada.contrastText"), justificada),
+    ).toBeGreaterThanOrEqual(CONTRASTE_TEXTO);
   });
 });
 

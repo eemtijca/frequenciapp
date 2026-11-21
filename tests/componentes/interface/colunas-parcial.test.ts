@@ -1,11 +1,10 @@
-// Confere a geometria das colunas da visão real com registros sintéticos no navegador.
+// Confere a geometria da tabela no desktop, dos cartões no celular e a adaptação pelo conteúdo.
 import path from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -18,13 +17,16 @@ let navegador: Browser;
 let url: string;
 let cache: string;
 
+const LARGURA_TABELA = 768;
+const LARGURA_PAINEL = 576;
+const LARGURA_FILTROS = 544;
+
 beforeAll(async () => {
   cache = mkdtempSync(path.join(tmpdir(), "frequenciapp-colunas-"));
   servidor = await createServer({
     configFile: false,
     cacheDir: cache,
     define: { "process.env": "{}" },
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { port: 0, hmr: false, watch: { ignored: ["**/*"] } },
@@ -42,23 +44,23 @@ afterAll(async () => {
   if (cache) rmSync(cache, { recursive: true, force: true });
 });
 
-it("alinha cabeçalhos e linhas com ações diferentes em desktop e mantém a disposição móvel", async () => {
+it("alinha a tabela no desktop, mantém os cartões no celular e responde à largura do conteúdo", async () => {
   const falhas: string[] = [];
   for (const { width, fonte, coluna } of [
-    ...[320, 390, 768, 1023, 1024, 1100, 1200, 1440].flatMap((width) =>
+    ...[320, 390, 768, 1024, 1100, 1200, 1440].flatMap((width) =>
       [16, 20].map((fonte) => ({ width, fonte, coluna: 0 })),
     ),
     ...[16, 20].flatMap((fonte) =>
-      [480, 48 * fonte, 48 * fonte + 4].map((coluna) => ({ width: 1440, fonte, coluna })),
+      [480, 768, 964].map((coluna) => ({ width: 1440, fonte, coluna })),
     ),
   ]) {
-    for (const tema of ["light", "dark"]) {
+    for (const tema of ["light", "dark"] as const) {
       const page = await navegador.newPage({ viewport: { width, height: 900 } });
       try {
-        await page.addInitScript(
-          (escuro) => document.documentElement.classList.toggle("dark", escuro),
-          tema === "dark",
-        );
+        await page.emulateMedia({ colorScheme: tema });
+        await page.addInitScript((tamanho: number) => {
+          document.documentElement.style.fontSize = `${tamanho}px`;
+        }, fonte);
         const confirmacoes: unknown[] = [];
         await page.route("**/api/**", async (route) => {
           const pedido = route.request();
@@ -135,23 +137,10 @@ it("alinha cabeçalhos e linhas com ações diferentes em desktop e mantém a di
           return route.abort();
         });
         await page.goto(url);
-        await page.evaluate(
-          ({ fonte, coluna }) => {
-            if (fonte !== 16) document.documentElement.style.fontSize = `${fonte}px`;
-            const conteudo = document.querySelector<HTMLElement>(
-              '[data-testid="conteudo-fixture"]',
-            );
-            if (coluna && conteudo) conteudo.style.maxWidth = `${coluna}px`;
-          },
-          { fonte, coluna },
-        );
-        await page.evaluate(
-          (escuro) => document.documentElement.classList.toggle("dark", escuro),
-          tema === "dark",
-        );
-        expect(await page.evaluate(() => document.documentElement.classList.contains("dark"))).toBe(
-          tema === "dark",
-        );
+        await page.evaluate((larguraMaxima: number) => {
+          const conteudo = document.querySelector<HTMLElement>('[data-testid="conteudo-fixture"]');
+          if (larguraMaxima && conteudo) conteudo.style.maxWidth = `${larguraMaxima}px`;
+        }, coluna);
         await page.getByRole("switch", { name: "Registro na Seduc: Aluno Justificado" }).waitFor();
         expect(await page.getByRole("switch", { name: /Registro na Seduc: Aluno/ }).count()).toBe(
           2,
@@ -162,137 +151,202 @@ it("alinha cabeçalhos e linhas com ações diferentes em desktop e mantém a di
             .count(),
         ).toBe(1);
         await page.evaluate(() => document.fonts.ready);
-        const geometria = await page.evaluate(() => {
-          const card = document.querySelector("ul.divide-y")?.closest(".superficie");
-          const menu = document.querySelector('[data-testid="menu-lateral"]');
-          const painel = document.querySelector(".pagina-painel");
-          const cabecalho = Array.from(card?.querySelectorAll("span") ?? []).find(
-            (e) => e.textContent === "Situação",
-          )?.parentElement;
-          if (!card || !menu || !painel || !cabecalho)
-            throw new Error("Estrutura da fixture ausente");
-          return {
-            largura: card.getBoundingClientRect().width,
-            menu: menu.getBoundingClientRect().width,
-            padding: parseFloat(getComputedStyle(painel).paddingLeft),
-            fonte: parseFloat(getComputedStyle(document.documentElement).fontSize),
-            desktop: getComputedStyle(cabecalho).display !== "none",
-          };
+
+        const secao = page.getByTestId("chamada-parcial");
+        const medidas = await secao.evaluate((no) => {
+          const largura = no.getBoundingClientRect().width;
+          const layout = no.getAttribute("data-layout");
+          return { largura, layout };
         });
-        expect(geometria.fonte).toBe(fonte);
-        expect(geometria.menu).toBe(width >= 1024 ? 15 * fonte : 0);
-        expect(geometria.padding).toBe((width >= 1024 ? 2 : width >= 640 ? 1.5 : 1) * fonte);
-        expect(geometria.desktop).toBe(geometria.largura - 2 >= 48 * fonte);
-        const erros = await page.evaluate(() => {
-          const erros: string[] = [];
-          const secao = document.querySelector('[data-testid="chamada-parcial"]');
-          const cabecalho = Array.from(secao?.querySelectorAll("span") ?? []).find(
-            (e) => e.textContent === "Situação",
-          );
-          const lista = secao?.querySelector("ul.divide-y");
-          const cartao = lista?.closest(".superficie");
-          if (!cartao) return ["Cartão ausente"];
-          const limites = cartao.getBoundingClientRect();
-          if (!cabecalho || !lista) return ["Cabeçalho ou lista ausente"];
-          const colunas = cabecalho.parentElement?.children;
-          if (!colunas || colunas.length !== 4 || !colunas[1] || !colunas[2] || !colunas[3])
-            return ["Colunas ausentes"];
-          if (lista.children.length !== 5) return ["Quantidade de linhas incorreta"];
-          const cabSituacao = colunas[1].getBoundingClientRect();
-          const cabSeduc = colunas[2].getBoundingClientRect();
-          const cabAcoes = colunas[3].getBoundingClientRect();
-          const desktop = getComputedStyle(cabecalho.parentElement as Element).display !== "none";
-          const turma = secao?.querySelector("#parcial-turma");
-          const navegacaoDia = secao?.querySelector(".navegacao-dia");
-          const busca = cartao.querySelector("#parcial-busca")?.closest(".campo");
-          const filtro = cartao.querySelector("#parcial-filtro");
-          const contexto = turma?.closest(".superficie");
-          if (!turma || !navegacaoDia || !busca || !filtro || !contexto || !secao)
-            return ["Controles da chamada parcial ausentes"];
-          const fonte = parseFloat(getComputedStyle(document.documentElement).fontSize);
-          const pares = [
-            [turma, navegacaoDia, contexto, secao.getBoundingClientRect().width >= 36 * fonte],
-            [busca, filtro, cartao, limites.width - 2 >= 34 * fonte],
-          ] as const;
-          for (const [primeiro, segundo, painel, ladoALado] of pares) {
-            const a = primeiro.getBoundingClientRect();
-            const b = segundo.getBoundingClientRect();
-            const caixa = painel.getBoundingClientRect();
-            if (!painel.contains(segundo) || b.right > caixa.right + 1)
-              erros.push("Controle fora de seu painel");
-            if (ladoALado ? b.left < a.right : b.top < a.bottom)
-              erros.push("Turma, data ou filtros não se adaptaram à largura disponível");
-          }
-          for (const linha of Array.from(lista.children)) {
-            const grade = linha.firstElementChild;
-            if (!grade) return ["Grade ausente"];
-            const nome = grade.querySelector("h2");
-            const situacao = grade.children[1];
-            const chave = grade.querySelector('[role="switch"]');
-            const botoes = grade.querySelectorAll('button:not([role="switch"])');
-            const acoes = botoes[0]?.parentElement;
-            if (!nome || !situacao || !acoes) return ["Conteúdo da linha ausente"];
-            const n = nome.getBoundingClientRect();
-            const s = situacao.getBoundingClientRect();
-            const a = acoes.getBoundingClientRect();
-            const k = chave?.getBoundingClientRect();
-            const perto = (x: number, y: number) => Math.abs(x - y) <= 1;
-            const retangulos = [
-              n,
-              s,
-              ...(k ? [k] : []),
-              ...Array.from(botoes, (b) => b.getBoundingClientRect()),
-            ];
-            for (const r of retangulos) {
-              if (r.width <= 0 || r.height <= 0)
-                erros.push(`${nome.textContent}: conteúdo sem área visível`);
-              if (r.left < limites.left - 1 || r.right > limites.right + 1)
-                erros.push(
-                  `${nome.textContent}: fora do cartão ${r.left.toFixed(1)}..${r.right.toFixed(1)} vs ${limites.left.toFixed(1)}..${limites.right.toFixed(1)}`,
+        const esperado = medidas.largura >= LARGURA_TABELA ? "tabela" : "cartoes";
+        await expect.poll(async () => secao.getAttribute("data-layout")).toBe(esperado);
+        expect(medidas.largura).toBeGreaterThan(0);
+
+        const erros = await page.evaluate(
+          ({ larguraTabela, larguraPainel, larguraFiltros }) => {
+            const erros: string[] = [];
+            const no = document.querySelector('[data-testid="chamada-parcial"]');
+            if (!(no instanceof HTMLElement)) return ["Seção ausente"];
+            const largura = no.getBoundingClientRect().width;
+            const caixa = (elemento: Element) => elemento.getBoundingClientRect();
+            const dentro = (a: DOMRect, b: DOMRect) =>
+              a.left >= b.left - 1 &&
+              a.right <= b.right + 1 &&
+              a.top >= b.top - 1 &&
+              a.bottom <= b.bottom + 1;
+            const colidem = (a: DOMRect, b: DOMRect) =>
+              a.left < b.right - 1 &&
+              a.right > b.left + 1 &&
+              a.top < b.bottom - 1 &&
+              a.bottom > b.top + 1;
+
+            const turma = document.querySelector("#parcial-turma");
+            const data = document.querySelector("#dia-chamada-parcial");
+            const busca = document.querySelector("#parcial-busca");
+            const filtro = document.querySelector("#parcial-filtro");
+            const campo = (elemento: Element | null) =>
+              elemento?.closest(".MuiFormControl-root") ?? null;
+            const painelTurma = campo(turma);
+            const painelData = campo(data);
+            const painelBusca = campo(busca) ?? busca?.closest(".MuiTextField-root") ?? null;
+            const painelFiltro = filtro?.closest(".MuiInputBase-root") ?? null;
+            if (!turma || !data || !busca || !filtro || !painelTurma || !painelData)
+              return ["Controles da chamada parcial ausentes"];
+            if (!painelBusca || !painelFiltro) return ["Busca ou filtro ausentes"];
+
+            const painel = painelTurma.closest(".MuiPaper-root");
+            const filtros = painelBusca.closest(".MuiPaper-root");
+            if (!painel || !filtros) return ["Painéis ausentes"];
+            if (
+              !dentro(caixa(painelTurma), caixa(painel)) ||
+              !dentro(caixa(painelData), caixa(painel))
+            )
+              erros.push("Turma ou data fora do painel");
+            if (
+              !dentro(caixa(painelBusca), caixa(filtros)) ||
+              !dentro(caixa(painelFiltro), caixa(filtros))
+            )
+              erros.push("Busca ou filtro fora do painel");
+
+            const a = caixa(painelTurma);
+            const b = caixa(painelData);
+            if (largura >= larguraPainel ? b.left < a.right - 1 : b.top < a.bottom - 1)
+              erros.push("Turma e data não se adaptaram à largura do painel");
+            const buscaCaixa = caixa(painelBusca);
+            const filtroCaixa = caixa(painelFiltro);
+            if (
+              largura >= larguraFiltros
+                ? filtroCaixa.left < buscaCaixa.right - 1
+                : filtroCaixa.top < buscaCaixa.bottom - 1
+            )
+              erros.push("Busca e filtro não se adaptaram à largura do painel");
+
+            if (largura >= larguraTabela) {
+              const tabela = no.querySelector("table");
+              const cabecalhos = tabela ? Array.from(tabela.querySelectorAll("thead th")) : [];
+              const linhas = tabela ? Array.from(tabela.querySelectorAll("tbody tr")) : [];
+              if (!tabela || cabecalhos.length !== 4 || linhas.length !== 5)
+                return ["Tabela, cabeçalho ou linhas ausentes"];
+              const textos = cabecalhos.map((item) => item.textContent?.trim());
+              if (textos.join("|") !== "Aluno|Situação|Registro na Seduc|Ações")
+                erros.push(`Cabeçalhos inesperados: ${textos.join("|")}`);
+              const limite = caixa(tabela);
+              for (const linha of linhas) {
+                const nome = linha.querySelector("th");
+                const celulas = Array.from(linha.querySelectorAll(":scope > td"));
+                if (!nome || celulas.length !== 3) {
+                  erros.push("Células da linha ausentes");
+                  continue;
+                }
+                const celulasCompletas = [nome, ...celulas];
+                for (let indice = 0; indice < celulasCompletas.length; indice++) {
+                  const celula = celulasCompletas[indice];
+                  const referencia = cabecalhos[indice];
+                  if (!celula || !referencia) continue;
+                  const c = caixa(celula);
+                  const r = caixa(referencia);
+                  if (Math.abs(c.left - r.left) > 1 || Math.abs(c.right - r.right) > 1)
+                    erros.push(`Coluna ${indice} desalinhada em ${nome.textContent}`);
+                  if (!dentro(c, limite)) erros.push(`Coluna ${indice} fora da tabela`);
+                }
+                const conteudos = Array.from(linha.querySelectorAll("th *, td *")).filter(
+                  (elemento) => {
+                    const estilo = getComputedStyle(elemento);
+                    const retangulo = elemento.getBoundingClientRect();
+                    return (
+                      retangulo.width > 1 &&
+                      retangulo.height > 1 &&
+                      estilo.display !== "none" &&
+                      estilo.visibility !== "hidden"
+                    );
+                  },
                 );
-            }
-            for (let i = 0; i < retangulos.length; i++) {
-              for (let j = i + 1; j < retangulos.length; j++) {
-                const x = retangulos[i],
-                  y = retangulos[j];
-                if (
-                  x &&
-                  y &&
-                  Math.min(x.right, y.right) - Math.max(x.left, y.left) > 1 &&
-                  Math.min(x.bottom, y.bottom) - Math.max(x.top, y.top) > 1
-                )
-                  erros.push(`${nome.textContent}: conteúdo sobreposto (${i},${j})`);
+                for (const elemento of conteudos) {
+                  const retangulo = caixa(elemento);
+                  if (!dentro(retangulo, limite))
+                    erros.push(`Conteúdo fora da tabela em ${nome.textContent}`);
+                }
+                const chip = linha.querySelector(".MuiChip-root");
+                const chave = linha.querySelector(".MuiSwitch-root");
+                const acoes = linha.querySelector("td:last-of-type");
+                const botoes = acoes ? Array.from(acoes.querySelectorAll("button")) : [];
+                if (!chip || !acoes) {
+                  erros.push("Situação ou ações ausentes");
+                  continue;
+                }
+                if (chave && !dentro(caixa(chave), limite))
+                  erros.push(`Chave fora da tabela em ${nome.textContent}`);
+                for (const botao of botoes) {
+                  if (!dentro(caixa(botao), caixa(acoes)))
+                    erros.push(`Ação fora da coluna em ${nome.textContent}`);
+                }
+                const retangulos = [
+                  caixa(chip),
+                  ...(chave ? [caixa(chave)] : []),
+                  ...botoes.map((botao) => caixa(botao)),
+                ];
+                for (let i = 0; i < retangulos.length; i++) {
+                  for (let j = i + 1; j < retangulos.length; j++) {
+                    const primeiro = retangulos[i];
+                    const segundo = retangulos[j];
+                    if (primeiro && segundo && colidem(primeiro, segundo))
+                      erros.push(`Conteúdo sobreposto em ${nome.textContent}`);
+                  }
+                }
+              }
+            } else {
+              const lista = no.querySelector("ul.MuiList-root");
+              const itens = lista ? Array.from(lista.children) : [];
+              if (!lista || itens.length !== 5) return ["Lista ou cartões ausentes"];
+              const limite = caixa(lista);
+              for (const item of itens) {
+                const titulo = item.querySelector("h2");
+                const chip = item.querySelector(".MuiChip-root");
+                const chave = item.querySelector(".MuiSwitch-root");
+                const botoes = Array.from(item.querySelectorAll("button"));
+                if (!titulo || !chip) {
+                  erros.push("Nome ou situação ausentes no cartão");
+                  continue;
+                }
+                if (!dentro(caixa(item), limite)) erros.push("Cartão fora da lista");
+                if (!dentro(caixa(titulo), limite) || !dentro(caixa(chip), limite))
+                  erros.push("Nome ou situação fora do cartão");
+                for (const botao of botoes) {
+                  if (!dentro(caixa(botao), caixa(item)))
+                    erros.push(`Ação fora do cartão em ${titulo.textContent}`);
+                }
+                const tituloCaixa = caixa(titulo);
+                const chipCaixa = caixa(chip);
+                const blocoAcoes = botoes[0]?.parentElement;
+                if (blocoAcoes) {
+                  if (!dentro(caixa(blocoAcoes), caixa(item)))
+                    erros.push(`Ações fora do cartão em ${titulo.textContent}`);
+                  if (caixa(blocoAcoes).left < tituloCaixa.right - 1)
+                    erros.push(`Ações não ficam à direita em ${titulo.textContent}`);
+                }
+                if (chipCaixa.top < tituloCaixa.bottom - 1)
+                  erros.push(`Situação não fica abaixo do nome em ${titulo.textContent}`);
+                if (chave && caixa(chave).top < chipCaixa.bottom - 1)
+                  erros.push(`Chave não fica abaixo da situação em ${titulo.textContent}`);
               }
             }
-            for (const botao of Array.from(botoes)) {
-              const b = botao.getBoundingClientRect();
-              if (b.left < a.left - 1 || b.right > a.right + 1 || b.right > innerWidth + 1)
-                erros.push(`${nome.textContent}: ação fora da coluna ou da tela`);
-            }
-            if (desktop) {
-              const caixasAcoes = Array.from(botoes, (botao) => botao.getBoundingClientRect());
-              if (caixasAcoes.some((caixa) => !perto(caixa.top, caixasAcoes[0]?.top ?? caixa.top)))
-                erros.push(`${nome.textContent}: ações não estão na mesma linha`);
-              if (!perto(s.left, cabSituacao.left))
-                erros.push(`${nome.textContent}: situação ${s.left} vs ${cabSituacao.left}`);
-              if (k && !perto(k.left, cabSeduc.left))
-                erros.push(`${nome.textContent}: Seduc ${k.left} vs ${cabSeduc.left}`);
-              if (!perto(a.right, cabAcoes.right))
-                erros.push(`${nome.textContent}: ações ${a.right} vs ${cabAcoes.right}`);
-            } else {
-              if (!perto(n.left, s.left) || a.left < n.right - 1 || s.top < n.bottom - 1)
-                erros.push(`${nome.textContent}: disposição móvel`);
-              if (k && k.top < s.bottom - 1) erros.push(`${nome.textContent}: chave móvel`);
-            }
-          }
-          return erros;
-        });
+
+            if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
+              erros.push("Overflow horizontal da página");
+            return erros;
+          },
+          {
+            larguraTabela: LARGURA_TABELA,
+            larguraPainel: LARGURA_PAINEL,
+            larguraFiltros: LARGURA_FILTROS,
+          },
+        );
         falhas.push(
           ...erros.map((erro) => `${width}/${fonte}/${coluna || "normal"}/${tema}: ${erro}`),
         );
         if (width === 1024 && fonte === 20 && !coluna && tema === "dark")
           await page.screenshot({ path: "test-results/colunas-parcial.png", fullPage: true });
-        if (width === 320 && fonte === 20 && tema === "dark")
+        if (width === 320 && fonte === 20 && !coluna && tema === "dark")
           await page.screenshot({ path: "test-results/colunas-parcial-movel.png", fullPage: true });
         if (width === 1440 && fonte === 16 && !coluna && tema === "light")
           await page.screenshot({
@@ -327,12 +381,7 @@ it("alinha cabeçalhos e linhas com ações diferentes em desktop e mantém a di
             .waitFor({ state: "visible" });
           const chave = page.getByRole("switch", { name: "Registro na Seduc: Aluno Justificado" });
           await chave.click();
-          await page.waitForFunction(
-            () =>
-              document
-                .querySelector('[role="switch"][aria-label="Registro na Seduc: Aluno Justificado"]')
-                ?.getAttribute("aria-checked") === "true",
-          );
+          await expect.poll(() => chave.isChecked()).toBe(true);
           expect(confirmacoes).toEqual([
             {
               dia: "2026-10-27",
@@ -350,4 +399,4 @@ it("alinha cabeçalhos e linhas com ações diferentes em desktop e mantém a di
     }
   }
   expect(falhas).toEqual([]);
-}, 120000);
+}, 180000);

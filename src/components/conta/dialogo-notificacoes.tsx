@@ -2,33 +2,39 @@
 
 // Preferência de push do dispositivo atual. A permissão só é pedida após
 // toque explícito; falhas de ativação desfazem a assinatura recém-criada.
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { LoaderCircle } from "lucide-react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Dialog from "@mui/material/Dialog";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
+import IconButton from "@mui/material/IconButton";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
+import Typography from "@mui/material/Typography";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
 import {
   ROTULOS_NOTIFICACAO,
   DESCRICOES_NOTIFICACAO,
   type TipoDeAviso,
   type PreferenciasNotificacoes,
 } from "@/domain/notificacoes";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   aberto: boolean;
   onAbrir: (aberto: boolean) => void;
   onDevolverFoco?: () => void;
 }
+
 interface Estado {
   configurada: boolean;
   chavePublica: string | null;
@@ -38,6 +44,18 @@ interface Estado {
   horarioResumo: string;
   horarioPendencias: string;
 }
+
+const VISUALMENTE_OCULTO = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
 
 function chaveDoServidor(chave: string): Uint8Array<ArrayBuffer> {
   const texto = atob(chave.replace(/-/g, "+").replace(/_/g, "/"));
@@ -87,6 +105,9 @@ export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }:
   const [erro, setErro] = useState("");
   const acaoDesejada = useRef<"ativar" | "desativar" | "testar" | "salvar">("ativar");
   const preferenciaDesejada = useRef<Partial<PreferenciasNotificacoes>>({});
+  const tituloId = useId();
+  const descricaoId = useId();
+  const padding = `${TOKENS_LAYOUT.dialogo.padding}px`;
 
   // O diálogo é limpo ao abrir. A comparação durante o render substitui o
   // reinício dentro do efeito, que a regra set-state-in-effect reprova.
@@ -219,130 +240,196 @@ export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }:
     void executar();
   }
 
+  function fechar() {
+    if (!executando) onAbrir(false);
+  }
+
   return (
     <Dialog
       open={aberto}
-      onOpenChange={(valor) => {
-        if (!executando) onAbrir(valor);
+      onClose={fechar}
+      fullWidth
+      maxWidth="sm"
+      scroll="paper"
+      role="dialog"
+      aria-labelledby={tituloId}
+      aria-describedby={descricaoId}
+      disableRestoreFocus={Boolean(onDevolverFoco)}
+      slotProps={{
+        paper: {
+          sx: {
+            maxWidth: `${TOKENS_LAYOUT.dialogo.larguraMaxima}px`,
+            borderRadius: `${TOKENS_LAYOUT.dialogo.raio}px`,
+          },
+        },
+        transition: {
+          onExited: () => {
+            if (onDevolverFoco) onDevolverFoco();
+          },
+        },
       }}
     >
-      <DialogContent
-        className="max-h-[calc(100dvh-2rem)] max-w-sm overflow-y-auto"
-        onCloseAutoFocus={
-          onDevolverFoco
-            ? (evento) => {
-                evento.preventDefault();
-                onDevolverFoco();
-              }
-            : undefined
-        }
-      >
-        <DialogHeader>
-          <DialogTitle>Notificações</DialogTitle>
-          <DialogDescription className="sr-only">
-            Escolher os avisos da conta e ativar o recebimento neste dispositivo.
-          </DialogDescription>
-        </DialogHeader>
+      <Box sx={{ position: "relative" }}>
+        <DialogTitle
+          id={tituloId}
+          sx={{
+            padding,
+            paddingBottom: 0,
+            paddingRight: `calc(${padding} + ${TOKENS_LAYOUT.alvoToque}px)`,
+          }}
+        >
+          Notificações
+        </DialogTitle>
+        <IconButton
+          aria-label="Fechar"
+          onClick={fechar}
+          sx={{
+            position: "absolute",
+            top: padding,
+            right: padding,
+            width: TOKENS_LAYOUT.alvoToque,
+            height: TOKENS_LAYOUT.alvoToque,
+          }}
+        >
+          <CloseRoundedIcon />
+        </IconButton>
+      </Box>
+      <DialogContent sx={{ display: "flex", flexDirection: "column", gap: 2, padding }}>
+        <DialogContentText id={descricaoId} sx={VISUALMENTE_OCULTO}>
+          Escolher os avisos da conta e ativar o recebimento neste dispositivo.
+        </DialogContentText>
         {carregando ? (
-          <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
-            <LoaderCircle className="animate-spin" size={16} />
-            Consultando notificações...
-          </p>
+          <Stack direction="row" spacing={1} role="status" sx={{ alignItems: "center" }}>
+            <CircularProgress size={16} />
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Consultando notificações...
+            </Typography>
+          </Stack>
         ) : (
-          <div className="flex flex-col gap-4">
+          <Stack spacing={2}>
             {estado?.preferencias ? (
-              <div className="flex flex-col gap-4">
-                <p className="text-sm font-medium">Tipos de aviso</p>
-                {estado.tipos.map(({ tipo, disponivel }) => (
-                  <div key={tipo} className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <Label htmlFor={`preferencia-${tipo}`}>{ROTULOS_NOTIFICACAO[tipo]}</Label>
-                      <p className="text-muted-foreground text-xs">
-                        {DESCRICOES_NOTIFICACAO[tipo]}
-                      </p>
-                      {!disponivel ? (
-                        <p className="text-muted-foreground text-xs">
-                          Este aviso está desligado pela Gestão.
-                        </p>
-                      ) : tipo !== "novasChamadas" ? (
-                        <p className="text-muted-foreground text-xs">
-                          A partir das{" "}
-                          {tipo === "resumoDiario"
-                            ? estado.horarioResumo
-                            : estado.horarioPendencias}{" "}
-                          (horário da escola).
-                        </p>
-                      ) : null}
-                    </div>
-                    <Switch
-                      id={`preferencia-${tipo}`}
-                      checked={estado.preferencias[tipo]}
-                      disabled={executando || !disponivel}
-                      onCheckedChange={(valor) => {
-                        preferenciaDesejada.current = { [tipo]: valor };
-                        executarAcao("salvar");
-                      }}
-                    />
-                  </div>
-                ))}
-                <p className="text-muted-foreground text-xs">
+              <Box>
+                <Typography variant="body2" component="p" sx={{ fontWeight: 600, mb: 1 }}>
+                  Tipos de aviso
+                </Typography>
+                <List disablePadding aria-label="Tipos de aviso">
+                  {estado.tipos.map(({ tipo, disponivel }) => {
+                    const idRotulo = `preferencia-${tipo}`;
+                    return (
+                      <ListItem
+                        key={tipo}
+                        disableGutters
+                        sx={{ alignItems: "flex-start", gap: 2, py: 1 }}
+                      >
+                        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.25, flex: 1 }}>
+                          <Typography
+                            id={idRotulo}
+                            component="p"
+                            variant="body2"
+                            sx={{ fontWeight: 500 }}
+                          >
+                            {ROTULOS_NOTIFICACAO[tipo]}
+                          </Typography>
+                          <Typography
+                            component="p"
+                            variant="caption"
+                            sx={{ color: "text.secondary" }}
+                          >
+                            {DESCRICOES_NOTIFICACAO[tipo]}
+                          </Typography>
+                          {!disponivel ? (
+                            <Typography
+                              component="p"
+                              variant="caption"
+                              sx={{ color: "text.secondary" }}
+                            >
+                              Este aviso está desligado pela Gestão.
+                            </Typography>
+                          ) : tipo !== "novasChamadas" ? (
+                            <Typography
+                              component="p"
+                              variant="caption"
+                              sx={{ color: "text.secondary" }}
+                            >
+                              A partir das{" "}
+                              {tipo === "resumoDiario"
+                                ? estado.horarioResumo
+                                : estado.horarioPendencias}{" "}
+                              (horário da escola).
+                            </Typography>
+                          ) : null}
+                        </Box>
+                        <Switch
+                          edge="end"
+                          checked={estado.preferencias[tipo]}
+                          disabled={executando || !disponivel}
+                          onChange={(evento) => {
+                            preferenciaDesejada.current = { [tipo]: evento.target.checked };
+                            executarAcao("salvar");
+                          }}
+                          slotProps={{ input: { "aria-labelledby": idRotulo } }}
+                        />
+                      </ListItem>
+                    );
+                  })}
+                </List>
+                <Typography variant="caption" component="p" sx={{ color: "text.secondary" }}>
                   Preferências para toda a conta; ativação por dispositivo.
-                </p>
-              </div>
+                </Typography>
+              </Box>
             ) : null}
             {!suportado ? (
-              <p className="text-muted-foreground text-sm">
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 Este navegador não oferece notificações push. No iPhone ou iPad, adicione o
                 aplicativo à Tela de Início pelo Safari e abra por esse ícone. É necessário iOS 16.4
                 ou posterior.
-              </p>
+              </Typography>
             ) : null}
             {estado && !estado.configurada ? (
-              <p className="text-muted-foreground text-sm">
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 As notificações ainda não foram configuradas pela administração.
-              </p>
+              </Typography>
             ) : null}
             {suportado && permissao === "denied" ? (
-              <p className="text-muted-foreground text-sm">
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 As notificações estão bloqueadas. Libere a permissão nas configurações deste site no
                 navegador e abra esta opção novamente.
-              </p>
+              </Typography>
             ) : null}
             {estado?.ativa ? (
-              <p role="status" className="text-sm">
+              <Typography role="status" variant="body2">
                 Notificações ativadas neste dispositivo.
-              </p>
+              </Typography>
             ) : null}
             {suportado && estado?.configurada ? (
-              <div className="flex flex-col gap-2">
-                <Button
+              <Stack spacing={1}>
+                <Botao
+                  variante={estado.ativa ? "contorno" : "secundario"}
                   disabled={executando || (!estado.ativa && permissao === "denied")}
+                  carregando={executando}
                   onClick={() => executarAcao(estado.ativa ? "desativar" : "ativar")}
                 >
-                  {executando ? <LoaderCircle className="animate-spin" size={16} /> : null}
                   {estado.ativa ? "Desativar notificações" : "Ativar notificações"}
-                </Button>
+                </Botao>
                 {estado.ativa ? (
-                  <Button
-                    variant="outline"
+                  <Botao
+                    variante="contorno"
                     disabled={executando}
                     onClick={() => executarAcao("testar")}
                   >
                     Enviar notificação de teste
-                  </Button>
+                  </Botao>
                 ) : null}
-              </div>
+              </Stack>
             ) : null}
-            <p className="text-muted-foreground text-xs">
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
               Os avisos não mostram nomes de alunos. Ao sair da conta neste dispositivo, as
               notificações são desativadas.
-            </p>
-          </div>
+            </Typography>
+          </Stack>
         )}
         {erro ? (
-          <p role="alert" className="text-falta-texto text-sm">
-            {erro}
-          </p>
+          <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
         ) : null}
       </DialogContent>
     </Dialog>

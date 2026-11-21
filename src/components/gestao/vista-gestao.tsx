@@ -2,8 +2,15 @@
 
 // Gestão: área do administrador. Séries, turmas, alunos, equipe, diretores
 // de turma e configurações em abas curtas.
-import { GraduationCap, ListChecks, School, Settings2, UserRoundCheck, Users } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
+import AdminPanelSettingsRoundedIcon from "@mui/icons-material/AdminPanelSettingsRounded";
+import BadgeRoundedIcon from "@mui/icons-material/BadgeRounded";
+import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
+import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
+import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
 import type {
   Aluno,
   Configuracoes,
@@ -12,8 +19,8 @@ import type {
   Serie,
   Turma,
 } from "@/domain/frequencia";
-import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
-import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
+import { Abas, type ItemAba } from "@/components/ui/mui/abas";
+import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
 import AbaSeries from "@/components/gestao/abas/aba-series";
 import AbaTurmas from "@/components/gestao/abas/aba-turmas";
 import AbaAlunos from "@/components/gestao/abas/aba-alunos";
@@ -50,14 +57,26 @@ interface Props {
   onAbrirParcial?: () => void;
 }
 
-const ABAS: AbaItem<Aba>[] = [
-  { valor: "series", rotulo: "Séries", icone: GraduationCap },
-  { valor: "turmas", rotulo: "Turmas", icone: School },
-  { valor: "alunos", rotulo: "Alunos", icone: ListChecks },
-  { valor: "equipe", rotulo: "Equipe", icone: Users },
-  { valor: "diretores", rotulo: "Diretores", rotuloCurto: "Diretores", icone: UserRoundCheck },
-  { valor: "configuracoes", rotulo: "Configurações", rotuloCurto: "Config.", icone: Settings2 },
+const ORDEM_ABAS: readonly Aba[] = [
+  "series",
+  "turmas",
+  "alunos",
+  "equipe",
+  "diretores",
+  "configuracoes",
 ];
+
+const ESTILO_TITULO_OCULTO = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
 
 export default function VistaGestao({
   abaInicial = "series",
@@ -86,6 +105,9 @@ export default function VistaGestao({
   const [atualizacao, setAtualizacao] = useState(0);
   const [horariosPendentes, setHorariosPendentes] = useState(false);
   const [configPendente, setConfigPendente] = useState(false);
+  const [aba, setAba] = useState<Aba>(() =>
+    planilhaInicial ? "configuracoes" : (abaInicial ?? "series"),
+  );
 
   useEffect(() => {
     onPendenciaHorarios?.(horariosPendentes);
@@ -109,67 +131,106 @@ export default function VistaGestao({
     setAtualizacao((valor) => valor + 1);
   });
 
-  return (
-    <section aria-label="Gestão da escola" className="flex flex-col gap-4 pb-6">
-      <h1 className="sr-only">Gestão</h1>
-      <div className="flex justify-end">
-        <AtualizadoDaVisao fuso={fuso} />
-      </div>
+  // As setas trocam a aba selecionada, como no teclado das abas antigas.
+  function aoTeclar(evento: KeyboardEvent<HTMLDivElement>) {
+    if (evento.altKey || evento.ctrlKey || evento.metaKey) return;
+    if (evento.key !== "ArrowRight" && evento.key !== "ArrowLeft") return;
+    if (!(evento.target instanceof HTMLElement)) return;
+    if (evento.target.getAttribute("role") !== "tab") return;
+    const indice = ORDEM_ABAS.indexOf(aba);
+    if (indice < 0) return;
+    const passo = evento.key === "ArrowRight" ? 1 : -1;
+    const proximo = ORDEM_ABAS[(indice + passo + ORDEM_ABAS.length) % ORDEM_ABAS.length];
+    if (proximo) setAba(proximo);
+  }
 
-      <AbasDeslizantes
+  const itens: ItemAba<Aba>[] = [
+    {
+      valor: "series",
+      rotulo: "Séries",
+      icone: <SchoolRoundedIcon fontSize="small" aria-hidden="true" />,
+      conteudo: <AbaSeries series={series} onMudanca={onSeriesMudaram} />,
+    },
+    {
+      valor: "turmas",
+      rotulo: "Turmas",
+      icone: <GroupsRoundedIcon fontSize="small" aria-hidden="true" />,
+      conteudo: (
+        <AbaTurmas
+          series={series}
+          turmas={turmas}
+          onMudanca={onTurmasMudaram}
+          onOrdenacao={onAlunosMudaram}
+        />
+      ),
+    },
+    {
+      valor: "alunos",
+      rotulo: "Alunos",
+      icone: <ListAltRoundedIcon fontSize="small" aria-hidden="true" />,
+      conteudo: <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />,
+    },
+    {
+      valor: "equipe",
+      rotulo: "Equipe",
+      icone: <BadgeRoundedIcon fontSize="small" aria-hidden="true" />,
+      conteudo: (
+        <AbaEquipe usuarioId={usuarioId} onMudanca={onTurmasMudaram} atualizacao={atualizacao} />
+      ),
+    },
+    {
+      valor: "diretores",
+      rotulo: "Diretores",
+      icone: <AdminPanelSettingsRoundedIcon fontSize="small" aria-hidden="true" />,
+      conteudo: (
+        <AbaDiretores turmas={turmas} diaCorrente={diaCorrente} atualizacao={atualizacao} />
+      ),
+    },
+    {
+      valor: "configuracoes",
+      rotulo: "Configurações",
+      rotuloCurto: "Config.",
+      icone: <SettingsRoundedIcon fontSize="small" aria-hidden="true" />,
+      conteudo: (
+        <AbaConfiguracoes
+          planilhaInicial={planilhaInicial}
+          configuracoes={configuracoes}
+          series={series}
+          justificativas={justificativas}
+          liberadores={liberadores}
+          turmas={turmas}
+          diaCorrente={diaCorrente}
+          fuso={fuso}
+          atualizacao={atualizacao}
+          onMudanca={onConfiguracoesMudaram}
+          onJustificativasMudaram={onJustificativasMudaram}
+          onLiberadoresMudaram={onLiberadoresMudaram}
+          onHorariosMudaram={onHorariosMudaram}
+          onPendenciaHorarios={setHorariosPendentes}
+          onPendenciaConfiguracoes={setConfigPendente}
+          onAbrirSaidas={onAbrirSaidas}
+          onAbrirParcial={onAbrirParcial}
+        />
+      ),
+    },
+  ];
+
+  return (
+    <Box component="section" aria-label="Gestão da escola" onKeyDown={aoTeclar} sx={{ pb: 3 }}>
+      <Typography component="h1" sx={ESTILO_TITULO_OCULTO}>
+        Gestão
+      </Typography>
+      <Box sx={{ display: "flex", justifyContent: "flex-end", mb: 2 }}>
+        <AtualizadoDaVisao fuso={fuso} />
+      </Box>
+
+      <Abas<Aba>
         rotuloAcessivel="Áreas de gestão"
-        abaInicial={abaInicial}
-        abas={ABAS}
+        ativo={aba}
+        onChange={setAba}
+        itens={itens}
         dataPager="gestao"
-      >
-        {(aba) => (
-          <>
-            {aba === "series" && <AbaSeries series={series} onMudanca={onSeriesMudaram} />}
-            {aba === "turmas" && (
-              <AbaTurmas
-                series={series}
-                turmas={turmas}
-                onMudanca={onTurmasMudaram}
-                onOrdenacao={onAlunosMudaram}
-              />
-            )}
-            {aba === "alunos" && (
-              <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />
-            )}
-            {aba === "equipe" && (
-              <AbaEquipe
-                usuarioId={usuarioId}
-                onMudanca={onTurmasMudaram}
-                atualizacao={atualizacao}
-              />
-            )}
-            {aba === "diretores" && (
-              <AbaDiretores turmas={turmas} diaCorrente={diaCorrente} atualizacao={atualizacao} />
-            )}
-            {aba === "configuracoes" && (
-              <AbaConfiguracoes
-                planilhaInicial={planilhaInicial}
-                configuracoes={configuracoes}
-                series={series}
-                justificativas={justificativas}
-                liberadores={liberadores}
-                turmas={turmas}
-                diaCorrente={diaCorrente}
-                fuso={fuso}
-                atualizacao={atualizacao}
-                onMudanca={onConfiguracoesMudaram}
-                onJustificativasMudaram={onJustificativasMudaram}
-                onLiberadoresMudaram={onLiberadoresMudaram}
-                onHorariosMudaram={onHorariosMudaram}
-                onPendenciaHorarios={setHorariosPendentes}
-                onPendenciaConfiguracoes={setConfigPendente}
-                onAbrirSaidas={onAbrirSaidas}
-                onAbrirParcial={onAbrirParcial}
-              />
-            )}
-          </>
-        )}
-      </AbasDeslizantes>
-    </section>
+      />
+    </Box>
   );
 }

@@ -65,8 +65,10 @@ test.describe("chamada com saída por aula", () => {
     // ocupar uma segunda linha, por isso a checagem é bidimensional.
     expect(
       await gatilhoDia.evaluate((botao) => {
-        const data = botao.querySelector(".numerais-tabulares")?.getBoundingClientRect();
-        const selo = botao.querySelector(".rounded-full")?.getBoundingClientRect();
+        const data = Array.from(botao.querySelectorAll("span"))
+          .find((el) => /^\d{2}\/\d{2}\/\d{4}$/.test(el.textContent ?? ""))
+          ?.getBoundingClientRect();
+        const selo = botao.querySelector("[data-selo]")?.getBoundingClientRect();
         const caixa = botao.getBoundingClientRect();
         if (
           !data ||
@@ -134,8 +136,8 @@ test.describe("chamada com saída por aula", () => {
     // No desktop, a lista fica à esquerda e o painel de informações à direita.
     if (!isMobile) {
       await page.setViewportSize({ width: 1440, height: 900 });
-      const lista = await painel.locator("div[class*='xl:order-1']").boundingBox();
-      const info = await painel.locator("div[class*='xl:order-2']").boundingBox();
+      const lista = await painel.locator('[data-coluna="lista"]').boundingBox();
+      const info = await painel.locator('[data-coluna="painel"]').boundingBox();
       expect(lista?.x ?? 0).toBeLessThan(info?.x ?? 0);
     }
 

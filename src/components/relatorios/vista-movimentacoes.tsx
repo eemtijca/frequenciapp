@@ -1,8 +1,17 @@
 "use client";
 
-// Relatório conjunto de saídas e entradas, com consulta independente do mês e grupos por turma ou por aluno.
+// Relatório conjunto de saídas e entradas, por turma ou por aluno, com período próprio.
 import { useEffect, useMemo, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, ChevronLeft, ChevronRight, LoaderCircle } from "lucide-react";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import NorthEastRoundedIcon from "@mui/icons-material/NorthEastRounded";
+import SouthWestRoundedIcon from "@mui/icons-material/SouthWestRounded";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Grid from "@mui/material/Grid";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import {
   diaDaSemanaIso,
   diaSeguinte,
@@ -22,13 +31,13 @@ import {
 import { pedir } from "@/lib/api-cliente";
 import { mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
-import { Label } from "@/components/ui/label";
-import { Selecionar } from "@/components/ui/selecionar";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { Cartao } from "@/components/ui/mui/cartao";
+import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
+import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import { Selo } from "@/components/ui/mui/selo";
 
 type Modo = "dia" | "semana" | "periodo";
 type Agrupamento = "turma" | "aluno";
@@ -62,54 +71,86 @@ function contagens(saidas: number, entradas: number): string[] {
 
 /** Uma saída ou entrada, com o aluno quando o grupo é a turma. */
 function LinhaMovimentacao({ item, comAluno }: { item: MovimentacaoRelatorio; comAluno: boolean }) {
+  const entrada = item.tipo === "ENTRADA";
   return (
-    <li className="grid min-w-0 gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <div className="min-w-0 space-y-2">
-        <div className="flex flex-wrap items-center gap-2 text-xs">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1 rounded-lg border px-2 py-1 font-medium",
-              item.tipo === "ENTRADA"
-                ? "border-primary/25 bg-primary/10 text-primary"
-                : "bg-muted/40 text-foreground",
-            )}
+    <Box
+      component="li"
+      sx={{
+        display: "grid",
+        gap: 2,
+        p: 2,
+        gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(0, 1fr) minmax(0, 1fr)" },
+      }}
+    >
+      <Stack spacing={1} sx={{ minWidth: 0 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{ alignItems: "center", flexWrap: "wrap" }}
+        >
+          <Selo
+            rotulo={entrada ? "Entrada" : "Saída"}
+            tom={entrada ? "sucesso" : "neutro"}
+            icon={
+              entrada ? (
+                <SouthWestRoundedIcon aria-hidden="true" />
+              ) : (
+                <NorthEastRoundedIcon aria-hidden="true" />
+              )
+            }
+          />
+          <Box
+            component="time"
+            dateTime={item.dia}
+            sx={{ color: "text.secondary", fontVariantNumeric: "tabular-nums", fontSize: 12 }}
           >
-            {item.tipo === "ENTRADA" ? (
-              <ArrowDownLeft size={14} aria-hidden="true" />
-            ) : (
-              <ArrowUpRight size={14} aria-hidden="true" />
-            )}
-            {item.tipo === "ENTRADA" ? "Entrada" : "Saída"}
-          </span>
-          <time dateTime={item.dia} className="text-muted-foreground numerais-tabulares">
             {rotuloData(item.dia)}
-          </time>
-          {item.horario && <span className="numerais-tabulares">{item.horario}</span>}
-        </div>
-        {comAluno && <p className="font-medium wrap-anywhere">{item.alunoNome}</p>}
-        {item.momento && (
-          <p className="text-muted-foreground text-xs">{rotuloMomento(item.momento)}</p>
-        )}
-      </div>
-      <dl className="min-w-0 space-y-2 text-sm">
-        <div>
-          <dt className="text-muted-foreground text-xs">Motivo</dt>
-          <dd className="wrap-anywhere">
+          </Box>
+          {item.horario ? (
+            <Typography
+              component="span"
+              variant="caption"
+              sx={{ fontVariantNumeric: "tabular-nums" }}
+            >
+              {item.horario}
+            </Typography>
+          ) : null}
+        </Stack>
+        {comAluno ? (
+          <Typography sx={{ fontWeight: 500, overflowWrap: "anywhere" }}>
+            {item.alunoNome}
+          </Typography>
+        ) : null}
+        {item.momento ? (
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {rotuloMomento(item.momento)}
+          </Typography>
+        ) : null}
+      </Stack>
+      <Stack component="dl" spacing={1} sx={{ m: 0, minWidth: 0 }}>
+        <Box>
+          <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
+            Motivo
+          </Typography>
+          <Box component="dd" sx={{ m: 0, overflowWrap: "anywhere" }}>
             {item.motivo ? (
-              <CaixasDeInfo partes={partesDoMotivo(item.motivo)} className="mt-1" />
+              <CaixasDeInfo itens={partesDoMotivo(item.motivo)} sx={{ mt: 0.5 }} />
             ) : (
               "Não informado"
             )}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-muted-foreground text-xs">
+          </Box>
+        </Box>
+        <Box>
+          <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
             {item.tipo === "SAIDA" ? "Liberado por" : "Responsável pelo registro"}
-          </dt>
-          <dd className="wrap-anywhere">{item.responsavel ?? "Não informado"}</dd>
-        </div>
-      </dl>
-    </li>
+          </Typography>
+          <Box component="dd" sx={{ m: 0, overflowWrap: "anywhere" }}>
+            {item.responsavel ?? "Não informado"}
+          </Box>
+        </Box>
+      </Stack>
+    </Box>
   );
 }
 
@@ -223,262 +264,372 @@ export default function VistaMovimentacoes({
   const proximoInicio = diaSeguinte(modo === "semana" ? segunda : dia, passo);
 
   return (
-    <section
+    <Box
+      component="section"
       aria-label="Relatório de saídas e entradas"
       aria-busy={carregando}
-      className="flex min-w-0 flex-col gap-4"
+      sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
     >
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold">Saídas e Entradas</h2>
-      </div>
-      <div role="group" aria-label="Período do relatório" className="flex flex-wrap gap-2">
-        {MODOS.map((item) => (
-          <Button
-            key={item.valor}
-            type="button"
-            variant="secondary"
-            aria-pressed={modo === item.valor}
-            onClick={() => setModo(item.valor)}
-            className="min-h-11"
-          >
-            {item.rotulo}
-          </Button>
-        ))}
-      </div>
-      <div role="group" aria-label="Agrupamento do relatório" className="flex flex-wrap gap-2">
-        {AGRUPAMENTOS.map((item) => (
-          <Button
-            key={item.valor}
-            type="button"
-            variant="secondary"
-            aria-pressed={agrupamento === item.valor}
-            onClick={() => setAgrupamento(item.valor)}
-            className="min-h-11"
-          >
-            {item.rotulo}
-          </Button>
-        ))}
-      </div>
-      <div className="superficie grid gap-4 p-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-        {modo === "periodo" ? (
-          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="movimentacoes-de">Data inicial</Label>
-              <SeletorPeriodo
-                id="movimentacoes-de"
-                modo="dia"
-                valor={inicio}
-                max={hoje}
-                rotuloAcessivel="Data inicial do relatório"
-                rotulo={rotuloData(inicio)}
-                onValor={setInicio}
-              />
-            </div>
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="movimentacoes-ate">Data final</Label>
-              <SeletorPeriodo
-                id="movimentacoes-ate"
-                modo="dia"
-                valor={fim}
-                max={hoje}
-                rotuloAcessivel="Data final do relatório"
-                rotulo={rotuloData(fim)}
-                onValor={setFim}
-              />
-            </div>
-          </div>
-        ) : (
-          <div className="min-w-0 space-y-2">
-            <Label htmlFor="movimentacoes-dia">
-              {modo === "semana" ? "Semana da data" : "Data"}
-            </Label>
-            <div className="navegacao-dia flex min-w-0 items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-11 shrink-0"
-                aria-label={`${nomePeriodo} anterior do relatório`}
-                onClick={() => setDia(diaSeguinte(dia, -passo))}
-              >
-                <ChevronLeft size={18} />
-              </Button>
-              <div className="min-w-0 flex-1">
-                <SeletorPeriodo
-                  id="movimentacoes-dia"
-                  modo="dia"
-                  valor={dia}
-                  max={hoje}
-                  rotuloAcessivel="Data do relatório"
-                  rotulo={rotuloData(dia)}
-                  onValor={setDia}
-                />
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                className="size-11 shrink-0"
-                aria-label={`${nomePeriodo === "Semana" ? "Próxima semana" : "Próximo dia"} do relatório`}
-                disabled={proximoInicio > hoje}
-                onClick={() =>
-                  setDia(diaSeguinte(dia, passo) > hoje ? hoje : diaSeguinte(dia, passo))
-                }
-              >
-                <ChevronRight size={18} />
-              </Button>
-            </div>
-          </div>
-        )}
-        <div className="min-w-0 space-y-2">
-          <Label htmlFor="movimentacoes-turma">Turma</Label>
-          <Selecionar
-            id="movimentacoes-turma"
-            ariaLabel="Turma do relatório de movimentações"
-            value={turmaId}
-            onValueChange={setTurmaId}
-            opcoes={[
-              { valor: "todas", rotulo: "Todas as turmas" },
-              ...turmas.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
-            ]}
-          />
-        </div>
-        {agrupamento === "aluno" && (
-          <>
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="movimentacoes-aluno">Aluno</Label>
+      <Typography component="h2" variant="h6">
+        Saídas e Entradas
+      </Typography>
+
+      <Stack
+        direction="row"
+        spacing={1}
+        useFlexGap
+        role="group"
+        aria-label="Período do relatório"
+        sx={{ flexWrap: "wrap" }}
+      >
+        {MODOS.map((item) => {
+          const selecionado = modo === item.valor;
+          return (
+            <Botao
+              key={item.valor}
+              variante="contorno"
+              aria-pressed={selecionado}
+              onClick={() => setModo(item.valor)}
+              sx={{ bgcolor: selecionado ? "action.selected" : undefined }}
+            >
+              {item.rotulo}
+            </Botao>
+          );
+        })}
+      </Stack>
+      <Stack
+        direction="row"
+        spacing={1}
+        useFlexGap
+        role="group"
+        aria-label="Agrupamento do relatório"
+        sx={{ flexWrap: "wrap" }}
+      >
+        {AGRUPAMENTOS.map((item) => {
+          const selecionado = agrupamento === item.valor;
+          return (
+            <Botao
+              key={item.valor}
+              variante="contorno"
+              aria-pressed={selecionado}
+              onClick={() => setAgrupamento(item.valor)}
+              sx={{ bgcolor: selecionado ? "action.selected" : undefined }}
+            >
+              {item.rotulo}
+            </Botao>
+          );
+        })}
+      </Stack>
+
+      <Cartao component="div">
+        <Grid container spacing={2} sx={{ width: "100%" }}>
+          {modo === "periodo" ? (
+            <>
+              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                <Stack spacing={1} sx={{ minWidth: 0 }}>
+                  <Typography component="label" htmlFor="movimentacoes-de" variant="caption">
+                    Data inicial
+                  </Typography>
+                  <SeletorPeriodo
+                    id="movimentacoes-de"
+                    modo="dia"
+                    valor={inicio}
+                    max={hoje}
+                    rotuloAcessivel="Data inicial do relatório"
+                    rotulo={rotuloData(inicio)}
+                    onValor={setInicio}
+                  />
+                </Stack>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                <Stack spacing={1} sx={{ minWidth: 0 }}>
+                  <Typography component="label" htmlFor="movimentacoes-ate" variant="caption">
+                    Data final
+                  </Typography>
+                  <SeletorPeriodo
+                    id="movimentacoes-ate"
+                    modo="dia"
+                    valor={fim}
+                    max={hoje}
+                    rotuloAcessivel="Data final do relatório"
+                    rotulo={rotuloData(fim)}
+                    onValor={setFim}
+                  />
+                </Stack>
+              </Grid>
+            </>
+          ) : (
+            <Grid size={{ xs: 12, sm: 8, lg: 5 }}>
+              <Stack spacing={1} sx={{ minWidth: 0 }}>
+                <Typography component="label" htmlFor="movimentacoes-dia" variant="caption">
+                  {modo === "semana" ? "Semana da data" : "Data"}
+                </Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                  <BotaoIcone
+                    rotulo={`${nomePeriodo} anterior do relatório`}
+                    variante="contorno"
+                    icone={<ChevronLeftRoundedIcon />}
+                    onClick={() => setDia(diaSeguinte(dia, -passo))}
+                    sx={{ width: 48, height: 48 }}
+                  />
+                  <Box sx={{ minWidth: 0, flex: 1 }}>
+                    <SeletorPeriodo
+                      id="movimentacoes-dia"
+                      modo="dia"
+                      valor={dia}
+                      max={hoje}
+                      rotuloAcessivel="Data do relatório"
+                      rotulo={rotuloData(dia)}
+                      onValor={setDia}
+                    />
+                  </Box>
+                  <BotaoIcone
+                    rotulo={`${
+                      nomePeriodo === "Semana" ? "Próxima semana" : "Próximo dia"
+                    } do relatório`}
+                    variante="contorno"
+                    icone={<ChevronRightRoundedIcon />}
+                    disabled={proximoInicio > hoje}
+                    onClick={() =>
+                      setDia(diaSeguinte(dia, passo) > hoje ? hoje : diaSeguinte(dia, passo))
+                    }
+                    sx={{ width: 48, height: 48 }}
+                  />
+                </Stack>
+              </Stack>
+            </Grid>
+          )}
+          <Grid size={{ xs: 12, sm: 4, lg: 3 }}>
+            <Stack spacing={1} sx={{ minWidth: 0 }}>
+              <Typography component="label" htmlFor="movimentacoes-turma" variant="caption">
+                Turma
+              </Typography>
               <Selecionar
-                id="movimentacoes-aluno"
-                ariaLabel="Aluno do relatório de movimentações"
-                value={alunoId}
-                onValueChange={setAlunoEscolhido}
-                buscavel
-                opcoes={[{ valor: TODOS_OS_ALUNOS, rotulo: "Todos os alunos" }, ...opcoesAluno]}
-              />
-            </div>
-            <div className="min-w-0 space-y-2">
-              <Label htmlFor="movimentacoes-filtro">Mostrar</Label>
-              <Selecionar
-                id="movimentacoes-filtro"
-                ariaLabel="Filtro de alunos do relatório"
-                value={filtroAluno}
-                onValueChange={(valor) =>
-                  setFiltroAluno(valor === "repetidas" ? "repetidas" : "todas")
-                }
+                id="movimentacoes-turma"
+                ariaLabel="Turma do relatório de movimentações"
+                valor={turmaId}
+                onValor={setTurmaId}
                 opcoes={[
-                  { valor: "todas", rotulo: "Todos com movimentações" },
-                  { valor: "repetidas", rotulo: "Duas ou mais no período" },
+                  { valor: "todas", rotulo: "Todas as turmas" },
+                  ...turmas.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
                 ]}
               />
-            </div>
-          </>
-        )}
-      </div>
-      <p className="text-muted-foreground text-sm" aria-live="polite">
+            </Stack>
+          </Grid>
+          {agrupamento === "aluno" ? (
+            <>
+              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                <Stack spacing={1} sx={{ minWidth: 0 }}>
+                  <Typography component="label" htmlFor="movimentacoes-aluno" variant="caption">
+                    Aluno
+                  </Typography>
+                  <Selecionar
+                    id="movimentacoes-aluno"
+                    ariaLabel="Aluno do relatório de movimentações"
+                    valor={alunoId}
+                    onValor={setAlunoEscolhido}
+                    buscavel
+                    opcoes={[{ valor: TODOS_OS_ALUNOS, rotulo: "Todos os alunos" }, ...opcoesAluno]}
+                  />
+                </Stack>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+                <Stack spacing={1} sx={{ minWidth: 0 }}>
+                  <Typography component="label" htmlFor="movimentacoes-filtro" variant="caption">
+                    Mostrar
+                  </Typography>
+                  <Selecionar
+                    id="movimentacoes-filtro"
+                    ariaLabel="Filtro de alunos do relatório"
+                    valor={filtroAluno}
+                    onValor={(valor) =>
+                      setFiltroAluno(valor === "repetidas" ? "repetidas" : "todas")
+                    }
+                    opcoes={[
+                      { valor: "todas", rotulo: "Todos com movimentações" },
+                      { valor: "repetidas", rotulo: "Duas ou mais no período" },
+                    ]}
+                  />
+                </Stack>
+              </Grid>
+            </>
+          ) : null}
+        </Grid>
+      </Cartao>
+
+      <Typography variant="body2" aria-live="polite" sx={{ color: "text.secondary" }}>
         {de === ate ? rotuloData(de) : `${rotuloData(de)} a ${rotuloData(ate)}`}
         {modo === "semana" && (domingo > hoje ? " · Semana até hoje" : " · Segunda a domingo")}
-      </p>
+      </Typography>
+
       {erroPeriodo ? (
-        <p role="alert" className="text-falta-texto text-sm">
+        <Typography role="alert" variant="body2" sx={{ color: "falta.texto" }}>
           {erroPeriodo}
-        </p>
+        </Typography>
       ) : carregando ? (
-        <p
+        <Stack
           role="status"
-          className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-sm"
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: "center", justifyContent: "center", py: 4 }}
         >
-          <LoaderCircle size={18} className="animate-spin" /> Carregando saídas e entradas...
-        </p>
+          <CircularProgress size={18} aria-hidden="true" />
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Carregando saídas e entradas...
+          </Typography>
+        </Stack>
       ) : atual?.erro ? (
-        <AvisoCompacto
+        <AlertaCompacto
           variante={atual.variante}
           titulo="Relatório indisponível"
           descricao={atual.erro}
           acao={{ rotulo: "Tentar de novo", onClick: () => setRecarga((valor) => valor + 1) }}
         />
-      ) : (
-        dados && (
-          <>
-            <dl aria-label="Totais de movimentações" className="grid grid-cols-2 gap-3">
-              <div className="superficie p-4">
-                <dt className="text-muted-foreground text-sm">Saídas</dt>
-                <dd className="numerais-tabulares mt-1 text-2xl font-semibold">
-                  {dados.totais.saidas}
-                </dd>
-              </div>
-              <div className="superficie p-4">
-                <dt className="text-muted-foreground text-sm">Entradas</dt>
-                <dd className="numerais-tabulares mt-1 text-2xl font-semibold">
-                  {dados.totais.entradas}
-                </dd>
-              </div>
-            </dl>
-            {dados.turmas.length === 0 ? (
-              <p className="superficie text-muted-foreground p-6 text-center text-sm">
+      ) : dados ? (
+        <>
+          <Box
+            component="dl"
+            aria-label="Totais de movimentações"
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+              gap: 2,
+              m: 0,
+            }}
+          >
+            <Cartao component="div">
+              <Typography component="dt" variant="body2" sx={{ color: "text.secondary" }}>
+                Saídas
+              </Typography>
+              <Typography
+                component="dd"
+                variant="h4"
+                sx={{ m: 0, mt: 0.5, fontVariantNumeric: "tabular-nums" }}
+              >
+                {dados.totais.saidas}
+              </Typography>
+            </Cartao>
+            <Cartao component="div">
+              <Typography component="dt" variant="body2" sx={{ color: "text.secondary" }}>
+                Entradas
+              </Typography>
+              <Typography
+                component="dd"
+                variant="h4"
+                sx={{ m: 0, mt: 0.5, fontVariantNumeric: "tabular-nums" }}
+              >
+                {dados.totais.entradas}
+              </Typography>
+            </Cartao>
+          </Box>
+          {dados.turmas.length === 0 ? (
+            <Paper variant="outlined" sx={{ p: 3, textAlign: "center", boxShadow: "none" }}>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 Nenhuma saída ou entrada neste período.
-              </p>
-            ) : agrupamento === "aluno" ? (
-              porAluno.length === 0 ? (
-                <p className="superficie text-muted-foreground p-6 text-center text-sm">
+              </Typography>
+            </Paper>
+          ) : agrupamento === "aluno" ? (
+            porAluno.length === 0 ? (
+              <Paper variant="outlined" sx={{ p: 3, textAlign: "center", boxShadow: "none" }}>
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
                   {alunoId === TODOS_OS_ALUNOS
                     ? "Nenhum aluno encontrado com estes filtros."
                     : "Este aluno não tem saídas nem entradas neste período."}
-                </p>
-              ) : (
-                porAluno.map((aluno) => (
-                  <section
-                    key={aluno.alunoId}
-                    aria-label={`Aluno ${aluno.alunoNome}`}
-                    className="superficie min-w-0 overflow-hidden"
-                  >
-                    <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-                      <div className="min-w-0">
-                        <h3 className="font-semibold wrap-anywhere">{aluno.alunoNome}</h3>
-                        <p className="text-muted-foreground text-xs wrap-anywhere">
-                          {aluno.turmas.join(" · ")}
-                        </p>
-                      </div>
-                      <CaixasDeInfo partes={contagens(aluno.saidas, aluno.entradas)} />
-                    </header>
-                    <ul className="divide-y">
-                      {aluno.movimentacoes.map((item) => (
-                        <LinhaMovimentacao
-                          key={`${item.tipo}:${item.id}`}
-                          item={item}
-                          comAluno={false}
-                        />
-                      ))}
-                    </ul>
-                  </section>
-                ))
-              )
+                </Typography>
+              </Paper>
             ) : (
-              dados.turmas.map((grupo) => (
-                <section
-                  key={`${grupo.turmaId}:${grupo.turmaRotulo}`}
-                  aria-label={`Turma ${grupo.turmaRotulo}`}
-                  className="superficie min-w-0 overflow-hidden"
+              porAluno.map((aluno) => (
+                <Paper
+                  component="section"
+                  variant="outlined"
+                  key={aluno.alunoId}
+                  aria-label={`Aluno ${aluno.alunoNome}`}
+                  sx={{ minWidth: 0, overflow: "hidden", boxShadow: "none" }}
                 >
-                  <header className="flex flex-wrap items-center justify-between gap-2 border-b px-4 py-3">
-                    <h3 className="font-semibold wrap-anywhere">{grupo.turmaRotulo}</h3>
-                    <CaixasDeInfo partes={contagens(grupo.saidas, grupo.entradas)} />
-                  </header>
-                  <ul className="divide-y">
-                    {grupo.movimentacoes.map((item) => (
-                      <LinhaMovimentacao key={`${item.tipo}:${item.id}`} item={item} comAluno />
+                  <Stack
+                    direction="row"
+                    spacing={2}
+                    sx={{
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      borderBottom: 1,
+                      borderColor: "divider",
+                      px: 2,
+                      py: 1.5,
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography
+                        component="h3"
+                        variant="subtitle2"
+                        sx={{ overflowWrap: "anywhere" }}
+                      >
+                        {aluno.alunoNome}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                      >
+                        {aluno.turmas.join(" · ")}
+                      </Typography>
+                    </Box>
+                    <CaixasDeInfo itens={contagens(aluno.saidas, aluno.entradas)} />
+                  </Stack>
+                  <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                    {aluno.movimentacoes.map((item) => (
+                      <LinhaMovimentacao
+                        key={`${item.tipo}:${item.id}`}
+                        item={item}
+                        comAluno={false}
+                      />
                     ))}
-                  </ul>
-                </section>
+                  </Box>
+                </Paper>
               ))
-            )}
-            <p className="text-muted-foreground text-xs">
-              {agrupamento === "aluno"
-                ? "Cada aluno reúne as saídas e as entradas do período, em todas as turmas."
-                : "Entradas e saídas agrupadas pela turma gravada no registro; saídas sem referência ficam como turma histórica desconhecida."}
-            </p>
-          </>
-        )
-      )}
-    </section>
+            )
+          ) : (
+            dados.turmas.map((grupo) => (
+              <Paper
+                component="section"
+                variant="outlined"
+                key={`${grupo.turmaId}:${grupo.turmaRotulo}`}
+                aria-label={`Turma ${grupo.turmaRotulo}`}
+                sx={{ minWidth: 0, overflow: "hidden", boxShadow: "none" }}
+              >
+                <Stack
+                  direction="row"
+                  spacing={2}
+                  sx={{
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    flexWrap: "wrap",
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    px: 2,
+                    py: 1.5,
+                  }}
+                >
+                  <Typography component="h3" variant="subtitle2" sx={{ overflowWrap: "anywhere" }}>
+                    {grupo.turmaRotulo}
+                  </Typography>
+                  <CaixasDeInfo itens={contagens(grupo.saidas, grupo.entradas)} />
+                </Stack>
+                <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                  {grupo.movimentacoes.map((item) => (
+                    <LinhaMovimentacao key={`${item.tipo}:${item.id}`} item={item} comAluno />
+                  ))}
+                </Box>
+              </Paper>
+            ))
+          )}
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            {agrupamento === "aluno"
+              ? "Cada aluno reúne as saídas e as entradas do período, em todas as turmas."
+              : "Entradas e saídas agrupadas pela turma gravada no registro; saídas sem referência ficam como turma histórica desconhecida."}
+          </Typography>
+        </>
+      ) : null}
+    </Box>
   );
 }

@@ -2,7 +2,13 @@
 
 // Botão que grava os feriados do ano e fica bloqueado até a senha do administrador.
 import { useEffect, useId, useRef, useState } from "react";
-import { Download, LoaderCircle, LockKeyhole, RotateCcw } from "lucide-react";
+import CloudDownloadRoundedIcon from "@mui/icons-material/CloudDownloadRounded";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type {
   AbrangenciaFeriados,
   EstadoSincronizacaoFeriados,
@@ -12,18 +18,11 @@ import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import { CampoSenha } from "@/components/ui/campo-senha";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { Dialogo } from "@/components/ui/mui/dialogo";
 
 interface Props {
   ano: string;
@@ -65,8 +64,8 @@ export default function ControleSincronizarFeriados({
   onAtualizar,
 }: Props) {
   const ajudaId = useId();
+  const idBotao = useId();
   const senhaId = useId();
-  const botaoRef = useRef<HTMLButtonElement>(null);
   const focar = useRef(false);
   const [leitura, setLeitura] = useState<Leitura | null>(null);
   const [tentativa, setTentativa] = useState(0);
@@ -182,8 +181,8 @@ export default function ControleSincronizarFeriados({
   useEffect(() => {
     if (!focar.current || !desbloqueado) return;
     focar.current = false;
-    botaoRef.current?.focus();
-  }, [desbloqueado]);
+    document.getElementById(idBotao)?.focus();
+  }, [desbloqueado, idBotao]);
 
   const ocupado = desabilitado || executando || desbloqueio.executando || carregando;
   const podeSincronizar =
@@ -215,145 +214,132 @@ export default function ControleSincronizarFeriados({
   }
 
   return (
-    <div className="bg-muted/30 flex min-w-0 flex-col gap-2 rounded-xl border p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          ref={botaoRef}
+    <Box
+      sx={(tema) => ({
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+        padding: 2,
+        borderRadius: 2,
+        border: `1px solid ${tema.vars.palette.divider}`,
+        backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 4%, transparent)`,
+        minWidth: 0,
+      })}
+    >
+      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
+        <Botao
+          id={idBotao}
           type="button"
-          className="h-auto min-h-11 min-w-0 whitespace-normal"
+          variante="primario"
           disabled={!podeSincronizar}
+          carregando={executando}
+          icone={<CloudDownloadRoundedIcon />}
           aria-describedby={ajudaId}
           onClick={() => void executar()}
         >
-          {executando ? (
-            <LoaderCircle
-              size={16}
-              aria-hidden="true"
-              className="animate-spin motion-reduce:animate-none"
-            />
-          ) : (
-            <Download size={16} aria-hidden="true" />
-          )}
           Sincronizar feriados
-        </Button>
+        </Botao>
         {sincronizado &&
-          !desbloqueado &&
-          estado.configurado &&
-          !leituraAtual?.erro &&
-          !carregando && (
-            <Button
-              type="button"
-              variant="outline"
-              className="h-auto min-h-11 min-w-0 whitespace-normal"
-              disabled={ocupado || !anoValido}
-              onClick={() => {
-                setErro("");
-                setErroSenha(null);
-                setDialogoAberto(true);
-              }}
-            >
-              <LockKeyhole size={16} aria-hidden="true" />
-              Desbloquear
-            </Button>
-          )}
-        {leituraAtual?.erro && (
-          <Button
+        !desbloqueado &&
+        estado.configurado &&
+        !leituraAtual?.erro &&
+        !carregando ? (
+          <Botao
             type="button"
-            variant="outline"
-            className="h-auto min-h-11 min-w-0 whitespace-normal"
+            variante="contorno"
+            disabled={ocupado || !anoValido}
+            icone={<LockRoundedIcon />}
+            onClick={() => {
+              setErro("");
+              setErroSenha(null);
+              setDialogoAberto(true);
+            }}
+          >
+            Desbloquear
+          </Botao>
+        ) : null}
+        {leituraAtual?.erro ? (
+          <Botao
+            type="button"
+            variante="contorno"
             disabled={desabilitado || executando}
+            icone={<RefreshRoundedIcon />}
             onClick={() => setTentativa((atual) => atual + 1)}
           >
-            <RotateCcw size={16} aria-hidden="true" />
             Tentar de novo
-          </Button>
-        )}
-      </div>
-      <p id={ajudaId} className="text-muted-foreground text-xs">
+          </Botao>
+        ) : null}
+        {desbloqueado ? (
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+            <LockOpenRoundedIcon fontSize="small" aria-hidden="true" />
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              Liberado para uma gravação
+            </Typography>
+          </Stack>
+        ) : null}
+      </Stack>
+      <Typography id={ajudaId} variant="caption" sx={{ color: "text.secondary" }}>
         {ajuda}
-      </p>
-      {erro && (
-        <AvisoCompacto
+      </Typography>
+      {erro ? (
+        <AlertaCompacto
           variante={varianteErro}
           titulo="Confira a sincronização"
           descricao={erro}
           tamanho="linha"
         />
-      )}
-      <Dialog
-        open={dialogoAberto}
-        onOpenChange={(aberto) => {
-          if (aberto) setDialogoAberto(true);
-          else fecharDialogo();
-        }}
+      ) : null}
+      <Dialogo
+        aberto={dialogoAberto}
+        onFechar={fecharDialogo}
+        titulo="Desbloquear sincronização"
+        descricao={`A senha do administrador libera uma nova gravação dos feriados de ${ano}.`}
       >
-        <DialogContent
-          showCloseButton={!desbloqueio.executando}
-          onEscapeKeyDown={(evento) => {
+        <Box
+          component="form"
+          onSubmit={(evento) => {
             evento.preventDefault();
-            fecharDialogo();
+            void desbloqueio.executar();
           }}
-          onPointerDownOutside={(evento) => {
-            evento.preventDefault();
-            fecharDialogo();
-          }}
+          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
         >
-          <DialogHeader>
-            <DialogTitle>Desbloquear sincronização</DialogTitle>
-            <DialogDescription>
-              A senha do administrador libera uma nova gravação dos feriados de {ano}.
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(evento) => {
-              evento.preventDefault();
-              void desbloqueio.executar();
-            }}
-          >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor={senhaId}>Senha do administrador</Label>
-              <CampoSenha
-                id={senhaId}
-                value={senha}
-                onChange={(evento) => setSenha(evento.target.value)}
-                autoComplete="current-password"
-                maxLength={200}
-                disabled={desbloqueio.executando}
-                className="h-11"
-              />
-            </div>
-            {erroSenha && (
-              <AvisoCompacto
-                variante={estadoDeErro(new ErroApi(erroSenha.mensagem, erroSenha.status))}
-                titulo="Confira a senha"
-                descricao={erroSenha.mensagem}
-                tamanho="linha"
-              />
-            )}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={desbloqueio.executando}
-                onClick={fecharDialogo}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={desbloqueio.executando || !senha.trim()}>
-                {desbloqueio.executando && (
-                  <LoaderCircle
-                    size={16}
-                    aria-hidden="true"
-                    className="animate-spin motion-reduce:animate-none"
-                  />
-                )}
-                Desbloquear
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+          <Campo id={senhaId} rotulo="Senha do administrador">
+            <CampoSenha
+              id={senhaId}
+              valor={senha}
+              onValor={setSenha}
+              autoComplete="current-password"
+              disabled={desbloqueio.executando}
+            />
+          </Campo>
+          {erroSenha ? (
+            <AlertaCompacto
+              variante={estadoDeErro(new ErroApi(erroSenha.mensagem, erroSenha.status))}
+              titulo="Confira a senha"
+              descricao={erroSenha.mensagem}
+              tamanho="linha"
+            />
+          ) : null}
+          <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <Botao
+              type="button"
+              variante="contorno"
+              disabled={desbloqueio.executando}
+              onClick={fecharDialogo}
+            >
+              Cancelar
+            </Botao>
+            <Botao
+              type="submit"
+              variante="secundario"
+              carregando={desbloqueio.executando}
+              disabled={!senha.trim()}
+            >
+              Desbloquear
+            </Botao>
+          </Stack>
+        </Box>
+      </Dialogo>
+    </Box>
   );
 }

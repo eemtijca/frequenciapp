@@ -1,17 +1,32 @@
 "use client";
 
 // Grade semanal por turma: consulta para todos e, em Gestão, edição confirmada com rascunho preservado.
-import { Fragment, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
-  CalendarDays,
-  Clock,
-  Coffee,
-  LoaderCircle,
-  Pencil,
-  Sun,
-  Sunset,
-  Utensils,
-} from "lucide-react";
+  Fragment,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
+import LocalCafeRoundedIcon from "@mui/icons-material/LocalCafeRounded";
+import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
+import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import WbTwilightRoundedIcon from "@mui/icons-material/WbTwilightRounded";
+import Box from "@mui/material/Box";
+import Grid from "@mui/material/Grid";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Stack from "@mui/material/Stack";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
 import { ehHoraValida, type Horario, type Turma } from "@/domain/frequencia";
 import {
   DIAS_DA_SEMANA,
@@ -28,31 +43,53 @@ import type { ProvaBimestral } from "@/domain/provas-bimestrais";
 import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 import DialogoAulas from "@/components/gestao/cadastros/dialogo-aulas";
 import { EditorAula, type RascunhoAula } from "@/components/horarios/editor-aula";
 import CartaoProvasBimestrais from "@/components/horarios/cartao-provas-bimestrais";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
-import { Label } from "@/components/ui/label";
-import { Selecionar } from "@/components/ui/selecionar";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
-import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
+import { Abas, type ItemAba } from "@/components/ui/mui/abas";
+import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { Cartao } from "@/components/ui/mui/cartao";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { TabelaPadrao } from "@/components/layout/tabela-padrao";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
-const TURNOS: AbaItem<"manha" | "tarde">[] = [
-  { valor: "manha", rotulo: "Manhã", icone: Sun },
-  { valor: "tarde", rotulo: "Tarde", icone: Sunset },
-];
+type Turno = "manha" | "tarde";
+
+const TEXTO_INVISIVEL = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
+
+const ESTILO_BOTAO_ICONE = {
+  minWidth: TOKENS_LAYOUT.alvoToque,
+  width: TOKENS_LAYOUT.alvoToque,
+  height: TOKENS_LAYOUT.alvoToque,
+  padding: 0,
+  "& .MuiButton-startIcon": { margin: 0 },
+} as const;
+
+const ESTILO_CABECALHO_CARTAO = {
+  display: "flex",
+  alignItems: "center",
+  gap: 1,
+  px: 2,
+  py: 1.5,
+  backgroundColor: "action.hover",
+  borderBottom: 1,
+  borderColor: "divider",
+} as const;
 
 interface Props {
   turmas: Turma[];
@@ -79,21 +116,41 @@ function nomeDisciplina(aula: Horario, dia: number): string {
 }
 
 function IconePausa({ pausa }: { pausa: Pausa }) {
-  const Icone = pausa.id === "almoco" ? Utensils : Coffee;
-  return <Icone size={16} aria-hidden="true" className="shrink-0" />;
+  const Icone = pausa.id === "almoco" ? RestaurantRoundedIcon : LocalCafeRoundedIcon;
+  return <Icone fontSize="small" aria-hidden="true" />;
 }
 
 function PausaDoDia({ pausa }: { pausa: Pausa }) {
   return (
-    <li className="bg-secondary/30 text-muted-foreground flex min-w-0 items-center gap-3 px-4 py-3 text-sm">
-      <span className="flex size-11 shrink-0 items-center justify-center">
+    <ListItem divider sx={{ gap: 2, py: 1.5, backgroundColor: "action.hover" }}>
+      <Box
+        aria-hidden="true"
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 44,
+          height: 44,
+          flexShrink: 0,
+        }}
+      >
         <IconePausa pausa={pausa} />
-      </span>
-      <span className="min-w-0 flex-1 font-medium">{pausa.rotulo}</span>
-      <span className="numerais-tabulares shrink-0 text-xs">
+      </Box>
+      <Typography variant="body2" sx={{ flex: 1, minWidth: 0, fontWeight: 500 }}>
+        {pausa.rotulo}
+      </Typography>
+      <Typography
+        variant="caption"
+        sx={{
+          flexShrink: 0,
+          color: "text.secondary",
+          fontVariantNumeric: "tabular-nums",
+          whiteSpace: "nowrap",
+        }}
+      >
         {pausa.inicio} às {pausa.fim}
-      </span>
-    </li>
+      </Typography>
+    </ListItem>
   );
 }
 
@@ -109,43 +166,86 @@ function OrdemAlmocoDoDiaCartao({ dias, dia, turmas, turmaSelecionada }: PropsOr
   const itens = ordemDoDia(dias, dia);
   if (itens.length === 0) return null;
   const rotuloDe = new Map(turmas.map((turma) => [turma.id, turma.rotulo]));
+
   return (
-    <section
+    <Cartao
+      component="section"
       aria-label={`Ordem do almoço de ${rotuloDia(dia)}`}
-      className="superficie overflow-hidden"
+      sx={{ padding: 0, overflow: "hidden" }}
     >
-      <h2 className="bg-secondary/50 flex items-center gap-2 border-b px-4 py-3 text-sm font-medium">
-        <Utensils size={16} aria-hidden="true" className="shrink-0" />
-        Ordem do almoço · {rotuloDia(dia)}
-      </h2>
-      <ol className="divide-y">
+      <Box sx={ESTILO_CABECALHO_CARTAO}>
+        <RestaurantRoundedIcon fontSize="small" aria-hidden="true" />
+        <Typography component="h2" variant="subtitle2">
+          Ordem do almoço · {rotuloDia(dia)}
+        </Typography>
+      </Box>
+      <List component="ol" aria-label={`Ordem do almoço de ${rotuloDia(dia)}`} disablePadding>
         {itens.map((item) => {
           const selecionada = item.turmaId === turmaSelecionada;
           return (
-            <li
+            <ListItem
               key={item.turmaId}
+              divider
               aria-current={selecionada ? "true" : undefined}
-              className={`flex min-w-0 items-center gap-3 px-4 py-3 text-sm ${selecionada ? "selecionado" : ""}`}
+              sx={{
+                gap: 2,
+                py: 1.5,
+                backgroundColor: selecionada ? "action.selected" : undefined,
+              }}
             >
-              <span className="controle numerais-tabulares flex size-11 shrink-0 items-center justify-center font-semibold">
-                <span aria-hidden="true">{item.posicao}º</span>
-                <span className="sr-only">{item.posicao}º lugar</span>
-              </span>
-              <span className="min-w-0 flex-1 font-medium break-words">
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 44,
+                  height: 44,
+                  flexShrink: 0,
+                  fontWeight: 600,
+                  fontVariantNumeric: "tabular-nums",
+                  border: 1,
+                  borderColor: "divider",
+                  borderRadius: 1,
+                }}
+              >
+                <Box component="span" aria-hidden="true">
+                  {item.posicao}º
+                </Box>
+                <Box component="span" sx={TEXTO_INVISIVEL}>
+                  {item.posicao}º lugar
+                </Box>
+              </Box>
+              <Typography variant="body2" sx={{ flex: 1, minWidth: 0, fontWeight: 500 }}>
                 {rotuloDe.get(item.turmaId) ?? "Turma"}
-                {selecionada ? <span className="sr-only">, turma consultada</span> : null}
-              </span>
+                {selecionada ? (
+                  <Box component="span" sx={TEXTO_INVISIVEL}>
+                    , turma consultada
+                  </Box>
+                ) : null}
+              </Typography>
               {item.inicio ? (
-                <span className="numerais-tabulares text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs">
-                  <Clock size={14} aria-hidden="true" className="shrink-0" />
-                  {item.inicio}
-                </span>
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", flexShrink: 0 }}>
+                  <ScheduleRoundedIcon
+                    aria-hidden="true"
+                    sx={{ fontSize: 14, color: "text.secondary" }}
+                  />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "text.secondary",
+                      fontVariantNumeric: "tabular-nums",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {item.inicio}
+                  </Typography>
+                </Stack>
               ) : null}
-            </li>
+            </ListItem>
           );
         })}
-      </ol>
-    </section>
+      </List>
+    </Cartao>
   );
 }
 
@@ -170,55 +270,189 @@ function AulasDoDia({
   editor,
   turno,
 }: PropsAulasDoDia) {
-  if (!itens.some((item) => item.tipo === "aula"))
+  if (!itens.some((item) => item.tipo === "aula")) {
     return (
-      <p className="text-muted-foreground px-4 py-6 text-sm">
+      <Typography variant="body2" sx={{ px: 2, py: 3, color: "text.secondary" }}>
         {turno ? "Sem aulas neste turno." : "Sem aulas neste dia."}
-      </p>
+      </Typography>
     );
+  }
 
   return (
-    <ol aria-label={`Aulas de ${rotuloDia(dia)}${turno ? ` · ${turno}` : ""}`} className="divide-y">
+    <List
+      component="ol"
+      aria-label={`Aulas de ${rotuloDia(dia)}${turno ? ` · ${turno}` : ""}`}
+      disablePadding
+    >
       {itens.map((item) => {
         if (item.tipo === "pausa") return <PausaDoDia key={item.pausa.id} pausa={item.pausa} />;
         const aula = item.aula;
+        const disciplina = aula.disciplinas?.[String(dia)]?.trim();
         return (
-          <li key={aula.id} className="flex min-w-0 flex-col gap-3 px-4 py-4">
-            <div className="flex items-start gap-3">
-              <span className="controle numerais-tabulares flex size-11 shrink-0 items-center justify-center text-sm font-semibold">
-                <span aria-hidden="true">{aula.ordem}ª</span>
-                <span className="sr-only">{aula.ordem}ª aula</span>
-              </span>
-              <div className="min-w-0 flex-1">
-                <p
-                  className={`text-sm font-medium break-words ${aula.disciplinas?.[String(dia)] ? "" : "text-muted-foreground"}`}
+          <ListItem key={aula.id} divider sx={{ display: "block", py: 2 }}>
+            <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start" }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 44,
+                  height: 44,
+                  flexShrink: 0,
+                  border: 1,
+                  borderColor: "divider",
+                  borderRadius: 1,
+                  fontWeight: 600,
+                  fontVariantNumeric: "tabular-nums",
+                }}
+              >
+                <Box component="span" aria-hidden="true">
+                  {aula.ordem}ª
+                </Box>
+                <Box component="span" sx={TEXTO_INVISIVEL}>
+                  {aula.ordem}ª aula
+                </Box>
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 500,
+                    overflowWrap: "anywhere",
+                    color: disciplina ? "text.primary" : "text.secondary",
+                  }}
                 >
                   {nomeDisciplina(aula, dia)}
-                </p>
-                <p className="numerais-tabulares text-muted-foreground mt-1 flex items-center gap-1.5 text-xs">
-                  <Clock size={14} aria-hidden="true" className="shrink-0" />
-                  {aula.inicio} às {aula.fim}
-                </p>
-              </div>
+                </Typography>
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", mt: 0.5 }}>
+                  <ScheduleRoundedIcon
+                    aria-hidden="true"
+                    sx={{ fontSize: 14, color: "text.secondary" }}
+                  />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "text.secondary",
+                      fontVariantNumeric: "tabular-nums",
+                      whiteSpace: "nowrap",
+                    }}
+                  >
+                    {aula.inicio} às {aula.fim}
+                  </Typography>
+                </Stack>
+              </Box>
               {editavel ? (
-                <Button
+                <Botao
+                  variante="texto"
                   type="button"
-                  variant="secondary"
-                  size="icon"
                   aria-label={`Editar ${aula.ordem}ª aula de ${rotuloDia(dia)}`}
                   aria-expanded={aulaEmEdicao === aula.id}
                   disabled={bloqueado}
+                  icone={<EditRoundedIcon />}
                   onClick={() => onEditar(aula, dia)}
-                >
-                  <Pencil size={16} aria-hidden="true" />
-                </Button>
+                  sx={ESTILO_BOTAO_ICONE}
+                />
               ) : null}
-            </div>
+            </Stack>
             {editor(aula, dia)}
-          </li>
+          </ListItem>
         );
       })}
-    </ol>
+    </List>
+  );
+}
+
+interface PropsTurnos {
+  dia: number;
+  itensPorTurno: Record<Turno, ItemDoDia<Horario>[]>;
+  editavel: boolean;
+  bloqueado: boolean;
+  aulaEmEdicao: string | undefined;
+  onEditar: (aula: Horario, dia: number) => void;
+  editor: (aula: Horario, dia: number, turno: Turno) => ReactNode;
+  dataPager: string;
+}
+
+function TurnosDoDia({
+  dia,
+  itensPorTurno,
+  editavel,
+  bloqueado,
+  aulaEmEdicao,
+  onEditar,
+  editor,
+  dataPager,
+}: PropsTurnos) {
+  function aulasNoTurno(turno: Turno): number {
+    return itensPorTurno[turno].filter((item) => item.tipo === "aula").length;
+  }
+
+  const [turno, setTurno] = useState<Turno>(() =>
+    aulasNoTurno("manha") === 0 && aulasNoTurno("tarde") > 0 ? "tarde" : "manha",
+  );
+
+  function aoTeclar(evento: KeyboardEvent<HTMLDivElement>) {
+    if (bloqueado) return;
+    const alvo = evento.target;
+    if (!(alvo instanceof HTMLElement) || alvo.getAttribute("role") !== "tab") return;
+    if (evento.key === "ArrowRight") setTurno(turno === "manha" ? "tarde" : "manha");
+    else if (evento.key === "ArrowLeft") setTurno(turno === "tarde" ? "manha" : "tarde");
+  }
+
+  function conteudo(qual: Turno): ReactNode {
+    const nome = qual === "manha" ? "Manhã" : "Tarde";
+    return (
+      <Cartao
+        component="section"
+        aria-label={`Aulas de ${rotuloDia(dia)} · ${nome}`}
+        sx={{ mt: 2, padding: 0, overflow: "hidden" }}
+      >
+        <Box sx={ESTILO_CABECALHO_CARTAO}>
+          <Typography component="h2" variant="subtitle2">
+            {rotuloDia(dia)}
+          </Typography>
+        </Box>
+        <AulasDoDia
+          dia={dia}
+          itens={itensPorTurno[qual]}
+          turno={nome}
+          editavel={editavel}
+          bloqueado={bloqueado}
+          aulaEmEdicao={aulaEmEdicao}
+          onEditar={onEditar}
+          editor={(aula, diaDaAula) => editor(aula, diaDaAula, qual)}
+        />
+      </Cartao>
+    );
+  }
+
+  const itens: ItemAba<Turno>[] = [
+    {
+      valor: "manha",
+      rotulo: "Manhã",
+      icone: <LightModeRoundedIcon fontSize="small" />,
+      desabilitado: bloqueado,
+      conteudo: conteudo("manha"),
+    },
+    {
+      valor: "tarde",
+      rotulo: "Tarde",
+      icone: <WbTwilightRoundedIcon fontSize="small" />,
+      desabilitado: bloqueado,
+      conteudo: conteudo("tarde"),
+    },
+  ];
+
+  return (
+    <Box onKeyDown={aoTeclar}>
+      <Abas
+        itens={itens}
+        ativo={turno}
+        onChange={setTurno}
+        rotuloAcessivel="Turnos do dia"
+        dataPager={dataPager}
+      />
+    </Box>
   );
 }
 
@@ -298,7 +532,7 @@ export default function VistaHorarios({
     (item) => item.tipo === "pausa" && item.pausa.id === "almoco",
   );
   // Aulas cadastradas na janela do almoço ficam na manhã, logo depois da linha do almoço.
-  const itensPorTurno = {
+  const itensPorTurno: Record<Turno, ItemDoDia<Horario>[]> = {
     manha: sequenciaDoDiaAtual.filter((item) =>
       item.tipo === "aula"
         ? turnoDaAula(item.aula) !== "tarde"
@@ -311,8 +545,6 @@ export default function VistaHorarios({
     ),
   };
   if (almocoDoDia && itensPorTurno.tarde.length > 0) itensPorTurno.tarde.unshift(almocoDoDia);
-  const aulasDoTurno = (turno: "manha" | "tarde") =>
-    itensPorTurno[turno].filter((item) => item.tipo === "aula").length;
   const disciplinaAlterada =
     rascunho !== null && rascunho.disciplina.trim() !== rascunho.disciplinaInicial;
   const inicioAlterado = rascunho !== null && rascunho.inicio !== rascunho.inicioInicial;
@@ -448,50 +680,55 @@ export default function VistaHorarios({
   const navegacaoBloqueada = rascunho !== null || enviando;
 
   return (
-    // A página rola sem folga inferior: o pb-6 deixa o último cartão respirar acima da borda.
-    <section
+    <Stack
+      component="section"
       aria-label={editavel ? "Edição de horários" : "Horários semanais"}
-      className={`flex min-w-0 flex-col gap-5 ${editavel ? "" : "pb-6"}`}
+      spacing={3}
+      sx={{ minWidth: 0, pb: editavel ? 0 : 3 }}
     >
       {editavel ? (
-        <h2 className="sr-only">Horários das turmas</h2>
+        <Box component="h2" sx={TEXTO_INVISIVEL}>
+          Horários das turmas
+        </Box>
       ) : (
-        <h1 className="sr-only">Horários</h1>
+        <Box component="h1" sx={TEXTO_INVISIVEL}>
+          Horários
+        </Box>
       )}
-      {!editavel && (
-        <div className="flex justify-end">
+      {!editavel ? (
+        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
           <AtualizadoDaVisao fuso={fuso} />
-        </div>
-      )}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor={`${base}-turma`}>Turma</Label>
-          <Selecionar
-            id={`${base}-turma`}
-            buscavel={editavel}
-            value={turma?.id ?? ""}
-            onValueChange={setTurmaId}
-            opcoes={turmas.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
-            disabled={turmas.length === 0 || navegacaoBloqueada}
-          />
-        </div>
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor={`${base}-dia`}>Dia da semana</Label>
-          <Selecionar
-            id={`${base}-dia`}
-            value={diaSelecionado}
-            onValueChange={setDiaSelecionado}
-            opcoes={[
-              { valor: "0", rotulo: "Semana completa" },
-              ...DIAS_DA_SEMANA.map((item) => ({
-                valor: String(item.valor),
-                rotulo: rotuloDia(item.valor),
-              })),
-            ]}
-            disabled={turmas.length === 0 || navegacaoBloqueada}
-          />
-        </div>
-      </div>
+        </Box>
+      ) : null}
+      <Grid container spacing={2}>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <Campo id={`${base}-turma`} rotulo="Turma">
+            <Selecionar
+              valor={turma?.id ?? ""}
+              onValor={setTurmaId}
+              opcoes={turmas.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
+              buscavel={editavel}
+              disabled={turmas.length === 0 || navegacaoBloqueada}
+            />
+          </Campo>
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6 }}>
+          <Campo id={`${base}-dia`} rotulo="Dia da semana">
+            <Selecionar
+              valor={diaSelecionado}
+              onValor={setDiaSelecionado}
+              opcoes={[
+                { valor: "0", rotulo: "Semana completa" },
+                ...DIAS_DA_SEMANA.map((item) => ({
+                  valor: String(item.valor),
+                  rotulo: rotuloDia(item.valor),
+                })),
+              ]}
+              disabled={turmas.length === 0 || navegacaoBloqueada}
+            />
+          </Campo>
+        </Grid>
+      </Grid>
 
       {!editavel ? (
         <CartaoProvasBimestrais
@@ -503,210 +740,252 @@ export default function VistaHorarios({
       ) : null}
 
       {editavel ? (
-        <div className="flex">
-          <Button
+        <Box sx={{ display: "flex" }}>
+          <Botao
+            variante="contorno"
             type="button"
-            variant="outline"
-            className="min-h-11 min-w-0"
             aria-label={`Editar horários de ${turma?.rotulo ?? "turma"}`}
             disabled={!turma || navegacaoBloqueada}
+            icone={<EditRoundedIcon />}
             onClick={() => setEditorCompleto(true)}
           >
-            <Pencil size={16} aria-hidden="true" />
             Editar horários
-          </Button>
-        </div>
+          </Botao>
+        </Box>
       ) : null}
 
       {editavel && rascunho && !contextoDisponivel ? (
-        <div className="flex min-w-0 flex-col gap-3">
-          <AvisoCompacto
+        <Stack spacing={2} sx={{ minWidth: 0 }}>
+          <AlertaCompacto
             variante="dados_invalidos"
             titulo="Esta aula não está mais disponível na grade."
             descricao={`${rascunho.turmaRotulo} · ${rascunho.ordem}ª aula. O rascunho permanece abaixo até o descarte.`}
             tamanho="linha"
           />
           {renderizarFormulario("indisponivel")}
-        </div>
+        </Stack>
       ) : null}
 
       {aulas.length === 0 ? (
-        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-3 px-5 text-center">
-          <CalendarDays size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">
+        <Stack
+          spacing={2}
+          sx={{
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 176,
+            px: 3,
+            textAlign: "center",
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 2,
+          }}
+        >
+          <CalendarMonthRoundedIcon
+            sx={{ fontSize: 28, color: "text.secondary" }}
+            aria-hidden="true"
+          />
+          <Typography sx={{ fontWeight: 500 }}>
             {turmas.length === 0 ? "Nenhuma turma cadastrada" : "Nenhum horário configurado"}
-          </p>
-        </div>
+          </Typography>
+        </Stack>
       ) : semanaCompleta ? (
         <>
-          <div className="superficie hidden overflow-hidden lg:block">
-            <div className="overflow-x-auto overscroll-contain">
-              <table className="w-full table-fixed text-left text-sm">
-                <caption className="sr-only">Grade semanal de {turma?.rotulo}</caption>
-                <thead className="bg-secondary/50">
-                  <tr>
-                    <th scope="col" className="w-28 px-3 py-3 font-medium">
-                      Aula
-                    </th>
-                    {diasDaGrade.map((item) => (
-                      <th key={item.valor} scope="col" className="px-3 py-3 font-medium">
-                        {item.abreviacao}
-                        <span className="sr-only">: {rotuloDia(item.valor)}</span>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {sequenciaDaGrade.map((entrada) => {
-                    if (entrada.tipo === "pausa") {
-                      return (
-                        <tr
-                          key={entrada.pausa.id}
-                          className="bg-secondary/30 text-muted-foreground"
-                        >
-                          <td colSpan={diasDaGrade.length + 1} className="px-3 py-2.5 text-xs">
-                            <span className="flex items-center gap-2 font-medium">
-                              <IconePausa pausa={entrada.pausa} />
-                              {entrada.pausa.rotulo}
-                              <span className="numerais-tabulares ml-auto font-normal">
-                                {entrada.pausa.inicio} às {entrada.pausa.fim}
-                              </span>
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    }
-                    const aula = entrada.aula;
+          <Box sx={{ display: { xs: "none", lg: "block" } }}>
+            <TabelaPadrao
+              caption={`Grade semanal de ${turma?.rotulo ?? "turma"}`}
+              primeiraColunaFixa
+            >
+              <TableHead>
+                <TableRow>
+                  <TableCell
+                    component="th"
+                    scope="col"
+                    sx={{ width: 128, fontWeight: 500, backgroundColor: "action.hover" }}
+                  >
+                    Aula
+                  </TableCell>
+                  {diasDaGrade.map((item) => (
+                    <TableCell
+                      key={item.valor}
+                      component="th"
+                      scope="col"
+                      sx={{ fontWeight: 500, backgroundColor: "action.hover" }}
+                    >
+                      {item.abreviacao}
+                      <Box component="span" sx={TEXTO_INVISIVEL}>
+                        : {rotuloDia(item.valor)}
+                      </Box>
+                    </TableCell>
+                  ))}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {sequenciaDaGrade.map((entrada) => {
+                  if (entrada.tipo === "pausa") {
                     return (
-                      <Fragment key={aula.id}>
-                        <tr>
-                          <th scope="row" className="numerais-tabulares px-3 py-4 font-medium">
+                      <TableRow key={entrada.pausa.id} sx={{ backgroundColor: "action.hover" }}>
+                        <TableCell colSpan={diasDaGrade.length + 1} sx={{ py: 1.5 }}>
+                          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                            <IconePausa pausa={entrada.pausa} />
+                            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                              {entrada.pausa.rotulo}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                ml: "auto",
+                                color: "text.secondary",
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {entrada.pausa.inicio} às {entrada.pausa.fim}
+                            </Typography>
+                          </Stack>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
+                  const aula = entrada.aula;
+                  return (
+                    <Fragment key={aula.id}>
+                      <TableRow>
+                        <TableCell component="th" scope="row" sx={{ verticalAlign: "top" }}>
+                          <Typography
+                            component="span"
+                            variant="body2"
+                            sx={{
+                              display: "block",
+                              fontWeight: 500,
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
                             {aula.ordem}ª aula
-                            <span className="text-muted-foreground mt-1 block text-xs font-normal">
-                              {aula.inicio} às {aula.fim}
-                            </span>
-                            {editavel ? (
-                              <Button
+                          </Typography>
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{
+                              display: "block",
+                              mt: 0.5,
+                              color: "text.secondary",
+                              fontVariantNumeric: "tabular-nums",
+                            }}
+                          >
+                            {aula.inicio} às {aula.fim}
+                          </Typography>
+                          {editavel ? (
+                            <Box sx={{ mt: 0.5 }}>
+                              <Botao
+                                variante="texto"
                                 type="button"
-                                variant="secondary"
-                                size="icon"
-                                className="mt-1"
                                 aria-label={`Editar horário da ${aula.ordem}ª aula`}
                                 disabled={navegacaoBloqueada}
+                                icone={<EditRoundedIcon />}
                                 onClick={() => abrirEdicao(aula, null)}
-                              >
-                                <Pencil size={16} aria-hidden="true" />
-                              </Button>
-                            ) : null}
-                          </th>
-                          {diasDaGrade.map((item) => (
-                            <td key={item.valor} className="px-3 py-4 align-top break-words">
-                              {aula.diasSemana.includes(item.valor) ? (
-                                <div className="flex min-w-0 flex-col items-start gap-1">
-                                  <span
-                                    className={
-                                      aula.disciplinas?.[String(item.valor)]
-                                        ? "font-medium"
-                                        : "text-muted-foreground"
-                                    }
+                                sx={ESTILO_BOTAO_ICONE}
+                              />
+                            </Box>
+                          ) : null}
+                        </TableCell>
+                        {diasDaGrade.map((item) => {
+                          const temAula = aula.diasSemana.includes(item.valor);
+                          const disciplina = aula.disciplinas?.[String(item.valor)]?.trim();
+                          return (
+                            <TableCell
+                              key={item.valor}
+                              sx={{ verticalAlign: "top", overflowWrap: "anywhere" }}
+                            >
+                              {temAula ? (
+                                <Stack spacing={0.5} sx={{ alignItems: "flex-start" }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: disciplina ? 500 : 400,
+                                      color: disciplina ? "text.primary" : "text.secondary",
+                                    }}
                                   >
                                     {nomeDisciplina(aula, item.valor)}
-                                  </span>
+                                  </Typography>
                                   {editavel ? (
-                                    <Button
+                                    <Botao
+                                      variante="texto"
                                       type="button"
-                                      variant="secondary"
-                                      size="icon"
                                       aria-label={`Editar disciplina da ${aula.ordem}ª aula de ${rotuloDia(item.valor)}`}
                                       disabled={navegacaoBloqueada}
+                                      icone={<EditRoundedIcon />}
                                       onClick={() => abrirEdicao(aula, item.valor)}
-                                    >
-                                      <Pencil size={16} aria-hidden="true" />
-                                    </Button>
+                                      sx={ESTILO_BOTAO_ICONE}
+                                    />
                                   ) : null}
-                                </div>
+                                </Stack>
                               ) : (
-                                <span className="sr-only">Sem aula</span>
+                                <Box component="span" sx={TEXTO_INVISIVEL}>
+                                  Sem aula
+                                </Box>
                               )}
-                            </td>
-                          ))}
-                        </tr>
-                        {editavel && rascunho?.aulaId === aula.id ? (
-                          <tr>
-                            <td colSpan={diasDaGrade.length + 1} className="px-3 py-4">
-                              {renderizarEditor(aula, null, "grade")}
-                            </td>
-                          </tr>
-                        ) : null}
-                      </Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:hidden">
-            {diasDaGrade.map((item) => (
-              <section
-                key={item.valor}
-                aria-label={`Aulas de ${rotuloDia(item.valor)}`}
-                className="superficie overflow-hidden"
-              >
-                <h2 className="bg-secondary/50 border-b px-4 py-3 text-sm font-medium">
-                  {rotuloDia(item.valor)}
-                </h2>
-                <AulasDoDia
-                  dia={item.valor}
-                  itens={sequenciaDoDia(
-                    aulas.filter((aula) => aula.diasSemana.includes(item.valor)),
-                    (aula) => aula.inicio,
-                  )}
-                  editavel={editavel}
-                  bloqueado={navegacaoBloqueada}
-                  aulaEmEdicao={diaDoEditor === item.valor ? rascunho?.aulaId : undefined}
-                  onEditar={abrirEdicao}
-                  editor={(aula, diaDaAula) =>
-                    renderizarEditor(aula, diaDaAula, `lista-${item.valor}`)
-                  }
-                />
-              </section>
-            ))}
-          </div>
+                            </TableCell>
+                          );
+                        })}
+                      </TableRow>
+                      {editavel && rascunho?.aulaId === aula.id ? (
+                        <TableRow>
+                          <TableCell colSpan={diasDaGrade.length + 1} sx={{ padding: 2 }}>
+                            {renderizarEditor(aula, null, "grade")}
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </Fragment>
+                  );
+                })}
+              </TableBody>
+            </TabelaPadrao>
+          </Box>
+          <Box sx={{ display: { xs: "block", lg: "none" } }}>
+            <Grid container spacing={2}>
+              {diasDaGrade.map((item) => (
+                <Grid key={item.valor} size={{ xs: 12, sm: 6 }}>
+                  <Cartao
+                    component="section"
+                    aria-label={`Aulas de ${rotuloDia(item.valor)}`}
+                    sx={{ padding: 0, overflow: "hidden" }}
+                  >
+                    <Box sx={ESTILO_CABECALHO_CARTAO}>
+                      <Typography component="h2" variant="subtitle2">
+                        {rotuloDia(item.valor)}
+                      </Typography>
+                    </Box>
+                    <AulasDoDia
+                      dia={item.valor}
+                      itens={sequenciaDoDia(
+                        aulas.filter((aula) => aula.diasSemana.includes(item.valor)),
+                        (aula) => aula.inicio,
+                      )}
+                      editavel={editavel}
+                      bloqueado={navegacaoBloqueada}
+                      aulaEmEdicao={diaDoEditor === item.valor ? rascunho?.aulaId : undefined}
+                      onEditar={abrirEdicao}
+                      editor={(aula, diaDaAula) =>
+                        renderizarEditor(aula, diaDaAula, `lista-${item.valor}`)
+                      }
+                    />
+                  </Cartao>
+                </Grid>
+              ))}
+            </Grid>
+          </Box>
         </>
       ) : (
-        <div className="flex min-w-0 flex-col gap-3">
-          <AbasDeslizantes
-            key={`${turma?.id}-${dia}`}
-            rotuloAcessivel="Turnos do dia"
-            abaInicial={
-              aulasDoTurno("manha") === 0 && aulasDoTurno("tarde") > 0 ? "tarde" : "manha"
-            }
-            abas={TURNOS}
-            dataPager={editavel ? "horarios-turnos-edicao" : "horarios-turnos"}
-            bloqueada={navegacaoBloqueada}
-          >
-            {(turno) => (
-              <section
-                aria-label={`Aulas de ${rotuloDia(dia)} · ${turno === "manha" ? "Manhã" : "Tarde"}`}
-                className="superficie mt-3 overflow-hidden"
-              >
-                <h2 className="bg-secondary/50 border-b px-4 py-3 text-sm font-medium">
-                  {rotuloDia(dia)}
-                </h2>
-                <AulasDoDia
-                  dia={dia}
-                  itens={itensPorTurno[turno]}
-                  turno={turno === "manha" ? "Manhã" : "Tarde"}
-                  editavel={editavel}
-                  bloqueado={navegacaoBloqueada}
-                  aulaEmEdicao={rascunho?.aulaId}
-                  onEditar={abrirEdicao}
-                  editor={(aula, diaDaAula) => renderizarEditor(aula, diaDaAula, `dia-${turno}`)}
-                />
-              </section>
-            )}
-          </AbasDeslizantes>
-        </div>
+        <TurnosDoDia
+          key={`${turma?.id}-${dia}`}
+          dia={dia}
+          itensPorTurno={itensPorTurno}
+          editavel={editavel}
+          bloqueado={navegacaoBloqueada}
+          aulaEmEdicao={rascunho?.aulaId}
+          onEditar={abrirEdicao}
+          editor={(aula, diaDaAula, turno) => renderizarEditor(aula, diaDaAula, `dia-${turno}`)}
+          dataPager={editavel ? "horarios-turnos-edicao" : "horarios-turnos"}
+        />
       )}
 
       {!semanaCompleta ? (
@@ -729,98 +1008,93 @@ export default function VistaHorarios({
               await onMudanca();
             }}
           />
-          <AlertDialog
-            open={confirmando}
-            onOpenChange={(aberto) => {
-              if (!enviando) setConfirmando(aberto);
-            }}
-          >
-            <AlertDialogContent
-              aria-busy={enviando}
-              onEscapeKeyDown={(evento) => {
-                if (enviando) evento.preventDefault();
-              }}
-            >
-              <AlertDialogHeader>
-                <AlertDialogTitle>Confirmar alterações na aula</AlertDialogTitle>
-                <AlertDialogDescription>
+          <DialogoConfirmacao
+            aberto={confirmando}
+            titulo="Confirmar alterações na aula"
+            descricao={
+              <Box component="div" sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                <Typography variant="body2">
                   {rascunho?.turmaRotulo} · {rascunho?.ordem}ª aula
                   {rascunho?.dia ? ` · ${rotuloDia(rascunho.dia)}` : ""}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              {rascunho ? (
-                <dl className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-                  {disciplinaAlterada ? (
-                    <>
-                      <dt className="text-muted-foreground">Disciplina</dt>
-                      <dd className="break-words">
-                        {rascunho.disciplinaInicial || "Sem disciplina"} para{" "}
-                        {rascunho.disciplina.trim() || "Sem disciplina"}
-                      </dd>
-                    </>
-                  ) : null}
-                  {inicioAlterado ? (
-                    <>
-                      <dt className="text-muted-foreground">Início</dt>
-                      <dd className="numerais-tabulares">
-                        {rascunho.inicioInicial} para {rascunho.inicio}
-                      </dd>
-                    </>
-                  ) : null}
-                  {fimAlterado ? (
-                    <>
-                      <dt className="text-muted-foreground">Fim</dt>
-                      <dd className="numerais-tabulares">
-                        {rascunho.fimInicial} para {rascunho.fim}
-                      </dd>
-                    </>
-                  ) : null}
-                </dl>
-              ) : null}
-              {inicioAlterado || fimAlterado ? (
-                <p className="text-muted-foreground text-sm">
-                  O horário vale para todos os dias desta aula.
-                </p>
-              ) : null}
-              <AlertDialogFooter>
-                <AlertDialogCancel disabled={enviando}>Voltar à edição</AlertDialogCancel>
-                <AlertDialogAction
-                  disabled={enviando || !contextoDisponivel}
-                  onClick={(evento) => {
-                    evento.preventDefault();
-                    void salvar();
-                  }}
-                >
-                  {enviando ? <LoaderCircle size={16} className="animate-spin" /> : null}
-                  Confirmar alterações
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          <AlertDialog open={descartando} onOpenChange={setDescartando}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  As alterações do formulário serão descartadas. Os horários salvos serão mantidos.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Continuar editando</AlertDialogCancel>
-                <AlertDialogAction
-                  variant="destructive"
-                  onClick={() => {
-                    setRascunho(null);
-                    setErro("");
-                  }}
-                >
-                  Descartar alterações
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                </Typography>
+                {rascunho ? (
+                  <Box component="dl" sx={{ m: 0 }}>
+                    {disciplinaAlterada ? (
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "baseline" }}>
+                        <Typography component="dt" variant="body2" sx={{ color: "text.secondary" }}>
+                          Disciplina
+                        </Typography>
+                        <Typography
+                          component="dd"
+                          variant="body2"
+                          sx={{ m: 0, overflowWrap: "anywhere" }}
+                        >
+                          {rascunho.disciplinaInicial || "Sem disciplina"} para{" "}
+                          {rascunho.disciplina.trim() || "Sem disciplina"}
+                        </Typography>
+                      </Stack>
+                    ) : null}
+                    {inicioAlterado ? (
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "baseline" }}>
+                        <Typography component="dt" variant="body2" sx={{ color: "text.secondary" }}>
+                          Início
+                        </Typography>
+                        <Typography
+                          component="dd"
+                          variant="body2"
+                          sx={{ m: 0, fontVariantNumeric: "tabular-nums" }}
+                        >
+                          {rascunho.inicioInicial} para {rascunho.inicio}
+                        </Typography>
+                      </Stack>
+                    ) : null}
+                    {fimAlterado ? (
+                      <Stack direction="row" spacing={1.5} sx={{ alignItems: "baseline" }}>
+                        <Typography component="dt" variant="body2" sx={{ color: "text.secondary" }}>
+                          Fim
+                        </Typography>
+                        <Typography
+                          component="dd"
+                          variant="body2"
+                          sx={{ m: 0, fontVariantNumeric: "tabular-nums" }}
+                        >
+                          {rascunho.fimInicial} para {rascunho.fim}
+                        </Typography>
+                      </Stack>
+                    ) : null}
+                  </Box>
+                ) : null}
+                {inicioAlterado || fimAlterado ? (
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    O horário vale para todos os dias desta aula.
+                  </Typography>
+                ) : null}
+              </Box>
+            }
+            rotuloConfirmar="Confirmar alterações"
+            rotuloCancelar="Voltar à edição"
+            operacaoEmAndamento={enviando}
+            onCancelar={() => {
+              if (!enviando) setConfirmando(false);
+            }}
+            onConfirmar={() => void salvar()}
+          />
+          <DialogoConfirmacao
+            aberto={descartando}
+            titulo="Descartar alterações?"
+            descricao="As alterações do formulário serão descartadas. Os horários salvos serão mantidos."
+            rotuloConfirmar="Descartar alterações"
+            rotuloCancelar="Continuar editando"
+            destrutivo
+            onCancelar={() => setDescartando(false)}
+            onConfirmar={() => {
+              setRascunho(null);
+              setErro("");
+              setDescartando(false);
+            }}
+          />
         </>
       ) : null}
-    </section>
+    </Stack>
   );
 }

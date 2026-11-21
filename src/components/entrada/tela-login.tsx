@@ -1,16 +1,28 @@
 "use client";
 
-// Tela de entrada: marca e recursos no desktop, formulário único no celular.
-import { useEffect, useState } from "react";
+// Entrada no layout sign-in-side: marca e destaques no desktop, formulário único no celular.
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, CalendarDays, LoaderCircle, WifiOff } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { CampoSenha } from "@/components/ui/campo-senha";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Logotipo } from "@/components/ui/logotipo";
-import { SeletorTema } from "@/components/ui/seletor-tema";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
+import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
+import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import Divider from "@mui/material/Divider";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Grid from "@mui/material/Grid";
+import Link from "@mui/material/Link";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { Alerta } from "@/components/ui/mui/alerta";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { Logotipo } from "@/components/ui/mui/logotipo";
+import { SeletorTema } from "@/components/ui/mui/seletor-tema";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { CampoTexto } from "@/components/ui/mui/text-field";
 import DialogoSobre from "@/components/dialogo-sobre";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
@@ -20,21 +32,33 @@ const CHAVE_AVISO = "frequenciapp:aviso-entrada";
 
 const DESTAQUES = [
   {
-    Icone: CalendarCheck,
+    Icone: EventAvailableRoundedIcon,
     titulo: "Chamada em poucos toques",
     texto: "Todos começam presentes. Marque só quem faltou e salve.",
   },
   {
-    Icone: CalendarDays,
+    Icone: CalendarMonthRoundedIcon,
     titulo: "Resumo semanal da escola",
     texto: "Frequência, movimentações e pendências da Seduc em um só lugar.",
   },
   {
-    Icone: WifiOff,
+    Icone: WifiOffRoundedIcon,
     titulo: "Funciona offline",
     texto: "Instale no celular e continue com o rascunho local quando a rede falhar.",
   },
 ];
+
+const LINK_DISCRETO = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  minWidth: 48,
+  minHeight: 48,
+  px: 0.5,
+  whiteSpace: "nowrap",
+  color: "text.secondary",
+  fontWeight: 400,
+} as const;
 
 interface Props {
   /** URL do índice para agentes de IA, montada a partir da requisição. */
@@ -80,7 +104,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
     }
   }, []);
 
-  async function submeter(evento: React.FormEvent) {
+  async function submeter(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     if (enviando) return;
     setEnviando(true);
@@ -111,176 +135,279 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
   }
 
   return (
-    <div
-      className="relative flex min-h-dvh flex-col lg:grid lg:grid-cols-2"
-      style={{
-        paddingTop: "env(safe-area-inset-top)",
-        paddingBottom: "env(safe-area-inset-bottom)",
-      }}
+    <Box
+      sx={(tema) => ({
+        position: "relative",
+        boxSizing: "border-box",
+        minHeight: "100dvh",
+        display: "flex",
+        flexDirection: "column",
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        backgroundImage: "radial-gradient(ellipse at 50% 50%, hsl(158, 55%, 96%), hsl(0, 0%, 99%))",
+        backgroundRepeat: "no-repeat",
+        ...tema.applyStyles("dark", {
+          backgroundImage:
+            "radial-gradient(at 50% 50%, hsla(158, 60%, 18%, 0.55), hsl(220, 35%, 3%))",
+        }),
+      })}
     >
-      <aside className="superficie hidden flex-col items-center justify-center rounded-none border-0 border-r p-10 lg:flex xl:p-14">
-        <div className="flex w-full max-w-md flex-col gap-10">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <Logotipo tamanho={56} priority />
-            <span className="text-xl font-semibold tracking-tight">FrequenciApp</span>
-            <h2 className="max-w-sm text-3xl leading-tight font-semibold tracking-tight">
-              A frequência da escola em um só lugar.
-            </h2>
-            <p className="text-muted-foreground max-w-sm text-sm leading-relaxed">
-              Chamada, saídas e relatórios da equipe da escola.
-            </p>
-          </div>
-          <ul className="flex flex-col gap-3">
-            {DESTAQUES.map(({ Icone, titulo, texto }) => (
-              <li key={titulo} className="superficie flex items-start gap-3 p-4">
-                <span className="selecionado text-primary flex size-10 shrink-0 items-center justify-center">
-                  <Icone size={18} aria-hidden="true" />
-                </span>
-                <span className="min-w-0">
-                  <span className="text-foreground block text-sm font-semibold">{titulo}</span>
-                  <span className="text-muted-foreground mt-0.5 block text-xs leading-relaxed">
-                    {texto}
-                  </span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </aside>
+      <Box
+        sx={{
+          position: "absolute",
+          top: "calc(8px + env(safe-area-inset-top, 0px))",
+          right: "calc(8px + env(safe-area-inset-right, 0px))",
+          zIndex: 2,
+        }}
+      >
+        <SeletorTema />
+      </Box>
 
-      <main className="flex flex-1 items-center justify-center px-4 py-10 sm:px-10">
-        <div className="superficie flex w-full max-w-sm flex-col gap-6 p-6 sm:max-w-md sm:p-8">
-          <div className="relative flex items-start justify-between gap-3">
-            <div className="flex w-full min-w-0 flex-col items-center gap-3 text-center lg:w-auto lg:items-start lg:text-left">
-              <Logotipo tamanho={48} className="lg:hidden" priority />
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight">FrequenciApp</h1>
-                <p className="text-muted-foreground mt-1 text-sm">
-                  Registro de frequência dos alunos da escola.
-                </p>
-              </div>
-            </div>
-            <SeletorTema variante="ghost" className="absolute top-0 right-0 shrink-0 lg:static" />
-          </div>
-
-          {avisoEntrada ? <AvisoCompacto variante={avisoEntrada} tamanho="linha" /> : null}
-
-          <form onSubmit={submeter} className="flex flex-col gap-5" noValidate>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">E-mail ou identificador</Label>
-              <Input
-                id="email"
-                type="text"
-                name="email"
-                autoComplete="username"
-                autoCapitalize="none"
-                spellCheck={false}
-                required
-                value={email}
-                aria-invalid={erro ? true : undefined}
-                aria-describedby={erro ? "erro-entrada" : undefined}
-                onChange={(evento) => {
-                  setEmail(evento.target.value);
-                  if (erro) setErro("");
-                }}
-                placeholder="ana@escola.br ou 3a-maria"
-                className="h-12 placeholder:text-sm"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="senha">Senha</Label>
-              <CampoSenha
-                id="senha"
-                name="password"
-                autoComplete="current-password"
-                required
-                value={senha}
-                aria-invalid={erro ? true : undefined}
-                aria-describedby={erro ? "erro-entrada" : undefined}
-                onChange={(evento) => {
-                  setSenha(evento.target.value);
-                  if (erro) setErro("");
-                }}
-                placeholder="Sua senha de acesso"
-                className="h-12"
-              />
-            </div>
-
-            <label className="pressionavel flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-              <input
-                type="checkbox"
-                name="lembrar"
-                checked={lembrar}
-                onChange={(evento) => setLembrar(evento.target.checked)}
-                className="accent-primary size-5 shrink-0"
-              />
-              Manter conectado neste dispositivo
-            </label>
-
-            {erro &&
-              (erroVariante ? (
-                <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
-              ) : (
-                <p
-                  id="erro-entrada"
-                  role="alert"
-                  className="bg-falta-fraca text-falta-texto rounded-2xl px-4 py-3 text-sm"
+      <Grid container component="main" sx={{ flex: 1 }}>
+        <Grid
+          component="aside"
+          size={{ xs: 12, lg: 6 }}
+          sx={{
+            display: { xs: "none", lg: "flex" },
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "background.paper",
+            borderRight: 1,
+            borderColor: "divider",
+            px: { lg: 5, xl: 7 },
+            py: 6,
+          }}
+        >
+          <Stack spacing={4} sx={{ width: "100%", maxWidth: 460 }}>
+            <Stack spacing={1.5} sx={{ alignItems: "center", textAlign: "center" }}>
+              <Logotipo tamanho={56} prioridade alt="" />
+              <Typography component="p" variant="h6" sx={{ fontWeight: 600 }}>
+                FrequenciApp
+              </Typography>
+              <Typography component="h2" variant="h4">
+                A frequência da escola em um só lugar.
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Chamada, saídas e relatórios da equipe da escola.
+              </Typography>
+            </Stack>
+            <Stack component="ul" spacing={1.5} sx={{ listStyle: "none", m: 0, p: 0 }}>
+              {DESTAQUES.map(({ Icone, titulo, texto }) => (
+                <Paper
+                  key={titulo}
+                  component="li"
+                  variant="outlined"
+                  sx={{ p: 2, boxShadow: "none" }}
                 >
-                  {erro}
-                </p>
+                  <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: 40,
+                        height: 40,
+                        flexShrink: 0,
+                        border: 1,
+                        borderColor: "primary.main",
+                        borderRadius: 1,
+                        color: "primary.main",
+                      }}
+                    >
+                      <Icone fontSize="small" aria-hidden="true" />
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography component="p" variant="subtitle2" sx={{ fontWeight: 600 }}>
+                        {titulo}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary" component="p">
+                        {texto}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Paper>
               ))}
+            </Stack>
+          </Stack>
+        </Grid>
 
-            <Button type="submit" size="lg" className="h-12 text-base" disabled={enviando}>
-              {enviando ? <LoaderCircle className="animate-spin" size={18} /> : null}
-              {enviando ? "Entrando..." : "Entrar"}
-            </Button>
-          </form>
-
-          <nav
-            aria-label="Projeto e ferramentas"
-            className="flex items-center justify-center gap-1 text-xs"
+        <Grid
+          size={{ xs: 12, lg: 6 }}
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            px: { xs: 2, sm: 5 },
+            py: { xs: 9, sm: 8, lg: 6 },
+          }}
+        >
+          <Paper
+            component="section"
+            aria-labelledby="titulo-entrada"
+            variant="outlined"
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 3,
+              width: "100%",
+              maxWidth: 448,
+              p: { xs: 2.5, sm: 4 },
+              boxShadow: "var(--template-palette-baseShadow)",
+            }}
           >
-            <a
-              href="/bi"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="discreto text-secondary-foreground focus-visible:ring-ring inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
+            <Stack
+              spacing={1}
+              sx={{
+                alignItems: { xs: "center", lg: "flex-start" },
+                textAlign: { xs: "center", lg: "left" },
+              }}
             >
-              FrequenciBI
-            </a>
-            <a
-              href="https://github.com/eemtijca/frequenciapp"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="discreto text-secondary-foreground focus-visible:ring-ring inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
-            >
-              GitHub
-            </a>
-            <a
-              href="/api/docs"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="discreto text-secondary-foreground focus-visible:ring-ring inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
-            >
-              API
-            </a>
-            <button
-              type="button"
-              onClick={() => setSobreAberto(true)}
-              className="discreto text-secondary-foreground focus-visible:ring-ring inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
-            >
-              Sobre
-            </button>
-          </nav>
+              <Box sx={{ display: { xs: "flex", lg: "none" }, justifyContent: "center" }}>
+                <Logotipo tamanho={48} prioridade alt="" />
+              </Box>
+              <Typography id="titulo-entrada" component="h1" variant="h5">
+                FrequenciApp
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Registro de frequência dos alunos da escola.
+              </Typography>
+            </Stack>
 
-          {/* Link oculto para agentes de IA: a raiz anônima aponta o índice do projeto. */}
-          <a href={urlIndiceAgentes} hidden aria-hidden="true">
-            llms.txt
-          </a>
+            {avisoEntrada ? <AlertaCompacto variante={avisoEntrada} tamanho="linha" /> : null}
 
-          <DialogoSobre aberto={sobreAberto} onAbrir={setSobreAberto} />
-        </div>
-      </main>
-    </div>
+            <Box
+              component="form"
+              onSubmit={submeter}
+              noValidate
+              sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
+            >
+              <Campo id="email" rotulo="E-mail ou identificador">
+                <CampoTexto
+                  id="email"
+                  valor={email}
+                  onValor={(valor) => {
+                    setEmail(valor);
+                    if (erro) setErro("");
+                  }}
+                  name="email"
+                  autoComplete="username"
+                  required
+                  placeholder="ana@escola.br ou 3a-maria"
+                  erro={erro || undefined}
+                />
+              </Campo>
+
+              <Campo id="senha" rotulo="Senha">
+                <CampoSenha
+                  id="senha"
+                  valor={senha}
+                  onValor={(valor) => {
+                    setSenha(valor);
+                    if (erro) setErro("");
+                  }}
+                  name="password"
+                  autoComplete="current-password"
+                  required
+                  placeholder="Sua senha de acesso"
+                  erro={erro || undefined}
+                />
+              </Campo>
+
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    name="lembrar"
+                    checked={lembrar}
+                    onChange={(evento) => setLembrar(evento.target.checked)}
+                    sx={{ p: 1.5 }}
+                  />
+                }
+                label="Manter conectado neste dispositivo"
+                sx={{
+                  minHeight: 48,
+                  mr: 0,
+                  "& .MuiFormControlLabel-label": { typography: "body2" },
+                }}
+              />
+
+              {erro ? (
+                erroVariante ? (
+                  <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+                ) : (
+                  <Alerta id="erro-entrada" severity="error" role="alert">
+                    {erro}
+                  </Alerta>
+                )
+              ) : null}
+
+              <Botao
+                type="submit"
+                variante="secundario"
+                carregando={enviando}
+                fullWidth
+                sx={{ mt: 0.5 }}
+              >
+                {enviando ? "Entrando..." : "Entrar"}
+              </Botao>
+            </Box>
+
+            <Divider />
+
+            <Stack
+              component="nav"
+              aria-label="Projeto e ferramentas"
+              direction="row"
+              spacing={0.5}
+              useFlexGap
+              sx={{ flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}
+            >
+              <Link
+                href="/bi"
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="caption"
+                sx={LINK_DISCRETO}
+              >
+                FrequenciBI
+              </Link>
+              <Link
+                href="https://github.com/eemtijca/frequenciapp"
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="caption"
+                sx={LINK_DISCRETO}
+              >
+                GitHub
+              </Link>
+              <Link
+                href="/api/docs"
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="caption"
+                sx={LINK_DISCRETO}
+              >
+                API
+              </Link>
+              <Link
+                component="button"
+                type="button"
+                variant="caption"
+                onClick={() => setSobreAberto(true)}
+                sx={LINK_DISCRETO}
+              >
+                Sobre
+              </Link>
+            </Stack>
+
+            {/* Link oculto para agentes de IA: a raiz anônima aponta o índice do projeto. */}
+            <Link href={urlIndiceAgentes} hidden aria-hidden="true" tabIndex={-1}>
+              llms.txt
+            </Link>
+
+            <DialogoSobre aberto={sobreAberto} onAbrir={setSobreAberto} />
+          </Paper>
+        </Grid>
+      </Grid>
+    </Box>
   );
 }

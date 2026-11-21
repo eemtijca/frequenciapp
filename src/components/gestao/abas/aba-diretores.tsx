@@ -4,21 +4,35 @@
 // emissão da palavra-chave (mostrada uma única vez), revogação com motivo e
 // situação da conta. Só leitura de estatísticas para o diretor (ADR-021).
 import { useEffect, useMemo, useState } from "react";
-import {
-  Ban,
-  Copy,
-  KeyRound,
-  LoaderCircle,
-  Pencil,
-  Plus,
-  Power,
-  UserRoundCheck,
-} from "lucide-react";
-import { toast } from "sonner";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
-import { estadoDeErro } from "@/lib/estado-http";
-import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
+import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
+import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
+import SearchOffRoundedIcon from "@mui/icons-material/SearchOffRounded";
+import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import CircularProgress from "@mui/material/CircularProgress";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Stack from "@mui/material/Stack";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
+import { TabelaPadrao } from "@/components/layout/tabela-padrao";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { Selo, type TomSelo } from "@/components/ui/mui/selo";
+import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { normalizar, rotuloData, rotuloDiaSemana, type Turma } from "@/domain/frequencia";
 import {
   ROTULOS_ESTADO_CREDENCIAL,
@@ -26,31 +40,12 @@ import {
   type DiretorDTO,
   type EstadoCredencial,
 } from "@/domain/diretores";
+import { publicarAviso } from "@/components/ui/mui/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { estadoDeErro } from "@/lib/estado-http";
+import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { BarraBusca } from "@/components/ui/barra-busca";
-import { Label } from "@/components/ui/label";
-import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { Selo, type VarianteSelo } from "@/components/ui/selo";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   turmas: Turma[];
@@ -67,13 +62,18 @@ interface Formulario {
 
 const VAZIO: Formulario = { nome: "", identificador: "", turmaIds: [], inicio: "" };
 
-const VARIANTE_ESTADO: Record<EstadoCredencial, VarianteSelo> = {
+const VARIANTE_ESTADO: Record<EstadoCredencial, TomSelo> = {
   sem_palavra: "neutro",
   emitida: "neutro",
   em_uso: "sucesso",
   expirada: "atencao",
   revogada: "perigo",
 };
+
+const ALVO_ACAO = {
+  width: TOKENS_LAYOUT.alvoToque,
+  height: TOKENS_LAYOUT.alvoToque,
+} as const;
 
 function dataCurta(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString("pt-BR") : "";
@@ -102,9 +102,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
       const dados = await pedir<{ diretores: DiretorDTO[] }>("/api/diretores");
       setDiretores(dados.diretores);
     } catch (excecao) {
-      toast.error(
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar os diretores.",
-      );
+      avisarErro(excecao, { contexto: "Não foi possível carregar os diretores." });
       setDiretores([]);
     }
   });
@@ -268,9 +266,12 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
   async function copiarPalavra(palavra: string) {
     try {
       await navigator.clipboard.writeText(palavra);
-      toast.success("Palavra-chave copiada.");
+      avisarSucesso("Palavra-chave copiada.");
     } catch {
-      toast.error("Não foi possível copiar. Selecione e copie o texto.");
+      publicarAviso({
+        severidade: "error",
+        titulo: "Não foi possível copiar. Selecione e copie o texto.",
+      });
     }
   }
 
@@ -278,9 +279,14 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
     diretor.estado === "emitida" || diretor.estado === "em_uso" || diretor.estado === "expirada";
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm">
+    <Stack spacing={2}>
+      <Stack
+        direction="row"
+        spacing={2}
+        useFlexGap
+        sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}
+      >
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {diretores === null
             ? "Carregando..."
             : `${diretores.filter((diretor) => diretor.ativo).length} ${
@@ -288,32 +294,39 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                   ? "diretor ativo"
                   : "diretores ativos"
               }`}
-        </p>
-        <Button size="lg" className="h-11" onClick={abrirNovo}>
-          <Plus size={16} />
+        </Typography>
+        <Botao variante="secundario" icone={<AddRoundedIcon />} onClick={abrirNovo}>
           Novo diretor
-        </Button>
-      </div>
+        </Botao>
+      </Stack>
 
       {carregando && diretores === null ? (
-        <div className="text-muted-foreground flex min-h-32 items-center justify-center gap-2 text-sm">
-          <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-          Carregando diretores...
-        </div>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 128,
+            color: "text.secondary",
+          }}
+        >
+          <CircularProgress size={20} aria-hidden="true" />
+          <Typography variant="body2">Carregando diretores...</Typography>
+        </Stack>
       ) : (diretores ?? []).length === 0 ? (
-        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
-          <UserRoundCheck size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Nenhum diretor de turma cadastrado</p>
-          <p className="text-muted-foreground text-sm">
-            Cadastre cada diretor com as turmas que ele acompanha.
-          </p>
-          <Button variant="outline" className="mt-2" onClick={abrirNovo}>
-            <Plus size={16} />
-            Cadastrar diretor
-          </Button>
-        </div>
+        <EstadoVazio
+          icone={<PersonAddRoundedIcon />}
+          titulo="Nenhum diretor de turma cadastrado"
+          descricao="Cadastre cada diretor com as turmas que ele acompanha."
+          acao={
+            <Botao variante="contorno" icone={<AddRoundedIcon />} onClick={abrirNovo}>
+              Cadastrar diretor
+            </Botao>
+          }
+        />
       ) : (
-        <div className="flex flex-col gap-3">
+        <Stack spacing={2}>
           <BarraBusca
             id="busca-diretores"
             valor={busca}
@@ -321,189 +334,243 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
             placeholder="Buscar por nome, identificador ou turma"
           />
           {filtrados.length === 0 ? (
-            <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-              <p className="font-medium">Nenhum diretor encontrado</p>
-              <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
-            </div>
+            <EstadoVazio
+              icone={<SearchOffRoundedIcon />}
+              titulo="Nenhum diretor encontrado"
+              descricao="Tente outro termo de busca."
+            />
           ) : (
-            <ul className="flex flex-col gap-3">
-              {filtrados.map((diretor) => (
-                <li
-                  key={diretor.id}
-                  className={`superficie overflow-hidden ${diretor.ativo ? "" : "opacity-60"}`}
-                  data-diretor={diretor.identificador}
-                >
-                  <div className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center">
-                    <div className="min-w-0 flex-1">
-                      <p className="flex flex-wrap items-center gap-2 font-medium">
-                        <span className="truncate">{diretor.nome}</span>
-                        <Selo variante={VARIANTE_ESTADO[diretor.estado]}>
-                          {ROTULOS_ESTADO_CREDENCIAL[diretor.estado]}
-                        </Selo>
-                        {!diretor.ativo && <Selo>desativado</Selo>}
-                      </p>
-                      <p className="text-muted-foreground numerais-tabulares truncate text-sm">
-                        {diretor.identificador}
-                      </p>
-                      <p className="text-muted-foreground mt-0.5 text-xs">
-                        {diretor.turmas.length > 0
-                          ? diretor.turmas.map((vinculo) => vinculo.turma).join(", ")
-                          : "Sem turma vinculada"}
-                        {diretor.expiraEm &&
-                        (diretor.estado === "emitida" || diretor.estado === "em_uso")
-                          ? ` · palavra válida até ${dataCurta(diretor.expiraEm)}`
-                          : ""}
-                        {diretor.estado === "revogada" && diretor.motivoRevogacao
-                          ? ` · revogada: ${diretor.motivoRevogacao}`
-                          : ""}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap items-center gap-1">
-                      <Button
-                        variant="outline"
-                        className="h-11"
-                        disabled={!diretor.ativo || chaveAtiva === `emitir-${diretor.id}`}
-                        onClick={() =>
-                          diretor.estado === "sem_palavra"
-                            ? emitir(diretor)
-                            : setEmitirAlvo(diretor)
-                        }
-                      >
-                        {chaveAtiva === `emitir-${diretor.id}` ? (
-                          <LoaderCircle size={16} className="animate-spin" />
-                        ) : (
-                          <KeyRound size={16} />
-                        )}
-                        {diretor.estado === "sem_palavra" ? "Gerar palavra-chave" : "Gerar nova"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-11"
-                        aria-label={`Editar ${diretor.nome}`}
-                        onClick={() => abrirEdicao(diretor)}
-                      >
-                        <Pencil size={16} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-11"
-                        aria-label={
-                          diretor.ativo ? `Desativar ${diretor.nome}` : `Reativar ${diretor.nome}`
-                        }
-                        disabled={chaveAtiva === `ativo-${diretor.id}`}
-                        onClick={() => alternarAtivo(diretor)}
-                      >
-                        <Power size={16} />
-                      </Button>
-                      {podeRevogar(diretor) && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="text-falta-texto size-11"
-                          aria-label={`Revogar a palavra-chave de ${diretor.nome}`}
-                          onClick={() => {
-                            setMotivo("");
-                            setRevogarAlvo(diretor);
+            <TabelaPadrao caption="Diretores de turma, com a situação da palavra-chave.">
+              <TableHead>
+                <TableRow>
+                  <TableCell scope="col">Diretor</TableCell>
+                  <TableCell scope="col" align="right">
+                    Ações
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filtrados.map((diretor) => {
+                  const emitindo = chaveAtiva === `emitir-${diretor.id}`;
+                  return (
+                    <TableRow
+                      key={diretor.id}
+                      data-diretor={diretor.identificador}
+                      sx={{ opacity: diretor.ativo ? 1 : 0.6 }}
+                    >
+                      <TableCell component="th" scope="row">
+                        <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            useFlexGap
+                            sx={{ alignItems: "center", flexWrap: "wrap" }}
+                          >
+                            <Typography sx={{ fontWeight: 500 }}>{diretor.nome}</Typography>
+                            <Selo
+                              rotulo={ROTULOS_ESTADO_CREDENCIAL[diretor.estado]}
+                              tom={VARIANTE_ESTADO[diretor.estado]}
+                            />
+                            {!diretor.ativo ? <Selo rotulo="desativado" /> : null}
+                          </Stack>
+                          <Typography
+                            variant="body2"
+                            noWrap
+                            sx={{ color: "text.secondary", fontVariantNumeric: "tabular-nums" }}
+                          >
+                            {diretor.identificador}
+                          </Typography>
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                            {diretor.turmas.length > 0
+                              ? diretor.turmas.map((vinculo) => vinculo.turma).join(", ")
+                              : "Sem turma vinculada"}
+                            {diretor.expiraEm &&
+                            (diretor.estado === "emitida" || diretor.estado === "em_uso")
+                              ? ` · palavra válida até ${dataCurta(diretor.expiraEm)}`
+                              : ""}
+                            {diretor.estado === "revogada" && diretor.motivoRevogacao
+                              ? ` · revogada: ${diretor.motivoRevogacao}`
+                              : ""}
+                          </Typography>
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="right">
+                        <Stack
+                          direction="row"
+                          spacing={1}
+                          useFlexGap
+                          sx={{
+                            justifyContent: "flex-end",
+                            alignItems: "center",
+                            flexWrap: "wrap",
                           }}
                         >
-                          <Ban size={16} />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+                          <Botao
+                            variante="contorno"
+                            icone={<KeyRoundedIcon />}
+                            carregando={emitindo}
+                            disabled={!diretor.ativo}
+                            onClick={() =>
+                              diretor.estado === "sem_palavra"
+                                ? emitir(diretor)
+                                : setEmitirAlvo(diretor)
+                            }
+                          >
+                            {diretor.estado === "sem_palavra"
+                              ? "Gerar palavra-chave"
+                              : "Gerar nova"}
+                          </Botao>
+                          <BotaoIcone
+                            rotulo={`Editar ${diretor.nome}`}
+                            icone={<EditRoundedIcon fontSize="small" />}
+                            variante="texto"
+                            sx={ALVO_ACAO}
+                            onClick={() => abrirEdicao(diretor)}
+                          />
+                          <BotaoIcone
+                            rotulo={
+                              diretor.ativo
+                                ? `Desativar ${diretor.nome}`
+                                : `Reativar ${diretor.nome}`
+                            }
+                            icone={<PowerSettingsNewRoundedIcon fontSize="small" />}
+                            variante="texto"
+                            sx={ALVO_ACAO}
+                            disabled={chaveAtiva === `ativo-${diretor.id}`}
+                            onClick={() => alternarAtivo(diretor)}
+                          />
+                          {podeRevogar(diretor) ? (
+                            <BotaoIcone
+                              rotulo={`Revogar a palavra-chave de ${diretor.nome}`}
+                              icone={<BlockRoundedIcon fontSize="small" />}
+                              variante="texto"
+                              sx={[ALVO_ACAO, (tema) => ({ color: tema.vars.palette.falta.texto })]}
+                              onClick={() => {
+                                setMotivo("");
+                                setRevogarAlvo(diretor);
+                              }}
+                            />
+                          ) : null}
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </TabelaPadrao>
           )}
-        </div>
+        </Stack>
       )}
 
-      <Dialog open={dialogoAberto} onOpenChange={setDialogoAberto}>
-        <DialogContent className="max-h-[90dvh] max-w-sm overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {emEdicao ? `Editar ${emEdicao.nome}` : "Novo diretor de turma"}
-            </DialogTitle>
-          </DialogHeader>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(evento) => {
-              evento.preventDefault();
-              void submeter();
-            }}
-            noValidate
-          >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="nome-diretor">Nome</Label>
-              <Input
-                id="nome-diretor"
-                value={formulario.nome}
+      <Dialogo
+        aberto={dialogoAberto}
+        onFechar={() => setDialogoAberto(false)}
+        titulo={emEdicao ? `Editar ${emEdicao.nome}` : "Novo diretor de turma"}
+        tamanho="grande"
+        acoes={
+          <>
+            <Botao variante="texto" onClick={() => setDialogoAberto(false)}>
+              Cancelar
+            </Botao>
+            <Botao
+              variante="secundario"
+              carregando={enviando}
+              disabled={problemaIdentificador !== null}
+              onClick={() => void submeter()}
+            >
+              {emEdicao ? "Salvar" : "Cadastrar"}
+            </Botao>
+          </>
+        }
+      >
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            void submeter();
+          }}
+          noValidate
+        >
+          <Stack spacing={2}>
+            <Campo id="nome-diretor" rotulo="Nome">
+              <CampoTexto
+                valor={formulario.nome}
+                onValor={(nome) => setFormulario((atual) => ({ ...atual, nome }))}
                 required
                 maxLength={100}
                 autoComplete="off"
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, nome: evento.target.value }))
-                }
                 placeholder="Nome do professor"
-                className="h-11"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="identificador-diretor">Identificador de acesso</Label>
-              <Input
-                id="identificador-diretor"
-                value={formulario.identificador}
+            </Campo>
+            <Campo
+              id="identificador-diretor"
+              rotulo="Identificador de acesso"
+              erro={problemaIdentificador ?? undefined}
+              descricao={
+                emEdicao
+                  ? "O identificador não muda depois de criado."
+                  : "Letras minúsculas, números, ponto ou hífen. É o que o diretor digita para entrar."
+              }
+            >
+              <CampoTexto
+                valor={formulario.identificador}
+                onValor={(identificador) => setFormulario((atual) => ({ ...atual, identificador }))}
                 required
                 maxLength={40}
                 autoComplete="off"
-                autoCapitalize="none"
-                spellCheck={false}
                 disabled={emEdicao !== null}
-                aria-invalid={problemaIdentificador !== null}
-                aria-describedby="dica-identificador"
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, identificador: evento.target.value }))
-                }
                 placeholder="ex.: 3a-maria"
-                className="h-11"
               />
-              <p id="dica-identificador" className="text-muted-foreground text-xs">
-                {emEdicao
-                  ? "O identificador não muda depois de criado."
-                  : (problemaIdentificador ??
-                    "Letras minúsculas, números, ponto ou hífen. É o que o diretor digita para entrar.")}
-              </p>
-            </div>
-            <fieldset className="flex flex-col gap-2">
-              <legend className="text-sm font-medium">Turmas acompanhadas</legend>
-              <p className="text-muted-foreground text-xs">
+            </Campo>
+            <Box component="fieldset" sx={{ border: 0, margin: 0, padding: 0 }}>
+              <Typography component="legend" variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                Turmas acompanhadas
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Os alunos entram pela turma de origem, como na Grade e na planilha.
-              </p>
+              </Typography>
               {turmasOrdenadas.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Cadastre as turmas antes.</p>
+                <Typography variant="body2" sx={{ color: "text.secondary", mt: 1 }}>
+                  Cadastre as turmas antes.
+                </Typography>
               ) : (
-                <div className="bg-secondary/30 grid max-h-56 grid-cols-2 gap-1 overflow-y-auto rounded-lg p-2">
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 0.5,
+                    maxHeight: 224,
+                    overflowY: "auto",
+                    mt: 1,
+                    p: 1,
+                    backgroundColor: "action.hover",
+                    borderRadius: 1,
+                  }}
+                >
                   {turmasOrdenadas.map((turma) => (
-                    <label
+                    <FormControlLabel
                       key={turma.id}
-                      className="hover:bg-secondary/60 flex min-h-11 items-center gap-2 rounded-md px-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={formulario.turmaIds.includes(turma.id)}
-                        onChange={(evento) => alternarTurma(turma.id, evento.target.checked)}
-                        className="size-4 accent-[var(--primary)]"
-                      />
-                      {turma.rotulo}
-                    </label>
+                      control={
+                        <Checkbox
+                          checked={formulario.turmaIds.includes(turma.id)}
+                          onChange={(evento) => alternarTurma(turma.id, evento.target.checked)}
+                          slotProps={{ input: { "aria-label": turma.rotulo } }}
+                        />
+                      }
+                      label={turma.rotulo}
+                      sx={{
+                        minHeight: TOKENS_LAYOUT.alvoToque,
+                        m: 0,
+                        px: 1,
+                        borderRadius: 1,
+                        width: { xs: "100%", sm: "calc(50% - 4px)" },
+                        "&:hover": { backgroundColor: "action.selected" },
+                      }}
+                    />
                   ))}
-                </div>
+                </Box>
               )}
-            </fieldset>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="inicio-diretor">Acompanha desde</Label>
+            </Box>
+            <Campo id="inicio-diretor" rotulo="Acompanha desde">
               <SeletorPeriodo
                 id="inicio-diretor"
                 modo="dia"
@@ -514,139 +581,133 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                 detalhe={rotuloDiaSemana(formulario.inicio || diaCorrente)}
                 onValor={(inicio) => setFormulario((atual) => ({ ...atual, inicio }))}
               />
-              <p id="dica-inicio-diretor" className="text-muted-foreground text-xs">
-                {emEdicao
-                  ? "Só antecipa o início das turmas já acompanhadas; turmas novas começam nesta data."
-                  : "O diretor vê a turma a partir desta data. Use uma data passada para incluir o histórico de quando já exercia a função."}
-              </p>
-            </div>
-            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={enviando || problemaIdentificador !== null}>
-                {enviando && <LoaderCircle size={16} className="animate-spin" />}
-                {emEdicao ? "Salvar" : "Cadastrar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </Campo>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {emEdicao
+                ? "Só antecipa o início das turmas já acompanhadas; turmas novas começam nesta data."
+                : "O diretor vê a turma a partir desta data. Use uma data passada para incluir o histórico de quando já exercia a função."}
+            </Typography>
+            {erro ? (
+              <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+            ) : null}
+          </Stack>
+        </form>
+      </Dialogo>
 
-      <AlertDialog
-        open={emitirAlvo !== null}
-        onOpenChange={(aberto) => {
-          if (!aberto) setEmitirAlvo(null);
+      <DialogoConfirmacao
+        aberto={emitirAlvo !== null}
+        titulo={`Gerar nova palavra-chave para ${emitirAlvo?.nome ?? ""}?`}
+        descricao="A palavra atual deixa de valer na hora e as sessões abertas caem. A nova aparece uma única vez."
+        rotuloConfirmar="Gerar nova"
+        operacaoEmAndamento={emitirAlvo !== null && chaveAtiva === `emitir-${emitirAlvo.id}`}
+        onConfirmar={() => {
+          const alvo = emitirAlvo;
+          setEmitirAlvo(null);
+          if (alvo) emitir(alvo);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Gerar nova palavra-chave para {emitirAlvo?.nome}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A palavra atual deixa de valer na hora e as sessões abertas caem. A nova aparece uma
-              única vez.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={() => emitirAlvo && emitir(emitirAlvo)}>
-              Gerar nova
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onCancelar={() => setEmitirAlvo(null)}
+      />
 
-      <Dialog
-        open={palavraEmitida !== null}
-        onOpenChange={(aberto) => {
-          if (!aberto) setPalavraEmitida(null);
-        }}
-      >
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>Palavra-chave de {palavraEmitida?.diretor.nome}</DialogTitle>
-            <DialogDescription>
-              Ela aparece só agora. Entregue ao diretor em mãos ou por mensagem direta; no primeiro
-              acesso ele troca por uma palavra própria.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <div className="bg-secondary/60 flex flex-col gap-1 rounded-lg border px-4 py-3">
-              <span className="text-muted-foreground text-xs">Identificador</span>
-              <span className="numerais-tabulares font-medium">
-                {palavraEmitida?.diretor.identificador}
-              </span>
-              <span className="text-muted-foreground mt-2 text-xs">Palavra-chave</span>
-              <span
-                className="numerais-tabulares text-lg font-semibold tracking-wide select-all"
-                data-palavra-chave
-              >
-                {palavraEmitida?.palavraChave}
-              </span>
-              <span className="text-muted-foreground mt-2 text-xs">
-                Válida até {dataCurta(palavraEmitida?.diretor.expiraEm ?? null)}, ou até a troca.
-              </span>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => palavraEmitida && void copiarPalavra(palavraEmitida.palavraChave)}
+      <Dialogo
+        aberto={palavraEmitida !== null}
+        onFechar={() => setPalavraEmitida(null)}
+        titulo={`Palavra-chave de ${palavraEmitida?.diretor.nome ?? ""}`}
+        descricao="Ela aparece só agora. Entregue ao diretor em mãos ou por mensagem direta; no primeiro acesso ele troca por uma palavra própria."
+        acoes={
+          <>
+            <Botao
+              variante="contorno"
+              icone={<ContentCopyRoundedIcon />}
+              onClick={() => {
+                if (palavraEmitida) void copiarPalavra(palavraEmitida.palavraChave);
+              }}
             >
-              <Copy size={16} />
               Copiar
-            </Button>
-            <Button type="button" onClick={() => setPalavraEmitida(null)}>
+            </Botao>
+            <Botao variante="secundario" onClick={() => setPalavraEmitida(null)}>
               Já entreguei
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <AlertDialog
-        open={revogarAlvo !== null}
-        onOpenChange={(aberto) => {
-          if (!aberto) setRevogarAlvo(null);
-        }}
+            </Botao>
+          </>
+        }
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Revogar a palavra-chave de {revogarAlvo?.nome}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O acesso cai na hora, em todos os aparelhos. Use em saída da função, suspeita de
-              vazamento ou desligamento. O motivo fica registrado.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="motivo-revogacao">Motivo</Label>
-            <Input
-              id="motivo-revogacao"
-              value={motivo}
-              maxLength={200}
-              autoComplete="off"
-              onChange={(evento) => setMotivo(evento.target.value)}
-              placeholder="ex.: deixou a direção da turma"
-              className="h-11"
-            />
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={motivo.trim().length < 3 || chaveAtiva === `revogar-${revogarAlvo?.id}`}
-              onClick={(evento) => {
-                // Mantém o diálogo aberto até a resposta, para mostrar erro se houver.
-                evento.preventDefault();
+        <Box
+          sx={(tema) => ({
+            display: "flex",
+            flexDirection: "column",
+            gap: 0.5,
+            p: 2,
+            border: `1px solid ${tema.vars.palette.divider}`,
+            borderRadius: 1,
+            backgroundColor: "action.hover",
+          })}
+        >
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Identificador
+          </Typography>
+          <Typography sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 500 }}>
+            {palavraEmitida?.diretor.identificador}
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary", mt: 1 }}>
+            Palavra-chave
+          </Typography>
+          <Typography
+            component="span"
+            data-palavra-chave
+            sx={{
+              fontVariantNumeric: "tabular-nums",
+              fontSize: "1.125rem",
+              fontWeight: 600,
+              letterSpacing: "0.05em",
+              userSelect: "all",
+            }}
+          >
+            {palavraEmitida?.palavraChave}
+          </Typography>
+          <Typography variant="caption" sx={{ color: "text.secondary", mt: 1 }}>
+            Válida até {dataCurta(palavraEmitida?.diretor.expiraEm ?? null)}, ou até a troca.
+          </Typography>
+        </Box>
+      </Dialogo>
+
+      <Dialogo
+        aberto={revogarAlvo !== null}
+        onFechar={() => {
+          if (chaveAtiva !== `revogar-${revogarAlvo?.id}`) setRevogarAlvo(null);
+        }}
+        titulo={`Revogar a palavra-chave de ${revogarAlvo?.nome ?? ""}?`}
+        descricao="O acesso cai na hora, em todos os aparelhos. Use em saída da função, suspeita de vazamento ou desligamento. O motivo fica registrado."
+        acoes={
+          <>
+            <Botao
+              variante="texto"
+              disabled={chaveAtiva === `revogar-${revogarAlvo?.id}`}
+              onClick={() => setRevogarAlvo(null)}
+            >
+              Cancelar
+            </Botao>
+            <Botao
+              variante="destrutivo"
+              carregando={chaveAtiva === `revogar-${revogarAlvo?.id}`}
+              disabled={motivo.trim().length < 3}
+              onClick={() => {
                 if (revogarAlvo) revogar(revogarAlvo);
               }}
             >
               Revogar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+            </Botao>
+          </>
+        }
+      >
+        <Campo id="motivo-revogacao" rotulo="Motivo">
+          <CampoTexto
+            valor={motivo}
+            onValor={setMotivo}
+            maxLength={200}
+            autoComplete="off"
+            placeholder="ex.: deixou a direção da turma"
+          />
+        </Campo>
+      </Dialogo>
+    </Stack>
   );
 }

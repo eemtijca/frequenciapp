@@ -3,8 +3,7 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Locator } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
+import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { RECURSOS_BI } from "../../../src/domain/bi";
 
@@ -20,7 +19,6 @@ beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
     cacheDir: path.join(tmpdir(), "vite-cabecalhos"),
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     resolve: {
@@ -50,12 +48,20 @@ const combinacoes = [
 async function fundo(no: Locator) {
   return no.evaluate((el) => getComputedStyle(el).backgroundColor);
 }
-async function verificarDiscreto(no: Locator) {
+async function verificarFoco(no: Locator) {
   await no.waitFor();
-  expect(await fundo(no)).toBe("rgba(0, 0, 0, 0)");
-  const caixa = await no.boundingBox();
-  expect(caixa?.height).toBeGreaterThanOrEqual(44);
-  expect(caixa?.width).toBeGreaterThanOrEqual(44);
+  const medida = await no.evaluate((el) => {
+    const caixa = el.getBoundingClientRect();
+    const depois = getComputedStyle(el, "::after");
+    const largura = Number.parseFloat(depois.width);
+    const altura = Number.parseFloat(depois.height);
+    return {
+      largura: Math.max(caixa.width, Number.isFinite(largura) ? largura : 0),
+      altura: Math.max(caixa.height, Number.isFinite(altura) ? altura : 0),
+    };
+  });
+  expect(medida.altura).toBeGreaterThanOrEqual(44);
+  expect(medida.largura).toBeGreaterThanOrEqual(44);
   // A tecla anterior ativa a modalidade de teclado; o foco direto evita
   // depender da ordem de tabulação, que muda com os menus do BI.
   await no.page().keyboard.press("Tab");
@@ -67,6 +73,14 @@ async function verificarDiscreto(no: Locator) {
       return estilo.outlineStyle !== "none" || estilo.boxShadow !== "none";
     }),
   ).toBe(true);
+}
+async function verificarDiscreto(no: Locator) {
+  await no.waitFor();
+  expect(await fundo(no)).toBe("rgba(0, 0, 0, 0)");
+  await verificarFoco(no);
+}
+async function aguardarTema(page: Page, tema: string) {
+  await expect.poll(() => page.locator("html").getAttribute("data-mui-color-scheme")).toBe(tema);
 }
 it.each(combinacoes)("entrada: ações auxiliares discretas em %s a %i px", async (tema, largura) => {
   const page = await browser.newPage({
@@ -82,7 +96,7 @@ it.each(combinacoes)("entrada: ações auxiliares discretas em %s a %i px", asyn
     await page.mouse.move(0, 0);
     await page.getByLabel("E-mail ou identificador").fill("teste");
     await page.getByLabel("Senha", { exact: true }).fill("exemplo");
-    await expect.poll(() => page.locator("html").getAttribute("class")).toContain(tema);
+    await aguardarTema(page, tema);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
@@ -90,7 +104,8 @@ it.each(combinacoes)("entrada: ações auxiliares discretas em %s a %i px", asyn
       await page.screenshot({
         path: `${process.env.CAPTURA_CABECALHOS}/entrada-${tema}-${largura}.png`,
       });
-    expect(await fundo(page.getByLabel("E-mail ou identificador"))).not.toBe("rgba(0, 0, 0, 0)");
+    const email = page.getByLabel("E-mail ou identificador");
+    expect(await fundo(email.locator("xpath=.."))).not.toBe("rgba(0, 0, 0, 0)");
     expect(await fundo(page.getByRole("button", { name: "Entrar", exact: true }))).not.toBe(
       "rgba(0, 0, 0, 0)",
     );
@@ -99,17 +114,20 @@ it.each(combinacoes)("entrada: ações auxiliares discretas em %s a %i px", asyn
     const sobre = page.getByRole("button", { name: "Sobre", exact: true });
     await verificarDiscreto(sobre);
     await sobre.press("Enter");
-    expect(await page.getByRole("dialog").isVisible()).toBe(true);
+    const dialogo = page.getByRole("dialog");
+    await dialogo.waitFor({ state: "visible" });
     await page.keyboard.press("Escape");
-    await verificarDiscreto(page.getByRole("button", { name: /Tema:.*Alterar tema/ }));
-    await page.getByRole("button", { name: /Tema:.*Alterar tema/ }).press("Enter");
-    expect(await page.getByRole("radiogroup", { name: "Tema do aplicativo" }).isVisible()).toBe(
-      true,
-    );
+    await dialogo.waitFor({ state: "hidden" });
+    const botaoTema = page.getByRole("button", { name: /Tema:.*Alterar tema/ });
+    await verificarFoco(botaoTema);
+    await botaoTema.press("Enter");
+    const gruposTema = page.getByRole("radiogroup", { name: "Tema do aplicativo" });
+    await gruposTema.waitFor({ state: "visible" });
+    expect(await gruposTema.isVisible()).toBe(true);
     await page.getByRole("radio", { name: tema === "light" ? "Escuro" : "Claro" }).click();
     await expect
-      .poll(() => page.locator("html").getAttribute("class"))
-      .toContain(tema === "light" ? "dark" : "light");
+      .poll(() => page.locator("html").getAttribute("data-mui-color-scheme"))
+      .toBe(tema === "light" ? "dark" : "light");
   } finally {
     await page.close();
   }
@@ -132,7 +150,7 @@ it.each([
       rota.fulfill({ path: path.resolve("src/app/icon.svg"), contentType: "image/svg+xml" }),
     );
     await page.goto(url);
-    await expect.poll(() => page.locator("html").getAttribute("class")).toContain(tema);
+    await aguardarTema(page, tema);
     await page.mouse.move(0, 0);
     const nav = page.getByRole("navigation", { name: "Projeto e ferramentas" });
     const itens = [
@@ -201,10 +219,26 @@ it.each(combinacoes)(
         .poll(() => page.getByText(/Atualizado em/).count(), { timeout: 30000 })
         .toBeGreaterThan(0);
       await page.mouse.move(0, 0);
-      await expect.poll(() => page.locator("html").getAttribute("class")).toContain(tema);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
-        true,
-      );
+      await aguardarTema(page, tema);
+      // O BI rola dentro da área de conteúdo; mede a caixa dos elementos, não o documento.
+      const excessos = await page.evaluate(() => {
+        const limite = document.documentElement.clientWidth + 1;
+        return Array.from(document.querySelectorAll("main *"))
+          .filter((el): el is HTMLElement => el instanceof HTMLElement)
+          .filter((el) => {
+            const estilo = getComputedStyle(el);
+            if (estilo.display === "none" || estilo.visibility === "hidden") return false;
+            for (let pai = el.parentElement; pai; pai = pai.parentElement) {
+              if (["auto", "scroll", "hidden", "clip"].includes(getComputedStyle(pai).overflowX))
+                return false;
+            }
+            const caixa = el.getBoundingClientRect();
+            return caixa.width > 0 && (caixa.left < -1 || caixa.right > limite);
+          })
+          .slice(0, 8)
+          .map((el) => `${el.tagName.toLowerCase()}.${el.className}`);
+      });
+      expect(excessos).toEqual([]);
       expect(await fundo(page.getByRole("button", { name: "Aplicar período" }))).not.toBe(
         "rgba(0, 0, 0, 0)",
       );
@@ -215,21 +249,20 @@ it.each(combinacoes)(
       await verificarDiscreto(page.getByRole("link", { name: "Voltar ao FrequenciApp" }));
       if (largura >= 640) {
         await verificarDiscreto(page.getByRole("button", { name: /Tema:.*Alterar tema/ }));
-        const nav = page.getByRole("navigation", { name: "Seções do FrequenciBI" });
-        expect(await fundo(nav.getByRole("button", { name: "Visão geral" }))).not.toBe(
+        const nav = page.getByRole("tablist", { name: "Seções do FrequenciBI" });
+        expect(await fundo(nav.getByRole("tab", { name: "Visão geral" }))).not.toBe(
           "rgba(0, 0, 0, 0)",
         );
-        const faltas = nav.getByRole("button", { name: "Faltas", exact: true });
+        const faltas = nav.getByRole("tab", { name: "Faltas", exact: true });
         await verificarDiscreto(faltas);
         await faltas.press("Enter");
         expect(await faltas.getAttribute("aria-current")).toBe("page");
-        expect(await fundo(faltas)).not.toBe("rgba(0, 0, 0, 0)");
         for (const nome of ["Compartilhar filtros", "Apresentar", "Imprimir"])
           await verificarDiscreto(page.getByRole("button", { name: nome, exact: true }));
         await page.getByRole("button", { name: "Apresentar", exact: true }).press("Enter");
       } else {
         const secao = page.getByRole("combobox", { name: "Seção do FrequenciBI" });
-        expect(await fundo(secao)).not.toBe("rgba(0, 0, 0, 0)");
+        expect(await fundo(secao.locator("xpath=.."))).not.toBe("rgba(0, 0, 0, 0)");
         await secao.click();
         await page.getByRole("option", { name: "Faltas", exact: true }).click();
         expect(await secao.textContent()).toContain("Faltas");

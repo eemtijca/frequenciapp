@@ -5,7 +5,6 @@ import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import { chromium, webkit, type Browser, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 // O foco pode demorar a voltar no WebKit sob carga; a espera padrão é curta.
@@ -19,11 +18,11 @@ const { createServer } = await import(pathToFileURL(vite).href);
 const cache = mkdtempSync(path.join(tmpdir(), "foco-periodo-vite-"));
 let servidor: Awaited<ReturnType<typeof createServer>>;
 let url: string;
+let webkitDisponivel = true;
 beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
     cacheDir: cache,
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     resolve: { alias: { "@": path.resolve("src") } },
@@ -33,7 +32,15 @@ beforeAll(async () => {
   const endereco = servidor.httpServer?.address();
   if (!endereco || typeof endereco === "string") throw new Error("Servidor indisponível");
   url = `http://127.0.0.1:${endereco.port}/tests/componentes/interface/foco-periodo.html`;
-});
+  // WebKit depende de bibliotecas do sistema. Em hosts sem elas, os testes do
+  // motor são pulados em vez de derrubar a suíte do Chromium.
+  try {
+    const navegador = await webkit.launch({ headless: true });
+    await navegador.close();
+  } catch {
+    webkitDisponivel = false;
+  }
+}, 120000);
 afterAll(async () => {
   await servidor?.close();
   rmSync(cache, { recursive: true, force: true });
@@ -58,7 +65,11 @@ for (const [motor, tipo] of [
 ] as const) {
   for (const modo of ["dia", "mes"] as const) {
     for (const tecla of ["Enter", "Space"] as const) {
-      it(`${motor}: ${modo} abre com ${tecla}, Escape devolve foco e reabre no valor`, async () => {
+      it(`${motor}: ${modo} abre com ${tecla}, Escape devolve foco e reabre no valor`, async ({
+        skip,
+      }) => {
+        if (motor === "webkit" && !webkitDisponivel)
+          skip("WebKit indisponível: dependências de sistema ausentes no host.");
         const browser = await tipo.launch({ headless: true });
         try {
           const page = await browser.newPage({ reducedMotion: "reduce" });
@@ -87,9 +98,10 @@ for (const [motor, tipo] of [
         }
       });
     }
-    it.each(["Enter", "Space"])(
-      `${motor}: ${modo} seleciona data com %s e devolve foco`,
-      async (tecla) => {
+    for (const tecla of ["Enter", "Space"] as const) {
+      it(`${motor}: ${modo} seleciona data com ${tecla} e devolve foco`, async ({ skip }) => {
+        if (motor === "webkit" && !webkitDisponivel)
+          skip("WebKit indisponível: dependências de sistema ausentes no host.");
         const browser = await tipo.launch({ headless: true });
         try {
           const page = await browser.newPage({ reducedMotion: "reduce" });
@@ -130,10 +142,12 @@ for (const [motor, tipo] of [
         } finally {
           await browser.close();
         }
-      },
-    );
+      });
+    }
   }
-  it(`${motor}: Fechar devolve foco e o gatilho alterna uma única vez`, async () => {
+  it(`${motor}: Fechar devolve foco e o gatilho alterna uma única vez`, async ({ skip }) => {
+    if (motor === "webkit" && !webkitDisponivel)
+      skip("WebKit indisponível: dependências de sistema ausentes no host.");
     const browser = await tipo.launch({ headless: true });
     try {
       const page = await browser.newPage({ reducedMotion: "reduce" });
@@ -155,7 +169,9 @@ for (const [motor, tipo] of [
       await browser.close();
     }
   });
-  it(`${motor}: foco deslocado para outro controle não volta ao gatilho`, async () => {
+  it(`${motor}: foco deslocado para outro controle não volta ao gatilho`, async ({ skip }) => {
+    if (motor === "webkit" && !webkitDisponivel)
+      skip("WebKit indisponível: dependências de sistema ausentes no host.");
     const browser = await tipo.launch({ headless: true });
     try {
       const page = await browser.newPage({ reducedMotion: "reduce" });
@@ -173,7 +189,11 @@ for (const [motor, tipo] of [
     }
   });
   for (const toque of [false, true]) {
-    it(`${motor}: ${toque ? "toque" : "clique"} fora ativa outro controle sem devolver foco`, async () => {
+    it(`${motor}: ${toque ? "toque" : "clique"} fora ativa outro controle sem devolver foco`, async ({
+      skip,
+    }) => {
+      if (motor === "webkit" && !webkitDisponivel)
+        skip("WebKit indisponível: dependências de sistema ausentes no host.");
       const browser: Browser = await tipo.launch({ headless: true });
       try {
         const page = await browser.newPage({ hasTouch: toque, reducedMotion: "reduce" });

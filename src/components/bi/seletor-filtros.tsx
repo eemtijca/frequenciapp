@@ -2,11 +2,17 @@
 
 // Filtros globais com aplicação explícita do período e controles acessíveis no celular.
 import { useId, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Selecionar } from "@/components/ui/selecionar";
-import { SeletorAno } from "@/components/ui/seletor-ano";
+import Box from "@mui/material/Box";
+import Grid from "@mui/material/Grid";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { SecaoConteudo } from "@/components/layout/secao-conteudo";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { SeletorAno } from "@/components/ui/mui/seletor-ano";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { textoBi, type DadosBi, type FiltrosBi } from "@/domain/bi-analise";
 import { periodoRapidoBi, PERIODOS_RAPIDOS_BI, type PeriodoRapidoBi } from "@/domain/bi-periodos";
@@ -82,204 +88,204 @@ export function SeletorFiltrosBi({
     nome: string,
     opcoes: { valor: string; rotulo: string }[],
   ) => (
-    <div className="min-w-0">
-      <Label htmlFor={`${id}-${campo}`} className="mb-1 block text-xs">
-        {nome}
-      </Label>
-      <Selecionar
-        id={`${id}-${campo}`}
-        ariaLabel={nome}
-        value={filtros[campo] || "__todos"}
-        onValueChange={(v) =>
-          onAlterar({
-            ...filtros,
-            [campo]: v === "__todos" ? "" : v,
-            ...(campo === "serieId"
-              ? { turmaId: "", alunoId: "" }
-              : campo === "turmaId"
-                ? { alunoId: "" }
-                : {}),
-          })
-        }
-        opcoes={[{ valor: "__todos", rotulo: "Todos" }, ...opcoes.filter((o) => o.valor)]}
-        buscavel={opcoes.length > 15}
-      />
-    </div>
+    <Grid size={1} sx={{ minWidth: 0 }}>
+      <Campo id={`${id}-${campo}`} rotulo={nome}>
+        <Selecionar
+          valor={filtros[campo] || "__todos"}
+          onValor={(v) =>
+            onAlterar({
+              ...filtros,
+              [campo]: v === "__todos" ? "" : v,
+              ...(campo === "serieId"
+                ? { turmaId: "", alunoId: "" }
+                : campo === "turmaId"
+                  ? { alunoId: "" }
+                  : {}),
+            })
+          }
+          opcoes={[{ valor: "__todos", rotulo: "Todos" }, ...opcoes.filter((o) => o.valor)]}
+          buscavel={opcoes.length > 15}
+        />
+      </Campo>
+    </Grid>
   );
   return (
-    <section className="superficie p-4 print:hidden" aria-label="Filtros da análise">
-      <div role="group" aria-label="Aplicar período rápido" className="mb-4 flex flex-wrap gap-2">
-        {PERIODOS_RAPIDOS_BI.map((periodo) => (
-          <Button
-            key={periodo}
-            size="sm"
-            className="h-11"
-            variant="outline"
-            type="button"
-            onClick={() => {
-              const datas = periodoRapidoBi(periodo, new Date(), fuso);
-              setAno(datas.inicio.slice(0, 4));
-              setInicio(datas.inicio);
-              setFim(datas.fim);
-              onAlterar({ ...filtros, ...datas });
-            }}
-          >
-            {PERIODOS[periodo]}
-          </Button>
-        ))}
-      </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (inicio && fim && inicio <= fim) onAlterar({ ...filtros, inicio, fim });
-        }}
-      >
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-          <div className="col-span-2 min-w-0 sm:col-span-1">
-            <Label htmlFor={`${id}-ano`} className="mb-1 block text-xs">
-              Ano
-            </Label>
-            <SeletorAno
-              id={`${id}-ano`}
-              rotuloAcessivel="Ano da análise"
-              valor={ano}
-              min={1900}
-              max={2200}
-              onValor={(valor) => {
-                setAno(valor);
-                setInicio(`${valor}-01-01`);
-                setFim(`${valor}-12-31`);
+    <Box
+      component="section"
+      aria-label="Filtros da análise"
+      sx={{ "@media print": { display: "none" } }}
+    >
+      <SecaoConteudo>
+        <Stack
+          direction="row"
+          useFlexGap
+          spacing={1}
+          role="group"
+          aria-label="Aplicar período rápido"
+          sx={{ flexWrap: "wrap" }}
+        >
+          {PERIODOS_RAPIDOS_BI.map((periodo) => (
+            <Botao
+              key={periodo}
+              variante="contorno"
+              tamanho="pequeno"
+              type="button"
+              sx={{ height: 48 }}
+              onClick={() => {
+                const datas = periodoRapidoBi(periodo, new Date(), fuso);
+                setAno(datas.inicio.slice(0, 4));
+                setInicio(datas.inicio);
+                setFim(datas.fim);
+                onAlterar({ ...filtros, ...datas });
               }}
-            />
-          </div>
-          <div className="col-span-2 min-w-0 sm:col-span-1">
-            <Label htmlFor={`${id}-inicio`} className="mb-1 block text-xs">
-              De
-            </Label>
-            <SeletorPeriodo
-              id={`${id}-inicio`}
-              modo="dia"
-              valor={inicio}
-              max={fim || `${ano}-12-31`}
-              rotulo={dataBr(inicio)}
-              rotuloAcessivel="Início da análise"
-              onValor={setInicio}
-            />
-          </div>
-          <div className="col-span-2 min-w-0 sm:col-span-1">
-            <Label htmlFor={`${id}-fim`} className="mb-1 block text-xs">
-              Até
-            </Label>
-            <SeletorPeriodo
-              id={`${id}-fim`}
-              modo="dia"
-              valor={fim}
-              min={inicio}
-              max={`${ano}-12-31`}
-              rotulo={dataBr(fim)}
-              rotuloAcessivel="Fim da análise"
-              onValor={setFim}
-            />
-          </div>
-          {selecionar(
-            "serieId",
-            "Série",
-            (dados.series ?? []).map((l) => ({ valor: l.id, rotulo: textoBi(l.nome) })),
-          )}
-          {selecionar(
-            "turmaId",
-            "Turma",
-            (dados.turmas ?? [])
-              .filter((l) => !filtros.serieId || l.serieId === filtros.serieId)
-              .map((l) => ({ valor: l.id, rotulo: textoBi(l.turma ?? l.nome) })),
-          )}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button
-            type="submit"
-            size="sm"
-            className="h-11"
-            disabled={!inicio || !fim || inicio > fim}
-          >
-            Aplicar período
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            className="h-11"
-            variant="secondary"
-            disabled={!temRecorte}
-            onClick={() =>
-              onAlterar({
-                ...filtros,
-                serieId: "",
-                turmaId: "",
-                alunoId: "",
-                busca: "",
-                justificativa: "",
-                tipo: "",
-                turno: "",
-                situacao: "",
-              })
+            >
+              {PERIODOS[periodo]}
+            </Botao>
+          ))}
+        </Stack>
+        <Box
+          component="form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (inicio && fim && inicio <= fim) onAlterar({ ...filtros, inicio, fim });
+          }}
+        >
+          <Grid container spacing={2} columns={{ xs: 1, sm: 2, lg: 5 }}>
+            <Grid size={1} sx={{ minWidth: 0 }}>
+              <Campo id={`${id}-ano`} rotulo="Ano">
+                <SeletorAno
+                  min={1900}
+                  max={2199}
+                  valor={ano}
+                  rotuloAcessivel="Ano da análise"
+                  onValor={(valor) => {
+                    setAno(valor);
+                    setInicio(`${valor}-01-01`);
+                    setFim(`${valor}-12-31`);
+                  }}
+                />
+              </Campo>
+            </Grid>
+            <Grid size={1} sx={{ minWidth: 0 }}>
+              <Campo id={`${id}-inicio`} rotulo="De">
+                <SeletorPeriodo
+                  id={`${id}-inicio`}
+                  modo="dia"
+                  valor={inicio}
+                  max={fim || `${ano}-12-31`}
+                  rotulo={dataBr(inicio)}
+                  rotuloAcessivel="Início da análise"
+                  onValor={setInicio}
+                />
+              </Campo>
+            </Grid>
+            <Grid size={1} sx={{ minWidth: 0 }}>
+              <Campo id={`${id}-fim`} rotulo="Até">
+                <SeletorPeriodo
+                  id={`${id}-fim`}
+                  modo="dia"
+                  valor={fim}
+                  min={inicio}
+                  max={`${ano}-12-31`}
+                  rotulo={dataBr(fim)}
+                  rotuloAcessivel="Fim da análise"
+                  onValor={setFim}
+                />
+              </Campo>
+            </Grid>
+            {selecionar(
+              "serieId",
+              "Série",
+              (dados.series ?? []).map((l) => ({ valor: l.id, rotulo: textoBi(l.nome) })),
+            )}
+            {selecionar(
+              "turmaId",
+              "Turma",
+              (dados.turmas ?? [])
+                .filter((l) => !filtros.serieId || l.serieId === filtros.serieId)
+                .map((l) => ({ valor: l.id, rotulo: textoBi(l.turma ?? l.nome) })),
+            )}
+          </Grid>
+          <Stack direction="row" useFlexGap spacing={1} sx={{ mt: 2, flexWrap: "wrap" }}>
+            <Botao
+              type="submit"
+              variante="secundario"
+              tamanho="pequeno"
+              sx={{ height: 48 }}
+              disabled={!inicio || !fim || inicio > fim}
+            >
+              Aplicar período
+            </Botao>
+            <Botao
+              type="button"
+              variante="contorno"
+              tamanho="pequeno"
+              sx={{ height: 48 }}
+              disabled={!temRecorte}
+              onClick={() =>
+                onAlterar({
+                  ...filtros,
+                  serieId: "",
+                  turmaId: "",
+                  alunoId: "",
+                  busca: "",
+                  justificativa: "",
+                  tipo: "",
+                  turno: "",
+                  situacao: "",
+                })
+              }
+            >
+              Limpar recortes
+            </Botao>
+            <Typography variant="caption" sx={{ alignSelf: "center", color: "text.secondary" }}>
+              {filtros.inicio} a {filtros.fim}
+            </Typography>
+          </Stack>
+        </Box>
+        {completo && (
+          <Acordeao
+            titulo="Mais filtros"
+            resumo={
+              adicionais > 0 ? `${adicionais} filtros adicionais ativos` : "Série, turma e busca"
             }
           >
-            Limpar recortes
-          </Button>
-          <span className="text-muted-foreground self-center text-xs">
-            {filtros.inicio} a {filtros.fim}
-          </span>
-        </div>
-      </form>
-      {completo && (
-        <details className="mt-3">
-          <summary className="cursor-pointer py-2 text-sm">
-            <span>Mais filtros</span>
-            {adicionais > 0 && (
-              <span
-                className="bg-primary/15 text-primary ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs tabular-nums"
-                aria-label={`${adicionais} filtros adicionais ativos`}
-              >
-                {adicionais}
-              </span>
-            )}
-          </summary>
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {selecionar(
-              "alunoId",
-              "Aluno",
-              (dados.alunos ?? [])
-                .filter(
-                  (l) =>
-                    (!filtros.serieId ||
-                      l.serieId === filtros.serieId ||
-                      (typeof l.turmaId === "string" && turmasDaSerie.has(l.turmaId))) &&
-                    (!filtros.turmaId || l.turmaId === filtros.turmaId),
-                )
-                .map((l) => ({ valor: l.id, rotulo: textoBi(l.aluno ?? l.nome) })),
-            )}
-            {selecionar("justificativa", "Justificativa", catalogos.justificativa ?? [])}
-            {selecionar("tipo", "Tipo", catalogos.tipo ?? [])}
-            {selecionar("turno", "Turno", catalogos.turno ?? [])}
-            {Boolean(dados.alunos) &&
-              selecionar("situacao", "Situação do aluno", [
-                { valor: "ativo", rotulo: "Ativo" },
-                { valor: "inativo", rotulo: "Inativo" },
-                { valor: "desistente", rotulo: "Desistente" },
-              ])}
-            <div className="min-w-0">
-              <Label htmlFor={`${id}-busca`} className="mb-1 block text-xs">
-                Busca por nome
-              </Label>
-              <Input
-                id={`${id}-busca`}
-                value={filtros.busca}
-                maxLength={200}
-                onChange={(e) => onAlterar({ ...filtros, busca: e.target.value })}
-              />
-            </div>
-          </div>
-        </details>
-      )}
-    </section>
+            <Grid container spacing={2} columns={{ xs: 1, sm: 2, lg: 4 }}>
+              {selecionar(
+                "alunoId",
+                "Aluno",
+                (dados.alunos ?? [])
+                  .filter(
+                    (l) =>
+                      (!filtros.serieId ||
+                        l.serieId === filtros.serieId ||
+                        (typeof l.turmaId === "string" && turmasDaSerie.has(l.turmaId))) &&
+                      (!filtros.turmaId || l.turmaId === filtros.turmaId),
+                  )
+                  .map((l) => ({ valor: l.id, rotulo: textoBi(l.aluno ?? l.nome) })),
+              )}
+              {selecionar("justificativa", "Justificativa", catalogos.justificativa ?? [])}
+              {selecionar("tipo", "Tipo", catalogos.tipo ?? [])}
+              {selecionar("turno", "Turno", catalogos.turno ?? [])}
+              {Boolean(dados.alunos) &&
+                selecionar("situacao", "Situação do aluno", [
+                  { valor: "ativo", rotulo: "Ativo" },
+                  { valor: "inativo", rotulo: "Inativo" },
+                  { valor: "desistente", rotulo: "Desistente" },
+                ])}
+              <Grid size={1} sx={{ minWidth: 0 }}>
+                <Campo id={`${id}-busca`} rotulo="Busca por nome">
+                  <CampoTexto
+                    valor={filtros.busca}
+                    onValor={(valor) => onAlterar({ ...filtros, busca: valor })}
+                    maxLength={200}
+                  />
+                </Campo>
+              </Grid>
+            </Grid>
+          </Acordeao>
+        )}
+      </SecaoConteudo>
+    </Box>
   );
 }

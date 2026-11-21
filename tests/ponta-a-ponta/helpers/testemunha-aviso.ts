@@ -6,9 +6,8 @@ export function registrarTestemunha(botao: HTMLElement, tipoEvento: string) {
     resultado.recebido = true;
     resultado.confiavel = evento.isTrusted;
     resultado.instante = Date.now();
-    const aviso = [...document.querySelectorAll("[data-sonner-toast]")].find(
-      (elemento) =>
-        elemento.querySelector("[data-title]")?.textContent?.trim() === "Configurações salvas.",
+    const aviso = [...document.querySelectorAll(".MuiSnackbar-root .MuiAlert-root")].find(
+      (elemento) => elemento.textContent?.trim() === "Configurações salvas.",
     );
     if (aviso) {
       const retangulos = [...aviso.getClientRects()];

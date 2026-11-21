@@ -69,7 +69,7 @@ test("a ordem definida na Gestão aparece na aba Horários do dia", async ({ pag
   await selecionarAcaoConfiguracoes(page, "Horários", "Almoço");
   const secao = page.locator('[data-secao="config-ordem-almoco"]');
   await secao.getByRole("button", { name: /Ordem do almoço/ }).click();
-  const regiao = secao.getByRole("region", { name: "Ordem do almoço" });
+  const regiao = secao.getByRole("region", { name: "Ordem do almoço", exact: true });
   await expect(regiao).toBeVisible();
 
   await escolher(page, regiao.getByRole("combobox", { name: "Dia da semana" }), ROTULO_DIA);

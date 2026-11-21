@@ -1,41 +1,47 @@
 "use client";
 
-// Chamada diária: todos presentes por padrão; toque no aluno para marcar
-// falta e de novo para voltar. A falta pode receber uma justificativa do
-// catálogo (FJ). Rascunho local e proteção de conflito.
+// Chamada diária: presença por padrão, falta ao tocar e justificativa (FJ), com rascunho local.
+// O dia aberto, o conflito por revisão e o bloqueio após salvar são preservados.
 import {
   mesmasJustificativasAntecipadas,
   type JustificativaAntecipada,
   type RevisaoJustificativaAntecipada,
 } from "@/domain/justificativas-antecipadas";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
-import {
-  ChevronDown,
-  ChevronLeft,
-  ChevronRight,
-  CloudCheck,
-  CalendarOff,
-  CheckCircle2,
-  ChartNoAxesCombined,
-  CircleDashed,
-  FileText,
-  Pencil,
-  Play,
-  LockKeyhole,
-  LockKeyholeOpen,
-  LoaderCircle,
-  RotateCcw,
-  Save,
-  School,
-  Settings2,
-} from "lucide-react";
-import { toast } from "sonner";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import CloudDoneRoundedIcon from "@mui/icons-material/CloudDoneRounded";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
+import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import RestartAltRoundedIcon from "@mui/icons-material/RestartAltRounded";
+import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
+import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
+import Box from "@mui/material/Box";
+import ButtonBase from "@mui/material/ButtonBase";
+import Collapse from "@mui/material/Collapse";
+import Fade from "@mui/material/Fade";
+import Grow from "@mui/material/Grow";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Paper from "@mui/material/Paper";
+import Skeleton from "@mui/material/Skeleton";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { type Theme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import { publicarAviso } from "@/components/ui/mui/avisos";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { ouvirBeneficiosMudaram } from "@/lib/eventos-beneficios";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
 import type {
   AcumuladoAluno,
   Aluno,
@@ -62,32 +68,26 @@ import {
 } from "@/domain/frequencia";
 import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
-import { Button } from "@/components/ui/button";
-import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CirculosAcumulado, fraseAcumulado } from "@/components/ui/circulo-contagem";
-import { Selecionar } from "@/components/ui/selecionar";
+import { AlertaCompacto, TelaEstado, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { CirculosAcumulado, fraseAcumulado } from "@/components/ui/mui/circulo-contagem";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { Selo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { LayoutConteudo } from "@/components/layout/layout-conteudo";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
 import { SeletorTurmaChamada } from "@/components/chamada/seletor-turma-chamada";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type { AlertaFrequenciaBeneficio } from "@/domain/beneficios-frequencia";
 import { AvisoBeneficioFrequencia } from "@/components/chamada/aviso-beneficio-frequencia";
-import estilos from "./vista-frequencia.module.css";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
 
 type Filtro = "todos" | "faltas" | "justificadas" | "presentes";
 
@@ -144,10 +144,93 @@ function paraObservacoes(faltas: FaltaAluno[]): Map<string, string> {
   return mapa;
 }
 
-const MARCAS = {
-  escondido: { scale: 0.6, opacity: 0 },
-  visivel: { scale: 1, opacity: 1 },
+const VISUALMENTE_OCULTO = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
 } as const;
+
+function estilosMarca(theme: Theme, estado: "P" | "F" | "FJ" | "D", naoIniciada: boolean) {
+  const palette = theme.vars.palette;
+  const base = {
+    display: "flex",
+    height: 44,
+    minWidth: 64,
+    flexShrink: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 0.75,
+    border: "1px solid transparent",
+    borderRadius: 2,
+    paddingX: 1.25,
+    fontSize: "0.875rem",
+    fontWeight: 600,
+    pointerEvents: "none" as const,
+  };
+
+  if (estado === "F") {
+    return { ...base, backgroundColor: palette.falta.fraco, color: palette.falta.texto };
+  }
+  if (estado === "FJ") {
+    return {
+      ...base,
+      backgroundColor: palette.justificada.fraco,
+      color: palette.justificada.texto,
+    };
+  }
+  if (estado === "D") {
+    return { ...base, backgroundColor: palette.action.hover, color: palette.text.secondary };
+  }
+  if (naoIniciada) {
+    return { ...base, backgroundColor: palette.action.hover, color: palette.text.secondary };
+  }
+  return {
+    ...base,
+    backgroundColor: palette.success.light,
+    color: palette.success.dark,
+    ...theme.applyStyles("dark", {
+      backgroundColor: palette.success.dark,
+      color: palette.success.light,
+    }),
+  };
+}
+
+function BarraSalvamento({ children, rotulo }: { children: ReactNode; rotulo: string }) {
+  return (
+    <Paper
+      component="footer"
+      aria-label={rotulo}
+      elevation={0}
+      square
+      sx={(theme) => ({
+        position: "sticky",
+        bottom: 0,
+        zIndex: theme.zIndex.appBar,
+        display: "flex",
+        alignItems: "center",
+        gap: 1,
+        marginTop: 2,
+        paddingTop: 1,
+        paddingX: 1,
+        paddingLeft: "calc(8px + env(safe-area-inset-left, 0px))",
+        paddingRight: "calc(8px + env(safe-area-inset-right, 0px))",
+        paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))",
+        border: `1px solid ${theme.vars.palette.divider}`,
+        borderRadius: 2,
+        backgroundColor: theme.vars.palette.background.paper,
+        boxShadow: theme.shadows[4],
+      })}
+    >
+      {children}
+    </Paper>
+  );
+}
 
 export default function VistaFrequencia({
   usuario,
@@ -202,6 +285,7 @@ export default function VistaFrequencia({
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [conflito, setConflito] = useState(false);
   const [confirmarSalvamento, setConfirmarSalvamento] = useState(false);
+  const [descartarAberto, setDescartarAberto] = useState(false);
   const [desbloqueio, setDesbloqueio] = useState<"chamada" | "sabado" | null>(null);
   const [filtro, setFiltro] = useState<Filtro>("todos");
   const justificativasAntecipadasRef = useRef<RevisaoJustificativaAntecipada[]>([]);
@@ -215,11 +299,15 @@ export default function VistaFrequencia({
   const [confirmacaoHistoricaAberta, setConfirmacaoHistoricaAberta] = useState(false);
   const [motivoHistorico, setMotivoHistorico] = useState("");
   const [erroHistorico, setErroHistorico] = useState("");
-  const semMovimento = useReducedMotion() ?? false;
+  const semMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   const atualizarTela = useCallback(() => {
     if (sujo) {
-      toast.info("Salve ou descarte as alterações antes de atualizar.");
+      publicarAviso({
+        id: "chamada-atualizar-sujo",
+        severidade: "info",
+        titulo: "Salve ou descarte as alterações antes de atualizar.",
+      });
       return;
     }
     setRecarregar((valor) => valor + 1);
@@ -338,7 +426,11 @@ export default function VistaFrequencia({
             } catch {
               // Apenas conteúdo comprovadamente inválido pode ser descartado.
               sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
-              toast.error("O rascunho local estava ilegível e não foi recuperado.");
+              publicarAviso({
+                id: "chamada-rascunho-ilegivel",
+                severidade: "error",
+                titulo: "O rascunho local estava ilegível e não foi recuperado.",
+              });
               return;
             }
             if (!rascunho || rascunho.versao !== 3 || !Array.isArray(rascunho.faltas)) {
@@ -357,11 +449,13 @@ export default function VistaFrequencia({
               justificativasAntecipadasRef.current = rascunho.justificativasAntecipadas ?? [];
               setSujo(true);
               if (rascunho.revisao === (frequencia?.revisao ?? 0) && agendasIguais) {
-                toast(
-                  frequencia
+                publicarAviso({
+                  id: "chamada-rascunho-recuperado",
+                  severidade: "info",
+                  titulo: frequencia
                     ? "Rascunho recuperado. Desbloqueie a chamada, confira e salve."
                     : "Rascunho recuperado. Confira as faltas e salve a frequência.",
-                );
+                });
               } else {
                 setConflito(true);
                 setErro(
@@ -373,9 +467,12 @@ export default function VistaFrequencia({
             }
           }
         } catch {
-          toast.error(
-            "Não foi possível ler ou remover o rascunho local. A chamada continua disponível; a cópia anterior não foi descartada automaticamente.",
-          );
+          publicarAviso({
+            id: "chamada-rascunho-leitura",
+            severidade: "error",
+            titulo:
+              "Não foi possível ler ou remover o rascunho local. A chamada continua disponível; a cópia anterior não foi descartada automaticamente.",
+          });
         }
       })
       .catch((excecao: unknown) => {
@@ -427,9 +524,12 @@ export default function VistaFrequencia({
       const chave = chaveRascunho(usuario.id, dia, turmaId);
       if (falhaRascunho.current !== chave) {
         falhaRascunho.current = chave;
-        toast.error(
-          "As alterações mais recentes estão apenas nesta aba. Não foi possível atualizar o rascunho local; uma cópia anterior pode continuar disponível.",
-        );
+        publicarAviso({
+          id: "chamada-rascunho-gravacao",
+          severidade: "error",
+          titulo:
+            "As alterações mais recentes estão apenas nesta aba. Não foi possível atualizar o rascunho local; uma cópia anterior pode continuar disponível.",
+        });
       }
     }
   }, [
@@ -794,9 +894,12 @@ export default function VistaFrequencia({
       try {
         sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
       } catch {
-        toast.error(
-          "A frequência foi salva, mas não foi possível remover o rascunho deste navegador.",
-        );
+        publicarAviso({
+          id: "chamada-rascunho-salvo-remover",
+          severidade: "error",
+          titulo:
+            "A frequência foi salva, mas não foi possível remover o rascunho deste navegador.",
+        });
       }
       const total = dados.frequencia.faltas.length;
       const justificadas = dados.frequencia.faltas.filter((falta) => falta.justificativa).length;
@@ -836,11 +939,14 @@ export default function VistaFrequencia({
       setErro(falha?.message ?? "Não foi possível salvar a chamada.");
       setErroVariante(falha?.conflito || agendasMudaram ? "conflito" : estadoDeErro(excecao));
       if (falha?.status !== 401) {
-        toast.error(falha?.message ?? "Não foi possível salvar a chamada.", {
-          description: falha?.conflito
+        publicarAviso({
+          id: "chamada-salvar-erro",
+          severidade: "error",
+          titulo: falha?.message ?? "Não foi possível salvar a chamada.",
+          descricao: falha?.conflito
             ? "A chamada foi salva por outra pessoa enquanto esta tela estava aberta. Revise as marcações."
             : undefined,
-          duration: falha?.conflito ? 8000 : undefined,
+          duracao: falha?.conflito ? 8000 : undefined,
         });
       }
     } finally {
@@ -852,12 +958,19 @@ export default function VistaFrequencia({
     try {
       sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
     } catch {
-      toast.error("Não foi possível remover o rascunho local. Ele pode reaparecer ao recarregar.");
+      publicarAviso({
+        id: "chamada-descartar-erro",
+        severidade: "error",
+        titulo: "Não foi possível remover o rascunho local. Ele pode reaparecer ao recarregar.",
+      });
       return;
     }
     setRecarregar((valor) => valor + 1);
-    toast("Rascunho descartado.", {
-      description: "As marcações voltaram para a última versão salva.",
+    publicarAviso({
+      id: "chamada-descartado",
+      severidade: "info",
+      titulo: "Rascunho descartado.",
+      descricao: "As marcações voltaram para a última versão salva.",
     });
   }
 
@@ -919,585 +1032,750 @@ export default function VistaFrequencia({
   // Sem turmas cadastradas ou visíveis, o estado vazio explica o próximo passo.
   if (turmas.length === 0) {
     return (
-      <section aria-label="Fazer chamada" className="flex flex-col gap-4 pb-6">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Chamada</h1>
-          <p className="text-muted-foreground text-sm">Nenhuma turma disponível</p>
-        </div>
-        <div className="superficie flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
-          <School size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Nenhuma turma cadastrada</p>
-          <p className="text-muted-foreground text-sm">
-            {podeAdministrar
-              ? "Cadastre séries, turmas e alunos na área de Gestão para começar."
-              : "Peça à administração para cadastrar as turmas e os alunos da escola."}
-          </p>
-          {podeAdministrar && onAbrirGestao && (
-            <Button variant="outline" className="mt-2" onClick={onAbrirGestao}>
-              <Settings2 size={16} />
-              Ir para a Gestão
-            </Button>
-          )}
-        </div>
-      </section>
+      <LayoutConteudo largura="leitura">
+        <Box component="section" aria-label="Fazer chamada">
+          <TelaEstado
+            incorporado
+            variante="indisponivel"
+            titulo="Nenhuma turma cadastrada"
+            descricao={
+              podeAdministrar
+                ? "Cadastre séries, turmas e alunos na área de Gestão para começar."
+                : "Peça à administração para cadastrar as turmas e os alunos da escola."
+            }
+            acao={
+              podeAdministrar && onAbrirGestao
+                ? { rotulo: "Ir para a Gestão", onClick: onAbrirGestao }
+                : undefined
+            }
+          />
+        </Box>
+      </LayoutConteudo>
     );
   }
 
+  const estadoMarca = (alunoId: string): "P" | "F" | "FJ" | "D" => {
+    if (desistentesDaTurma.has(alunoId)) return "D";
+    if (!ausencias.has(alunoId)) return "P";
+    return justificativas.get(alunoId) ? "FJ" : "F";
+  };
+
   return (
-    <section aria-label="Fazer chamada" className="flex flex-col gap-4">
-      <h1 className="sr-only">Chamada</h1>
+    <LayoutConteudo largura="larga">
+      <Box
+        component="section"
+        aria-label="Fazer chamada"
+        sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, pb: 2 }}
+      >
+        <Typography component="h1" sx={VISUALMENTE_OCULTO}>
+          Chamada
+        </Typography>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
-        <div className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-4 xl:order-2">
-          {turmas.length > 1 && (
-            <SeletorTurmaChamada
-              turmas={turmas}
-              alunos={alunos}
-              turmaId={turmaId}
-              dia={dia}
-              feriado={feriado?.nome}
-              frequencias={frequenciasDoDia?.chave === chave ? frequenciasDoDia.frequencias : []}
-              coberturaDisponivel={frequenciasDoDia?.chave === chave}
-              carregando={carregando}
-              temAlteracoes={sujo || conflito}
-              travado={travado}
-              semCobertura={nav.resumo}
-              onEscolher={setTurmaId}
-            />
-          )}
+        <Box
+          sx={{
+            display: "grid",
+            gap: 2,
+            alignItems: "start",
+            gridTemplateColumns: { xs: "minmax(0, 1fr)", xl: "minmax(0, 1fr) 20rem" },
+          }}
+        >
+          <Stack
+            data-coluna="painel"
+            spacing={2}
+            sx={{
+              minWidth: 0,
+              order: { xs: 1, xl: 2 },
+              position: { xl: "sticky" },
+              top: { xl: 16 },
+            }}
+          >
+            {turmas.length > 1 && (
+              <SeletorTurmaChamada
+                turmas={turmas}
+                alunos={alunos}
+                turmaId={turmaId}
+                dia={dia}
+                feriado={feriado?.nome}
+                frequencias={frequenciasDoDia?.chave === chave ? frequenciasDoDia.frequencias : []}
+                coberturaDisponivel={frequenciasDoDia?.chave === chave}
+                carregando={carregando}
+                temAlteracoes={sujo || conflito}
+                travado={travado}
+                semCobertura={nav.resumo}
+                onEscolher={setTurmaId}
+              />
+            )}
 
-          <div className="navegacao-dia flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className={`${estilos.acao} size-11 shrink-0`}
-              aria-label="Dia anterior"
-              disabled={travado || !dia}
-              onClick={() => nav.anterior()}
-            >
-              <ChevronLeft size={18} />
-            </Button>
-            <div className={`${estilos.data} min-w-0 flex-1`}>
-              <SeletorPeriodo
-                id="dia-frequencia"
-                modo="dia"
-                valor={nav.resumo ? (nav.domingo ?? "") : dia}
-                max={diaCorrente}
-                calendarioSemanal
-                mostrarSelo={!nav.resumo}
+            <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
+              <BotaoIcone
+                rotulo="Dia anterior"
+                variante="contorno"
+                icone={<ChevronLeftRoundedIcon />}
+                disabled={travado || !dia}
+                onClick={() => nav.anterior()}
+                sx={(tema) => ({
+                  width: 48,
+                  height: 48,
+                  flexShrink: 0,
+                  border: `1px solid ${tema.vars.palette.divider}`,
+                  backgroundColor: tema.vars.palette.background.paper,
+                  "&:hover": { backgroundColor: tema.vars.palette.action.hover },
+                })}
+              />
+              <Box sx={{ minWidth: 0, flex: 1 }}>
+                <SeletorPeriodo
+                  id="dia-frequencia"
+                  modo="dia"
+                  valor={nav.resumo ? (nav.domingo ?? "") : dia}
+                  max={diaCorrente}
+                  calendarioSemanal
+                  mostrarSelo={!nav.resumo}
+                  disabled={travado}
+                  rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da chamada"}
+                  rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
+                  detalhe={nav.resumo ? "semana" : diaDaSemana}
+                  aoHoje={() => {
+                    setCarregando(false);
+                    nav.voltarParaHoje();
+                  }}
+                  hojeAtivo={nav.hojeAtivo}
+                  onAbertoChange={setCalendarioAberto}
+                  onValor={(proximo) => nav.escolherDia(proximo)}
+                />
+              </Box>
+              <BotaoIcone
+                rotulo="Dia seguinte"
+                variante="contorno"
+                icone={<ChevronRightRoundedIcon />}
+                disabled={travado || !dia || nav.seguinteDesabilitado}
+                onClick={() => nav.seguinte()}
+                sx={(tema) => ({
+                  width: 48,
+                  height: 48,
+                  flexShrink: 0,
+                  border: `1px solid ${tema.vars.palette.divider}`,
+                  backgroundColor: tema.vars.palette.background.paper,
+                  "&:hover": { backgroundColor: tema.vars.palette.action.hover },
+                })}
+              />
+            </Stack>
+
+            {!nav.resumo && (
+              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+                <AtualizadoDaVisao fuso={fuso} />
+              </Box>
+            )}
+
+            {nav.mostrarVoltar && (
+              <Botao
+                variante="texto"
+                tamanho="pequeno"
                 disabled={travado}
-                rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da chamada"}
-                rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
-                detalhe={nav.resumo ? "semana" : diaDaSemana}
-                aoHoje={() => {
+                onClick={() => {
                   setCarregando(false);
                   nav.voltarParaHoje();
                 }}
-                hojeAtivo={nav.hojeAtivo}
-                onAbertoChange={setCalendarioAberto}
-                onValor={(proximo) => nav.escolherDia(proximo)}
-              />
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className={`${estilos.acao} size-11 shrink-0`}
-              aria-label="Dia seguinte"
-              disabled={travado || !dia || nav.seguinteDesabilitado}
-              onClick={() => nav.seguinte()}
-            >
-              <ChevronRight size={18} />
-            </Button>
-          </div>
-          {!nav.resumo && (
-            <div className="flex justify-end">
-              <AtualizadoDaVisao fuso={fuso} />
-            </div>
-          )}
-          {nav.mostrarVoltar && (
-            <button
-              type="button"
-              disabled={travado}
-              onClick={() => {
-                setCarregando(false);
-                nav.voltarParaHoje();
-              }}
-              className="text-primary pressionavel self-start text-sm font-medium hover:underline disabled:text-[var(--texto-desabilitado)]"
-            >
-              Voltar para hoje
-            </button>
-          )}
-          {!nav.resumo && feriado && (
-            <div
-              role="status"
-              className="superficie text-muted-foreground flex items-center gap-2 px-4 py-3 text-sm"
-            >
-              <CalendarOff size={18} aria-hidden="true" className="shrink-0" />
-              <span className="min-w-0 break-words">Feriado · {feriado.nome}</span>
-            </div>
-          )}
-          {!nav.resumo && (
-            <>
-              {sujo && (
-                <p className="text-muted-foreground text-xs">
-                  Salve ou descarte as alterações para mudar a data ou a turma.
-                </p>
-              )}
-
-              {configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
-                <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
-                  <span>Aulas do dia:</span>
-                  {aulasDoDia.map((aula) => (
-                    <span
-                      key={aula.id}
-                      className="bg-secondary text-secondary-foreground numerais-tabulares rounded-md px-1.5 py-0.5 font-medium"
-                    >
-                      {aula.ordem}ª {aula.inicio}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {revisaoSalva > 0 && !aulasRegistradas && !carregando && (
-                <p className="text-muted-foreground text-xs">
-                  Aulas estimadas pela grade atual; esta chamada não guardou o retrato das aulas.
-                </p>
-              )}
-              {!carregando && contagemParciais > 0 && (
-                <p className="text-muted-foreground text-xs">
-                  {contagemParciais === 1
-                    ? "1 aluno saiu em parte das aulas."
-                    : `${contagemParciais} alunos saíram em parte das aulas.`}
-                </p>
-              )}
-
-              <div className={ehSabado ? "flex flex-col gap-2" : "grid grid-cols-2 gap-2"}>
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-label={tituloResumo}
-                  aria-expanded={resumoAberto}
-                  aria-controls={idResumo}
-                  onClick={() => setResumoAberto((atual) => !atual)}
-                  className={`${estilos.acao} h-11 min-w-0 justify-center px-3 ${
-                    revisaoSalva > 0 ? "" : "col-span-2"
-                  }`}
-                >
-                  <ChartNoAxesCombined size={16} aria-hidden="true" />
-                  <span>Resumo</span>
-                  <ChevronDown
-                    aria-hidden="true"
-                    className={`size-4 transition-transform motion-reduce:transition-none ${resumoAberto ? "rotate-180" : ""}`}
-                  />
-                </Button>
-                {ehSabado && !feriado && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    aria-pressed={sabadoLiberado}
-                    disabled={ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas}
-                    title={
-                      !temAulasAtivas
-                        ? "Cadastre aulas ativas na Gestão."
-                        : !leituraConfirmada
-                          ? "Aguarde a leitura da chamada. Em caso de falha, tente novamente."
-                          : "Libera a chamada somente para esta turma e este sábado."
-                    }
-                    className={`${estilos.acao} h-auto min-h-11 w-full justify-center px-4 py-2 whitespace-normal`}
-                    onClick={() => {
-                      if (ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas)
-                        return;
-                      setDesbloqueio("sabado");
-                    }}
-                  >
-                    {sabadoLiberado ? (
-                      <CheckCircle2 className="size-4 shrink-0" aria-hidden="true" />
-                    ) : (
-                      <LockKeyholeOpen className="size-4 shrink-0" aria-hidden="true" />
-                    )}
-                    <span>{sabadoLiberado ? "Sábado letivo" : "Desbloquear sábado letivo"}</span>
-                  </Button>
-                )}
-                {revisaoSalva > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className={`${estilos.acao} h-11 min-w-0 justify-center px-3`}
-                    aria-label={`${chamadaBloqueada ? "Desbloquear" : "Bloquear"} chamada de ${turma?.rotulo ?? ""} em ${rotuloDia}${chamadaBloqueada ? ", editar chamada" : ""}`}
-                    disabled={ocupado || (edicaoLiberada && sujo)}
-                    onClick={() => {
-                      if (ocupado || (edicaoLiberada && sujo)) return;
-                      if (chamadaBloqueada) {
-                        setDesbloqueio("chamada");
-                      } else {
-                        setEdicaoLiberada(false);
-                        setAulasAbertas(null);
-                      }
-                    }}
-                  >
-                    {chamadaBloqueada ? <Pencil size={16} /> : <LockKeyhole size={16} />}
-                    {chamadaBloqueada ? "Editar" : "Bloquear"}
-                  </Button>
-                )}
-              </div>
-
-              {(erro || conflito) &&
-                (conflito ? (
-                  <AvisoCompacto
-                    variante="conflito"
-                    titulo="A chamada foi salva em outro aparelho"
-                    descricao={erro || undefined}
-                    tamanho="linha"
-                    acao={{ rotulo: "Recarregar versão salva", onClick: descartar }}
-                  />
-                ) : (
-                  <AvisoCompacto
-                    variante={erroVariante}
-                    descricao={erro}
-                    tamanho="linha"
-                    acao={
-                      !sujo
-                        ? {
-                            rotulo: "Tentar novamente",
-                            onClick: () => setRecarregar((valor) => valor + 1),
-                          }
-                        : undefined
-                    }
-                  />
-                ))}
-              <div
-                aria-label="Barra de salvamento"
-                className="superficie fixed left-1/2 z-30 flex w-[calc(100vw-2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-2xl p-2 xl:static xl:left-auto xl:z-auto xl:w-full xl:max-w-none xl:translate-x-0"
-                style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+                sx={{ alignSelf: "flex-start", px: 0 }}
               >
-                <p
-                  aria-live="polite"
-                  className="text-muted-foreground min-w-0 flex-1 px-2 text-xs font-medium"
-                  title={feriado?.nome}
-                >
-                  {feriado ? "Feriado" : tituloEstado}
-                </p>
+                Voltar para hoje
+              </Botao>
+            )}
+
+            {!nav.resumo && feriado && (
+              <Paper
+                role="status"
+                variant="outlined"
+                elevation={0}
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1,
+                  px: 2,
+                  py: 1.5,
+                  color: "text.secondary",
+                }}
+              >
+                <EventBusyRoundedIcon fontSize="small" aria-hidden="true" />
+                <Typography variant="body2" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                  Feriado · {feriado.nome}
+                </Typography>
+              </Paper>
+            )}
+
+            {!nav.resumo && (
+              <>
                 {sujo && (
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Descartar"
-                        title="Descartar alterações"
-                        disabled={salvando}
-                        className={`${estilos.acao} size-11 shrink-0`}
-                      >
-                        <RotateCcw size={16} aria-hidden="true" />
-                      </Button>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          As marcações não salvas serão descartadas e a última versão salva será
-                          recarregada.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Continuar marcando</AlertDialogCancel>
-                        <AlertDialogAction onClick={descartar}>Descartar</AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Salve ou descarte as alterações para mudar a data ou a turma.
+                  </Typography>
                 )}
-                <Button
-                  className={`${estilos.salvar} shrink-0`}
-                  variant={chamadaNaoIniciada ? "secondary" : "default"}
-                  onClick={() => setConfirmarSalvamento(true)}
-                  disabled={!podeSalvar}
-                >
-                  {salvando ? (
-                    <LoaderCircle size={16} className="animate-spin" />
-                  ) : atualizadoEm && !sujo ? (
-                    <CloudCheck size={16} />
-                  ) : (
-                    <Save size={16} />
-                  )}
-                  {salvando ? "Salvando..." : "Salvar"}
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
 
-        <div className="flex min-w-0 flex-col gap-4 pb-24 xl:order-1">
-          {nav.resumo && nav.semana ? (
-            <VistaResumoSemana
-              turmas={turmasDoResumo}
-              alunos={alunos}
-              dias={nav.semana}
-              domingo={nav.domingo}
-              feriados={configuracoes.feriados}
-              configuracoes={configuracoes}
-              mostrarSaidas={configuracoes.saidaAntecipada}
-              versao={versaoFrequencias + recarregar}
-              contexto="chamada"
-              ativo={ativo}
-              pausado={calendarioAberto}
-              viewId="chamada"
-              fuso={fuso}
-              onAbrirDia={(proximo) => nav.escolherDia(proximo)}
-            />
-          ) : (
-            <>
-              <section
-                id={idResumo}
-                aria-label={tituloResumo}
-                hidden={!resumoAberto}
-                className="superficie overflow-hidden"
-              >
-                {resumoAberto && (
-                  <>
-                    <div className="bg-secondary/50 flex flex-wrap items-center justify-between gap-2 border-b px-4 py-2.5">
-                      <h2 className="font-medium">{tituloResumo}</h2>
-                      <span className="text-muted-foreground numerais-tabulares text-xs">
+                {configuracoes.frequenciaPorAula && aulasDoDia.length > 1 && (
+                  <Stack
+                    direction="row"
+                    spacing={0.75}
+                    useFlexGap
+                    sx={{ alignItems: "center", flexWrap: "wrap" }}
+                  >
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                      Aulas do dia:
+                    </Typography>
+                    {aulasDoDia.map((aula) => (
+                      <Selo
+                        key={aula.id}
+                        rotulo={`${aula.ordem}ª ${aula.inicio}`}
+                        tom="neutro"
+                        tamanho="pequeno"
+                      />
+                    ))}
+                  </Stack>
+                )}
+                {revisaoSalva > 0 && !aulasRegistradas && !carregando && (
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Aulas estimadas pela grade atual; esta chamada não guardou o retrato das aulas.
+                  </Typography>
+                )}
+                {!carregando && contagemParciais > 0 && (
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    {contagemParciais === 1
+                      ? "1 aluno saiu em parte das aulas."
+                      : `${contagemParciais} alunos saíram em parte das aulas.`}
+                  </Typography>
+                )}
+
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: ehSabado ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))",
+                    gap: 1,
+                  }}
+                >
+                  <Botao
+                    type="button"
+                    variante="contorno"
+                    aria-label={tituloResumo}
+                    aria-expanded={resumoAberto}
+                    aria-controls={idResumo}
+                    onClick={() => setResumoAberto((atual) => !atual)}
+                    icone={<InsightsRoundedIcon fontSize="small" />}
+                    sx={{
+                      minHeight: 48,
+                      minWidth: 0,
+                      ...(revisaoSalva === 0 ? { gridColumn: "1 / -1" } : {}),
+                    }}
+                  >
+                    Resumo
+                    <ExpandMoreRoundedIcon
+                      aria-hidden="true"
+                      fontSize="small"
+                      sx={{
+                        ml: 1,
+                        transform: resumoAberto ? "rotate(180deg)" : "rotate(0deg)",
+                        transition: semMovimento ? "none" : "transform 150ms ease",
+                      }}
+                    />
+                  </Botao>
+                  {ehSabado && !feriado && (
+                    <Botao
+                      type="button"
+                      variante="contorno"
+                      aria-pressed={sabadoLiberado}
+                      disabled={ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas}
+                      title={
+                        !temAulasAtivas
+                          ? "Cadastre aulas ativas na Gestão."
+                          : !leituraConfirmada
+                            ? "Aguarde a leitura da chamada. Em caso de falha, tente novamente."
+                            : "Libera a chamada somente para esta turma e este sábado."
+                      }
+                      onClick={() => {
+                        if (ocupado || !leituraConfirmada || sabadoLiberado || !temAulasAtivas)
+                          return;
+                        setDesbloqueio("sabado");
+                      }}
+                      icone={
+                        sabadoLiberado ? (
+                          <CheckCircleRoundedIcon fontSize="small" />
+                        ) : (
+                          <LockOpenRoundedIcon fontSize="small" />
+                        )
+                      }
+                      sx={{ minHeight: 48, whiteSpace: "normal", px: 2 }}
+                    >
+                      {sabadoLiberado ? "Sábado letivo" : "Desbloquear sábado letivo"}
+                    </Botao>
+                  )}
+                  {revisaoSalva > 0 && (
+                    <Botao
+                      type="button"
+                      variante="contorno"
+                      aria-label={`${chamadaBloqueada ? "Desbloquear" : "Bloquear"} chamada de ${turma?.rotulo ?? ""} em ${rotuloDia}${chamadaBloqueada ? ", editar chamada" : ""}`}
+                      disabled={ocupado || (edicaoLiberada && sujo)}
+                      onClick={() => {
+                        if (ocupado || (edicaoLiberada && sujo)) return;
+                        if (chamadaBloqueada) {
+                          setDesbloqueio("chamada");
+                        } else {
+                          setEdicaoLiberada(false);
+                          setAulasAbertas(null);
+                        }
+                      }}
+                      icone={
+                        chamadaBloqueada ? (
+                          <EditRoundedIcon fontSize="small" />
+                        ) : (
+                          <LockRoundedIcon fontSize="small" />
+                        )
+                      }
+                      sx={{ minHeight: 48, minWidth: 0 }}
+                    >
+                      {chamadaBloqueada ? "Editar" : "Bloquear"}
+                    </Botao>
+                  )}
+                </Box>
+
+                {erro || conflito ? (
+                  <Fade in appear={!semMovimento} timeout={semMovimento ? 0 : 180}>
+                    <Box>
+                      {conflito ? (
+                        <AlertaCompacto
+                          variante="conflito"
+                          titulo="A chamada foi salva em outro aparelho"
+                          descricao={erro || undefined}
+                          tamanho="linha"
+                          acao={{ rotulo: "Recarregar versão salva", onClick: descartar }}
+                        />
+                      ) : (
+                        <AlertaCompacto
+                          variante={erroVariante}
+                          descricao={erro}
+                          tamanho="linha"
+                          acao={
+                            !sujo
+                              ? {
+                                  rotulo: "Tentar novamente",
+                                  onClick: () => setRecarregar((valor) => valor + 1),
+                                }
+                              : undefined
+                          }
+                        />
+                      )}
+                    </Box>
+                  </Fade>
+                ) : null}
+              </>
+            )}
+          </Stack>
+
+          <Stack data-coluna="lista" spacing={2} sx={{ minWidth: 0, order: { xs: 2, xl: 1 } }}>
+            {nav.resumo && nav.semana ? (
+              <VistaResumoSemana
+                turmas={turmasDoResumo}
+                alunos={alunos}
+                dias={nav.semana}
+                domingo={nav.domingo}
+                feriados={configuracoes.feriados}
+                configuracoes={configuracoes}
+                mostrarSaidas={configuracoes.saidaAntecipada}
+                versao={versaoFrequencias + recarregar}
+                contexto="chamada"
+                ativo={ativo}
+                pausado={calendarioAberto}
+                viewId="chamada"
+                fuso={fuso}
+                onAbrirDia={(proximo) => nav.escolherDia(proximo)}
+              />
+            ) : (
+              <>
+                <Collapse in={resumoAberto} timeout={semMovimento ? 0 : "auto"} unmountOnExit>
+                  <Paper
+                    id={idResumo}
+                    component="section"
+                    role="region"
+                    aria-label={tituloResumo}
+                    variant="outlined"
+                    elevation={0}
+                    sx={{ overflow: "hidden" }}
+                  >
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        gap: 1,
+                        borderBottom: 1,
+                        borderColor: "divider",
+                        backgroundColor: "action.hover",
+                        px: 2,
+                        py: 1,
+                      }}
+                    >
+                      <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 600 }}>
+                        {tituloResumo}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "text.secondary", fontVariantNumeric: "tabular-nums" }}
+                      >
                         {leituraConfirmada && revisaoSalva === 0 && !erro ? "Prévia · " : ""}
                         {rotuloDia}
-                      </span>
-                    </div>
-                    <div className="border-b p-3">
-                      <div className="grid grid-cols-3 gap-2" aria-label="Resumo da chamada">
-                        <button
-                          type="button"
-                          aria-pressed={filtro === "faltas"}
-                          onClick={() =>
-                            setFiltro((atual) => (atual === "faltas" ? "todos" : "faltas"))
-                          }
-                          className="controle aria-[pressed=true]:bg-falta-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
-                        >
-                          <span className="numerais-tabulares text-falta-texto text-2xl font-semibold">
-                            {carregando ? "" : contagemFaltas}
-                          </span>
-                          <span className="text-muted-foreground text-xs font-medium">Faltas</span>
-                        </button>
-                        <button
-                          type="button"
-                          aria-pressed={filtro === "justificadas"}
-                          onClick={() =>
-                            setFiltro((atual) =>
-                              atual === "justificadas" ? "todos" : "justificadas",
-                            )
-                          }
-                          className="controle aria-[pressed=true]:bg-justificada-fraca pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
-                        >
-                          <span className="numerais-tabulares text-justificada-texto text-2xl font-semibold">
-                            {carregando ? "" : contagemJustificadas}
-                          </span>
-                          <span className="text-muted-foreground text-xs font-medium">
-                            Justificadas
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          aria-pressed={filtro === "presentes"}
-                          onClick={() =>
-                            setFiltro((atual) => (atual === "presentes" ? "todos" : "presentes"))
-                          }
-                          className="controle pressionavel flex min-h-16 flex-col items-center justify-center gap-0.5 px-2 py-2"
-                        >
-                          <span className="numerais-tabulares text-primary text-2xl font-semibold">
-                            {carregando ? "" : contagemPresencas}
-                          </span>
-                          <span className="text-muted-foreground text-xs font-medium">
-                            Presentes
-                          </span>
-                        </button>
-                      </div>
-                    </div>
+                      </Typography>
+                    </Box>
+                    <Box sx={{ borderBottom: 1, borderColor: "divider", p: 1.5 }}>
+                      <Box
+                        aria-label="Resumo da chamada"
+                        sx={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                          gap: 1,
+                        }}
+                      >
+                        {(
+                          [
+                            ["faltas", "Faltas", contagemFaltas],
+                            ["justificadas", "Justificadas", contagemJustificadas],
+                            ["presentes", "Presentes", contagemPresencas],
+                          ] as const
+                        ).map(([valorFiltro, rotulo, quantidade]) => {
+                          const selecionado = filtro === valorFiltro;
+                          return (
+                            <ButtonBase
+                              key={valorFiltro}
+                              type="button"
+                              aria-pressed={selecionado}
+                              onClick={() =>
+                                setFiltro((atual) =>
+                                  atual === valorFiltro ? "todos" : valorFiltro,
+                                )
+                              }
+                              sx={(tema) => ({
+                                display: "flex",
+                                minHeight: 64,
+                                flexDirection: "column",
+                                alignItems: "center",
+                                justifyContent: "center",
+                                gap: 0.25,
+                                px: 1,
+                                py: 1,
+                                border: `1px solid ${selecionado ? tema.vars.palette.primary.main : tema.vars.palette.divider}`,
+                                borderRadius: 2,
+                                backgroundColor:
+                                  selecionado && valorFiltro === "faltas"
+                                    ? tema.vars.palette.falta.fraco
+                                    : selecionado && valorFiltro === "justificadas"
+                                      ? tema.vars.palette.justificada.fraco
+                                      : selecionado
+                                        ? tema.vars.palette.action.selected
+                                        : tema.vars.palette.background.paper,
+                              })}
+                            >
+                              <Typography
+                                component="span"
+                                variant="h5"
+                                sx={{
+                                  fontWeight: 600,
+                                  fontVariantNumeric: "tabular-nums",
+                                  color:
+                                    valorFiltro === "faltas"
+                                      ? "falta.texto"
+                                      : valorFiltro === "justificadas"
+                                        ? "justificada.texto"
+                                        : "primary.main",
+                                }}
+                              >
+                                {carregando ? "" : quantidade}
+                              </Typography>
+                              <Typography
+                                component="span"
+                                variant="caption"
+                                sx={{ color: "text.secondary", fontWeight: 500 }}
+                              >
+                                {rotulo}
+                              </Typography>
+                            </ButtonBase>
+                          );
+                        })}
+                      </Box>
+                    </Box>
                     {(() => {
                       const ausentes = ativosDaTurma.filter((aluno) => ausencias.has(aluno.id));
                       if (ausentes.length === 0) {
                         return (
-                          <p className="text-muted-foreground px-4 py-3 text-sm">
+                          <Typography
+                            variant="body2"
+                            sx={{ px: 2, py: 1.5, color: "text.secondary" }}
+                          >
                             Nenhuma falta nesta chamada.
-                          </p>
+                          </Typography>
                         );
                       }
                       return (
-                        <ul className="divide-y">
+                        <List disablePadding>
                           {ausentes.map((aluno) => {
                             const acumulado = acumuladoDe(aluno.id);
                             const codigo = justificativas.get(aluno.id);
                             return (
-                              <li
+                              <ListItem
                                 key={aluno.id}
-                                className="flex items-start gap-3 px-4 py-2.5 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+                                divider
+                                sx={{
+                                  display: "flex",
+                                  alignItems: "flex-start",
+                                  gap: 1.5,
+                                  px: 2,
+                                  py: 1.25,
+                                }}
                               >
-                                <span className="min-w-0 flex-1">
-                                  <span className="block truncate text-sm font-medium">
+                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                  <Typography variant="body2" noWrap sx={{ fontWeight: 500 }}>
                                     {nomeNaChamada(
                                       aluno.nome,
                                       mostrarOrigem,
                                       aluno.turmaOriginalId !== turmaId,
                                     )}
-                                    {codigo && (
-                                      <span className="text-primary ml-2 text-xs font-semibold">
+                                    {codigo ? (
+                                      <Box
+                                        component="span"
+                                        sx={{ ml: 1, color: "primary.main", fontWeight: 600 }}
+                                      >
                                         {codigo}
-                                      </span>
-                                    )}
-                                  </span>
+                                      </Box>
+                                    ) : null}
+                                  </Typography>
                                   {(mostrarOrigem || codigo) && (
-                                    <span className="text-muted-foreground block truncate text-xs">
+                                    <Typography
+                                      variant="caption"
+                                      noWrap
+                                      sx={{ display: "block", color: "text.secondary" }}
+                                    >
                                       {mostrarOrigem
                                         ? `Origem ${rotuloOrigemDe(aluno.turmaOriginalId)}`
                                         : ""}
                                       {codigo
                                         ? `${mostrarOrigem ? " · " : ""}${rotuloJustificativa(codigo, catalogoJustificativas)}`
                                         : ""}
-                                    </span>
+                                    </Typography>
                                   )}
-                                </span>
-                                <span className="flex shrink-0 flex-col items-end gap-1">
+                                </Box>
+                                <Stack spacing={0.5} sx={{ flexShrink: 0, alignItems: "flex-end" }}>
                                   {acumulado ? (
                                     <>
                                       <CirculosAcumulado
                                         faltas={acumulado.faltas}
                                         justificadas={acumulado.faltasJustificadas}
                                       />
-                                      <span className="text-muted-foreground text-xs">no mês</span>
+                                      <Typography
+                                        variant="caption"
+                                        sx={{ color: "text.secondary" }}
+                                      >
+                                        no mês
+                                      </Typography>
                                     </>
                                   ) : (
-                                    <span className="text-muted-foreground text-xs">
+                                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
                                       {resumo ? "sem faltas no mês" : "-"}
-                                    </span>
+                                    </Typography>
                                   )}
-                                </span>
-                              </li>
+                                </Stack>
+                              </ListItem>
                             );
                           })}
-                        </ul>
+                        </List>
                       );
                     })()}
-                  </>
-                )}
-              </section>
+                  </Paper>
+                </Collapse>
 
-              <div className="superficie overflow-hidden">
-                {mostrarSituacao && (
-                  <div
-                    role="region"
-                    aria-label="Situação da chamada"
-                    className="flex items-center gap-3 border-b px-4 py-3"
-                  >
-                    {chamadaNaoIniciada ? (
-                      <CircleDashed
-                        className="text-muted-foreground size-5 shrink-0"
-                        aria-hidden="true"
-                      />
-                    ) : sujo ? (
-                      <Pencil className="text-alerta-texto size-5 shrink-0" aria-hidden="true" />
-                    ) : (
-                      <CloudCheck className="text-primary size-5 shrink-0" aria-hidden="true" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <h2 className="text-sm font-semibold">
-                        {salvando ? "Salvando..." : tituloSituacao}
-                      </h2>
-                      {(chamadaNaoIniciada || sujo) && (
-                        <p className="text-muted-foreground mt-0.5 text-xs">
-                          {chamadaNaoIniciada
-                            ? "Confira os alunos e salve."
-                            : "Salve para confirmar."}
-                        </p>
+                <Paper variant="outlined" elevation={0} sx={{ overflow: "hidden" }}>
+                  {mostrarSituacao && (
+                    <Box
+                      role="region"
+                      aria-label="Situação da chamada"
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 1.5,
+                        borderBottom: 1,
+                        borderColor: "divider",
+                        px: 2,
+                        py: 1.5,
+                      }}
+                    >
+                      {chamadaNaoIniciada ? (
+                        <AssignmentRoundedIcon
+                          fontSize="small"
+                          aria-hidden="true"
+                          sx={{ color: "text.secondary", flexShrink: 0 }}
+                        />
+                      ) : sujo ? (
+                        <EditRoundedIcon
+                          fontSize="small"
+                          aria-hidden="true"
+                          sx={{ color: "alerta.texto", flexShrink: 0 }}
+                        />
+                      ) : (
+                        <CloudDoneRoundedIcon
+                          fontSize="small"
+                          aria-hidden="true"
+                          sx={{ color: "primary.main", flexShrink: 0 }}
+                        />
                       )}
-                    </div>
-                    {chamadaNaoIniciada && (
-                      <Button onClick={iniciarChamada} disabled={bloqueado}>
-                        <Play size={16} aria-hidden="true" />
-                        Iniciar
-                      </Button>
-                    )}
-                  </div>
-                )}
-                {filtro !== "todos" && (
-                  <div className="flex justify-end px-4 py-2 text-xs">
-                    <button
-                      type="button"
-                      className="text-primary pressionavel font-medium hover:underline"
-                      onClick={() => setFiltro("todos")}
-                    >
-                      Ver todos
-                    </button>
-                  </div>
-                )}
-
-                {carregando ? (
-                  <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
-                    <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-                    Carregando chamada...
-                  </div>
-                ) : ativosDaTurma.length === 0 ? (
-                  <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-                    <p className="font-medium">Nenhum aluno ativo nesta turma</p>
-                    <p className="text-muted-foreground text-sm">
-                      {podeAdministrar
-                        ? "Cadastre alunos na área de Gestão."
-                        : "Peça ao administrador para cadastrar os alunos desta turma."}
-                    </p>
-                  </div>
-                ) : visiveis.length === 0 ? (
-                  <div className="flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-                    <p className="font-medium">
-                      {filtro === "faltas"
-                        ? "Nenhuma falta nesta chamada."
-                        : "Nenhum aluno neste filtro."}
-                    </p>
-                    <button
-                      type="button"
-                      className="text-primary pressionavel text-sm font-medium hover:underline"
-                      onClick={() => setFiltro("todos")}
-                    >
-                      Mostrar todos
-                    </button>
-                  </div>
-                ) : (
-                  <ul ref={listaAlunosRef} aria-label="Alunos da chamada" className="divide-y">
-                    {visiveis.map((aluno) => {
-                      const nomeExibido = nomeNaChamada(
-                        aluno.nome,
-                        mostrarOrigem,
-                        aluno.turmaOriginalId !== turmaId,
-                      );
-                      const desistente = desistentesDaTurma.has(aluno.id);
-                      const faltando = !desistente && ausencias.has(aluno.id);
-                      const marcadas = ausencias.get(aluno.id)?.size ?? 0;
-                      const parcial = faltando && totalAulasDoDia > 0 && marcadas < totalAulasDoDia;
-                      const codigo = justificativas.get(aluno.id) ?? "";
-                      const mostrarJustificativa = faltando && !chamadaBloqueada;
-                      const justificativaSalva = faltando && chamadaBloqueada && Boolean(codigo);
-                      const mostrarAulas =
-                        faltando &&
-                        configuracoes.frequenciaPorAula &&
-                        aulasAbertas === aluno.id &&
-                        aulasDoDia.length > 1;
-                      const acumulado = acumuladoDe(aluno.id);
-                      const temAcumulado = Boolean(
-                        acumulado && (acumulado.faltas > 0 || acumulado.faltasJustificadas > 0),
-                      );
-                      const alertasBeneficios = alertasDoAluno(aluno.id);
-                      const esmaecida = desistente || (bloqueado && !chamadaBloqueada);
-                      return (
-                        <li
-                          key={aluno.id}
-                          className="bg-card last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)]"
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography component="h2" variant="subtitle2" sx={{ fontWeight: 600 }}>
+                          {salvando ? "Salvando..." : tituloSituacao}
+                        </Typography>
+                        {(chamadaNaoIniciada || sujo) && (
+                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                            {chamadaNaoIniciada
+                              ? "Confira os alunos e salve."
+                              : "Salve para confirmar."}
+                          </Typography>
+                        )}
+                      </Box>
+                      {chamadaNaoIniciada && (
+                        <Botao
+                          tamanho="pequeno"
+                          disabled={bloqueado}
+                          onClick={iniciarChamada}
+                          icone={<PlayArrowRoundedIcon fontSize="small" />}
                         >
-                          <div>
-                            <div className="flex items-stretch">
-                              <div
-                                className={`faixa-toque relative flex min-h-18 min-w-0 flex-1 items-center gap-3 px-4 py-3 transition-colors ${
-                                  bloqueado || desistente ? "" : "hover:bg-secondary/40"
-                                }`}
+                          Iniciar
+                        </Botao>
+                      )}
+                    </Box>
+                  )}
+
+                  {filtro !== "todos" && (
+                    <Box sx={{ display: "flex", justifyContent: "flex-end", px: 2, py: 0.5 }}>
+                      <Botao
+                        variante="texto"
+                        tamanho="pequeno"
+                        onClick={() => setFiltro("todos")}
+                        sx={{ px: 0 }}
+                      >
+                        Ver todos
+                      </Botao>
+                    </Box>
+                  )}
+
+                  {carregando ? (
+                    <Stack spacing={1} sx={{ minHeight: 160, p: 2 }}>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{
+                          alignItems: "center",
+                          justifyContent: "center",
+                          color: "text.secondary",
+                        }}
+                      >
+                        <Typography variant="body2">Carregando chamada...</Typography>
+                      </Stack>
+                      {[0, 1, 2].map((linha) => (
+                        <Skeleton key={linha} variant="rounded" height={64} />
+                      ))}
+                    </Stack>
+                  ) : ativosDaTurma.length === 0 ? (
+                    <EstadoVazio
+                      icone={<SchoolRoundedIcon />}
+                      titulo="Nenhum aluno ativo nesta turma"
+                      descricao={
+                        podeAdministrar
+                          ? "Cadastre alunos na área de Gestão."
+                          : "Peça ao administrador para cadastrar os alunos desta turma."
+                      }
+                    />
+                  ) : visiveis.length === 0 ? (
+                    <EstadoVazio
+                      icone={<AssignmentRoundedIcon />}
+                      titulo={
+                        filtro === "faltas"
+                          ? "Nenhuma falta nesta chamada."
+                          : "Nenhum aluno neste filtro."
+                      }
+                      descricao="O filtro atual não tem alunos para mostrar."
+                      acao={
+                        <Botao variante="texto" onClick={() => setFiltro("todos")}>
+                          Mostrar todos
+                        </Botao>
+                      }
+                    />
+                  ) : (
+                    <List
+                      ref={listaAlunosRef}
+                      aria-label="Alunos da chamada"
+                      disablePadding
+                      sx={{ py: 0 }}
+                    >
+                      {visiveis.map((aluno) => {
+                        const nomeExibido = nomeNaChamada(
+                          aluno.nome,
+                          mostrarOrigem,
+                          aluno.turmaOriginalId !== turmaId,
+                        );
+                        const desistente = desistentesDaTurma.has(aluno.id);
+                        const faltando = !desistente && ausencias.has(aluno.id);
+                        const marcadas = ausencias.get(aluno.id)?.size ?? 0;
+                        const parcial =
+                          faltando && totalAulasDoDia > 0 && marcadas < totalAulasDoDia;
+                        const codigo = justificativas.get(aluno.id) ?? "";
+                        const mostrarJustificativa = faltando && !chamadaBloqueada;
+                        const justificativaSalva = faltando && chamadaBloqueada && Boolean(codigo);
+                        const mostrarAulas =
+                          faltando &&
+                          configuracoes.frequenciaPorAula &&
+                          aulasAbertas === aluno.id &&
+                          aulasDoDia.length > 1;
+                        const acumulado = acumuladoDe(aluno.id);
+                        const temAcumulado = Boolean(
+                          acumulado && (acumulado.faltas > 0 || acumulado.faltasJustificadas > 0),
+                        );
+                        const alertasBeneficios = alertasDoAluno(aluno.id);
+                        const esmaecida = desistente || (bloqueado && !chamadaBloqueada);
+                        const estado = estadoMarca(aluno.id);
+                        return (
+                          <ListItem
+                            key={aluno.id}
+                            disablePadding
+                            divider
+                            sx={{ display: "block", backgroundColor: "background.paper" }}
+                          >
+                            <Box
+                              sx={{
+                                display: "flex",
+                                alignItems: "stretch",
+                              }}
+                            >
+                              <Box
+                                data-faixa-toque
+                                data-aluno={aluno.id}
+                                sx={{
+                                  display: "flex",
+                                  minHeight: 72,
+                                  minWidth: 0,
+                                  flex: 1,
+                                  alignItems: "center",
+                                  gap: 1.5,
+                                  px: 2,
+                                  py: 1.5,
+                                  position: "relative",
+                                  ...(bloqueado || desistente
+                                    ? {}
+                                    : { "&:hover": { backgroundColor: "action.hover" } }),
+                                }}
                               >
-                                <span className="min-w-0 flex-1">
-                                  <span
-                                    className={`flex min-w-0 items-center gap-2 ${esmaecida ? "opacity-60" : ""}`}
+                                <Box sx={{ minWidth: 0, flex: 1 }}>
+                                  <Box
+                                    sx={{
+                                      display: "flex",
+                                      minWidth: 0,
+                                      alignItems: "center",
+                                      gap: 1,
+                                      opacity: esmaecida ? 0.6 : 1,
+                                    }}
                                   >
-                                    <button
+                                    <ButtonBase
                                       type="button"
                                       data-marcar-falta
                                       aria-pressed={faltando}
@@ -1520,49 +1798,99 @@ export default function VistaFrequencia({
                                           : ""
                                       }`}
                                       onClick={() => alternarFalta(aluno.id)}
-                                      // Sem escala ao pressionar: scale faria do botão o bloco de
-                                      // contenção do ::after, e o toque na marca P cairia fora dele.
-                                      className="focus-visible:after:ring-ring/50 flex min-w-0 items-center gap-2 text-left outline-none after:absolute after:inset-0 focus-visible:after:ring-[3px] focus-visible:after:ring-inset"
+                                      sx={(tema) => ({
+                                        position: "static",
+                                        display: "flex",
+                                        minWidth: 0,
+                                        alignItems: "center",
+                                        gap: 1,
+                                        borderRadius: 1,
+                                        color: "text.primary",
+                                        textAlign: "left",
+                                        "&::after": {
+                                          content: '""',
+                                          position: "absolute",
+                                          inset: 0,
+                                        },
+                                        "&.Mui-focusVisible::after": {
+                                          outline: `3px solid ${tema.vars.palette.primary.main}`,
+                                          outlineOffset: -3,
+                                        },
+                                        "&.Mui-disabled": {
+                                          color: "text.primary",
+                                          cursor: "not-allowed",
+                                        },
+                                      })}
                                     >
-                                      <span
-                                        className={`min-w-0 truncate ${faltando ? "font-semibold" : "font-medium"}`}
+                                      <Typography
+                                        component="span"
+                                        variant="body2"
+                                        noWrap
+                                        sx={{ minWidth: 0, fontWeight: faltando ? 600 : 500 }}
                                       >
                                         {nomeExibido}
-                                      </span>
+                                      </Typography>
                                       {desistente && (
-                                        <span className="bg-secondary text-secondary-foreground shrink-0 rounded px-1.5 py-0.5 text-[11px] font-semibold">
-                                          DESISTENTE
-                                        </span>
+                                        <Selo component="span" rotulo="DESISTENTE" tom="neutro" />
                                       )}
-                                    </button>
-                                  </span>
+                                    </ButtonBase>
+                                  </Box>
                                   {justificativaSalva && (
-                                    <span className="text-justificada-texto mt-1 block text-xs font-medium">
+                                    <Typography
+                                      variant="caption"
+                                      sx={{
+                                        mt: 0.5,
+                                        display: "block",
+                                        color: "justificada.texto",
+                                        fontWeight: 500,
+                                      }}
+                                    >
                                       {rotuloJustificativa(codigo, catalogoJustificativas)}
-                                    </span>
+                                    </Typography>
                                   )}
                                   {parcial ||
                                   (temAcumulado && acumulado) ||
                                   alertasBeneficios.length > 0 ? (
-                                    <span className="mt-0.5 flex flex-wrap items-center gap-1">
+                                    <Stack
+                                      direction="row"
+                                      spacing={0.75}
+                                      useFlexGap
+                                      sx={{
+                                        mt: 0.5,
+                                        flexWrap: "wrap",
+                                        alignItems: "center",
+                                      }}
+                                    >
                                       {parcial ? (
-                                        <span
-                                          className={`text-falta-texto block truncate text-xs ${esmaecida ? "opacity-60" : ""}`}
+                                        <Typography
+                                          variant="caption"
+                                          sx={{
+                                            color: "falta.texto",
+                                            opacity: esmaecida ? 0.6 : 1,
+                                          }}
                                         >
                                           saiu em parte das aulas
-                                        </span>
+                                        </Typography>
                                       ) : temAcumulado && acumulado ? (
-                                        <span
-                                          className={`flex flex-wrap items-center gap-1 ${esmaecida ? "opacity-60" : ""}`}
+                                        <Stack
+                                          direction="row"
+                                          spacing={0.5}
+                                          sx={{
+                                            alignItems: "center",
+                                            opacity: esmaecida ? 0.6 : 1,
+                                          }}
                                         >
-                                          <span className="text-muted-foreground text-xs">
+                                          <Typography
+                                            variant="caption"
+                                            sx={{ color: "text.secondary" }}
+                                          >
                                             No mês
-                                          </span>
+                                          </Typography>
                                           <CirculosAcumulado
                                             faltas={acumulado.faltas}
                                             justificadas={acumulado.faltasJustificadas}
                                           />
-                                        </span>
+                                        </Stack>
                                       ) : null}
                                       {alertasBeneficios.length > 0 && (
                                         <AvisoBeneficioFrequencia
@@ -1570,34 +1898,54 @@ export default function VistaFrequencia({
                                           alertas={alertasBeneficios}
                                         />
                                       )}
-                                    </span>
+                                    </Stack>
                                   ) : null}
-                                </span>
-                                <motion.span
-                                  key={desistente ? "D" : faltando ? codigo || "F" : "P"}
-                                  initial={semMovimento ? false : MARCAS.escondido}
-                                  animate={MARCAS.visivel}
-                                  transition={
-                                    semMovimento
-                                      ? { duration: 0 }
-                                      : { type: "spring", stiffness: 500, damping: 28 }
-                                  }
-                                  aria-hidden="true"
-                                  data-estado={
-                                    desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"
-                                  }
-                                  data-nao-iniciada={chamadaNaoIniciada && !desistente && !faltando}
-                                  className={`${estilos.marca} ${esmaecida ? "opacity-60" : ""}`}
+                                </Box>
+                                <Grow
+                                  key={estado}
+                                  in
+                                  appear={!semMovimento}
+                                  timeout={semMovimento ? 0 : 160}
                                 >
-                                  {!desistente && faltando && codigo && <FileText size={16} />}
-                                  {desistente ? "D" : faltando ? (codigo ? "FJ" : "F") : "P"}
-                                </motion.span>
-                              </div>
+                                  <Box
+                                    component="span"
+                                    aria-hidden="true"
+                                    data-estado={estado}
+                                    data-nao-iniciada={
+                                      chamadaNaoIniciada && !desistente && !faltando
+                                    }
+                                    sx={(tema) => ({
+                                      ...estilosMarca(
+                                        tema,
+                                        estado,
+                                        chamadaNaoIniciada && !desistente && !faltando,
+                                      ),
+                                      opacity: esmaecida ? 0.6 : 1,
+                                    })}
+                                  >
+                                    {estado === "FJ" && (
+                                      <DescriptionRoundedIcon
+                                        fontSize="small"
+                                        sx={{ color: "inherit" }}
+                                      />
+                                    )}
+                                    {estado === "D"
+                                      ? "D"
+                                      : estado === "FJ"
+                                        ? "FJ"
+                                        : estado === "F"
+                                          ? "F"
+                                          : "P"}
+                                  </Box>
+                                </Grow>
+                              </Box>
                               {faltando &&
                                 configuracoes.frequenciaPorAula &&
                                 aulasDoDia.length > 1 && (
-                                  <button
+                                  <Botao
                                     type="button"
+                                    variante="contorno"
+                                    tamanho="pequeno"
                                     aria-expanded={aulasAbertas === aluno.id}
                                     aria-label={`Aulas em que ${nomeExibido} faltou`}
                                     disabled={bloqueado}
@@ -1606,190 +1954,307 @@ export default function VistaFrequencia({
                                         atual === aluno.id ? null : aluno.id,
                                       )
                                     }
-                                    className={`${estilos.acao} pressionavel my-3 mr-2 h-11 shrink-0 px-3 text-xs font-medium`}
+                                    sx={{ alignSelf: "center", mr: 2, my: 1, flexShrink: 0 }}
                                   >
                                     Aulas
-                                  </button>
+                                  </Botao>
                                 )}
-                            </div>
-                          </div>
-                          {(mostrarJustificativa || mostrarAulas) && (
-                            <div className="border-t px-4 py-2.5">
-                              {mostrarJustificativa && (
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <Selecionar
-                                    id={`justificativa-${aluno.id}`}
-                                    value={codigo}
-                                    onValueChange={(valor) => definirJustificativa(aluno.id, valor)}
-                                    disabled={bloqueado}
-                                    ariaLabel={`Justificativa da falta de ${nomeExibido}`}
-                                    opcoes={opcoesJustificativa}
-                                    className="h-11 max-w-64 rounded-2xl"
-                                  />
-                                  {codigo === JUSTIFICATIVA_OUTROS && (
-                                    <Input
-                                      value={observacoes.get(aluno.id) ?? ""}
-                                      maxLength={200}
-                                      disabled={bloqueado}
-                                      onChange={(evento) =>
-                                        definirObservacao(aluno.id, evento.target.value)
-                                      }
-                                      placeholder="Observação"
-                                      aria-label={`Observação da falta de ${nomeExibido}`}
-                                      className="h-11 max-w-64 rounded-2xl"
-                                    />
-                                  )}
-                                </div>
-                              )}
-                              {mostrarAulas && (
-                                <div className="mt-2.5">
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {aulasDoDia.map((aula) => {
-                                      const marcada =
-                                        ausencias.get(aluno.id)?.has(aula.id) ?? false;
-                                      return (
-                                        <button
-                                          key={aula.id}
-                                          type="button"
-                                          aria-pressed={marcada}
+                            </Box>
+                            {(mostrarJustificativa || mostrarAulas) && (
+                              <Box sx={{ borderTop: 1, borderColor: "divider", px: 2, py: 1.5 }}>
+                                {mostrarJustificativa && (
+                                  <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    useFlexGap
+                                    sx={{ flexWrap: "wrap", alignItems: "center" }}
+                                  >
+                                    <Box sx={{ width: { xs: "100%", sm: 256 } }}>
+                                      <Selecionar
+                                        id={`justificativa-${aluno.id}`}
+                                        valor={codigo}
+                                        onValor={(valor) => definirJustificativa(aluno.id, valor)}
+                                        disabled={bloqueado}
+                                        ariaLabel={`Justificativa da falta de ${nomeExibido}`}
+                                        opcoes={opcoesJustificativa}
+                                      />
+                                    </Box>
+                                    {codigo === JUSTIFICATIVA_OUTROS && (
+                                      <Box sx={{ width: { xs: "100%", sm: 256 } }}>
+                                        <CampoTexto
+                                          id={`observacao-${aluno.id}`}
+                                          valor={observacoes.get(aluno.id) ?? ""}
+                                          onValor={(texto) => definirObservacao(aluno.id, texto)}
+                                          maxLength={200}
                                           disabled={bloqueado}
-                                          onClick={() => alternarAula(aluno.id, aula.id)}
-                                          className={`numerais-tabulares pressionavel h-11 rounded-2xl px-3 text-xs font-medium transition-colors disabled:bg-[var(--superficie-desabilitada)] disabled:text-[var(--texto-desabilitado)] ${
-                                            marcada
-                                              ? "bg-falta-fraca text-falta-texto"
-                                              : "bg-secondary text-secondary-foreground"
-                                          }`}
-                                        >
-                                          {aula.ordem}ª {aula.inicio}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs">
-                                    <button
-                                      type="button"
-                                      disabled={bloqueado}
-                                      className="text-primary pressionavel font-medium hover:underline disabled:text-[var(--texto-desabilitado)]"
-                                      onClick={() =>
-                                        definirAulas(
-                                          aluno.id,
-                                          aulasDoDia.map((aula) => aula.id),
-                                        )
-                                      }
+                                          placeholder="Observação"
+                                          ariaLabel={`Observação da falta de ${nomeExibido}`}
+                                          tamanho="pequeno"
+                                        />
+                                      </Box>
+                                    )}
+                                  </Stack>
+                                )}
+                                {mostrarAulas && (
+                                  <Box sx={{ mt: 1.5 }}>
+                                    <Stack
+                                      direction="row"
+                                      spacing={0.75}
+                                      useFlexGap
+                                      sx={{ flexWrap: "wrap" }}
                                     >
-                                      Todas
-                                    </button>
-                                    <button
-                                      type="button"
-                                      disabled={bloqueado}
-                                      className="text-primary pressionavel font-medium hover:underline disabled:text-[var(--texto-desabilitado)]"
-                                      onClick={() => definirAulas(aluno.id, [])}
+                                      {aulasDoDia.map((aula) => {
+                                        const marcada =
+                                          ausencias.get(aluno.id)?.has(aula.id) ?? false;
+                                        return (
+                                          <ButtonBase
+                                            key={aula.id}
+                                            type="button"
+                                            aria-pressed={marcada}
+                                            disabled={bloqueado}
+                                            onClick={() => alternarAula(aluno.id, aula.id)}
+                                            sx={(tema) => ({
+                                              minHeight: 48,
+                                              borderRadius: 2,
+                                              px: 1.5,
+                                              fontVariantNumeric: "tabular-nums",
+                                              fontSize: "0.75rem",
+                                              fontWeight: 500,
+                                              border: `1px solid ${
+                                                marcada
+                                                  ? tema.vars.palette.falta.main
+                                                  : "transparent"
+                                              }`,
+                                              backgroundColor: marcada
+                                                ? tema.vars.palette.falta.fraco
+                                                : tema.vars.palette.action.hover,
+                                              color: marcada
+                                                ? tema.vars.palette.falta.texto
+                                                : tema.vars.palette.text.primary,
+                                              "&.Mui-disabled": {
+                                                backgroundColor:
+                                                  tema.vars.palette.action.disabledBackground,
+                                                color: tema.vars.palette.text.disabled,
+                                              },
+                                            })}
+                                          >
+                                            {aula.ordem}ª {aula.inicio}
+                                          </ButtonBase>
+                                        );
+                                      })}
+                                    </Stack>
+                                    <Stack
+                                      direction="row"
+                                      spacing={1.5}
+                                      sx={{ mt: 1, alignItems: "center", flexWrap: "wrap" }}
                                     >
-                                      Nenhuma
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      </div>
+                                      <Botao
+                                        variante="texto"
+                                        tamanho="pequeno"
+                                        disabled={bloqueado}
+                                        onClick={() =>
+                                          definirAulas(
+                                            aluno.id,
+                                            aulasDoDia.map((aula) => aula.id),
+                                          )
+                                        }
+                                        sx={{ px: 0 }}
+                                      >
+                                        Todas
+                                      </Botao>
+                                      <Botao
+                                        variante="texto"
+                                        tamanho="pequeno"
+                                        disabled={bloqueado}
+                                        onClick={() => definirAulas(aluno.id, [])}
+                                        sx={{ px: 0 }}
+                                      >
+                                        Nenhuma
+                                      </Botao>
+                                    </Stack>
+                                  </Box>
+                                )}
+                              </Box>
+                            )}
+                          </ListItem>
+                        );
+                      })}
+                    </List>
+                  )}
+                </Paper>
+              </>
+            )}
+          </Stack>
+        </Box>
 
-      <AlertDialog open={confirmarSalvamento} onOpenChange={setConfirmarSalvamento}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {correcao ? "Salvar correção da chamada?" : "Salvar chamada?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
+        {!nav.resumo && (
+          <BarraSalvamento rotulo="Barra de salvamento">
+            <Typography
+              component="p"
+              aria-live="polite"
+              variant="body2"
+              title={feriado?.nome}
+              sx={{
+                minWidth: 0,
+                flex: 1,
+                px: 1,
+                color: "text.secondary",
+                fontWeight: 500,
+                overflowWrap: "anywhere",
+              }}
+            >
+              {feriado ? "Feriado" : tituloEstado}
+            </Typography>
+            {sujo && (
+              <BotaoIcone
+                rotulo="Descartar"
+                title="Descartar alterações"
+                variante="texto"
+                icone={<RestartAltRoundedIcon fontSize="small" />}
+                disabled={salvando}
+                onClick={() => setDescartarAberto(true)}
+                sx={{ flexShrink: 0 }}
+              />
+            )}
+            <Botao
+              variante={chamadaNaoIniciada ? "secundario" : "primario"}
+              onClick={() => setConfirmarSalvamento(true)}
+              disabled={!podeSalvar}
+              carregando={salvando}
+              icone={
+                atualizadoEm && !sujo ? (
+                  <CloudDoneRoundedIcon fontSize="small" />
+                ) : (
+                  <SaveRoundedIcon fontSize="small" />
+                )
+              }
+              sx={{ flexShrink: 0, minHeight: 48 }}
+            >
+              {salvando ? "Salvando..." : "Salvar"}
+            </Botao>
+          </BarraSalvamento>
+        )}
+      </Box>
+
+      <DialogoConfirmacao
+        aberto={confirmarSalvamento}
+        titulo={correcao ? "Salvar correção da chamada?" : "Salvar chamada?"}
+        descricao={
+          <Stack spacing={1.5}>
+            <Typography variant="body2">
               {correcao
                 ? `A versão salva de ${turma?.rotulo ?? "turma"} em ${rotuloDia} será substituída pelas marcações atuais e a chamada voltará a ficar bloqueada.`
                 : `Confira as marcações de ${turma?.rotulo ?? "turma"} em ${rotuloDia}. A chamada será bloqueada para edição depois do salvamento.`}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <dl className="bg-card grid grid-cols-3 divide-x rounded-[14px] border">
-            {[
-              ["Faltas", contagemFaltas, "text-falta-texto"],
-              ["Justificadas", contagemJustificadas, "text-justificada-texto"],
-              ["Presentes", contagemPresencas, "text-primary"],
-            ].map(([rotulo, valor, classe]) => (
-              <div key={rotulo} className="flex flex-col items-center gap-0.5 px-2 py-3">
-                <dt className="text-muted-foreground text-xs font-medium">{rotulo}</dt>
-                <dd className={`numerais-tabulares text-xl font-semibold ${classe}`}>{valor}</dd>
-              </div>
-            ))}
-          </dl>
-          {sabadoLiberado && (
-            <p className="text-muted-foreground text-xs">
-              Sábado letivo liberado para esta turma e data.
-            </p>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel>Continuar revisando</AlertDialogCancel>
-            <AlertDialogAction onClick={salvar} disabled={!podeSalvar || salvando}>
-              Salvar chamada
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog
-        open={desbloqueio !== null}
-        onOpenChange={(aberto) => {
-          if (!aberto) setDesbloqueio(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{tituloDesbloqueio}</AlertDialogTitle>
-            <AlertDialogDescription>{descricaoDesbloqueio}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmarDesbloqueio}>Desbloquear</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={confirmacaoHistoricaAberta} onOpenChange={setConfirmacaoHistoricaAberta}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirmar chamada histórica?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A composição desta turma em {rotuloDia} não pôde ser comprovada. Confirme o lançamento
-              e informe o motivo. A confirmação fica registrada na auditoria.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="motivo-historico">Motivo</Label>
-            <Input
-              id="motivo-historico"
-              value={motivoHistorico}
-              onChange={(evento) => setMotivoHistorico(evento.target.value)}
-              maxLength={200}
-              placeholder="Ex.: chamada do diário de papel"
-            />
-            {erroHistorico && (
-              <p role="alert" className="text-falta-texto text-sm">
-                {erroHistorico}
-              </p>
+            </Typography>
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 2,
+                backgroundColor: "background.paper",
+              }}
+            >
+              {(
+                [
+                  ["Faltas", contagemFaltas, "falta.texto"],
+                  ["Justificadas", contagemJustificadas, "justificada.texto"],
+                  ["Presentes", contagemPresencas, "primary.main"],
+                ] as const
+              ).map(([rotulo, valor, cor], indice) => (
+                <Box
+                  key={rotulo}
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    gap: 0.25,
+                    px: 1,
+                    py: 1.5,
+                    ...(indice > 0 ? { borderLeft: 1, borderColor: "divider" } : {}),
+                  }}
+                >
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 500 }}>
+                    {rotulo}
+                  </Typography>
+                  <Typography
+                    variant="h6"
+                    sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: cor }}
+                  >
+                    {valor}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            {sabadoLiberado && (
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Sábado letivo liberado para esta turma e data.
+              </Typography>
             )}
-          </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelarHistorico}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(evento) => {
+          </Stack>
+        }
+        onConfirmar={() => {
+          setConfirmarSalvamento(false);
+          void salvar();
+        }}
+        onCancelar={() => setConfirmarSalvamento(false)}
+        rotuloConfirmar="Salvar chamada"
+        rotuloCancelar="Continuar revisando"
+        operacaoEmAndamento={salvando}
+      />
+
+      <DialogoConfirmacao
+        aberto={descartarAberto}
+        titulo="Descartar alterações?"
+        descricao="As marcações não salvas serão descartadas e a última versão salva será recarregada."
+        onConfirmar={() => {
+          setDescartarAberto(false);
+          descartar();
+        }}
+        onCancelar={() => setDescartarAberto(false)}
+        rotuloConfirmar="Descartar"
+        rotuloCancelar="Continuar marcando"
+        destrutivo
+      />
+
+      <DialogoConfirmacao
+        aberto={desbloqueio !== null}
+        titulo={tituloDesbloqueio}
+        descricao={descricaoDesbloqueio}
+        onConfirmar={() => {
+          setDesbloqueio(null);
+          confirmarDesbloqueio();
+        }}
+        onCancelar={() => setDesbloqueio(null)}
+        rotuloConfirmar="Desbloquear"
+        rotuloCancelar="Cancelar"
+      />
+
+      <Dialogo
+        aberto={confirmacaoHistoricaAberta}
+        onFechar={() => {
+          setConfirmacaoHistoricaAberta(false);
+          cancelarHistorico();
+        }}
+        titulo="Confirmar chamada histórica?"
+        descricao={`A composição desta turma em ${rotuloDia} não pôde ser comprovada. Confirme o lançamento e informe o motivo. A confirmação fica registrada na auditoria.`}
+        acoes={
+          <>
+            <Botao
+              variante="texto"
+              onClick={() => {
+                setConfirmacaoHistoricaAberta(false);
+                cancelarHistorico();
+              }}
+            >
+              Cancelar
+            </Botao>
+            <Botao
+              variante="secundario"
+              onClick={() => {
                 const motivo = motivoHistorico.trim();
                 if (motivo.length < 3 || motivo.length > 200) {
-                  evento.preventDefault();
                   setErroHistorico(
                     motivo.length < 3
                       ? "Informe um motivo com pelo menos 3 caracteres."
@@ -1804,10 +2269,21 @@ export default function VistaFrequencia({
               }}
             >
               Confirmar e salvar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </section>
+            </Botao>
+          </>
+        }
+      >
+        <Campo id="motivo-historico" rotulo="Motivo" erro={erroHistorico || undefined}>
+          <CampoTexto
+            id="motivo-historico"
+            valor={motivoHistorico}
+            onValor={setMotivoHistorico}
+            maxLength={200}
+            placeholder="Ex.: chamada do diário de papel"
+            erro={erroHistorico || undefined}
+          />
+        </Campo>
+      </Dialogo>
+    </LayoutConteudo>
   );
 }
