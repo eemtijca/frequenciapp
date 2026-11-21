@@ -41,6 +41,9 @@ export interface AbasProps<T extends string> {
   ocultarTrilho?: boolean;
 }
 
+const RECUO_TRILHO = 4;
+const RAIO_ABA = 18;
+
 function estiloAba(tema: Theme, ativo: boolean) {
   return {
     display: "flex",
@@ -51,7 +54,7 @@ function estiloAba(tema: Theme, ativo: boolean) {
     flexDirection: { xs: "column", sm: "row" },
     gap: { xs: 0.25, sm: 0.75 },
     px: { xs: 0.5, sm: 1 },
-    borderRadius: 1.5,
+    borderRadius: `${RAIO_ABA}px`,
     color: ativo ? tema.vars.palette.text.primary : tema.vars.palette.text.secondary,
     backgroundColor: ativo ? alpha(brand[500], 0.14) : "transparent",
     fontSize: { xs: "0.6875rem", sm: "0.75rem" },
@@ -133,8 +136,9 @@ export function Abas<T extends string>({
           display: ocultarTrilho ? "none" : "grid",
           gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))`,
           gap: 0.5,
-          p: 0.5,
-          borderRadius: 2.5,
+          p: `${RECUO_TRILHO}px`,
+          // O raio externo acompanha a curva da aba a uma distância igual ao recuo.
+          borderRadius: `${RAIO_ABA + RECUO_TRILHO}px`,
           backgroundColor: tema.vars.palette.action.hover,
         })}
       >

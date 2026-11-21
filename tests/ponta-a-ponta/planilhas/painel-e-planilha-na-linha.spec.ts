@@ -168,18 +168,28 @@ test("Saídas e entradas: o botão da planilha fica na linha das abas", async ({
   const botao = page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" });
   const caixaAbas = await abas.boundingBox();
   const caixaBotao = await botao.boundingBox();
-  expect(caixaAbas).not.toBeNull();
-  expect(caixaBotao).not.toBeNull();
-  // Mesma linha: o centro do botão cai dentro da faixa vertical das abas.
-  const centro = (caixaBotao?.y ?? 0) + (caixaBotao?.height ?? 0) / 2;
-  expect(centro).toBeGreaterThan(caixaAbas?.y ?? 0);
-  expect(centro).toBeLessThan((caixaAbas?.y ?? 0) + (caixaAbas?.height ?? 0));
-  expect((caixaBotao?.x ?? 0) + (caixaBotao?.width ?? 0)).toBeLessThanOrEqual(360);
+  if (!caixaAbas || !caixaBotao) throw new Error("Abas ou botão da planilha indisponíveis.");
+  expect(caixaBotao.width).toBe(48);
+  expect(caixaBotao.height).toBe(48);
+  expect(caixaBotao.y + caixaBotao.height / 2).toBeCloseTo(caixaAbas.y + caixaAbas.height / 2, 0);
+  expect(caixaBotao.x + caixaBotao.width).toBeLessThanOrEqual(360);
+  await expect(botao).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
+  const raio = (elemento: Element) =>
+    Number.parseFloat(getComputedStyle(elemento).borderBottomLeftRadius);
+  const selecionada = abas.getByRole("tab", { name: "Saídas", selected: true, exact: true });
+  const caixaSelecionada = await selecionada.boundingBox();
+  if (!caixaSelecionada) throw new Error("Aba Saídas não selecionada.");
+  expect((await abas.evaluate(raio)) - (await selecionada.evaluate(raio))).toBeCloseTo(
+    caixaSelecionada.x - caixaAbas.x,
+    0,
+  );
 
   // Sem faixa de título vazia: a data vem logo abaixo da linha das abas.
   const data = page.locator("#dia-saidas");
   const caixaData = await data.boundingBox();
-  expect((caixaData?.y ?? 0) - ((caixaAbas?.y ?? 0) + (caixaAbas?.height ?? 0))).toBeLessThan(40);
+  if (!caixaData) throw new Error("Seletor de data indisponível.");
+  expect(caixaData.y - (caixaAbas.y + caixaAbas.height)).toBeLessThan(40);
 
   const estouro = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -188,5 +198,36 @@ test("Saídas e entradas: o botão da planilha fica na linha das abas", async ({
 
   // O mesmo botão único atende as duas abas: não há botão separado nas Entradas.
   await page.getByRole("tab", { name: "Entradas", exact: true }).click();
+  await expect(botao).toHaveCount(1);
   await expect(botao).toBeVisible();
+});
+
+test("Planilha disponível abre a mesma janela por teclado nas Entradas", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Só o estado da integração é simulado; o teste não confirma envio.
+  await page.route("**/api/planilha-saidas/estado", (rota) =>
+    rota.fulfill({
+      json: {
+        estado: {
+          ativa: true,
+          modo: "conservador",
+          modoCompletoAte: null,
+          configurada: true,
+          podeEnviar: true,
+        },
+      },
+    }),
+  );
+  await page.goto("/?visao=saidas&aba=entradas");
+  await aguardarHidratacao(page);
+  const botao = page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" });
+  await expect(botao).toBeEnabled();
+  await expect(botao).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await botao.focus();
+  await page.keyboard.press("Enter");
+  const janela = page.getByRole("dialog", { name: /^Enviar saídas e entradas/ });
+  await expect(janela).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(janela).toBeHidden();
+  await expect(botao).toBeFocused();
 });

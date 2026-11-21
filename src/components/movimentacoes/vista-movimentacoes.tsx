@@ -3,9 +3,9 @@
 // Área compartilhada de saídas e entradas, em abas, com registros independentes.
 // A aba ativa vai para a URL (?visao=saidas&aba=entradas) enquanto a área está aberta.
 import { useCallback, useEffect, useState, type ComponentProps } from "react";
-import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import TableChartOutlinedIcon from "@mui/icons-material/TableChartOutlined";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import VistaSaidas from "./vista-saidas";
@@ -17,6 +17,7 @@ import DialogoEnvioSaidas, {
   useEstadoPlanilhaSaidas,
 } from "@/components/movimentacoes/dialogo-envio-saidas";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 export type AbaMovimentacao = "saidas" | "entradas";
 
@@ -137,9 +138,27 @@ export default function VistaMovimentacoes({
               : "Planilha não conectada. Configure em Gestão."
           }
           onClick={() => setEnvioAberto(true)}
-          icone={<DescriptionRoundedIcon />}
-          sx={{ flexShrink: 0 }}
+          sx={(tema) => ({
+            flexShrink: 0,
+            mt: 0.5,
+            height: TOKENS_LAYOUT.alvoToque,
+            width: { xs: TOKENS_LAYOUT.alvoToque, sm: "auto" },
+            minWidth: TOKENS_LAYOUT.alvoToque,
+            px: { xs: 0, sm: 1.5 },
+            gap: 0.75,
+            "&&": {
+              bgcolor: "transparent",
+              borderColor: "bordaControle",
+              "&:hover": { bgcolor: "action.hover" },
+              "&:active": { bgcolor: "action.selected" },
+              "&.Mui-disabled": {
+                background: "transparent !important",
+                borderColor: `${tema.vars.palette.divider} !important`,
+              },
+            },
+          })}
         >
+          <TableChartOutlinedIcon sx={{ fontSize: 20 }} />
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
             Planilha
           </Box>
