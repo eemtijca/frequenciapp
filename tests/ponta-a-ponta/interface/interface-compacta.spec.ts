@@ -44,6 +44,7 @@ async function abrirChamadaDoDia(page: Page) {
 
 for (const [nome, largura, altura] of [
   ["desktop", 1440, 900],
+  ["logo antes das duas colunas", 1439, 900],
   ["desktop com gaveta", 905, 900],
   ["tablet", 768, 900],
   ["celular", 390, 844],
@@ -62,7 +63,8 @@ for (const [nome, largura, altura] of [
     await expect(salvar).toBeEnabled();
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await chamada.evaluate((elemento) => elemento.closest('section[role="group"]')?.scrollTo(0, 0));
-    const barra = page.locator('[aria-label="Barra de salvamento"]');
+    const barra = chamada.locator('footer[aria-label="Barra de salvamento"]');
+    await expect(barra).toHaveCount(1);
     await expect(barra).toBeVisible();
     const caixaInicial = await barra.boundingBox();
     const primeira = await linhas.first().boundingBox();
@@ -71,7 +73,22 @@ for (const [nome, largura, altura] of [
     expect(primeira.height).toBeGreaterThanOrEqual(48);
     expect(primeira.height).toBeLessThanOrEqual(64);
     expect(primeira.y).toBeLessThan(altura / 2);
-    expect(sexta.y + sexta.height).toBeLessThanOrEqual(caixaInicial.y);
+    if (largura >= 1440) {
+      const contexto = chamada.locator('[data-coluna="painel"]');
+      const painel = await contexto.boundingBox();
+      const situacao = await chamada
+        .getByRole("region", { name: "Situação da chamada" })
+        .boundingBox();
+      const alunos = await lista.boundingBox();
+      if (!painel || !situacao || !alunos) throw new Error("O contexto da Chamada não apareceu.");
+      expect(caixaInicial.x).toBeGreaterThan(alunos.x + alunos.width);
+      expect(Math.abs(caixaInicial.x - painel.x)).toBeLessThan(2);
+      expect(Math.abs(caixaInicial.width - painel.width)).toBeLessThan(2);
+      expect(caixaInicial.y).toBeGreaterThanOrEqual(situacao.y + situacao.height + 7);
+      expect(sexta.y + sexta.height).toBeLessThanOrEqual(altura);
+    } else {
+      expect(sexta.y + sexta.height).toBeLessThanOrEqual(caixaInicial.y);
+    }
     expect(caixaInicial.height).toBeLessThan(84);
     await expect(chamada.getByText("E2E Ano A", { exact: true })).toBeVisible();
     await expect(chamada.getByRole("button", { name: /^Data da chamada:/ })).toBeVisible();
@@ -94,14 +111,22 @@ for (const [nome, largura, altura] of [
       .poll(async () => {
         const linha = await ultima.boundingBox();
         const rodape = await barra.boundingBox();
-        return Boolean(linha && rodape && linha.y >= 0 && linha.y + linha.height <= rodape.y);
+        return Boolean(
+          linha &&
+          rodape &&
+          linha.y >= 0 &&
+          linha.y + linha.height <= altura &&
+          (largura >= 1440 ? !sobrepoe(linha, rodape) : linha.y + linha.height <= rodape.y),
+        );
       })
       .toBe(true);
     const rodape = await barra.boundingBox();
     const secao = await chamada.boundingBox();
     if (!rodape || !secao) throw new Error("A barra saiu da área da chamada.");
-    expect(Math.abs(rodape.x - secao.x)).toBeLessThan(2);
-    expect(Math.abs(rodape.width - secao.width)).toBeLessThan(2);
+    if (largura < 1440) {
+      expect(Math.abs(rodape.x - secao.x)).toBeLessThan(2);
+      expect(Math.abs(rodape.width - secao.width)).toBeLessThan(2);
+    }
     expect(rodape.x).toBeGreaterThanOrEqual(0);
     expect(rodape.x + rodape.width).toBeLessThanOrEqual(largura);
     expect(rodape.y + rodape.height).toBeLessThanOrEqual(altura);
@@ -205,7 +230,8 @@ for (const [largura, altura, tema, faltasFiltradas] of [
             alerta &&
             rodape &&
             linha.y >= (largura >= 905 ? 64 : 56) &&
-            linha.y + linha.height <= rodape.y &&
+            linha.y + linha.height <= altura &&
+            (largura >= 1440 ? !sobrepoe(linha, rodape) : linha.y + linha.height <= rodape.y) &&
             !sobrepoe(linha, alerta) &&
             !sobrepoe(rodape, alerta),
           );

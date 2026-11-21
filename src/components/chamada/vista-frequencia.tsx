@@ -210,8 +210,8 @@ function BarraSalvamento({ children, ref }: { children: ReactNode; ref: Ref<HTML
       elevation={0}
       square
       sx={(theme) => ({
-        position: "sticky",
-        bottom: 0,
+        position: { xs: "sticky", xl: "static" },
+        bottom: { xs: 0, xl: "auto" },
         zIndex: theme.zIndex.appBar,
         display: "flex",
         alignItems: "center",
@@ -302,6 +302,7 @@ export default function VistaFrequencia({
   const [motivoHistorico, setMotivoHistorico] = useState("");
   const [erroHistorico, setErroHistorico] = useState("");
   const semMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const painelLateral = useMediaQuery((tema: Theme) => tema.breakpoints.up("xl"));
 
   useEffect(() => {
     if (!ativo || nav.resumo || !temTurmas) return;
@@ -322,10 +323,12 @@ export default function VistaFrequencia({
       const limites = rolagem.getBoundingClientRect();
       const rodape = barra.getBoundingClientRect();
       const sobreposicao = aviso?.getBoundingClientRect();
-      // A altura da barra, não sua posição no fluxo, mantém a reserva estável ao rolar.
+      const caixaColuna = coluna.getBoundingClientRect();
+      // A barra só reduz a altura disponível na coluna que ela cruza.
+      const alturaSobreALista = cruzaNaHorizontal(caixaColuna, rodape) ? rodape.height : 0;
       const espaco =
-        sobreposicao?.height && cruzaNaHorizontal(coluna.getBoundingClientRect(), sobreposicao)
-          ? Math.max(0, limites.bottom - rodape.height - sobreposicao.top + folga)
+        sobreposicao?.height && cruzaNaHorizontal(caixaColuna, sobreposicao)
+          ? Math.max(0, limites.bottom - alturaSobreALista - sobreposicao.top + folga)
           : 0;
       grade.style.setProperty(reserva, `${espaco}px`);
 
@@ -333,6 +336,7 @@ export default function VistaFrequencia({
       if (
         !(foco instanceof HTMLElement) ||
         !grade.contains(foco) ||
+        barra.contains(foco) ||
         !foco.matches(":focus-visible")
       ) {
         return;
@@ -340,11 +344,13 @@ export default function VistaFrequencia({
       const controle = foco.matches("[data-marcar-falta]")
         ? (foco.closest("[data-faixa-toque]") ?? foco)
         : foco;
-      const topoBarra = barra.getBoundingClientRect().top;
-      const limiteInferior = (caixa: DOMRect) =>
-        sobreposicao?.height && cruzaNaHorizontal(caixa, sobreposicao)
-          ? Math.min(topoBarra, sobreposicao.top)
-          : topoBarra;
+      const caixaBarra = barra.getBoundingClientRect();
+      const limiteInferior = (caixa: DOMRect) => {
+        const topo = cruzaNaHorizontal(caixa, caixaBarra) ? caixaBarra.top : limites.bottom;
+        return sobreposicao?.height && cruzaNaHorizontal(caixa, sobreposicao)
+          ? Math.min(topo, sobreposicao.top)
+          : topo;
+      };
       const linha = foco.closest("li");
       const caixaLinha =
         linha && listaAlunosRef.current?.contains(linha) ? linha.getBoundingClientRect() : null;
@@ -390,7 +396,7 @@ export default function VistaFrequencia({
       cancelAnimationFrame(quadro);
       grade.style.removeProperty(reserva);
     };
-  }, [ativo, nav.resumo, temTurmas]);
+  }, [ativo, nav.resumo, temTurmas, painelLateral]);
 
   const atualizarTela = useCallback(() => {
     if (sujo) {
@@ -1151,6 +1157,58 @@ export default function VistaFrequencia({
     return justificativas.get(alunoId) ? "FJ" : "F";
   };
 
+  const barraSalvamento = nav.resumo ? null : (
+    <BarraSalvamento ref={barraSalvamentoRef}>
+      <Typography
+        component="p"
+        aria-live="polite"
+        variant="body2"
+        title={feriado?.nome}
+        sx={{
+          minWidth: 0,
+          flex: 1,
+          color: "text.secondary",
+          fontWeight: 500,
+          overflowWrap: "anywhere",
+        }}
+      >
+        {feriado ? "Feriado" : tituloEstado}
+      </Typography>
+      {sujo && (
+        <BotaoIcone
+          rotulo="Descartar"
+          title="Descartar alterações"
+          variante="texto"
+          icone={<RestartAltRoundedIcon fontSize="small" />}
+          disabled={salvando}
+          onClick={() => setDescartarAberto(true)}
+          sx={{
+            flexShrink: 0,
+            width: TOKENS_LAYOUT.alvoToque,
+            height: TOKENS_LAYOUT.alvoToque,
+          }}
+        />
+      )}
+      <Botao
+        variante="principal"
+        tamanho="pequeno"
+        onClick={() => setConfirmarSalvamento(true)}
+        disabled={!podeSalvar}
+        carregando={salvando}
+        icone={
+          atualizadoEm && !sujo ? (
+            <CloudDoneRoundedIcon fontSize="small" />
+          ) : (
+            <SaveRoundedIcon fontSize="small" />
+          )
+        }
+        sx={{ flexShrink: 0, minHeight: TOKENS_LAYOUT.alvoToque }}
+      >
+        {salvando ? "Salvando..." : "Salvar"}
+      </Botao>
+    </BarraSalvamento>
+  );
+
   return (
     <Box sx={{ p: nav.resumo ? ESPACAMENTO_LATERAL_CONTEUDO : 0 }}>
       <Box
@@ -1478,6 +1536,7 @@ export default function VistaFrequencia({
                 ) : null}
               </>
             )}
+            {painelLateral && barraSalvamento}
           </Grid>
 
           <Grid
@@ -2213,57 +2272,7 @@ export default function VistaFrequencia({
           </Grid>
         </Grid>
 
-        {!nav.resumo && (
-          <BarraSalvamento ref={barraSalvamentoRef}>
-            <Typography
-              component="p"
-              aria-live="polite"
-              variant="body2"
-              title={feriado?.nome}
-              sx={{
-                minWidth: 0,
-                flex: 1,
-                color: "text.secondary",
-                fontWeight: 500,
-                overflowWrap: "anywhere",
-              }}
-            >
-              {feriado ? "Feriado" : tituloEstado}
-            </Typography>
-            {sujo && (
-              <BotaoIcone
-                rotulo="Descartar"
-                title="Descartar alterações"
-                variante="texto"
-                icone={<RestartAltRoundedIcon fontSize="small" />}
-                disabled={salvando}
-                onClick={() => setDescartarAberto(true)}
-                sx={{
-                  flexShrink: 0,
-                  width: TOKENS_LAYOUT.alvoToque,
-                  height: TOKENS_LAYOUT.alvoToque,
-                }}
-              />
-            )}
-            <Botao
-              variante="principal"
-              tamanho="pequeno"
-              onClick={() => setConfirmarSalvamento(true)}
-              disabled={!podeSalvar}
-              carregando={salvando}
-              icone={
-                atualizadoEm && !sujo ? (
-                  <CloudDoneRoundedIcon fontSize="small" />
-                ) : (
-                  <SaveRoundedIcon fontSize="small" />
-                )
-              }
-              sx={{ flexShrink: 0, minHeight: TOKENS_LAYOUT.alvoToque }}
-            >
-              {salvando ? "Salvando..." : "Salvar"}
-            </Botao>
-          </BarraSalvamento>
-        )}
+        {!painelLateral && barraSalvamento}
       </Box>
 
       <DialogoConfirmacao
