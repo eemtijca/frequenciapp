@@ -478,7 +478,12 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             </Botao>
           </Stack>
         ) : (
-          <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            useFlexGap
+            sx={{ flexWrap: "wrap", justifyContent: { xs: "flex-start", sm: "flex-end" } }}
+          >
             <Botao
               variante="contorno"
               icone={<FileUploadRoundedIcon />}
