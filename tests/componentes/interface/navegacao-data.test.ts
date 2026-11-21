@@ -70,6 +70,8 @@ async function aguardarTema(page: Page, tema: "light" | "dark") {
     const r = contexto.getImageData(0, 0, 1, 1).data[0] ?? 0;
     return valor === "dark" ? r < 80 : r > 180;
   }, tema);
+  // A troca de tema anima cor e fundo dos controles por 100 ms.
+  await page.waitForTimeout(150);
 }
 
 interface MedidaControle {
