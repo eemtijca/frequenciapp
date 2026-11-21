@@ -1566,7 +1566,13 @@ function ConteudoConfiguracoes({
           aria-labelledby="categoria-config-escola"
           hidden={categoria !== "escola"}
           inert={categoria !== "escola"}
-          sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            minWidth: 0,
+            "&[hidden]": { display: "none" },
+          }}
         >
           <Abas<AcaoEscola>
             itens={itensEscola}
@@ -1583,7 +1589,13 @@ function ConteudoConfiguracoes({
           aria-labelledby="categoria-config-horarios"
           hidden={categoria !== "horarios"}
           inert={categoria !== "horarios"}
-          sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            minWidth: 0,
+            "&[hidden]": { display: "none" },
+          }}
         >
           {horariosAbertos ? (
             <Abas<AcaoHorarios>
@@ -1602,7 +1614,13 @@ function ConteudoConfiguracoes({
           aria-labelledby="categoria-config-planilhas"
           hidden={categoria !== "planilhas"}
           inert={categoria !== "planilhas"}
-          sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            minWidth: 0,
+            "&[hidden]": { display: "none" },
+          }}
         >
           <IntegracaoPlanilha
             turmas={turmas}
@@ -1625,7 +1643,13 @@ function ConteudoConfiguracoes({
           aria-labelledby="categoria-config-acesso"
           hidden={categoria !== "acesso"}
           inert={categoria !== "acesso"}
-          sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            minWidth: 0,
+            "&[hidden]": { display: "none" },
+          }}
         >
           <Abas<AcaoAcesso>
             itens={itensAcesso}
@@ -1642,7 +1666,13 @@ function ConteudoConfiguracoes({
           aria-labelledby="categoria-config-dados"
           hidden={categoria !== "dados"}
           inert={categoria !== "dados"}
-          sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            minWidth: 0,
+            "&[hidden]": { display: "none" },
+          }}
         >
           {dados}
         </Box>

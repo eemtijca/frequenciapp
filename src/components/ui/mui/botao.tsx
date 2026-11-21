@@ -109,41 +109,47 @@ function estilosIcone(theme: Theme, variante: VarianteBotao) {
   switch (variante) {
     case "primario":
       return {
-        color: palette.grey[50],
-        backgroundColor: palette.grey[900],
-        borderColor: palette.grey[700],
-        "&:hover": {
-          backgroundColor: palette.grey[800],
-          borderColor: palette.grey[600],
-        },
-        ...theme.applyStyles("dark", {
-          color: palette.grey[900],
-          backgroundColor: palette.grey[50],
-          borderColor: palette.grey[100],
+        "&.MuiIconButton-root": {
+          color: palette.grey[50],
+          backgroundColor: palette.grey[900],
+          borderColor: palette.grey[700],
           "&:hover": {
-            backgroundColor: palette.grey[200],
-            borderColor: palette.grey[300],
+            backgroundColor: palette.grey[800],
+            borderColor: palette.grey[600],
           },
-        }),
+          ...theme.applyStyles("dark", {
+            color: palette.grey[900],
+            backgroundColor: palette.grey[50],
+            borderColor: palette.grey[100],
+            "&:hover": {
+              backgroundColor: palette.grey[200],
+              borderColor: palette.grey[300],
+            },
+          }),
+        },
       };
     case "secundario":
       return {
-        color: palette.secondary.contrastText,
-        backgroundColor: palette.secondary.main,
-        borderColor: palette.secondary.main,
-        "&:hover": {
-          backgroundColor: palette.secondary.dark,
-          borderColor: palette.secondary.dark,
+        "&.MuiIconButton-root": {
+          color: palette.secondary.contrastText,
+          backgroundColor: palette.secondary.main,
+          borderColor: palette.secondary.main,
+          "&:hover": {
+            backgroundColor: palette.secondary.dark,
+            borderColor: palette.secondary.dark,
+          },
         },
       };
     case "destrutivo":
       return {
-        color: palette.error.contrastText,
-        backgroundColor: palette.error.main,
-        borderColor: palette.error.main,
-        "&:hover": {
-          backgroundColor: palette.error.dark,
-          borderColor: palette.error.dark,
+        "&.MuiIconButton-root": {
+          color: palette.error.contrastText,
+          backgroundColor: palette.error.main,
+          borderColor: palette.error.main,
+          "&:hover": {
+            backgroundColor: palette.error.dark,
+            borderColor: palette.error.dark,
+          },
         },
       };
     case "texto":
