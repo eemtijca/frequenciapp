@@ -114,7 +114,17 @@ export default function VistaMovimentacoes({
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Abas
+            rotuloAcessivel="Tipo de registro"
+            itens={itens}
+            ativo={aba}
+            onChange={aoTrocar}
+            variant="fullWidth"
+            dataPager="movimentacoes"
+          />
+        </Box>
         <Botao
           type="button"
           variante="contorno"
@@ -128,20 +138,13 @@ export default function VistaMovimentacoes({
           }
           onClick={() => setEnvioAberto(true)}
           icone={<DescriptionRoundedIcon />}
+          sx={{ flexShrink: 0 }}
         >
           <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
             Planilha
           </Box>
         </Botao>
       </Stack>
-      <Abas
-        rotuloAcessivel="Tipo de registro"
-        itens={itens}
-        ativo={aba}
-        onChange={aoTrocar}
-        variant="fullWidth"
-        dataPager="movimentacoes"
-      />
       <DialogoEnvioSaidas
         aberto={envioAberto}
         onAbrir={setEnvioAberto}
