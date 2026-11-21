@@ -42,10 +42,12 @@ import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { Cartao, CartaoCabecalho, CartaoConteudo, CartaoTitulo } from "@/components/ui/mui/cartao";
 import type { VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { GradeCartoes } from "@/components/layout/grade-cartoes";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
+import { categoriasDaSerie } from "@/components/painel/categorias-do-painel";
 import VistaPeriodo from "@/components/painel/vista-periodo";
 import FaixaGraficos from "@/components/painel/faixa-graficos";
 import { IndicadorCobertura } from "@/components/painel/indicador-cobertura";
@@ -329,7 +331,12 @@ export default function VistaPainel({
   const IconeNivel = nivel?.Icone;
   const taxa = percentual.format(resumo.infrequencia);
 
+  const categoriasDaEscola = series.map((serie) => serie.id);
+
   function graficoDoDia(serieSelecionada: Serie | null) {
+    const categorias = serieSelecionada
+      ? categoriasDaSerie(serieSelecionada.id, turmas, alunos)
+      : categoriasDaEscola;
     const distribuicaoDaSerie = serieSelecionada
       ? (distribuicao.find((item) => item.serieId === serieSelecionada.id) ?? null)
       : null;
@@ -372,6 +379,7 @@ export default function VistaPainel({
           <CartaoConteudo>
             <GraficoRosca
               titulo={titulo}
+              categorias={categorias}
               fatias={
                 feriado
                   ? []
@@ -405,6 +413,7 @@ export default function VistaPainel({
             <CartaoConteudo>
               <GraficoRosca
                 titulo={`Faltas do dia por turma original da ${serieSelecionada.nome}`}
+                categorias={categorias}
                 fatias={porOrigem.map((turma) => ({
                   categoriaId: turma.turmaId,
                   nome: turma.rotulo,
@@ -526,77 +535,74 @@ export default function VistaPainel({
               </Alerta>
             ) : null}
 
-            <Cartao
-              component="section"
-              aria-label="Indicadores do dia"
-              sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 8rem), 1fr))",
-                gap: { xs: 2, sm: 3 },
-                alignItems: "start",
-              }}
-            >
-              <Stack
-                role="group"
-                aria-label="Resumo do dia"
-                aria-busy={carregandoPainel}
-                spacing={1}
-              >
-                <CartaoTitulo>Infrequência</CartaoTitulo>
-                {feriado ? (
-                  <IndicadorFeriado nome={feriado.nome} />
-                ) : carregandoPainel ? (
-                  <Skeleton variant="rounded" width="100%" height={64} />
-                ) : (
-                  <>
-                    <Typography
-                      component="p"
-                      variant={nivel ? "h3" : "body2"}
-                      sx={{
-                        fontWeight: nivel ? 600 : 400,
-                        fontVariantNumeric: "tabular-nums",
-                        color: nivel ? "text.primary" : "text.secondary",
-                      }}
-                    >
-                      {nivel ? taxa : "Sem dados"}
-                    </Typography>
-                    <BarraProgresso
-                      valor={resumo.infrequencia * 100}
-                      tom={nivel?.tom ?? "neutro"}
-                      rotulo="Infrequência do dia"
-                      descricao={
-                        nivel
-                          ? `${taxa} de infrequência, ${nivel.rotulo.toLowerCase()}`
-                          : "Sem dados"
-                      }
-                      testId="infrequencia-preenchida"
-                    />
-                    {nivel && IconeNivel && (
-                      <Stack
-                        direction="row"
-                        spacing={0.75}
-                        sx={{ alignItems: "center", color: nivel.cor }}
+            <Cartao component="section" aria-label="Indicadores do dia">
+              <GradeCartoes dupla>
+                <Stack
+                  role="group"
+                  aria-label="Resumo do dia"
+                  aria-busy={carregandoPainel}
+                  spacing={1}
+                >
+                  <CartaoTitulo>Infrequência</CartaoTitulo>
+                  <Typography variant="caption" color="text.secondary">
+                    Toda a escola
+                  </Typography>
+                  {feriado ? (
+                    <IndicadorFeriado nome={feriado.nome} />
+                  ) : carregandoPainel ? (
+                    <Skeleton variant="rounded" width="100%" height={64} />
+                  ) : (
+                    <>
+                      <Typography
+                        component="p"
+                        variant={nivel ? "h3" : "body2"}
+                        sx={{
+                          fontWeight: nivel ? 600 : 400,
+                          fontVariantNumeric: "tabular-nums",
+                          color: nivel ? "text.primary" : "text.secondary",
+                        }}
                       >
-                        <IconeNivel aria-hidden="true" sx={{ fontSize: 16, flexShrink: 0 }} />
-                        <Typography variant="caption" color="inherit">
-                          {nivel.rotulo}
-                        </Typography>
-                      </Stack>
-                    )}
-                    {resumo.parciais > 0 && (
-                      <Typography variant="caption" color="text.secondary">
-                        {resumo.parciais}{" "}
-                        {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
+                        {nivel ? taxa : "Sem dados"}
                       </Typography>
-                    )}
-                  </>
-                )}
-              </Stack>
-              <IndicadorCobertura
-                turmas={coberturaTurmas}
-                feriado={feriado?.nome}
-                carregando={carregandoPainel}
-              />
+                      <BarraProgresso
+                        valor={resumo.infrequencia * 100}
+                        tom={nivel?.tom ?? "neutro"}
+                        rotulo="Infrequência do dia"
+                        descricao={
+                          nivel
+                            ? `${taxa} de infrequência, ${nivel.rotulo.toLowerCase()}`
+                            : "Sem dados"
+                        }
+                        testId="infrequencia-preenchida"
+                      />
+                      {nivel && IconeNivel && (
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          sx={{ alignItems: "center", color: nivel.cor }}
+                        >
+                          <IconeNivel aria-hidden="true" sx={{ fontSize: 16, flexShrink: 0 }} />
+                          <Typography variant="caption" color="inherit">
+                            {nivel.rotulo}
+                          </Typography>
+                        </Stack>
+                      )}
+                      {resumo.parciais > 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          {resumo.parciais}{" "}
+                          {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                </Stack>
+                <IndicadorCobertura
+                  turmas={coberturaTurmas}
+                  escopo={serieAtiva?.nome ?? "Toda a escola"}
+                  feriado={feriado?.nome}
+                  carregando={carregandoPainel}
+                />
+              </GradeCartoes>
             </Cartao>
 
             <FaixaGraficos
@@ -648,6 +654,7 @@ export default function VistaPainel({
                       <CartaoConteudo>
                         <GraficoRosca
                           titulo="Desistentes por série"
+                          categorias={categoriasDaEscola}
                           fatias={desistencias.series.map((serie) => ({
                             categoriaId: serie.serieId,
                             nome: serie.nome,

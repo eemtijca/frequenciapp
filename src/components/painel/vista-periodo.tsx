@@ -19,6 +19,7 @@ import { Cartao, CartaoCabecalho, CartaoConteudo, CartaoTitulo } from "@/compone
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
+import { categoriasDaSerie } from "@/components/painel/categorias-do-painel";
 
 interface Props {
   diaCorrente: string;
@@ -275,6 +276,11 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
                 serie
                   ? `Faltas do período por turma da ${serie.nome}`
                   : "Faltas do período por série"
+              }
+              categorias={
+                serie
+                  ? categoriasDaSerie(serie.serieId, turmas, alunos)
+                  : series.map((item) => item.id)
               }
               fatias={selecionados.map((item) => ({
                 categoriaId: "turmaId" in item ? item.turmaId : item.serieId,

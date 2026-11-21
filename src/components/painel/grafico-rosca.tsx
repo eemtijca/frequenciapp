@@ -4,7 +4,7 @@
 import { useId } from "react";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
-import Table from "@mui/material/Table";
+import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
@@ -23,7 +23,6 @@ export interface FatiaGrafico {
   nome: string;
   valor: number;
   detalhe?: string;
-  alunos?: number;
   unidadeSingular?: string;
   unidadePlural?: string;
 }
@@ -52,11 +51,12 @@ function variaveisCategorias(modo: "claro" | "escuro") {
   );
 }
 
-function corDaCategoria(id: string): string {
-  // FNV-1a: o mesmo identificador conserva a cor em qualquer ordem ou recorte.
-  let hash = 2166136261;
-  for (const caractere of id) hash = Math.imul(hash ^ (caractere.codePointAt(0) ?? 0), 16777619);
-  return `var(--rosca-categoria-${(hash >>> 0) % CORES_CATEGORIAS.length})`;
+function indicesDasCategorias(categorias: readonly string[], fatias: FatiaGrafico[]) {
+  const ids = new Set(categorias);
+  for (const { categoriaId } of fatias) {
+    if (categoriaId !== undefined) ids.add(categoriaId);
+  }
+  return new Map([...ids].sort().map((id, indice) => [id, indice]));
 }
 
 function LegendaCategorias({
@@ -65,20 +65,11 @@ function LegendaCategorias({
   total,
 }: {
   titulo: string;
-  fatias: (FatiaGrafico & { cor: string })[];
+  fatias: (FatiaGrafico & { cor: string; marcador?: string })[];
   total: number;
 }) {
   return (
-    <Table
-      aria-label={`Legenda de ${titulo}`}
-      size="small"
-      sx={{
-        tableLayout: "fixed",
-        "& .MuiTableCell-root": { px: 0.5, whiteSpace: "normal", overflowWrap: "anywhere" },
-        "& .MuiTableCell-head": { height: "auto", typography: "caption", fontWeight: 600 },
-        "& .MuiTableRow-root:last-child .MuiTableCell-body": { borderBottom: 0 },
-      }}
-    >
+    <TabelaPadrao caption={`Legenda de ${titulo}`} compacta>
       <TableHead>
         <TableRow>
           <TableCell>Categoria</TableCell>
@@ -102,6 +93,7 @@ function LegendaCategorias({
                   sx={{ width: 8, height: 8, borderRadius: "50%", flexShrink: 0 }}
                 />
                 <Box sx={{ minWidth: 0 }}>
+                  {fatia.marcador ? `${fatia.marcador} · ` : ""}
                   {fatia.nome}
                   {fatia.detalhe && (
                     <Typography component="div" variant="caption" color="text.secondary">
@@ -120,13 +112,15 @@ function LegendaCategorias({
           </TableRow>
         ))}
       </TableBody>
-    </Table>
+    </TabelaPadrao>
   );
 }
 
 interface Props {
   titulo: string;
   fatias: FatiaGrafico[];
+  /** Cadastro completo deste recorte, inclusive categorias sem faltas. */
+  categorias?: readonly string[];
   rotuloTotal?: string;
   unidadeSingular?: string;
   unidadePlural?: string;
@@ -137,6 +131,7 @@ interface Props {
 export default function GraficoRosca({
   titulo,
   fatias,
+  categorias = [],
   rotuloTotal = "faltas",
   unidadeSingular = "falta",
   unidadePlural = "faltas",
@@ -146,16 +141,25 @@ export default function GraficoRosca({
   const descricaoId = useId();
   const tema = useTheme();
   const cores = coresGrafico(tema);
-  const porCategoria = fatias.some((fatia) => fatia.categoriaId !== undefined);
+  const indices = indicesDasCategorias(categorias, fatias);
+  const porCategoria = indices.size > 0;
+  const usaMarcadores = indices.size > CORES_CATEGORIAS.length;
   const visiveis = fatias
     .filter((fatia) => fatia.valor > 0)
-    .map((fatia, indice) => ({
-      ...fatia,
-      cor:
-        fatia.categoriaId !== undefined
-          ? corDaCategoria(fatia.categoriaId)
-          : (cores[indice % cores.length] ?? tema.vars.palette.primary.main),
-    }));
+    .map((fatia, indice) => {
+      const indiceCategoria =
+        fatia.categoriaId === undefined ? undefined : indices.get(fatia.categoriaId);
+      return {
+        ...fatia,
+        cor:
+          indiceCategoria === undefined
+            ? (cores[indice % cores.length] ?? tema.vars.palette.primary.main)
+            : `var(--rosca-categoria-${indiceCategoria % CORES_CATEGORIAS.length})`,
+        marcador:
+          usaMarcadores && indiceCategoria !== undefined ? String(indiceCategoria + 1) : undefined,
+      };
+    });
+  const marcadores = new Map(visiveis.map((fatia) => [fatia.categoriaId, fatia.marcador]));
   const total = visiveis.reduce((soma, fatia) => soma + fatia.valor, 0);
   const rotuloFatia = (fatia: FatiaGrafico) =>
     `${fatia.valor} ${fatia.valor === 1 ? (fatia.unidadeSingular ?? unidadeSingular) : (fatia.unidadePlural ?? unidadePlural)}`;
@@ -225,6 +229,11 @@ export default function GraficoRosca({
               innerRadius: "62%",
               outerRadius: "96%",
               paddingAngle: 2,
+              ...(usaMarcadores && {
+                arcLabel: (fatia: { id?: string | number }) =>
+                  marcadores.get(String(fatia.id)) ?? "",
+                arcLabelMinAngle: 12,
+              }),
               valueFormatter: (_valor, contexto) => {
                 const fatia = visiveis[contexto.dataIndex];
                 return fatia ? rotuloFatia(fatia) : "";
@@ -234,6 +243,19 @@ export default function GraficoRosca({
           width={TAMANHO_GRAFICO}
           height={TAMANHO_GRAFICO}
           margin={{ top: 0, right: 0, bottom: 0, left: 0 }}
+          sx={
+            usaMarcadores
+              ? {
+                  "& .MuiPieArcLabel-root": {
+                    fill: "background.paper",
+                    stroke: "text.primary",
+                    strokeWidth: 2,
+                    paintOrder: "stroke",
+                    fontWeight: 700,
+                  },
+                }
+              : undefined
+          }
           hideLegend
           skipAnimation
           slotProps={{ tooltip: { trigger: "item" } }}
@@ -291,35 +313,7 @@ export default function GraficoRosca({
               key={fatia.nome}
               cor={fatia.cor}
               nome={fatia.nome}
-              detalhe={
-                fatia.alunos !== undefined ? (
-                  <Box
-                    component="span"
-                    role="img"
-                    aria-label={fatia.detalhe ?? `${fatia.alunos} alunos`}
-                    title={fatia.detalhe ?? `${fatia.alunos} alunos`}
-                    sx={{
-                      display: "inline-block",
-                      mt: 0.5,
-                      px: 1,
-                      py: 0.5,
-                      border: 1,
-                      borderColor: "divider",
-                      borderRadius: 1,
-                      backgroundColor: "action.hover",
-                      color: "text.secondary",
-                      fontVariantNumeric: "tabular-nums",
-                      fontSize: "0.75rem",
-                      lineHeight: 1.2,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    <span aria-hidden="true">{fatia.alunos} alunos</span>
-                  </Box>
-                ) : fatia.detalhe ? (
-                  fatia.detalhe
-                ) : null
-              }
+              detalhe={fatia.detalhe}
             >
               <CirculoValor
                 texto={String(fatia.valor)}

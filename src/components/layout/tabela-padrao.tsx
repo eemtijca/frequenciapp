@@ -12,18 +12,31 @@ interface TabelaPadraoProps {
   caption?: string;
   children: ReactNode;
   primeiraColunaFixa?: boolean;
+  compacta?: boolean;
 }
 
-export function TabelaPadrao({ caption, children, primeiraColunaFixa = false }: TabelaPadraoProps) {
+export function TabelaPadrao({
+  caption,
+  children,
+  primeiraColunaFixa = false,
+  compacta = false,
+}: TabelaPadraoProps) {
   return (
     <TableContainer
       component={Paper}
-      variant="outlined"
+      variant={compacta ? "elevation" : "outlined"}
       sx={{ width: "100%", overflowX: "auto", boxShadow: "none" }}
     >
       <Table
         aria-label={caption ? undefined : "Tabela de dados"}
+        size={compacta ? "small" : "medium"}
         sx={(tema) => ({
+          ...(compacta && {
+            tableLayout: "fixed",
+            "& .MuiTableCell-root": { px: 0.5, whiteSpace: "normal", overflowWrap: "anywhere" },
+            "& .MuiTableCell-head": { height: "auto", typography: "caption", fontWeight: 600 },
+            "& .MuiTableRow-root:last-child .MuiTableCell-body": { borderBottom: 0 },
+          }),
           "& .MuiTableCell-root.MuiTableCell-alignRight, & .MuiTableCell-root[data-numero='true']":
             {
               textAlign: "right",
@@ -47,7 +60,12 @@ export function TabelaPadrao({ caption, children, primeiraColunaFixa = false }: 
         {caption ? (
           <Box
             component="caption"
-            sx={{ captionSide: "bottom", p: 2, color: "text.secondary", typography: "body2" }}
+            sx={{
+              captionSide: "bottom",
+              p: compacta ? 0.5 : 2,
+              color: "text.secondary",
+              typography: compacta ? "caption" : "body2",
+            }}
           >
             {caption}
           </Box>

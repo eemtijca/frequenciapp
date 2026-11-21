@@ -25,6 +25,16 @@ const primeiro = { categoriaId: "serie-a", nome: "1º ano", valor: 1 };
 const segundo = { categoriaId: "serie-b", nome: "2º ano", valor: 2 };
 
 describe("rosca categórica do Painel", () => {
+  it("distingue séries com IDs que colidiam e conserva a cor num recorte de uma delas", () => {
+    const a = { ...primeiro, categoriaId: "00000000-0000-4000-8000-000000000110" };
+    const b = { ...segundo, categoriaId: "00000000-0000-4000-8000-000000000118" };
+    const inicial = coresDaLegenda(rosca([a, b]));
+    expect(new Set(inicial).size).toBe(2);
+    expect(coresDaLegenda(rosca([b], { categorias: [a.categoriaId, b.categoriaId] }))).toEqual([
+      inicial[1],
+    ]);
+  });
+
   it("conserva a cor da série quando a anterior zera e quando a série muda de nome", () => {
     const inicial = coresDaLegenda(rosca([primeiro, segundo]));
     expect(inicial).toHaveLength(2);
@@ -39,7 +49,7 @@ describe("rosca categórica do Painel", () => {
   it("mantém total, quantidades, proporções e detalhe em texto sem exigir a leitura das cores", () => {
     const html = rosca([primeiro, { ...segundo, detalhe: "4 de 5 alunos com chamada" }]);
     const tabela = semEstilos(html).match(
-      /<table\b[^>]*aria-label="Legenda de Faltas por série"[^>]*>[\s\S]*?<\/table>/,
+      /<table\b[^>]*>[\s\S]*?<caption\b[^>]*>Legenda de Faltas por série<\/caption>[\s\S]*?<\/table>/,
     )?.[0];
     expect(tabela).toBeDefined();
     const texto = textoVisivel(tabela ?? "");

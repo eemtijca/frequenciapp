@@ -13,13 +13,14 @@ export type EspacamentoGrade = 2 | 3;
 interface GradeCartoesProps {
   children: ReactNode;
   spacing?: EspacamentoGrade;
+  dupla?: boolean;
 }
 
-export function GradeCartoes({ children, spacing = 2 }: GradeCartoesProps) {
+export function GradeCartoes({ children, spacing = 2, dupla = false }: GradeCartoesProps) {
   return (
     <Grid container spacing={spacing} columns={COLUNAS_GRADE}>
       {Children.map(children, (filho) => (
-        <Grid size={TAMANHO_CARTAO}>{filho}</Grid>
+        <Grid size={dupla ? { xs: 2, sm: 4, md: 6 } : TAMANHO_CARTAO}>{filho}</Grid>
       ))}
     </Grid>
   );

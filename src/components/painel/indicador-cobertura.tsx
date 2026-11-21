@@ -30,11 +30,12 @@ const TEXTO_OCULTO = {
 
 interface Props {
   turmas: CoberturaTurmaDia[];
+  escopo: string;
   feriado?: string;
   carregando: boolean;
 }
 
-export function IndicadorCobertura({ turmas, feriado, carregando }: Props) {
+export function IndicadorCobertura({ turmas, escopo, feriado, carregando }: Props) {
   const descricaoId = useId();
   const esperados = turmas.reduce((total, item) => total + item.esperados, 0);
   const registrados = turmas.reduce(
@@ -49,6 +50,9 @@ export function IndicadorCobertura({ turmas, feriado, carregando }: Props) {
   return (
     <Stack role="group" aria-label="Cobertura do dia" aria-busy={carregando} spacing={1}>
       <CartaoTitulo>Cobertura do dia</CartaoTitulo>
+      <Typography variant="caption" color="text.secondary">
+        {escopo}
+      </Typography>
       {feriado ? (
         <>
           <IndicadorFeriado nome={feriado} />
