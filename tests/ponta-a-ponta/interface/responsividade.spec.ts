@@ -45,7 +45,7 @@ test.describe("responsividade", () => {
       caixaNotificacoes?.x ?? 0,
     );
     await expect(cabecalho.getByRole("button")).toHaveCount(4);
-    await expect(page.locator("main").locator("+ nav")).toHaveCount(0);
+    await expect(page.locator("main").first().locator("+ nav")).toHaveCount(0);
     await info.attach("conteudo-mobile-390", {
       body: await page.screenshot({ animations: "disabled" }),
       contentType: "image/png",

@@ -37,7 +37,7 @@ test.describe("navegação", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await page.getByRole("button", { name: "Chamada", exact: true }).click();
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "chamada");
     await expect(page.getByRole("region", { name: "Fazer chamada", exact: true })).toBeVisible();
   });
 
@@ -92,7 +92,7 @@ test.describe("navegação", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/?visao=gestao");
     await aguardarHidratacao(page);
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
     await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
     const navegacao = await abrirNavegacao(page);
     await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toHaveAttribute(

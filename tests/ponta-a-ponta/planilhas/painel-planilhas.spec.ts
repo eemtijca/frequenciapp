@@ -61,7 +61,7 @@ test("chamada parcial prepara somente após confirmar e abre a vista pelo painel
   await selecionarAcaoPlanilha(cartao, "Enviar");
   await expect(cartao.getByRole("button", { name: "Conferir aba parcial" })).toBeHidden();
   await cartao.getByRole("button", { name: "Abrir Chamada Parcial", exact: true }).click();
-  await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada-parcial");
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", "chamada-parcial");
   expect(preparos).toHaveLength(1);
 });
 

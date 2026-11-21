@@ -413,7 +413,7 @@ test.describe("consulta da coordenação", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/?visao=horarios");
     await aguardarHidratacao(page);
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "horarios");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "horarios");
     await expect(
       page.getByRole("region", { name: "Horários semanais", exact: true }),
     ).toBeVisible();

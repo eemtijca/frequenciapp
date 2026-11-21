@@ -59,7 +59,7 @@ const VISOES_COM_RESUMO = new Set(["painel", "chamada", "chamada-parcial", "said
  */
 export async function abrirDiaSeResumo(page: Page): Promise<void> {
   if (!hojeEDomingo()) return;
-  const visao = await page.locator("main").getAttribute("data-visao");
+  const visao = await page.locator("main").first().getAttribute("data-visao");
   const seletores: Record<string, string[]> = {
     painel: ["#dia-painel"],
     chamada: ["#dia-frequencia"],
@@ -119,7 +119,7 @@ export async function trocarVisao(
     .getByRole("button", { name: new RegExp(`^${nome}(?: Alterações não salvas)?$`) })
     .click();
   await expect(page.getByRole("dialog", { name: "Menu do aplicativo", exact: true })).toBeHidden();
-  await expect(page.locator("main")).toHaveAttribute("data-visao", visao);
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", visao);
   if (!opcoes?.manterResumo && VISOES_COM_RESUMO.has(visao)) await abrirDiaSeResumo(page);
 }
 

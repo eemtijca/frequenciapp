@@ -190,7 +190,7 @@ test.describe("menu lateral", () => {
     await page.setViewportSize({ width: 905, height: 800 });
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
-    await expect(page.locator("main")).toBeFocused();
+    await expect(page.locator("main").first()).toBeFocused();
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -274,7 +274,7 @@ test.describe("menu lateral", () => {
       await confirmar.getByRole("button", { name: "Continuar aqui", exact: true }).click();
       await expect(confirmar).toBeHidden();
       await expect(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
-      await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
+      await expect(page.locator("main").first()).toHaveAttribute("data-visao", "chamada");
       await expect(aluno).toHaveAttribute("aria-pressed", "true");
 
       await abrirNavegacao(page);

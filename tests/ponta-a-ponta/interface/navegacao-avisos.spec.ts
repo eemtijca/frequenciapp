@@ -120,7 +120,7 @@ for (const largura of [390, 800]) {
     // A navegação segue real; o pré-aquecimento reduz trabalho, mas não garante
     // que a interação termine antes de o aviso expirar e não cobre Chamada fria.
     await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "chamada");
     const navegacao = await abrirNavegacao(page);
     const gestao = navegacao.getByRole("button", { name: /^Gestão(?: Alterações não salvas)?$/ });
 
@@ -145,7 +145,7 @@ for (const largura of [390, 800]) {
     await expect(
       page.getByRole("dialog", { name: "Menu do aplicativo", exact: true }),
     ).toBeHidden();
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
     await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
   });
 }

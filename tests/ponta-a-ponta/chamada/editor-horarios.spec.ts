@@ -100,7 +100,7 @@ function observarGravacoes(page: Page): Request[] {
 async function abrirHorarios(page: Page, turma = origem): Promise<Locator> {
   await page.goto("/?visao=gestao");
   await aguardarHidratacao(page);
-  await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
   await page.getByRole("tab", { name: "Configurações", exact: true }).click();
   await page.locator("#categoria-config-horarios").click();
   const vista = page.getByRole("region", { name: "Edição de horários", exact: true });
@@ -115,7 +115,7 @@ async function abrirHorarios(page: Page, turma = origem): Promise<Locator> {
 async function abrirConsulta(page: Page, turma = origem): Promise<Locator> {
   await page.goto("/?visao=horarios");
   await aguardarHidratacao(page);
-  await expect(page.locator("main")).toHaveAttribute("data-visao", "horarios");
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", "horarios");
   const vista = page.getByRole("region", { name: "Horários semanais", exact: true });
   await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
   await page.getByRole("option", { name: turma, exact: true }).click();
@@ -354,7 +354,7 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
   await expect(avisoSaida).toBeVisible();
   expect(gravacoes).toHaveLength(0);
   await avisoSaida.getByRole("button", { name: "Mudar de tela", exact: true }).click();
-  await expect(page.locator("main")).toHaveAttribute("data-visao", "painel");
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", "painel");
   await trocarVisao(page, "Gestão", "gestao");
   await expect(formulario).toBeVisible();
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
