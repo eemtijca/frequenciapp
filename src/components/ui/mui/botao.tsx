@@ -5,7 +5,7 @@ import type { MouseEventHandler, ReactNode } from "react";
 import NextLink from "next/link";
 import Button, { type ButtonProps } from "@mui/material/Button";
 import IconButton, { type IconButtonProps } from "@mui/material/IconButton";
-import type { SxProps, Theme } from "@mui/material/styles";
+import type { Theme } from "@mui/material/styles";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 export type VarianteBotao = "primario" | "secundario" | "contorno" | "texto" | "destrutivo";
@@ -62,10 +62,6 @@ export type BotaoProps = PropsBase &
     carregando?: boolean;
     icone?: ReactNode;
   };
-
-function combinarSx(base: SxProps<Theme>, extra: SxProps<Theme> | undefined): SxProps<Theme> {
-  return [base, ...(Array.isArray(extra) ? extra : [extra])];
-}
 
 /** Botão com a hierarquia de ações do tema: grafite, verde, contorno, texto ou destrutivo. */
 export function Botao({
