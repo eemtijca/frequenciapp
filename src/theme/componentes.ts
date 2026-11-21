@@ -86,6 +86,12 @@ const inputs: Components<Theme> = {
                 },
                 "&:active": { backgroundColor: cinza[400] },
               }),
+              "&.Mui-disabled": {
+                background: `${theme.vars.palette.action.disabledBackground} !important`,
+                border: `1px solid ${theme.vars.palette.action.disabledBackground} !important`,
+                color: theme.vars.palette.text.disabled,
+                boxShadow: "none",
+              },
             },
           },
           {

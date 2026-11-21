@@ -130,7 +130,14 @@ function estilosDaSituacao(tema: Theme, categoria: CategoriaSituacao) {
   if (categoria === "justificada")
     return { backgroundColor: palette.justificada.fraco, color: palette.justificada.texto };
   if (categoria === "presente")
-    return { backgroundColor: palette.action.selected, color: palette.primary.main };
+    return {
+      backgroundColor: palette.success.main,
+      color: palette.success.contrastText,
+      ...tema.applyStyles("dark", {
+        backgroundColor: palette.success.dark,
+        color: palette.success.light,
+      }),
+    };
   return {};
 }
 

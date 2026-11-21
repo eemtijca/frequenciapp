@@ -95,7 +95,18 @@ export function Botao({
       loadingPosition={icone ? "start" : "center"}
       startIcon={carregando ? undefined : icone}
       aria-busy={carregando || undefined}
-      sx={combinarSx({ height: TOKENS_LAYOUT.botao[tamanho], ...ALVO_TOQUE }, sx)}
+      sx={[
+        { height: TOKENS_LAYOUT.botao[tamanho], ...ALVO_TOQUE },
+        (theme) => ({
+          "&.Mui-disabled": {
+            background: `${theme.vars.palette.action.disabledBackground} !important`,
+            border: `1px solid ${theme.vars.palette.action.disabledBackground} !important`,
+            color: theme.vars.palette.text.disabled,
+            boxShadow: "none",
+          },
+        }),
+        ...(Array.isArray(sx) ? sx : [sx]),
+      ]}
       {...props}
     >
       {children}
