@@ -21,13 +21,13 @@ describe("tokens de layout", () => {
   it("fixa as medidas de tabela, diálogo e cartão", () => {
     expect(TOKENS_LAYOUT.tabela).toEqual({ cabecalho: 56, linha: 52, padding: 16 });
     expect(TOKENS_LAYOUT.dialogo).toEqual({ larguraMaxima: 560, padding: 24, raio: 10 });
-    expect(TOKENS_LAYOUT.cartao).toEqual({ padding: 16, raio: 8 });
-    expect(RAIOS.controle).toBe(8);
+    expect(TOKENS_LAYOUT.cartao).toEqual({ padding: 16, raio: 16 });
+    expect(RAIOS.controle).toBe(12);
     expect(RAIOS.dialogo).toBe(10);
   });
 
   it("fixa as medidas de campos, botões, ícones e alvos de toque", () => {
-    expect(TOKENS_LAYOUT.campo).toEqual({ medio: 56, pequeno: 40, raio: 8, foco: 3 });
+    expect(TOKENS_LAYOUT.campo).toEqual({ medio: 56, pequeno: 40, raio: 12, foco: 3 });
     expect(TOKENS_LAYOUT.botao).toEqual({ pequeno: 36, medio: 40 });
     expect(TOKENS_LAYOUT.icone).toBe(24);
     expect(TOKENS_LAYOUT.alvoToque).toBe(48);

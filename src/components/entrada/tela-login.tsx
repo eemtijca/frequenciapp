@@ -26,6 +26,7 @@ import { CampoTexto } from "@/components/ui/mui/text-field";
 import DialogoSobre from "@/components/dialogo-sobre";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 const CHAVE_EMAIL = "frequenciapp:email";
 const CHAVE_AVISO = "frequenciapp:aviso-entrada";
@@ -136,7 +137,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
 
   return (
     <Box
-      sx={(tema) => ({
+      sx={{
         position: "relative",
         boxSizing: "border-box",
         minHeight: "100dvh",
@@ -144,13 +145,8 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
         flexDirection: "column",
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "env(safe-area-inset-bottom, 0px)",
-        backgroundImage: "radial-gradient(ellipse at 50% 50%, hsl(158, 55%, 96%), hsl(0, 0%, 99%))",
-        backgroundRepeat: "no-repeat",
-        ...tema.applyStyles("dark", {
-          backgroundImage:
-            "radial-gradient(at 50% 50%, hsla(158, 60%, 18%, 0.55), hsl(220, 35%, 3%))",
-        }),
-      })}
+        bgcolor: "background.default",
+      }}
     >
       <Box
         sx={{
@@ -251,8 +247,8 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
               gap: 3,
               width: "100%",
               maxWidth: 448,
-              p: { xs: 2.5, sm: 4 },
-              boxShadow: "var(--template-palette-baseShadow)",
+              p: { xs: 2, sm: 4 },
+              borderRadius: `${TOKENS_LAYOUT.cartao.raio}px`,
             }}
           >
             <Stack
@@ -342,10 +338,10 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
 
               <Botao
                 type="submit"
-                variante="secundario"
+                variante="principal"
                 carregando={enviando}
                 fullWidth
-                sx={{ mt: 0.5 }}
+                sx={{ mt: 0.5, height: TOKENS_LAYOUT.alvoToque }}
               >
                 {enviando ? "Entrando..." : "Entrar"}
               </Botao>
@@ -359,7 +355,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
               direction="row"
               spacing={0.5}
               useFlexGap
-              sx={{ flexWrap: "wrap", justifyContent: "center", alignItems: "center" }}
+              sx={{ justifyContent: "space-between", alignItems: "center" }}
             >
               <Link
                 href="/bi"

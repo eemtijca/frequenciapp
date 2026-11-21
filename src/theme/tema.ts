@@ -3,7 +3,7 @@
 import { createTheme, type Shadows } from "@mui/material/styles";
 import { colorSchemes } from "./paleta";
 import { tipografia } from "./tipografia";
-import { BREAKPOINTS } from "./layout";
+import { BREAKPOINTS, RAIOS } from "./layout";
 import { componentes } from "./componentes";
 
 const sombrasPadrao = createTheme().shadows;
@@ -20,7 +20,7 @@ export const tema = createTheme({
   colorSchemes,
   typography: tipografia,
   shape: {
-    borderRadius: 8,
+    borderRadius: RAIOS.controle,
   },
   shadows: sombras,
   breakpoints: {

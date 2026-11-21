@@ -64,31 +64,18 @@ const inputs: Components<Theme> = {
             style: { height: TOKENS_LAYOUT.botao.medio, padding: "8px 16px" },
           },
           {
-            props: { color: "primary", variant: "contained" },
+            props: { color: "inherit", variant: "contained" },
             style: {
-              color: cinza[50],
-              backgroundColor: cinza[900],
-              backgroundImage: `linear-gradient(to bottom, ${cinza[700]}, ${cinza[800]})`,
-              boxShadow: `inset 0 1px 0 ${cinza[600]}, inset 0 -1px 0 1px hsl(220, 0%, 0%)`,
-              border: `1px solid ${cinza[700]}`,
-              "&:hover": {
-                backgroundImage: "none",
-                backgroundColor: cinza[700],
-                boxShadow: "none",
-              },
-              "&:active": { backgroundColor: cinza[800] },
+              color: cinza[800],
+              backgroundColor: cinza[100],
+              border: `1px solid ${theme.vars.palette.bordaControle}`,
+              "&:hover": { backgroundColor: cinza[200], boxShadow: "none" },
+              "&:active": { backgroundColor: cinza[300] },
               ...theme.applyStyles("dark", {
-                color: cinza[800],
-                backgroundColor: cinza[50],
-                backgroundImage: `linear-gradient(to bottom, ${cinza[100]}, ${cinza[50]})`,
-                boxShadow: `inset 0 -1px 0 hsl(220, 30%, 80%)`,
-                border: `1px solid ${cinza[50]}`,
-                "&:hover": {
-                  backgroundImage: "none",
-                  backgroundColor: cinza[300],
-                  boxShadow: "none",
-                },
-                "&:active": { backgroundColor: cinza[400] },
+                color: cinza[50],
+                backgroundColor: cinza[800],
+                "&:hover": { backgroundColor: cinza[700] },
+                "&:active": { backgroundColor: cinza[600] },
               }),
               "&.Mui-disabled": {
                 background: `${theme.vars.palette.action.disabledBackground} !important`,
@@ -99,31 +86,16 @@ const inputs: Components<Theme> = {
             },
           },
           {
-            props: { color: "secondary", variant: "contained" },
+            props: ({ color, variant }) =>
+              variant === "contained" && (color === "primary" || color === "secondary"),
             style: {
               color: brand[50],
               backgroundColor: brand[700],
-              backgroundImage: `linear-gradient(to bottom, ${brand[600]}, ${brand[700]})`,
-              border: `1px solid ${brand[700]}`,
-              boxShadow: `inset 0 1px 0 ${alpha(brand[500], 0.5)}`,
-              "&:hover": {
-                backgroundImage: "none",
-                backgroundColor: brand[800],
-                boxShadow: "none",
-              },
+              backgroundImage: "none",
+              border: `1px solid ${brand[600]}`,
+              boxShadow: "none",
+              "&:hover": { backgroundColor: brand[800], boxShadow: "none" },
               "&:active": { backgroundColor: brand[900] },
-              ...theme.applyStyles("dark", {
-                color: brand[900],
-                backgroundColor: brand[300],
-                backgroundImage: `linear-gradient(to bottom, ${brand[200]}, ${brand[300]})`,
-                border: `1px solid ${brand[300]}`,
-                "&:hover": {
-                  backgroundImage: "none",
-                  backgroundColor: brand[200],
-                  boxShadow: "none",
-                },
-                "&:active": { backgroundColor: brand[400] },
-              }),
             },
           },
           {
@@ -301,12 +273,13 @@ const inputs: Components<Theme> = {
         backgroundColor: theme.vars.palette.background.paper,
         transition: theme.transitions.create(["border-color", "box-shadow"], { duration: 120 }),
         [`& .${outlinedInputClasses.notchedOutline}`]: {
-          borderColor: theme.vars.palette.divider,
+          borderColor: theme.vars.palette.bordaControle,
           borderRadius: TOKENS_LAYOUT.campo.raio,
         },
-        "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: cinza[400] },
+        "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: cinza[600] },
         [`&.${outlinedInputClasses.focused}`]: {
-          boxShadow: `0 0 0 ${TOKENS_LAYOUT.campo.foco}px ${alpha(brand[500], 0.24)}`,
+          outline: ANEL_FOCO(theme),
+          outlineOffset: 2,
           [`& .${outlinedInputClasses.notchedOutline}`]: {
             borderColor: theme.vars.palette.primary.main,
             borderWidth: 1,
@@ -322,7 +295,7 @@ const inputs: Components<Theme> = {
           padding: "9px 12px",
         },
         ...theme.applyStyles("dark", {
-          "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: cinza[500] },
+          "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: cinza[400] },
         }),
         variants: [
           {
@@ -1007,19 +980,9 @@ const surfaces: Components<Theme> = {
       root: ({ theme }) => ({
         padding: TOKENS_LAYOUT.cartao.padding,
         borderRadius: TOKENS_LAYOUT.cartao.raio,
-        backgroundColor: cinza[50],
+        backgroundColor: theme.vars.palette.background.paper,
         border: `1px solid ${theme.vars.palette.divider}`,
         boxShadow: "none",
-        ...theme.applyStyles("dark", { backgroundColor: cinza[800] }),
-        variants: [
-          {
-            props: { variant: "outlined" },
-            style: {
-              background: theme.vars.palette.background.paper,
-              ...theme.applyStyles("dark", { background: alpha(cinza[900], 0.4) }),
-            },
-          },
-        ],
       }),
     },
   },

@@ -33,12 +33,12 @@ export const TOKENS_LAYOUT = {
   },
   cartao: {
     padding: 16,
-    raio: 8,
+    raio: 16,
   },
   campo: {
     medio: 56,
     pequeno: 40,
-    raio: 8,
+    raio: 12,
     foco: 3,
   },
   botao: {
@@ -56,8 +56,8 @@ export const TOKENS_LAYOUT = {
 } as const;
 
 export const RAIOS = {
-  controle: 8,
-  dialogo: 10,
+  controle: TOKENS_LAYOUT.campo.raio,
+  dialogo: TOKENS_LAYOUT.dialogo.raio,
   pilula: 999,
 } as const;
 

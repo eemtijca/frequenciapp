@@ -764,7 +764,7 @@ export function SeletorPeriodo({
           py: 0.5,
           border: `1px solid ${paletaDoTema(theme).divider}`,
           borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
-          backgroundColor: paletaDoTema(theme).background.paper,
+          backgroundColor: "transparent",
           color: paletaDoTema(theme).text.primary,
           fontFamily: theme.typography.fontFamily,
           fontSize: theme.typography.body2.fontSize ?? "0.875rem",

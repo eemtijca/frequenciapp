@@ -3,7 +3,15 @@
 import { describe, expect, it } from "vitest";
 import { tema } from "@/theme/tema";
 import { coresGrafico } from "@/theme/paleta";
-import { contraste, deltaE, hslParaRgb, lerHsl, piorSeparacao, type Rgb } from "../../helpers/cor";
+import {
+  contraste,
+  deltaE,
+  hexParaRgb,
+  hslParaRgb,
+  lerHsl,
+  piorSeparacao,
+  type Rgb,
+} from "../../helpers/cor";
 
 type NomeEsquema = "light" | "dark";
 
@@ -25,10 +33,21 @@ function paleta(esquema: NomeEsquema) {
 
 function cor(valor: string | undefined, rotulo: string): Rgb {
   if (!valor) throw new Error(`Cor ${rotulo} ausente no tema`);
-  return hslParaRgb(...lerHsl(valor));
+  return valor.startsWith("#") ? hexParaRgb(valor) : hslParaRgb(...lerHsl(valor));
 }
 
 describe("tema Material UI", () => {
+  it("aplica os fundos neutros da marca, com borda identificável para campos", () => {
+    expect(paleta("light").background).toMatchObject({ default: "#f6f6f6", paper: "#ffffff" });
+    expect(paleta("dark").background).toMatchObject({ default: "#141413", paper: "#1f1e1d" });
+    for (const { esquema } of ESQUEMAS) {
+      const cores = paleta(esquema);
+      expect(
+        contraste(cor(cores.bordaControle, "borda do campo"), cor(cores.background.paper, "papel")),
+      ).toBeGreaterThanOrEqual(3);
+    }
+  });
+
   it("gera variáveis CSS com o prefixo e o seletor do projeto", () => {
     expect(tema.cssVarPrefix).toBe("template");
     expect(tema.colorSchemeSelector).toBe("data-mui-color-scheme");
@@ -62,8 +81,8 @@ describe("tema Material UI", () => {
     }
   });
 
-  it("mantém forma, breakpoints, espaçamento e sombra do template", () => {
-    expect(tema.shape.borderRadius).toBe(8);
+  it("mantém os raios da marca, os breakpoints e os espaços do MD2", () => {
+    expect(tema.shape.borderRadius).toBe(12);
     expect(tema.breakpoints.values).toEqual({ xs: 0, sm: 600, md: 905, lg: 1240, xl: 1440 });
     expect(tema.spacing(1)).toBe("var(--template-spacing, 8px)");
     expect(tema.shadows[1]).toContain("--template-palette-baseShadow");

@@ -8,11 +8,21 @@ import IconButton, { type IconButtonProps } from "@mui/material/IconButton";
 import type { Theme } from "@mui/material/styles";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
-export type VarianteBotao = "primario" | "secundario" | "contorno" | "texto" | "destrutivo";
+export type VarianteBotao =
+  | "principal"
+  | "neutro"
+  | "primario"
+  | "secundario"
+  | "contorno"
+  | "texto"
+  | "destrutivo";
 export type TamanhoBotao = "pequeno" | "medio";
 
 const VARIANTES = {
-  primario: { variant: "contained", color: "primary" },
+  principal: { variant: "contained", color: "primary" },
+  neutro: { variant: "contained", color: "inherit" },
+  // Chamadores ainda não revisitados mantêm a intenção visual anterior.
+  primario: { variant: "contained", color: "inherit" },
   secundario: { variant: "contained", color: "secondary" },
   contorno: { variant: "outlined", color: "primary" },
   texto: { variant: "text", color: "primary" },
@@ -63,9 +73,9 @@ export type BotaoProps = PropsBase &
     icone?: ReactNode;
   };
 
-/** Botão com a hierarquia de ações do tema: grafite, verde, contorno, texto ou destrutivo. */
+/** Botão principal, neutro, discreto ou destrutivo conforme o contexto. */
 export function Botao({
-  variante = "primario",
+  variante = "neutro",
   tamanho = "medio",
   carregando = false,
   icone,
@@ -114,27 +124,20 @@ function estilosIcone(theme: Theme, variante: VarianteBotao) {
   const { palette } = theme.vars;
 
   switch (variante) {
+    case "neutro":
     case "primario":
       return {
         "&.MuiIconButton-root": {
-          color: palette.grey[50],
-          backgroundColor: palette.grey[900],
-          borderColor: palette.grey[700],
+          color: palette.text.primary,
+          backgroundColor: palette.action.hover,
+          borderColor: palette.bordaControle,
           "&:hover": {
-            backgroundColor: palette.grey[800],
-            borderColor: palette.grey[600],
+            backgroundColor: palette.action.selected,
+            borderColor: palette.bordaControle,
           },
-          ...theme.applyStyles("dark", {
-            color: palette.grey[900],
-            backgroundColor: palette.grey[50],
-            borderColor: palette.grey[100],
-            "&:hover": {
-              backgroundColor: palette.grey[200],
-              borderColor: palette.grey[300],
-            },
-          }),
         },
       };
+    case "principal":
     case "secundario":
       return {
         "&.MuiIconButton-root": {
@@ -175,7 +178,7 @@ function estilosIcone(theme: Theme, variante: VarianteBotao) {
     default:
       return {
         "&.MuiIconButton-root": {
-          backgroundColor: palette.background.paper,
+          backgroundColor: "transparent",
           borderColor: palette.grey[300],
           "&:hover": {
             backgroundColor: palette.action.hover,

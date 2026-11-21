@@ -75,6 +75,18 @@ const casos = ([320, 390, 1280] as const).flatMap((largura) =>
 
 test.describe("login real sem sessão", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+  test("@anon Entrar tem preenchimento sólido e sem brilho no tema escuro", async ({ page }) => {
+    await tema(page, "dark");
+    await somenteLeitura(page);
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", "dark");
+    const botao = page.getByRole("button", { name: "Entrar", exact: true });
+    await expect(botao).toBeVisible();
+    await expect(botao).toHaveCSS("background-image", "none");
+    await expect(botao).toHaveCSS("box-shadow", "none");
+  });
+
   for (const { largura, cor } of casos) {
     test(`@anon placeholder e fonte em ${largura}px ${cor}`, async ({ page }, info) => {
       await page.setViewportSize({ width: largura, height: 900 });
