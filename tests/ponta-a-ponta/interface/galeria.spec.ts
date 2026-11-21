@@ -211,10 +211,12 @@ async function prepararChamadaParcial(page: Page): Promise<void> {
   await expect(secao).toBeVisible();
   await expect(secao).toHaveAttribute("aria-busy", "false", { timeout: 15_000 });
   await expect(page.getByRole("heading", { name: "Chamada parcial", exact: true })).toBeVisible();
-  for (let tentativa = 0; tentativa < 3; tentativa += 1) {
+  const dia = secao.getByRole("button", { name: /^Data da chamada parcial:/ });
+  // Feriado, fim de semana ou dia sem chamada não representam a rotina da tela.
+  for (let tentativa = 0; tentativa < 8; tentativa += 1) {
     const feriado = await secao.getByText(/^Feriado ·/).count();
-    if (feriado === 0) return;
-    const dia = secao.getByRole("button", { name: /^Data da chamada parcial:/ });
+    const registros = await secao.getByText(/^(Presente|Falta|Justificada)$/).count();
+    if (feriado === 0 && registros > 0) return;
     const anterior = await dia.getAttribute("aria-label");
     await secao
       .getByRole("button", { name: "Dia anterior da chamada parcial", exact: true })
@@ -222,6 +224,14 @@ async function prepararChamadaParcial(page: Page): Promise<void> {
     await expect.poll(async () => dia.getAttribute("aria-label")).not.toBe(anterior);
     await expect(secao.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
   }
+  throw new Error("A semente não tem dia com registros para a Chamada Parcial.");
+}
+
+async function escolherDiaDaSemana(page: Page, dia: string): Promise<void> {
+  const seletor = page.getByRole("combobox", { name: "Dia da semana", exact: true }).first();
+  await seletor.click();
+  await page.getByRole("option", { name: dia, exact: true }).click();
+  await expect(seletor).toContainText(dia);
 }
 
 async function prepararHorarios(page: Page): Promise<void> {
@@ -229,20 +239,29 @@ async function prepararHorarios(page: Page): Promise<void> {
   await expect(
     page.getByRole("region", { name: /Horários semanais|Edição de horários/ }).first(),
   ).toBeVisible();
+  // O dia corrente pode cair no fim de semana e esconder a grade letiva.
+  await escolherDiaDaSemana(page, "Segunda-feira");
 }
 
 async function prepararHorariosDia(page: Page): Promise<void> {
   await prepararHorarios(page);
-  const seletor = page.getByRole("combobox", { name: "Dia da semana", exact: true });
-  await seletor.click();
-  await page.getByRole("option", { name: "Segunda-feira", exact: true }).click();
-  await expect(seletor).toContainText("Segunda-feira");
+}
+
+async function voltarParaDiaLetivo(page: Page, rotulo: RegExp, anterior: string): Promise<void> {
+  const data = page.getByRole("button", { name: rotulo }).first();
+  for (let tentativa = 0; tentativa < 7; tentativa += 1) {
+    const nome = await data.getAttribute("aria-label");
+    if (!/sábado|domingo/i.test(nome ?? "")) return;
+    await page.getByRole("button", { name: anterior, exact: true }).click();
+    await expect.poll(async () => data.getAttribute("aria-label")).not.toBe(nome);
+  }
 }
 
 async function prepararSaidas(page: Page): Promise<void> {
   await trocarVisao(page, "Saídas e Entradas", "saidas");
   await page.getByRole("tab", { name: "Saídas", exact: true }).click();
   await expect(page.getByRole("region", { name: "Saídas antecipadas", exact: true })).toBeVisible();
+  await voltarParaDiaLetivo(page, /^Data da saída:/, "Dia anterior");
 }
 
 async function prepararEntradas(page: Page): Promise<void> {
@@ -251,6 +270,7 @@ async function prepararEntradas(page: Page): Promise<void> {
   await expect(
     page.getByRole("region", { name: "Entradas registradas", exact: true }),
   ).toBeVisible();
+  await voltarParaDiaLetivo(page, /^Data da entrada:/, "Dia anterior");
 }
 
 async function selecionarAba(page: Page, aba: string): Promise<void> {
@@ -305,6 +325,7 @@ async function prepararConfiguracoes(page: Page, categoria: string): Promise<voi
   const botao = nav.getByRole("button", { name: categoria, exact: true });
   await botao.click();
   await expect(botao).toHaveAttribute("aria-pressed", "true");
+  if (categoria === "Horários") await escolherDiaDaSemana(page, "Segunda-feira");
 }
 
 async function prepararEntrada(page: Page): Promise<void> {
