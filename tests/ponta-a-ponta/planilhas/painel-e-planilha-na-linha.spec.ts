@@ -54,13 +54,7 @@ test.describe("atualização do Painel ao voltar para a aba", () => {
         const requisicaoDeAtualizacao =
           acionado &&
           (mesCoincide ? doMes && pedido.headers()["x-e2e-visibilidade"] === "1" : doDia);
-        const resposta = await rota.fetch();
-        if (resposta.status() !== 200) {
-          await rota.fulfill({ response: resposta });
-          return;
-        }
         if (requisicaoDeAtualizacao) atualizado = true;
-        const dados = (await resposta.json()) as { frequencias: { dia: string }[] };
         const frequencia = {
           dia,
           turmaId,
@@ -72,11 +66,9 @@ test.describe("atualização do Painel ao voltar para a aba", () => {
           faltas: atualizado ? [{ alunoId: primeiroAluno.id, horarios: ["aula-sintetica"] }] : [],
         };
         await rota.fulfill({
-          response: resposta,
           json: {
-            ...dados,
             ...(doDia ? { feriado: null } : {}),
-            frequencias: [...dados.frequencias.filter((item) => item.dia !== dia), frequencia],
+            frequencias: [frequencia],
           },
         });
       });

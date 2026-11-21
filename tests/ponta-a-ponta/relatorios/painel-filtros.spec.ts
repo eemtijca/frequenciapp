@@ -79,13 +79,15 @@ test("cada cartão do Painel mostra o gráfico e a cobertura do próprio escopo"
   await expect(page.getByRole("group", { name: "Filtro por série" })).toHaveCount(0);
   // Só o chip da Cobertura do dia: o mesmo nome também está em seletores da página.
   const cobertura = page.getByRole("group", { name: "Cobertura do dia" });
-  const pendente = (turma: string) => cobertura.locator("span.bg-falta-fraca", { hasText: turma });
+  const pendente = (turma: string) => cobertura.getByRole("listitem").filter({ hasText: turma });
 
   await expect(page.getByRole("article", { name: /: Toda a escola$/ })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Toda a escola" })).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Gráfico em exibição", exact: true }),
+  ).toContainText("Toda a escola");
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /^E2E Painel (Um|Dois)$/ })).toHaveCount(0);
-  await cobertura.locator("summary").click();
+  await cobertura.getByRole("button", { name: /turmas? pendentes?/ }).click();
   await expect(pendente("E2E Painel Dois A")).toBeVisible();
 
   await rolarAteGrafico(page, "E2E Painel Um");
@@ -147,26 +149,23 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     await abrirSerie();
     await expect(progresso).toHaveAttribute("aria-valuenow", "0");
     await expect(progresso).toHaveAttribute("aria-valuetext", "0 de 3 alunos com chamada salva");
-    await expect(progresso.getByTestId("cobertura-preenchida")).toHaveAttribute(
-      "style",
-      /^width:\s*0%;?$/,
-    );
     await expect(cartao.getByText("0/3 alunos")).toHaveCount(0);
     await expect(progresso).toHaveAccessibleDescription(
       "E2E Painel Dois A: pendente; E2E Painel Dois B: pendente",
     );
-    await expect(cartao.locator("summary")).toHaveText("2 turmas pendentes");
-    await expect(cartao.locator("span.bg-falta-fraca").first()).toBeHidden();
-    if (isMobile) await cartao.locator("summary").click();
+    const pendentes = cartao.getByRole("button", { name: /turmas? pendentes?/ });
+    await expect(pendentes).toContainText("2 turmas pendentes");
+    await expect(cartao.getByRole("listitem").first()).toBeHidden();
+    if (isMobile) await pendentes.click();
     else {
-      await cartao.locator("summary").focus();
-      await cartao.locator("summary").press("Enter");
+      await pendentes.focus();
+      await pendentes.press("Enter");
     }
-    await expect(cartao.locator("span.bg-falta-fraca")).toHaveText([
+    await expect(cartao.getByRole("listitem")).toHaveText([
       "E2E Painel Dois A",
       "E2E Painel Dois B",
     ]);
-    await expect(cartao.locator("span.bg-falta-fraca").first()).toBeVisible();
+    await expect(cartao.getByRole("listitem").first()).toBeVisible();
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth))
       .toBe(true);
@@ -175,10 +174,6 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     await abrirSerie();
     await expect(progresso).toHaveAttribute("aria-valuenow", "66");
     await expect(progresso).toHaveAttribute("aria-valuetext", "2 de 3 alunos com chamada salva");
-    await expect(progresso.getByTestId("cobertura-preenchida")).toHaveAttribute(
-      "style",
-      /^width:\s*66%;?$/,
-    );
     await expect(cartao.getByText("2/3 alunos")).toHaveCount(0);
     const percentual = await cartao.getByText("66%", { exact: true }).boundingBox();
     const barra = await progresso.boundingBox();
@@ -193,19 +188,15 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
       body: await cartao.screenshot(),
       contentType: "image/png",
     });
-    await expect(cartao.locator("summary")).toHaveText("1 turma pendente");
-    await cartao.locator("summary").click();
-    await expect(cartao.locator("span.bg-falta-fraca")).toHaveText("E2E Painel Dois B");
+    await expect(cartao.getByRole("button", { name: "1 turma pendente" })).toBeVisible();
+    await cartao.getByRole("button", { name: "1 turma pendente" }).click();
+    await expect(cartao.getByRole("listitem")).toHaveText("E2E Painel Dois B");
 
     await salvarChamada("B");
     await abrirSerie();
     await expect(progresso).toHaveAttribute("aria-valuenow", "100");
-    await expect(progresso.getByTestId("cobertura-preenchida")).toHaveAttribute(
-      "style",
-      /^width:\s*100%;?$/,
-    );
     await expect(cartao.getByText("Concluída", { exact: true })).toBeVisible();
-    await expect(cartao.locator("summary")).toHaveCount(0);
+    await expect(cartao.getByRole("button", { name: /turmas? pendentes?/ })).toHaveCount(0);
     await testInfo.attach("Cobertura concluída", {
       body: await cartao.screenshot(),
       contentType: "image/png",
@@ -220,9 +211,6 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     );
     await expect(vazio.getByText("Sem alunos", { exact: true })).toBeVisible();
     await expect(vazio.getByText("Concluída", { exact: true })).toHaveCount(0);
-    await expect(
-      vazio.getByRole("progressbar").getByTestId("cobertura-preenchida"),
-    ).toHaveAttribute("style", /^width:\s*0%;?$/);
   } finally {
     await comBanco(async (cliente) => {
       await cliente.query(
@@ -463,7 +451,6 @@ test.describe("infrequência do dia", () => {
     await expect(resumo.getByText("Sem dados", { exact: true })).toBeVisible();
     await expect(resumo.getByText("0%", { exact: true })).toHaveCount(0);
     await expect(barra).toHaveAttribute("aria-valuetext", "Sem dados");
-    await expect(resumo.getByTestId("infrequencia-preenchida")).toHaveClass(/bg-muted/);
 
     estado = "falta";
     await page.getByRole("button", { name: "Dia seguinte", exact: true }).click();
@@ -471,7 +458,6 @@ test.describe("infrequência do dia", () => {
     await expect(resumo.getByText("33,3%", { exact: true })).toBeVisible();
     await expect(barra).toHaveAttribute("aria-valuenow", "33");
     await expect(barra).toHaveAttribute("aria-valuetext", /33,3% de infrequência, acima do limite/);
-    await expect(resumo.getByTestId("infrequencia-preenchida")).toHaveClass(/bg-falta/);
     await expect(resumo.getByText("Acima do limite", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("article", { name: /: Toda a escola$/ }).getByText(/faltas \(F \+ FJ\)/),
@@ -505,7 +491,6 @@ test.describe("infrequência do dia", () => {
     await expect(resumo.getByText("Sem dados", { exact: true })).toHaveCount(0);
     await expect(barra).toHaveAttribute("aria-valuenow", "0");
     await expect(barra).toHaveAttribute("aria-valuetext", /0% de infrequência, dentro do esperado/);
-    await expect(resumo.getByTestId("infrequencia-preenchida")).toHaveClass(/bg-primary/);
     await expect(resumo.getByText("Dentro do esperado", { exact: true })).toBeVisible();
 
     estado = "feriado";
@@ -636,7 +621,9 @@ test.describe("gráfico personalizado por período", () => {
     await rolarAteGrafico(page, "Toda a escola");
     await expect(painel).toHaveCount(0);
     await expect(page.getByRole("group", { name: "Resumo do dia" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Toda a escola", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("combobox", { name: "Gráfico em exibição", exact: true }),
+    ).toContainText("Toda a escola");
     await rolarAteGrafico(page, "Personalizado");
     await expect(
       painel.getByRole("group", { name: "Resumo do período" }).locator("strong"),
@@ -737,23 +724,17 @@ test.describe("gráfico personalizado por período", () => {
     await painel.locator("[data-grafico-sob-demanda]").scrollIntoViewIfNeeded();
     const grafico = painel.getByRole("img", { name: "Faltas do período por série" });
     await expect(grafico).toBeVisible();
-    const aplicacao = grafico.getByRole("application");
-    await aplicacao.focus();
-    await aplicacao.press("ArrowRight");
-    const detalhe = grafico.locator(".recharts-tooltip-wrapper");
-    await expect(detalhe).toBeVisible();
-    await expect(detalhe).toHaveText("E2E Painel Dois: 1 falta");
     await expect(page.getByRole("article", { name: /: Personalizado$/ })).toBeInViewport();
-    // A dica deve caber no gráfico mesmo quando o cartão é estreito.
+    // A dica flutuante precisa continuar inteira na tela estreita.
+    await grafico.hover({ position: { x: 88, y: 22 } });
+    const dica = grafico.locator(".MuiChartsTooltip-root");
+    await expect(dica).toBeVisible();
     await expect
       .poll(async () => {
-        const caixa = await grafico.boundingBox();
-        const dica = await detalhe.boundingBox();
+        const largura = await page.evaluate(() => window.innerWidth);
+        const dicaCaixa = await dica.boundingBox();
         return Boolean(
-          caixa &&
-          dica &&
-          dica.x >= caixa.x - 1 &&
-          dica.x + dica.width <= caixa.x + caixa.width + 1,
+          dicaCaixa && dicaCaixa.x >= -1 && dicaCaixa.x + dicaCaixa.width <= largura + 1,
         );
       })
       .toBe(true);

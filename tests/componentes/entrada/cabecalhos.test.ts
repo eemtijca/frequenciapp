@@ -121,7 +121,7 @@ it.each(combinacoes)("entrada: ações auxiliares discretas em %s a %i px", asyn
     const botaoTema = page.getByRole("button", { name: /Tema:.*Alterar tema/ });
     await verificarFoco(botaoTema);
     await botaoTema.press("Enter");
-    const gruposTema = page.getByRole("radiogroup", { name: /Tema:.*Alterar tema/ });
+    const gruposTema = page.getByRole("radiogroup", { name: "Tema do aplicativo" });
     await gruposTema.waitFor({ state: "visible" });
     expect(await gruposTema.isVisible()).toBe(true);
     await page.getByRole("radio", { name: tema === "light" ? "Escuro" : "Claro" }).click();

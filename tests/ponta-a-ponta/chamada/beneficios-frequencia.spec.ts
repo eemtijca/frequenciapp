@@ -75,7 +75,7 @@ async function abrirBeneficios(page: Page) {
   await page.getByRole("tab", { name: "Configurações" }).click();
   await selecionarAcaoConfiguracoes(page, "Escola", "Frequência");
   const secao = page.locator('[data-secao="config-beneficios"]');
-  const regiao = secao.getByRole("region", { name: "Benefícios e frequência mínima" });
+  const regiao = secao.getByRole("region", { name: "Benefícios e frequência mínima", exact: true });
   if (!(await regiao.isVisible())) {
     await secao.getByRole("button", { name: /Benefícios e frequência mínima/ }).click();
   }

@@ -106,6 +106,17 @@ for (const largura of [390, 800]) {
       })
       .toBe(true);
 
+    await expect(aviso).toBeVisible();
+    await expect
+      .poll(async () => {
+        const caixaAviso = await aviso.boundingBox();
+        return (
+          caixaAviso !== null &&
+          caixaAviso.y >= (caixaCabecalho?.y ?? 0) + (caixaCabecalho?.height ?? 0)
+        );
+      })
+      .toBe(true);
+
     // A navegação segue real; o pré-aquecimento reduz trabalho, mas não garante
     // que a interação termine antes de o aviso expirar e não cobre Chamada fria.
     await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
@@ -121,7 +132,6 @@ for (const largura of [390, 800]) {
       hasTouch ? "touchstart" : "pointerdown",
     );
 
-    await expect(aviso).toBeVisible();
     if (hasTouch) await gestao.tap();
     else await gestao.click();
     const registro = await testemunha.jsonValue();

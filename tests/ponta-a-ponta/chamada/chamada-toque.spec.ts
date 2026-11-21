@@ -44,7 +44,14 @@ test.describe("toque", () => {
     const { aluno, x, y } = await abrirChamada(page);
     await page.touchscreen.tap(x, y);
     await expect(aluno).toHaveAttribute("aria-pressed", "true");
-    await page.touchscreen.tap(x, y);
+    // A linha cresce com o campo de justificativa; o segundo toque usa o centro atual.
+    const caixa = await aluno
+      .locator("xpath=ancestor::*[@data-faixa-toque]")
+      .locator("span", { hasText: /^(P|F)$/ })
+      .last()
+      .boundingBox();
+    if (!caixa) throw new Error("Marca da linha sem posição após a primeira falta.");
+    await page.touchscreen.tap(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
     await expect(aluno).toHaveAttribute("aria-pressed", "false");
   });
 });

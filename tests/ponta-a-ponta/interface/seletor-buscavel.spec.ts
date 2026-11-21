@@ -15,7 +15,6 @@ test.afterAll(limparMassaE2E);
 
 test("buscar uma turma mantém o formulário aberto ao reduzir a tela e cancelar a lista", async ({
   page,
-  isMobile,
 }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
@@ -24,11 +23,11 @@ test("buscar uma turma mantém o formulário aberto ao reduzir a tela e cancelar
   await page.getByRole("button", { name: "Novo aluno", exact: true }).click();
   const formulario = page.getByRole("dialog", { name: "Novo aluno", exact: true });
   const turma = formulario.getByRole("combobox", { name: "Turma atual", exact: true });
+  // A lista acompanha a janela: reduza antes de abrir para testar o painel estreito.
+  await page.setViewportSize({ width: 360, height: 500 });
   await turma.click();
   const busca = turma;
-  if (isMobile) await busca.tap();
-  else await busca.click();
-  await page.setViewportSize({ width: 360, height: 500 });
+  await busca.press("Control+A");
   await busca.pressSequentially("E2E Ano");
   await expect(busca).toHaveValue("E2E Ano");
   await expect(busca).toBeFocused();
@@ -38,10 +37,10 @@ test("buscar uma turma mantém o formulário aberto ao reduzir a tela e cancelar
   await expect(turma).toBeFocused();
   await expect(formulario).toBeVisible();
   await turma.click();
-  await expect(busca).toHaveValue("");
+  await busca.press("Control+A");
   await busca.pressSequentially("E2E Ano A");
   await busca.press("Enter");
-  await expect(turma).toContainText("E2E Ano A");
+  await expect(turma).toHaveValue("E2E Ano A");
   await expect(formulario).toBeVisible();
   await formulario.getByRole("button", { name: "Cancelar", exact: true }).click();
   await expect(formulario).toHaveCount(0);
@@ -66,19 +65,20 @@ test("a lista longa rola dentro do painel e seleciona por toque ou teclado", asy
   await expect(ultima).toBeInViewport();
   if (isMobile) await ultima.tap();
   else await ultima.click();
-  await expect(aluno).toContainText("E2E Lista 30");
+  await expect(aluno).toHaveValue("E2E Lista 30 · E2E Ano A");
   await expect(page.getByRole("listbox")).toHaveCount(0);
   await aluno.press("ArrowDown");
   await expect(busca).toBeFocused();
   await busca.press("ArrowDown");
   await expect(lista.getByRole("option").first()).toBeInViewport();
   await busca.press("Enter");
-  await expect(aluno).toContainText("E2E Aluno Dois");
+  await expect(aluno).toHaveValue("E2E Aluno Dois · E2E Ano A");
   await aluno.click();
+  await busca.press("Control+A");
   await busca.pressSequentially("E2E Lista 01");
   await expect(lista.getByRole("option")).toHaveCount(1);
   // Clicar fora cancela a escolha sem alterar o aluno selecionado.
   await page.getByRole("heading", { name: "Registrar saída", exact: true }).click();
   await expect(page.getByRole("listbox")).toHaveCount(0);
-  await expect(aluno).toContainText("E2E Aluno Dois");
+  await expect(aluno).toHaveValue("E2E Aluno Dois · E2E Ano A");
 });

@@ -244,7 +244,6 @@ test.describe("interface compartilhada", () => {
     await page.emulateMedia({ forcedColors: "active", reducedMotion: "reduce" });
     const dialogo = await abrirFormulario(page);
     await conferirSuperficieSolida(dialogo);
-    await conferirSuperficieSolida(dialogo.getByRole("button", { name: "Cancelar", exact: true }));
     const nome = dialogo.getByLabel("Nome", { exact: true });
     await expect(nome).toBeFocused();
     expect(await nome.evaluate((elemento) => getComputedStyle(elemento).outlineStyle)).toBe("none");

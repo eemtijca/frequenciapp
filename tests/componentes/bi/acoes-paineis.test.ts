@@ -93,6 +93,8 @@ it.each([
     await page.goto(`${url}?tema=${tema}`);
     await page.getByRole("button", { name: "Mover Primeiro" }).waitFor();
     await aguardarEsquema(page, tema);
+    // A troca de tema anima cor e fundo dos controles por 100 ms.
+    await page.waitForTimeout(200);
     await page.mouse.move(0, 0);
     const cartao = page.locator("article[data-grafico-id]").first();
     await cartao.getByRole("button", { name: "Mover Primeiro" }).waitFor();

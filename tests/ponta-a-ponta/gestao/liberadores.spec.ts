@@ -18,7 +18,7 @@ import {
 async function abrirCatalogo(page: Page) {
   await selecionarAcaoConfiguracoes(page, "Escola", "Cadastros");
   const secao = page.locator('[data-secao="config-liberadores"]');
-  const regiao = secao.getByRole("region", { name: "Quem libera as saídas" });
+  const regiao = secao.getByRole("region", { name: "Quem libera as saídas", exact: true });
   if (!(await regiao.isVisible())) {
     await secao.getByRole("button", { name: /Quem libera as saídas/ }).click();
   }
@@ -47,7 +47,7 @@ test.describe("quem libera as saídas", () => {
     await secao.getByText("Adicionar responsável", { exact: true }).click();
     await page.locator("#liberador-codigo").fill("E2E1");
     await page.locator("#liberador-rotulo").fill("E2E Porteiro");
-    await secao.getByRole("button", { name: "Adicionar" }).click();
+    await secao.getByRole("button", { name: "Adicionar", exact: true }).click();
     await expect(secao.getByText("E2E Porteiro")).toBeVisible();
     // O aviso flutua sobre o rodapé e pausa a própria saída enquanto o ponteiro o cobre.
     await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0, { timeout: 15_000 });

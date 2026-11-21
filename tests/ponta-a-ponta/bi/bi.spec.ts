@@ -343,7 +343,9 @@ test("revogação remove chave e cache, preservando as visões locais", async ({
   await page.getByText("Configurações deste navegador", { exact: true }).click();
   await page.getByRole("button", { name: "Conferir chave novamente", exact: true }).click();
   await expect(page.getByRole("button", { name: "Testar e entrar", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBeNull();
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("frequencibi:chave")))
+    .toBeNull();
   expect(
     await page.evaluate(
       () => JSON.parse(localStorage.getItem("frequencibi:personalizacao") ?? "{}").visoes.length,

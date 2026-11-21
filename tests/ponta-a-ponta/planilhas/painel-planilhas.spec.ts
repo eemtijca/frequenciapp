@@ -142,7 +142,7 @@ test("saídas no celular preserva o formulário ao trocar de ação e recolhe o 
   await expect(cartao.getByRole("button", { name: "Abrir a vista Saídas" })).toBeVisible();
   for (const acao of ["Enviar", "Organizar", "Configurar"] as const) {
     await selecionarAcaoPlanilha(cartao, acao);
-    const caixa = await navegacao.getByRole("button", { name: acao, exact: true }).boundingBox();
+    const caixa = await navegacao.getByRole("tab", { name: acao, exact: true }).boundingBox();
     expect(caixa?.height).toBeGreaterThanOrEqual(44);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,

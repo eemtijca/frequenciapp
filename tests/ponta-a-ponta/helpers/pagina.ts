@@ -183,7 +183,7 @@ export async function registrarSaida(page: Page): Promise<void> {
   await expect(dialogo).toBeVisible();
   await dialogo.getByRole("button", { name: "Registrar saída", exact: true }).click();
   await expect(dialogo).toBeHidden();
-  await expect(page.locator("#saida-aluno")).toContainText("Selecione o aluno");
+  await expect(page.locator("#saida-aluno")).toHaveValue("");
 }
 
 /** Clica em Registrar entrada, confirma o resumo e aguarda o formulário limpar. */
@@ -193,7 +193,7 @@ export async function registrarEntrada(page: Page): Promise<void> {
   await expect(dialogo).toBeVisible();
   await dialogo.getByRole("button", { name: "Registrar entrada", exact: true }).click();
   await expect(dialogo).toBeHidden();
-  await expect(page.locator("#entrada-aluno")).toContainText("Selecione o aluno");
+  await expect(page.locator("#entrada-aluno")).toHaveAttribute("placeholder", "Selecione o aluno");
 }
 
 /** Confirma o salvamento de uma frequência parcial no diálogo já aberto. */
@@ -241,7 +241,15 @@ export async function desbloquearChamada(secao: Locator): Promise<void> {
 export async function liberarSabadoSeNecessario(secao: Locator): Promise<void> {
   const liberar = secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true });
   if (!(await liberar.isVisible().catch(() => false))) return;
-  await expect(liberar).toBeEnabled();
+  const jaLiberado = secao.getByRole("button", { name: "Sábado letivo", exact: true });
+  // Depois de recarregar, o botão aparece desabilitado enquanto a chamada é lida.
+  await expect
+    .poll(async () => {
+      if (await jaLiberado.isVisible().catch(() => false)) return "liberado";
+      return (await liberar.isEnabled().catch(() => false)) ? "liberar" : "aguardando";
+    })
+    .not.toBe("aguardando");
+  if (await jaLiberado.isVisible().catch(() => false)) return;
   await liberar.click();
   const dialogo = secao
     .page()
@@ -259,19 +267,15 @@ export async function liberarSabadoSeNecessario(secao: Locator): Promise<void> {
 /** Escolhe um horário "HH:MM" pelo popover próprio, como a pessoa faria com o mouse. */
 export async function escolherHorario(page: Page, id: string, horario: string): Promise<void> {
   const [hora, minuto] = horario.split(":");
-  await page.locator(id).click();
-  const painel = page
-    .getByRole("dialog")
-    .filter({ has: page.getByRole("listbox", { name: "Horas" }) });
-  await painel
-    .getByRole("listbox", { name: "Horas" })
-    .getByRole("option", { name: hora ?? "", exact: true })
-    .click();
-  await painel
-    .getByRole("listbox", { name: "Minutos" })
-    .getByRole("option", { name: minuto ?? "", exact: true })
-    .click();
-  await expect(painel).toHaveCount(0);
+  const campo = page
+    .locator(id)
+    .locator('xpath=ancestor::div[contains(@class,"MuiPickersInputBase-root")]')
+    .first();
+  await campo.getByRole("spinbutton", { name: "Horas", exact: true }).click();
+  await page.keyboard.type(hora ?? "");
+  await campo.getByRole("spinbutton", { name: "Minutos", exact: true }).click();
+  await page.keyboard.type(minuto ?? "");
+  await page.keyboard.press("Tab");
 }
 
 /** Abre uma aba da área de saídas e entradas. */

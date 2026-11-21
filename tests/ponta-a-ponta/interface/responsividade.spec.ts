@@ -88,7 +88,7 @@ test.describe("responsividade", () => {
 
     // O símbolo acompanha a coluna dos ícones da navegação, sem deslocamento.
     const marca = await page.locator('aside img[src$="icon.svg"]').first().boundingBox();
-    const primeiroIcone = await page.locator("aside nav button svg").first().boundingBox();
+    const primeiroIcone = await page.locator('aside nav [role="button"] svg').first().boundingBox();
     expect(marca).not.toBeNull();
     expect(primeiroIcone).not.toBeNull();
     const centroMarca = (marca?.x ?? 0) + (marca?.width ?? 0) / 2;
@@ -175,7 +175,7 @@ test.describe("responsividade", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "FrequenciApp" })).toBeVisible();
     const aside = await page.locator("aside").boundingBox();
-    const principal = await page.locator("main").boundingBox();
+    const principal = await page.locator("main > div").last().boundingBox();
     expect(Math.abs((aside?.width ?? 0) - (principal?.width ?? 0))).toBeLessThanOrEqual(1);
   });
 
@@ -189,11 +189,16 @@ test.describe("responsividade", () => {
     expect(campo?.x ?? 0).toBeGreaterThanOrEqual(28);
 
     // A marca e o título acompanham o centro do cartão, não só o espaço restante.
-    const cartao = await page.locator("main .MuiPaper-root").first().boundingBox();
+    const cartao = await page
+      .locator('main section[aria-labelledby="titulo-entrada"]')
+      .boundingBox();
     const titulo = await page
       .getByRole("heading", { name: "FrequenciApp", exact: true })
       .boundingBox();
-    const marca = await page.locator('main img[src$="icon.svg"]').first().boundingBox();
+    const marca = await page
+      .locator('main section[aria-labelledby="titulo-entrada"] img')
+      .first()
+      .boundingBox();
     expect(cartao).not.toBeNull();
     expect(titulo).not.toBeNull();
     expect(marca).not.toBeNull();

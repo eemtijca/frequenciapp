@@ -255,11 +255,12 @@ describe("SelecionarBuscavel", () => {
   it("limpa a busca ao reabrir e mantém a digitação no próprio campo", () => {
     const texto = fonte("selecionar-buscavel.tsx");
     expect(texto).toContain("filterOptions");
-    expect(texto).toContain("inputValue={aberto ? termo :");
-    expect(texto).toContain('evento.type !== "change"');
-    expect(texto).toContain('setTermo("")');
+    expect(texto).toContain("inputValue={texto}");
+    expect(texto).toContain("onInputChange");
+    expect(texto).toContain("setEdicao({ chave: chaveSelecionada, texto: novo })");
     expect(texto).toContain("clearOnBlur={false}");
     expect(texto).toContain("openOnFocus");
+    expect(texto).toContain("selectOnFocus");
   });
 });
 

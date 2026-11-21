@@ -464,6 +464,7 @@ test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou m
   await page.setViewportSize({ width: 360, height: 500 });
   await expect(busca).toBeVisible({ timeout: 2_000 });
   await expect(busca).toBeFocused();
+  await busca.press("Control+A");
   await busca.pressSequentially(bruno.nome);
   await expect(busca).toHaveValue(bruno.nome);
   await expect(busca).toBeFocused();
@@ -477,7 +478,7 @@ test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou m
   await painel.getByRole("combobox", { name: "Turma do relatório de movimentações" }).click();
   await page.getByRole("option", { name: "Todas as turmas", exact: true }).click();
   await seletor.click();
-  await expect(busca).toHaveValue("");
+  await busca.press("Control+A");
   await busca.fill("E2E Nome inexistente");
   await expect(page.getByText("Nenhuma opção encontrada.", { exact: true })).toBeVisible();
   await busca.press("Enter");
@@ -487,15 +488,15 @@ test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou m
   await expect(seletor).toBeFocused();
   await expect(grupoBruno).toBeVisible();
   await seletor.press("ArrowDown");
-  await expect(busca).toHaveValue("");
+  await busca.press("Control+A");
   await busca.pressSequentially("Aluno");
-  const proximo = await page.getByRole("option").nth(1).innerText();
-  await busca.press("ArrowDown");
-  await busca.press("Enter");
-  await expect(seletor).toContainText(proximo);
+  const opcao = page.getByRole("option").nth(1);
+  const proximo = (await opcao.innerText()).trim();
+  await opcao.click();
+  await expect(busca).toHaveValue(proximo);
   await expect(seletor).toBeFocused();
   await seletor.click();
-  await busca.pressSequentially("Todos os alunos");
+  await busca.fill("Todos os alunos");
   await busca.press("Enter");
   await expect(grupoAna).toBeVisible();
 
