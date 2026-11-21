@@ -9,13 +9,7 @@ import type { Theme } from "@mui/material/styles";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 export type VarianteBotao =
-  | "principal"
-  | "neutro"
-  | "primario"
-  | "secundario"
-  | "contorno"
-  | "texto"
-  | "destrutivo";
+  "principal" | "neutro" | "primario" | "secundario" | "contorno" | "texto" | "destrutivo";
 export type TamanhoBotao = "pequeno" | "medio";
 
 const VARIANTES = {

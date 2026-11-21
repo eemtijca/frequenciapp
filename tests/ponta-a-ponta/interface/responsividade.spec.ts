@@ -34,9 +34,7 @@ test.describe("responsividade", () => {
     const tema = cabecalho.getByRole("button", { name: /tema/i });
     const caixaTema = await tema.boundingBox();
     expect(caixaTema).not.toBeNull();
-    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(
-      caixaTema?.x ?? 0,
-    );
+    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(caixaTema?.x ?? 0);
     expect((caixaTema?.x ?? 0) + (caixaTema?.width ?? 0)).toBeLessThanOrEqual(
       caixaNotificacoes?.x ?? 0,
     );

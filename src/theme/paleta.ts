@@ -205,8 +205,7 @@ export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
         selected: "rgba(0, 0, 0, 0.08)",
         disabled: cinza[500],
       },
-      baseShadow:
-        "rgba(0, 0, 0, 0.08) 0px 4px 16px, rgba(0, 0, 0, 0.08) 0px 8px 16px -5px",
+      baseShadow: "rgba(0, 0, 0, 0.08) 0px 4px 16px, rgba(0, 0, 0, 0.08) 0px 8px 16px -5px",
       falta: {
         light: vermelho[300],
         main: vermelho[500],
@@ -290,8 +289,7 @@ export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
         selected: "rgba(255, 255, 255, 0.1)",
         disabled: cinza[400],
       },
-      baseShadow:
-        "rgba(0, 0, 0, 0.35) 0px 4px 16px, rgba(0, 0, 0, 0.4) 0px 8px 16px -5px",
+      baseShadow: "rgba(0, 0, 0, 0.35) 0px 4px 16px, rgba(0, 0, 0, 0.4) 0px 8px 16px -5px",
       falta: {
         light: vermelho[200],
         main: vermelho[300],
