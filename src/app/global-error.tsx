@@ -22,10 +22,10 @@ export default function ErroGlobal({
         <style>{`
           :root {
             color-scheme: light dark;
-            --fundo: #fcfcfc;
-            --tinta: #0b0e14;
-            --tinta-fraca: #47536b;
-            --borda: #dadee7;
+            --fundo: #f6f6f6;
+            --tinta: #262626;
+            --tinta-fraca: #595959;
+            --borda: #e4e4e2;
             --verde: #1d7253;
             --verde-texto: #effaf6;
             --emblema-fundo: rgba(29, 114, 83, 0.1);
@@ -33,10 +33,10 @@ export default function ErroGlobal({
           }
           @media (prefers-color-scheme: dark) {
             :root {
-              --fundo: #05070a;
+              --fundo: #141413;
               --tinta: #ffffff;
-              --tinta-fraca: #94a0b8;
-              --borda: #333b4c;
+              --tinta-fraca: #a6a6a6;
+              --borda: #393837;
               --verde: #81cfb3;
               --verde-texto: #082b1e;
               --emblema-fundo: rgba(129, 207, 179, 0.15);

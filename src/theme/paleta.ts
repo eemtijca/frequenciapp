@@ -29,6 +29,7 @@ declare module "@mui/material/styles" {
 
   interface Palette {
     baseShadow: string;
+    bordaControle: string;
     falta: CorSemantica;
     justificada: CorSemantica;
     alerta: CorSemantica;
@@ -36,6 +37,7 @@ declare module "@mui/material/styles" {
 
   interface PaletteOptions {
     baseShadow?: string;
+    bordaControle?: string;
     falta?: CorSemanticaOptions;
     justificada?: CorSemanticaOptions;
     alerta?: CorSemanticaOptions;
@@ -56,18 +58,18 @@ export const brand = {
   900: "hsl(158, 70%, 10%)",
 } as const;
 
-/** Cinza grafite do template, usado em texto, bordas e botões neutros. */
+/** Rampa grafite neutra para texto, bordas e controles. */
 export const cinza = {
-  50: "hsl(220, 35%, 97%)",
-  100: "hsl(220, 30%, 94%)",
-  200: "hsl(220, 20%, 88%)",
-  300: "hsl(220, 20%, 80%)",
-  400: "hsl(220, 20%, 65%)",
-  500: "hsl(220, 20%, 42%)",
-  600: "hsl(220, 20%, 35%)",
-  700: "hsl(220, 20%, 25%)",
-  800: "hsl(220, 30%, 6%)",
-  900: "hsl(220, 35%, 3%)",
+  50: "#f6f6f6",
+  100: "#eeeeee",
+  200: "#dddddd",
+  300: "#c7c7c7",
+  400: "#a6a6a6",
+  500: "#797979",
+  600: "#595959",
+  700: "#414141",
+  800: "#262626",
+  900: "#141413",
 } as const;
 
 /** Azul da informação e da falta justificada, separado do verde da marca. */
@@ -141,8 +143,8 @@ export function coresGrafico(tema: Theme): string[] {
 
 /** Cores de navegador equivalentes ao fundo padrão de cada esquema. */
 export const CORES_NAVEGADOR = {
-  claro: "#fcfcfc",
-  escuro: "#05070a",
+  claro: cinza[50],
+  escuro: cinza[900],
 } as const;
 
 export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
@@ -187,10 +189,11 @@ export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
       grey: {
         ...cinza,
       },
-      divider: "hsla(220, 20%, 80%, 0.6)",
+      divider: "#e4e4e2",
+      bordaControle: cinza[500],
       background: {
-        default: "hsl(0, 0%, 99%)",
-        paper: cinza[50],
+        default: CORES_NAVEGADOR.claro,
+        paper: "#ffffff",
       },
       text: {
         primary: cinza[800],
@@ -198,12 +201,12 @@ export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
         disabled: cinza[600],
       },
       action: {
-        hover: "hsla(220, 30%, 94%, 0.2)",
-        selected: "hsla(220, 30%, 94%, 0.3)",
+        hover: "rgba(0, 0, 0, 0.04)",
+        selected: "rgba(0, 0, 0, 0.08)",
         disabled: cinza[500],
       },
       baseShadow:
-        "hsla(220, 30%, 5%, 0.07) 0px 4px 16px 0px, hsla(220, 25%, 10%, 0.07) 0px 8px 16px -5px",
+        "rgba(0, 0, 0, 0.08) 0px 4px 16px, rgba(0, 0, 0, 0.08) 0px 8px 16px -5px",
       falta: {
         light: vermelho[300],
         main: vermelho[500],
@@ -271,10 +274,11 @@ export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
       grey: {
         ...cinza,
       },
-      divider: "hsla(220, 20%, 25%, 0.6)",
+      divider: "#393837",
+      bordaControle: cinza[500],
       background: {
-        default: cinza[900],
-        paper: "hsl(220, 30%, 7%)",
+        default: CORES_NAVEGADOR.escuro,
+        paper: "#1f1e1d",
       },
       text: {
         primary: "hsl(0, 0%, 100%)",
@@ -282,12 +286,12 @@ export const colorSchemes: Record<"light" | "dark", ColorSystemOptions> = {
         disabled: cinza[400],
       },
       action: {
-        hover: "hsla(220, 20%, 35%, 0.2)",
-        selected: "hsla(220, 20%, 35%, 0.3)",
+        hover: "rgba(255, 255, 255, 0.06)",
+        selected: "rgba(255, 255, 255, 0.1)",
         disabled: cinza[400],
       },
       baseShadow:
-        "hsla(220, 30%, 5%, 0.7) 0px 4px 16px 0px, hsla(220, 25%, 10%, 0.8) 0px 8px 16px -5px",
+        "rgba(0, 0, 0, 0.35) 0px 4px 16px, rgba(0, 0, 0, 0.4) 0px 8px 16px -5px",
       falta: {
         light: vermelho[200],
         main: vermelho[300],
