@@ -141,6 +141,18 @@ export function coresGrafico(tema: Theme): string[] {
   ];
 }
 
+// Verdes institucionais e grafites para categorias, sem significado de presença ou falta.
+export const CORES_CATEGORIAS = [
+  { claro: brand[700], escuro: brand[400] },
+  { claro: cinza[600], escuro: cinza[400] },
+  { claro: "#38886a", escuro: "#9ccab7" },
+  { claro: cinza[500], escuro: cinza[300] },
+  { claro: brand[800], escuro: brand[300] },
+  { claro: cinza[700], escuro: "#858585" },
+  { claro: "#57846f", escuro: "#5d9e83" },
+  { claro: cinza[800], escuro: cinza[200] },
+] as const;
+
 /** Cores de navegador equivalentes ao fundo padrão de cada esquema. */
 export const CORES_NAVEGADOR = {
   claro: cinza[50],

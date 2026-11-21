@@ -4,12 +4,13 @@
 import { useState } from "react";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import { BotaoIcone } from "@/components/ui/mui/botao";
 import { CarrosselCartoes, type ItemCarrossel } from "@/components/ui/mui/carrossel-cartoes";
 import { Selecionar } from "@/components/ui/mui/selecionar";
+import { CartaoTitulo } from "@/components/ui/mui/cartao";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   itens: ItemCarrossel[];
@@ -18,7 +19,7 @@ interface Props {
   ocupado?: boolean;
 }
 
-const TAMANHO_CONTROLE = 44;
+const TAMANHO_CONTROLE = TOKENS_LAYOUT.alvoToque;
 
 export default function FaixaGraficos({ itens, valor, onValor, ocupado }: Props) {
   const indice = Math.max(
@@ -44,15 +45,13 @@ export default function FaixaGraficos({ itens, valor, onValor, ocupado }: Props)
       <Stack spacing={2}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
-          spacing={2}
+          spacing={{ xs: 1, sm: 2 }}
           sx={{
             alignItems: { xs: "stretch", sm: "center" },
             justifyContent: "space-between",
           }}
         >
-          <Typography component="h2" variant="subtitle2">
-            Gráficos
-          </Typography>
+          <CartaoTitulo>Gráficos</CartaoTitulo>
           <Stack
             direction="row"
             spacing={1}
@@ -65,6 +64,7 @@ export default function FaixaGraficos({ itens, valor, onValor, ocupado }: Props)
                 minWidth: 0,
                 flex: { xs: 1, sm: "none" },
                 width: { xs: "100%", sm: 224 },
+                "& .MuiInputBase-root": { minHeight: TAMANHO_CONTROLE },
               }}
             >
               <Selecionar

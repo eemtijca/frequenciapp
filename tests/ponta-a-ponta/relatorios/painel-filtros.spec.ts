@@ -149,7 +149,9 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     await abrirSerie();
     await expect(progresso).toHaveAttribute("aria-valuenow", "0");
     await expect(progresso).toHaveAttribute("aria-valuetext", "0 de 3 alunos com chamada salva");
-    await expect(cartao.getByText("0/3 alunos")).toHaveCount(0);
+    await expect(
+      cartao.getByText("0 de 3 alunos com chamada salva", { exact: true }),
+    ).toBeVisible();
     await expect(progresso).toHaveAccessibleDescription(
       "E2E Painel Dois A: pendente; E2E Painel Dois B: pendente",
     );
@@ -174,7 +176,9 @@ test("cobertura distingue chamadas pendentes, parciais, completas e série vazia
     await abrirSerie();
     await expect(progresso).toHaveAttribute("aria-valuenow", "66");
     await expect(progresso).toHaveAttribute("aria-valuetext", "2 de 3 alunos com chamada salva");
-    await expect(cartao.getByText("2/3 alunos")).toHaveCount(0);
+    await expect(
+      cartao.getByText("2 de 3 alunos com chamada salva", { exact: true }),
+    ).toBeVisible();
     const percentual = await cartao.getByText("66%", { exact: true }).boundingBox();
     const barra = await progresso.boundingBox();
     expect(
@@ -466,17 +470,15 @@ test.describe("infrequência do dia", () => {
     await escola
       .getByRole("img", { name: "Faltas do dia por série", exact: true })
       .scrollIntoViewIfNeeded();
-    // O número fica compacto, mas a cobertura continua legível por tecnologia assistiva.
-    await expect(
-      escola.getByRole("img", { name: "1 de 1 alunos com chamada", exact: true }),
-    ).toHaveText("1 alunos");
-    await testInfo.attach("Legenda compacta clara", {
+    const legenda = escola.getByRole("table", { name: "Legenda de Faltas do dia por série" });
+    await expect(legenda.getByText("1 de 1 alunos com chamada", { exact: true })).toBeVisible();
+    await testInfo.attach("Legenda clara", {
       body: await escola.screenshot(),
       contentType: "image/png",
     });
     await page.emulateMedia({ colorScheme: "dark" });
     await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", "dark");
-    await testInfo.attach("Legenda compacta escura", {
+    await testInfo.attach("Legenda escura", {
       body: await escola.screenshot(),
       contentType: "image/png",
     });
@@ -616,7 +618,9 @@ test.describe("gráfico personalizado por período", () => {
       painel.getByRole("img", { name: "Faltas do período por turma da E2E Painel Um" }),
     ).toBeVisible();
     await expect(resumo.locator("strong")).toHaveText(["1", "2", "0", "50%"]);
-    await expect(painel.getByRole("list")).not.toContainText("E2E Painel Dois");
+    await expect(painel.getByRole("table", { name: /^Legenda de / })).not.toContainText(
+      "E2E Painel Dois",
+    );
 
     await rolarAteGrafico(page, "Toda a escola");
     await expect(painel).toHaveCount(0);

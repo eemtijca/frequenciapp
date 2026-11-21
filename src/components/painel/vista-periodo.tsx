@@ -271,16 +271,19 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
               </Grid>
             </Box>
             <GraficoRosca
-              tomValores="falta"
               titulo={
                 serie
                   ? `Faltas do período por turma da ${serie.nome}`
                   : "Faltas do período por série"
               }
               fatias={selecionados.map((item) => ({
+                categoriaId: "turmaId" in item ? item.turmaId : item.serieId,
                 nome: "rotulo" in item ? item.rotulo : item.nome,
                 valor: ausencias(item),
-                detalhe: `${percentual.format(infrequencia(item))} de infrequência`,
+                detalhe:
+                  item.registrados > 0
+                    ? `${percentual.format(infrequencia(item))} de infrequência`
+                    : "Sem dados de infrequência",
               }))}
               vazio={
                 resumo.registrados === 0
