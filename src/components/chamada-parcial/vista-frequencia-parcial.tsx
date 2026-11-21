@@ -123,27 +123,9 @@ function categoriaDaSituacao(
   return "falta";
 }
 
-function estilosDaSituacao(tema: Theme, categoria: CategoriaSituacao) {
-  const { palette } = tema.vars;
-  if (categoria === "falta")
-    return { backgroundColor: palette.falta.fraco, color: palette.falta.texto };
-  if (categoria === "justificada")
-    return { backgroundColor: palette.justificada.fraco, color: palette.justificada.texto };
-  if (categoria === "presente")
-    return {
-      backgroundColor: palette.success.main,
-      color: palette.success.contrastText,
-      ...tema.applyStyles("dark", {
-        backgroundColor: palette.success.dark,
-        color: palette.success.light,
-      }),
-    };
-  return {};
-}
-
 function tomDaSituacao(categoria: CategoriaSituacao): TomSelo {
   if (categoria === "falta") return "perigo";
-  if (categoria === "justificada") return "atencao";
+  if (categoria === "justificada") return "informacao";
   if (categoria === "presente") return "sucesso";
   return "neutro";
 }
@@ -252,14 +234,7 @@ function momentoDaConfirmacao(
 }
 
 function SeloDaSituacao({ resumo, categoria }: { resumo: string; categoria: CategoriaSituacao }) {
-  return (
-    <Selo
-      rotulo={resumo}
-      tom={tomDaSituacao(categoria)}
-      title={resumo}
-      sx={[(tema) => estilosDaSituacao(tema, categoria), ESTILO_SELO]}
-    />
-  );
+  return <Selo rotulo={resumo} tom={tomDaSituacao(categoria)} title={resumo} sx={ESTILO_SELO} />;
 }
 
 function StatusSeduc({

@@ -192,8 +192,12 @@ function estilosMarca(theme: Theme, estado: "P" | "F" | "FJ" | "D", naoIniciada:
   }
   return {
     ...base,
-    backgroundColor: palette.action.selected,
-    color: palette.primary.main,
+    backgroundColor: palette.success.light,
+    color: palette.success.dark,
+    ...theme.applyStyles("dark", {
+      backgroundColor: palette.success.dark,
+      color: palette.success.light,
+    }),
   };
 }
 

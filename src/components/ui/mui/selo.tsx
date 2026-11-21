@@ -2,12 +2,13 @@
 import type { ReactNode } from "react";
 import Chip, { type ChipProps } from "@mui/material/Chip";
 
-export type TomSelo = "neutro" | "sucesso" | "atencao" | "perigo";
+export type TomSelo = "neutro" | "sucesso" | "informacao" | "atencao" | "perigo";
 export type TamanhoSelo = "pequeno" | "medio";
 
 const TONS = {
   neutro: "default",
   sucesso: "success",
+  informacao: "info",
   atencao: "warning",
   perigo: "error",
 } as const satisfies Record<TomSelo, ChipProps["color"]>;
