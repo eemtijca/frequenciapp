@@ -7,7 +7,17 @@ import {
   type JustificativaAntecipada,
   type RevisaoJustificativaAntecipada,
 } from "@/domain/justificativas-antecipadas";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type ReactNode,
+  type Ref,
+} from "react";
 import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
@@ -28,6 +38,7 @@ import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import Collapse from "@mui/material/Collapse";
 import Fade from "@mui/material/Fade";
+import Grid from "@mui/material/Grid";
 import Grow from "@mui/material/Grow";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -80,7 +91,7 @@ import { Selecionar } from "@/components/ui/mui/selecionar";
 import { Selo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
-import { LayoutConteudo } from "@/components/layout/layout-conteudo";
+import { ESPACAMENTO_LATERAL_CONTEUDO, LayoutConteudo } from "@/components/layout/layout-conteudo";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
 import { SeletorTurmaChamada } from "@/components/chamada/seletor-turma-chamada";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
@@ -88,6 +99,7 @@ import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type { AlertaFrequenciaBeneficio } from "@/domain/beneficios-frequencia";
 import { AvisoBeneficioFrequencia } from "@/components/chamada/aviso-beneficio-frequencia";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 type Filtro = "todos" | "faltas" | "justificadas" | "presentes";
 
@@ -156,19 +168,18 @@ const VISUALMENTE_OCULTO = {
   border: 0,
 } as const;
 
-function estilosMarca(theme: Theme, estado: "P" | "F" | "FJ" | "D", naoIniciada: boolean) {
+function estilosMarca(theme: Theme, estado: "P" | "F" | "FJ" | "D") {
   const palette = theme.vars.palette;
   const base = {
     display: "flex",
-    height: 44,
-    minWidth: 64,
+    minHeight: 32,
+    minWidth: 56,
     flexShrink: 0,
     alignItems: "center",
     justifyContent: "center",
-    gap: 0.75,
-    border: "1px solid transparent",
+    gap: 0.5,
     borderRadius: 2,
-    paddingX: 1.25,
+    paddingX: 1,
     fontSize: "0.875rem",
     fontWeight: 600,
     pointerEvents: "none" as const,
@@ -187,25 +198,15 @@ function estilosMarca(theme: Theme, estado: "P" | "F" | "FJ" | "D", naoIniciada:
   if (estado === "D") {
     return { ...base, backgroundColor: palette.action.hover, color: palette.text.secondary };
   }
-  if (naoIniciada) {
-    return { ...base, backgroundColor: palette.action.hover, color: palette.text.secondary };
-  }
-  return {
-    ...base,
-    backgroundColor: palette.success.light,
-    color: palette.success.dark,
-    ...theme.applyStyles("dark", {
-      backgroundColor: palette.success.dark,
-      color: palette.success.light,
-    }),
-  };
+  return { ...base, color: palette.text.secondary };
 }
 
-function BarraSalvamento({ children, rotulo }: { children: ReactNode; rotulo: string }) {
+function BarraSalvamento({ children, ref }: { children: ReactNode; ref: Ref<HTMLElement> }) {
   return (
     <Paper
       component="footer"
-      aria-label={rotulo}
+      ref={ref}
+      aria-label="Barra de salvamento"
       elevation={0}
       square
       sx={(theme) => ({
@@ -215,16 +216,13 @@ function BarraSalvamento({ children, rotulo }: { children: ReactNode; rotulo: st
         display: "flex",
         alignItems: "center",
         gap: 1,
-        marginTop: 2,
-        paddingTop: 1,
-        paddingX: 1,
+        paddingTop: 0.5,
         paddingLeft: "calc(8px + env(safe-area-inset-left, 0px))",
         paddingRight: "calc(8px + env(safe-area-inset-right, 0px))",
-        paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))",
+        paddingBottom: "calc(4px + env(safe-area-inset-bottom, 0px))",
         border: `1px solid ${theme.vars.palette.divider}`,
         borderRadius: 2,
         backgroundColor: theme.vars.palette.background.paper,
-        boxShadow: theme.shadows[4],
       })}
     >
       {children}
@@ -267,6 +265,7 @@ export default function VistaFrequencia({
   const [sabadoDesbloqueado, setSabadoDesbloqueado] = useState<string | null>(null);
   const idResumo = useId();
   const listaAlunosRef = useRef<HTMLUListElement>(null);
+  const barraSalvamentoRef = useRef<HTMLElement>(null);
   const [revisaoSalva, setRevisaoSalva] = useState(0);
   const [edicaoLiberada, setEdicaoLiberada] = useState(false);
   // Lista gravada da chamada; nula enquanto o dia não foi salvo.
@@ -1060,33 +1059,58 @@ export default function VistaFrequencia({
     return justificativas.get(alunoId) ? "FJ" : "F";
   };
 
+  function manterFocoAcimaDaBarra({ currentTarget, target }: FocusEvent<HTMLElement>) {
+    if (!(target instanceof HTMLElement) || !currentTarget.contains(target)) return;
+    // O navegador considera a área rolável, mas não desconta o rodapé sticky.
+    requestAnimationFrame(() => {
+      const barra = barraSalvamentoRef.current;
+      if (!barra || document.activeElement !== target || !target.matches(":focus-visible")) return;
+      const controle = target.matches("[data-marcar-falta]")
+        ? (target.closest("[data-faixa-toque]") ?? target)
+        : target;
+      if (controle.getBoundingClientRect().bottom + 8 > barra.getBoundingClientRect().top) {
+        controle.scrollIntoView({ block: "center", inline: "nearest" });
+      }
+    });
+  }
+
   return (
-    <LayoutConteudo largura="larga">
+    <Box sx={{ p: nav.resumo ? ESPACAMENTO_LATERAL_CONTEUDO : 0 }}>
       <Box
         component="section"
         aria-label="Fazer chamada"
-        sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0, pb: 2 }}
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 1,
+          minWidth: 0,
+          // No fim da lista, a barra encosta na área rolável do shell, sem subir sob os avisos.
+          ...(nav.resumo ? { pb: 2 } : { mb: { xs: -2, sm: -3, lg: -4 } }),
+        }}
       >
         <Typography component="h1" sx={VISUALMENTE_OCULTO}>
           Chamada
         </Typography>
 
-        <Box
-          sx={{
-            display: "grid",
-            gap: 2,
-            alignItems: "start",
-            gridTemplateColumns: { xs: "minmax(0, 1fr)", xl: "minmax(0, 1fr) 20rem" },
-          }}
+        <Grid
+          container
+          columns={{ xs: 4, sm: 8, md: 12 }}
+          spacing={nav.resumo ? 2 : 1}
+          sx={{ alignItems: "flex-start" }}
+          onFocus={nav.resumo ? undefined : manterFocoAcimaDaBarra}
         >
-          <Stack
+          <Grid
+            size={{ xs: 4, sm: 8, md: 12, xl: nav.resumo ? "auto" : 5 }}
             data-coluna="painel"
-            spacing={2}
             sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: nav.resumo ? 2 : 1,
               minWidth: 0,
               order: { xs: 1, xl: 2 },
               position: { xl: "sticky" },
               top: { xl: 16 },
+              ...(nav.resumo ? { width: { xl: "20rem" } } : {}),
             }}
           >
             {turmas.length > 1 && (
@@ -1161,9 +1185,23 @@ export default function VistaFrequencia({
             </Stack>
 
             {!nav.resumo && (
-              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                <AtualizadoDaVisao fuso={fuso} />
-              </Box>
+              <Stack
+                direction="row"
+                sx={{
+                  alignItems: "baseline",
+                  justifyContent: "space-between",
+                  flexWrap: "wrap",
+                  columnGap: 1,
+                  rowGap: 0.5,
+                }}
+              >
+                {turma && (
+                  <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
+                    {turma.rotulo}
+                  </Typography>
+                )}
+                <AtualizadoDaVisao fuso={fuso} sx={{ whiteSpace: "normal" }} />
+              </Stack>
             )}
 
             {nav.mostrarVoltar && (
@@ -1243,11 +1281,15 @@ export default function VistaFrequencia({
                   </Typography>
                 )}
 
-                <Box
+                <Stack
+                  direction={ehSabado ? "column" : "row"}
+                  spacing={1}
                   sx={{
-                    display: "grid",
-                    gridTemplateColumns: ehSabado ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))",
-                    gap: 1,
+                    "& > button": {
+                      flex: "1 1 0",
+                      minWidth: 0,
+                      minHeight: TOKENS_LAYOUT.alvoToque,
+                    },
                   }}
                 >
                   <Botao
@@ -1258,11 +1300,6 @@ export default function VistaFrequencia({
                     aria-controls={idResumo}
                     onClick={() => setResumoAberto((atual) => !atual)}
                     icone={<InsightsRoundedIcon fontSize="small" />}
-                    sx={{
-                      minHeight: 48,
-                      minWidth: 0,
-                      ...(revisaoSalva === 0 ? { gridColumn: "1 / -1" } : {}),
-                    }}
                   >
                     Resumo
                     <ExpandMoreRoundedIcon
@@ -1300,7 +1337,7 @@ export default function VistaFrequencia({
                           <LockOpenRoundedIcon fontSize="small" />
                         )
                       }
-                      sx={{ minHeight: 48, whiteSpace: "normal", px: 2 }}
+                      sx={{ whiteSpace: "normal", px: 2 }}
                     >
                       {sabadoLiberado ? "Sábado letivo" : "Desbloquear sábado letivo"}
                     </Botao>
@@ -1327,12 +1364,11 @@ export default function VistaFrequencia({
                           <LockRoundedIcon fontSize="small" />
                         )
                       }
-                      sx={{ minHeight: 48, minWidth: 0 }}
                     >
                       {chamadaBloqueada ? "Editar" : "Bloquear"}
                     </Botao>
                   )}
-                </Box>
+                </Stack>
 
                 {erro || conflito ? (
                   <Fade in appear={!semMovimento} timeout={semMovimento ? 0 : 180}>
@@ -1365,9 +1401,19 @@ export default function VistaFrequencia({
                 ) : null}
               </>
             )}
-          </Stack>
+          </Grid>
 
-          <Stack data-coluna="lista" spacing={2} sx={{ minWidth: 0, order: { xs: 2, xl: 1 } }}>
+          <Grid
+            size={{ xs: 4, sm: 8, md: 12, xl: nav.resumo ? "grow" : 7 }}
+            data-coluna="lista"
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: nav.resumo ? 2 : 1,
+              minWidth: 0,
+              order: { xs: 2, xl: 1 },
+            }}
+          >
             {nav.resumo && nav.semana ? (
               <VistaResumoSemana
                 turmas={turmasDoResumo}
@@ -1423,14 +1469,7 @@ export default function VistaFrequencia({
                       </Typography>
                     </Box>
                     <Box sx={{ borderBottom: 1, borderColor: "divider", p: 1.5 }}>
-                      <Box
-                        aria-label="Resumo da chamada"
-                        sx={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
-                          gap: 1,
-                        }}
-                      >
+                      <Stack direction="row" spacing={1} aria-label="Resumo da chamada">
                         {(
                           [
                             ["faltas", "Faltas", contagemFaltas],
@@ -1451,6 +1490,8 @@ export default function VistaFrequencia({
                               }
                               sx={(tema) => ({
                                 display: "flex",
+                                flex: "1 1 0",
+                                minWidth: 0,
                                 minHeight: 64,
                                 flexDirection: "column",
                                 alignItems: "center",
@@ -1489,14 +1530,18 @@ export default function VistaFrequencia({
                               <Typography
                                 component="span"
                                 variant="caption"
-                                sx={{ color: "text.secondary", fontWeight: 500 }}
+                                sx={{
+                                  color: "text.secondary",
+                                  fontWeight: 500,
+                                  overflowWrap: "anywhere",
+                                }}
                               >
                                 {rotulo}
                               </Typography>
                             </ButtonBase>
                           );
                         })}
-                      </Box>
+                      </Stack>
                     </Box>
                     {(() => {
                       const ausentes = ativosDaTurma.filter((aluno) => ausencias.has(aluno.id));
@@ -1595,11 +1640,11 @@ export default function VistaFrequencia({
                       sx={{
                         display: "flex",
                         alignItems: "center",
-                        gap: 1.5,
+                        gap: 1,
                         borderBottom: 1,
                         borderColor: "divider",
                         px: 2,
-                        py: 1.5,
+                        py: 0.5,
                       }}
                     >
                       {chamadaNaoIniciada ? (
@@ -1635,10 +1680,12 @@ export default function VistaFrequencia({
                       </Box>
                       {chamadaNaoIniciada && (
                         <Botao
+                          variante="texto"
                           tamanho="pequeno"
                           disabled={bloqueado}
                           onClick={iniciarChamada}
                           icone={<PlayArrowRoundedIcon fontSize="small" />}
+                          sx={{ minHeight: TOKENS_LAYOUT.alvoToque, flexShrink: 0 }}
                         >
                           Iniciar
                         </Botao>
@@ -1673,7 +1720,11 @@ export default function VistaFrequencia({
                         <Typography variant="body2">Carregando chamada...</Typography>
                       </Stack>
                       {[0, 1, 2].map((linha) => (
-                        <Skeleton key={linha} variant="rounded" height={64} />
+                        <Skeleton
+                          key={linha}
+                          variant="rounded"
+                          height={TOKENS_LAYOUT.tabela.linha}
+                        />
                       ))}
                     </Stack>
                   ) : ativosDaTurma.length === 0 ? (
@@ -1752,13 +1803,13 @@ export default function VistaFrequencia({
                                 data-aluno={aluno.id}
                                 sx={{
                                   display: "flex",
-                                  minHeight: 72,
+                                  minHeight: TOKENS_LAYOUT.tabela.linha,
                                   minWidth: 0,
                                   flex: 1,
                                   alignItems: "center",
-                                  gap: 1.5,
-                                  px: 2,
-                                  py: 1.5,
+                                  gap: 1,
+                                  px: { xs: 1, sm: 2 },
+                                  py: 0.5,
                                   position: "relative",
                                   ...(bloqueado || desistente
                                     ? {}
@@ -1803,6 +1854,7 @@ export default function VistaFrequencia({
                                         display: "flex",
                                         minWidth: 0,
                                         alignItems: "center",
+                                        flexWrap: "wrap",
                                         gap: 1,
                                         borderRadius: 1,
                                         color: "text.primary",
@@ -1825,8 +1877,11 @@ export default function VistaFrequencia({
                                       <Typography
                                         component="span"
                                         variant="body2"
-                                        noWrap
-                                        sx={{ minWidth: 0, fontWeight: faltando ? 600 : 500 }}
+                                        sx={{
+                                          minWidth: 0,
+                                          overflowWrap: "anywhere",
+                                          fontWeight: faltando ? 600 : 500,
+                                        }}
                                       >
                                         {nomeExibido}
                                       </Typography>
@@ -1914,14 +1969,7 @@ export default function VistaFrequencia({
                                     data-nao-iniciada={
                                       chamadaNaoIniciada && !desistente && !faltando
                                     }
-                                    sx={(tema) => ({
-                                      ...estilosMarca(
-                                        tema,
-                                        estado,
-                                        chamadaNaoIniciada && !desistente && !faltando,
-                                      ),
-                                      opacity: esmaecida ? 0.6 : 1,
-                                    })}
+                                    sx={(tema) => estilosMarca(tema, estado)}
                                   >
                                     {estado === "FJ" && (
                                       <DescriptionRoundedIcon
@@ -2084,11 +2132,11 @@ export default function VistaFrequencia({
                 </Paper>
               </>
             )}
-          </Stack>
-        </Box>
+          </Grid>
+        </Grid>
 
         {!nav.resumo && (
-          <BarraSalvamento rotulo="Barra de salvamento">
+          <BarraSalvamento ref={barraSalvamentoRef}>
             <Typography
               component="p"
               aria-live="polite"
@@ -2097,7 +2145,6 @@ export default function VistaFrequencia({
               sx={{
                 minWidth: 0,
                 flex: 1,
-                px: 1,
                 color: "text.secondary",
                 fontWeight: 500,
                 overflowWrap: "anywhere",
@@ -2113,11 +2160,16 @@ export default function VistaFrequencia({
                 icone={<RestartAltRoundedIcon fontSize="small" />}
                 disabled={salvando}
                 onClick={() => setDescartarAberto(true)}
-                sx={{ flexShrink: 0 }}
+                sx={{
+                  flexShrink: 0,
+                  width: TOKENS_LAYOUT.alvoToque,
+                  height: TOKENS_LAYOUT.alvoToque,
+                }}
               />
             )}
             <Botao
-              variante={chamadaNaoIniciada ? "secundario" : "primario"}
+              variante="principal"
+              tamanho="pequeno"
               onClick={() => setConfirmarSalvamento(true)}
               disabled={!podeSalvar}
               carregando={salvando}
@@ -2128,7 +2180,7 @@ export default function VistaFrequencia({
                   <SaveRoundedIcon fontSize="small" />
                 )
               }
-              sx={{ flexShrink: 0, minHeight: 48 }}
+              sx={{ flexShrink: 0, minHeight: TOKENS_LAYOUT.alvoToque }}
             >
               {salvando ? "Salvando..." : "Salvar"}
             </Botao>
@@ -2146,10 +2198,9 @@ export default function VistaFrequencia({
                 ? `A versão salva de ${turma?.rotulo ?? "turma"} em ${rotuloDia} será substituída pelas marcações atuais e a chamada voltará a ficar bloqueada.`
                 : `Confira as marcações de ${turma?.rotulo ?? "turma"} em ${rotuloDia}. A chamada será bloqueada para edição depois do salvamento.`}
             </Typography>
-            <Box
+            <Stack
+              direction="row"
               sx={{
-                display: "grid",
-                gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
                 border: 1,
                 borderColor: "divider",
                 borderRadius: 2,
@@ -2167,6 +2218,8 @@ export default function VistaFrequencia({
                   key={rotulo}
                   sx={{
                     display: "flex",
+                    flex: "1 1 0",
+                    minWidth: 0,
                     flexDirection: "column",
                     alignItems: "center",
                     gap: 0.25,
@@ -2175,7 +2228,15 @@ export default function VistaFrequencia({
                     ...(indice > 0 ? { borderLeft: 1, borderColor: "divider" } : {}),
                   }}
                 >
-                  <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 500 }}>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: "text.secondary",
+                      fontWeight: 500,
+                      overflowWrap: "anywhere",
+                      textAlign: "center",
+                    }}
+                  >
                     {rotulo}
                   </Typography>
                   <Typography
@@ -2186,7 +2247,7 @@ export default function VistaFrequencia({
                   </Typography>
                 </Box>
               ))}
-            </Box>
+            </Stack>
             {sabadoLiberado && (
               <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Sábado letivo liberado para esta turma e data.
@@ -2284,6 +2345,6 @@ export default function VistaFrequencia({
           />
         </Campo>
       </Dialogo>
-    </LayoutConteudo>
+    </Box>
   );
 }
