@@ -114,7 +114,8 @@ for (const [nome, largura, altura] of [
       const revisao = page.getByRole("alertdialog", { name: "Salvar chamada?", exact: true });
       await expect(revisao).toBeVisible();
       await page.setViewportSize({ width: largura, height: altura });
-      await expect(chamada.locator('[data-coluna="painel"] > footer')).toHaveCount(1);
+      // O fundo do diálogo fica fora da árvore de acessibilidade enquanto ele está aberto.
+      await expect(page.locator('[data-coluna="painel"] > footer')).toHaveCount(1);
       await revisao.getByRole("button", { name: "Continuar revisando" }).click();
       await expect(salvar).toBeFocused();
       await expect(aluno).toHaveAttribute("aria-pressed", "true");

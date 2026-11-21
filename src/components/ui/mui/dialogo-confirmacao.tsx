@@ -16,6 +16,7 @@ interface DialogoConfirmacaoProps {
   descricao?: ReactNode;
   onConfirmar: () => void;
   onCancelar: () => void;
+  aposFechar?: () => void;
   rotuloConfirmar?: string;
   rotuloCancelar?: string;
   destrutivo?: boolean;
@@ -28,6 +29,7 @@ export function DialogoConfirmacao({
   descricao,
   onConfirmar,
   onCancelar,
+  aposFechar,
   rotuloConfirmar = "Confirmar",
   rotuloCancelar = "Cancelar",
   destrutivo = false,
@@ -40,6 +42,7 @@ export function DialogoConfirmacao({
   return (
     <Dialog
       open={aberto}
+      onTransitionExited={aposFechar}
       onClose={(_evento, motivo) => {
         if (operacaoEmAndamento || motivo === "backdropClick") return;
         onCancelar();

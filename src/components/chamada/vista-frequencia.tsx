@@ -2390,9 +2390,10 @@ export default function VistaFrequencia({
           setConfirmarSalvamento(false);
           void salvar();
         }}
-        onCancelar={() => {
-          setConfirmarSalvamento(false);
+        onCancelar={() => setConfirmarSalvamento(false)}
+        aposFechar={() => {
           restaurarGatilhoSeMoveu(gatilhoDaRevisaoRef.current);
+          gatilhoDaRevisaoRef.current = null;
         }}
         rotuloConfirmar="Salvar chamada"
         rotuloCancelar="Continuar revisando"
@@ -2407,9 +2408,10 @@ export default function VistaFrequencia({
           setDescartarAberto(false);
           descartar();
         }}
-        onCancelar={() => {
-          setDescartarAberto(false);
+        onCancelar={() => setDescartarAberto(false)}
+        aposFechar={() => {
           restaurarGatilhoSeMoveu(gatilhoDoDescarteRef.current);
+          gatilhoDoDescarteRef.current = null;
         }}
         rotuloConfirmar="Descartar"
         rotuloCancelar="Continuar marcando"
