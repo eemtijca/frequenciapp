@@ -127,6 +127,16 @@ export async function conferirSemRolagemHorizontal(page: Page): Promise<void> {
   ).toBeLessThanOrEqual(1);
 }
 
+/** Em desktop, o conteúdo principal não pode começar sob a gaveta fixa. */
+export async function conferirForaDaGaveta(page: Page): Promise<void> {
+  const gavetaLocator = page.locator('aside[aria-label="Navegação do aplicativo"]:visible').first();
+  if ((await gavetaLocator.count()) === 0) return;
+  const gaveta = await gavetaLocator.boundingBox();
+  if (!gaveta) return;
+  const principal = await page.locator("main").first().boundingBox();
+  expect(principal?.x ?? 0).toBeGreaterThanOrEqual(gaveta.x + gaveta.width - 1);
+}
+
 /**
  * Confere os gráficos visíveis: cada svg precisa de dimensões maiores que zero.
  * O mínimo permite exigir pelo menos um gráfico nas telas que os possuem.
@@ -175,11 +185,11 @@ export async function capturarTela(page: Page, captura: Captura): Promise<string
   if (captura.preparar) await captura.preparar(page);
   await aguardarFontes(page);
   await aguardarTema(page, captura.tema);
-  await expect(page.getByText("Carregando gráfico").first()).toBeHidden({ timeout: 15_000 });
   await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0, { timeout: 10_000 });
   await conferirGraficos(page);
   await limparFoco(page);
   await conferirSemRolagemHorizontal(page);
+  await conferirForaDaGaveta(page);
   const arquivo = path.join(pasta, captura.nome);
   await page.screenshot({ path: arquivo, animations: "disabled" });
   // Capturas locais ficam fora do manifesto versionado.

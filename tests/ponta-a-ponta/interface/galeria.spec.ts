@@ -263,6 +263,17 @@ async function prepararRelatorios(page: Page, aba: string): Promise<void> {
   await trocarVisao(page, "Relatórios", "relatorios");
   await selecionarAba(page, aba);
   await expect(page.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
+  if (aba === "Saídas e Entradas") {
+    const vazio = page.getByText("Nenhuma saída ou entrada neste período.", { exact: true });
+    for (let tentativa = 0; tentativa < 4; tentativa += 1) {
+      if ((await vazio.count()) === 0) break;
+      const data = page.getByRole("button", { name: /^Data do relatório:/ });
+      const anterior = await data.getAttribute("aria-label");
+      await page.getByRole("button", { name: "Dia anterior do relatório", exact: true }).click();
+      await expect.poll(async () => data.getAttribute("aria-label")).not.toBe(anterior);
+      await expect(page.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
+    }
+  }
 }
 
 async function prepararAlunos(page: Page, agrupamento?: "Turma atual" | "Turma de origem") {
@@ -311,6 +322,11 @@ async function entrarComoDiretor(page: Page): Promise<void> {
   await page.getByLabel("Senha", { exact: true }).fill(senha);
   await page.getByRole("button", { name: "Entrar", exact: true }).click();
   await expect(page.locator('[data-visao="diretor"]')).toBeVisible({ timeout: 15_000 });
+  const entrada = page.getByText("Entrada confirmada.", { exact: true });
+  await expect(entrada)
+    .toBeVisible({ timeout: 5_000 })
+    .catch(() => undefined);
+  await expect(entrada).toBeHidden({ timeout: 10_000 });
 }
 
 async function prepararMinhasTurmas(page: Page): Promise<void> {
@@ -318,9 +334,16 @@ async function prepararMinhasTurmas(page: Page): Promise<void> {
   const resumo = page.getByLabel("Resumo do período", { exact: true });
   await expect(resumo).toBeVisible();
   await expect(resumo).toHaveAttribute("aria-busy", "false");
+  const areaGrafico = page.locator("[data-grafico-sob-demanda]").first();
+  await areaGrafico.scrollIntoViewIfNeeded();
   const grafico = page.getByRole("img", { name: /^Ausência por aluno/ });
-  await grafico.scrollIntoViewIfNeeded();
   await expect(grafico).toBeVisible({ timeout: 15_000 });
+  await page.evaluate(() => {
+    document.querySelector("main")?.scrollTo({ top: 0 });
+    document.scrollingElement?.scrollTo({ top: 0 });
+    window.scrollTo({ top: 0 });
+  });
+  await page.waitForTimeout(200);
 }
 
 async function prepararBiPortao(page: Page): Promise<void> {
