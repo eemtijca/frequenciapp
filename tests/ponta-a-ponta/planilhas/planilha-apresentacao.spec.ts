@@ -1,5 +1,8 @@
 // Prévia visual no desktop e celular, com dados fictícios e rede controlada.
-import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { colunasDeApresentacao } from "../../../src/domain/planilha-apresentacao";
 import { CABECALHO_ENTRADAS } from "../../../src/domain/planilha-entradas";
@@ -60,7 +63,7 @@ test("admin confere, cancela e aplica a apresentação com rolagem das colunas",
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const cartao = page.locator('[data-secao="planilha-saidas"]');
   await cartao.getByRole("button", { name: /Planilha de entradas e saídas/ }).click();

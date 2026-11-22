@@ -1,5 +1,8 @@
 // A Gestão concentra as planilhas operacionais e mantém o acesso ao FrequenciBI.
-import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
@@ -13,7 +16,7 @@ test("retira o painel externo da Gestão e mantém o FrequenciBI na navegação"
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const planilhas = page.locator("#config-grupo-planilhas");
   await expect(planilhas).toBeVisible();

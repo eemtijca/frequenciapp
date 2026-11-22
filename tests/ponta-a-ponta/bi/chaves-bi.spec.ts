@@ -1,5 +1,6 @@
 // Gestão de chaves do BI no rascunho: aplicação sem senha na seção,
 // confirmação com senha no lote, segredo único e desfazer antes de salvar.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco, ADMIN_E2E } from "../helpers/banco";
 import { aguardarHidratacao, escolherHorario, trocarVisao } from "../helpers/pagina";
@@ -13,7 +14,7 @@ async function abrir(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "FrequenciBI");
   const secao = page.locator('[data-secao="config-chaves-bi"]');
   await expect(secao.getByRole("heading", { name: "FrequenciBI", exact: true })).toBeVisible();

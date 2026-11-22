@@ -1,5 +1,6 @@
 // Painel Turmas com séries recolhíveis, progresso e bloqueios de edição.
 // Gestão mantém a seleção de origem recolhível. Dados sintéticos.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaDaSemanaIso, diaSeguinte, rotuloData, rotuloDataCurta } from "@/domain/frequencia";
 import { diaDeChamada } from "../helpers/dia";
@@ -491,7 +492,7 @@ test("Gestão: as turmas específicas da origem ficam numa seção recolhível",
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: /Config/ }).click();
+  await abrirConfiguracoesDaGestao(page);
   const secao = page.locator('[data-secao="config-origem-turmas"]');
   const gatilho = secao.getByRole("button", { name: /Turmas específicas/ });
   const caixa = page.getByRole("checkbox", {

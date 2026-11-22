@@ -57,14 +57,12 @@ test.describe("menu lateral", () => {
         }
       };
 
-      for (const destino of ["botao", "veu", "secao"] as const) {
+      for (const destino of ["botao", "veu"] as const) {
         await acionar(abrir);
         await expect(menu).toBeVisible();
         if (destino === "botao") await acionar(fechar);
-        else if (destino === "veu") {
+        else {
           await acionar(page.locator(".MuiDrawer-root .MuiBackdrop-root"), { x: 387, y: 422 });
-        } else {
-          await acionar(menu.getByRole("button", { name: "Chamada", exact: true }));
         }
         await conferirRetorno(false);
       }
@@ -90,6 +88,13 @@ test.describe("menu lateral", () => {
       await expect(atualizar).toBeFocused();
       await expect(atualizar).toHaveCSS("outline-style", "solid");
       await expect(atualizar).toHaveCSS("outline-width", "3px");
+
+      await acionar(abrir);
+      await acionar(menu.getByRole("button", { name: "Chamada", exact: true }));
+      await expect(menu).toBeHidden();
+      await expect(
+        page.getByRole("heading", { name: "Chamada", level: 1, exact: true }),
+      ).toBeFocused();
     });
   }
 
@@ -137,6 +142,32 @@ test.describe("menu lateral", () => {
     await page.locator(".MuiDrawer-root .MuiBackdrop-root").click({ position: { x: 387, y: 422 } });
     await expect(menu).toBeHidden();
     await expect(abrir).toBeFocused();
+  });
+
+  test("percorre Gestão no mesmo modal e foca o cadastro ao escolher um destino", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    const nav = await abrirNavegacao(page);
+    await nav.getByRole("button", { name: "Gestão", exact: true }).press("Enter");
+    const voltar = nav.getByRole("button", { name: "Voltar ao menu principal", exact: true });
+    await expect(voltar).toBeFocused();
+    await expect(nav.getByRole("button", { name: "Séries", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await nav.getByRole("button", { name: "Turmas", exact: true }).press("Space");
+    await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
+    const titulo = page.getByRole("heading", { name: "Turmas", level: 1, exact: true });
+    await expect(titulo).toBeFocused();
+    await abrirNavegacao(page);
+    await voltar.press("Enter");
+    const gestao = nav.getByRole("button", { name: "Gestão", exact: true });
+    await expect(gestao).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(titulo).toBeVisible();
+    await expect(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
   });
 
   test("abre e fecha sem trava de rolagem, desfoque ou bloqueio herdado pela tela", async ({
@@ -190,7 +221,9 @@ test.describe("menu lateral", () => {
     await page.setViewportSize({ width: 905, height: 800 });
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
-    await expect(page.locator("main").first()).toBeFocused();
+    await expect(
+      page.getByRole("heading", { name: "Painel", level: 1, exact: true }),
+    ).toBeFocused();
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });

@@ -1,5 +1,6 @@
 // Utilidades comuns dos testes de ponta a ponta.
 import { expect, type Locator, type Page } from "@playwright/test";
+import { exporNivelGestao, fecharNavegacaoMovel } from "../../helpers/categorias-configuracoes";
 import { nomeDoMes } from "@/domain/frequencia";
 import { navegarCalendario } from "./calendario-historico";
 import { validarDiaCivil } from "./navegacao-periodo";
@@ -115,9 +116,21 @@ export async function trocarVisao(
   // O indicador de rascunho integra o nome acessível depois da recuperação em segundo plano.
   const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const navegacao = await abrirNavegacao(page);
-  await navegacao
-    .getByRole("button", { name: new RegExp(`^${nome}(?: Alterações não salvas)?$`) })
-    .click();
+  if (visao === "gestao") {
+    const principal = navegacao.getByRole("button", {
+      name: /^Gestão(?: Alterações não salvas)?$/,
+    });
+    if (await principal.isVisible()) await exporNivelGestao(page);
+    await fecharNavegacaoMovel(page);
+  } else {
+    for (const retorno of ["Voltar para Gestão", "Voltar ao menu principal"]) {
+      const voltar = navegacao.getByRole("button", { name: retorno, exact: true });
+      if (await voltar.isVisible()) await voltar.click();
+    }
+    await navegacao
+      .getByRole("button", { name: new RegExp(`^${nome}(?: Alterações não salvas)?$`) })
+      .click();
+  }
   await expect(page.getByRole("dialog", { name: "Menu do aplicativo", exact: true })).toBeHidden();
   await expect(page.locator("main").first()).toHaveAttribute("data-visao", visao);
   if (!opcoes?.manterResumo && VISOES_COM_RESUMO.has(visao)) await abrirDiaSeResumo(page);

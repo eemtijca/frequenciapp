@@ -2,22 +2,14 @@
 
 // Configurações da escola em um único rascunho: recursos, catálogos, avisos,
 // acesso, almoço, calendário e chaves do BI são revisados e gravados em lote.
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
-import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import EventRepeatRoundedIcon from "@mui/icons-material/EventRepeatRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import FileUploadRoundedIcon from "@mui/icons-material/FileUploadRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
-import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
-import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
-import RestaurantRoundedIcon from "@mui/icons-material/RestaurantRounded";
-import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
-import ShieldRoundedIcon from "@mui/icons-material/ShieldRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import Box from "@mui/material/Box";
 import Checkbox from "@mui/material/Checkbox";
@@ -47,7 +39,7 @@ import type {
 } from "@/domain/configuracoes";
 import { DIAS_ORDEM_ALMOCO } from "@/domain/ordem-almoco";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { Abas } from "@/components/ui/mui/abas";
+import { PaineisVisitados } from "@/components/gestao/paineis-visitados";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { Campo } from "@/components/ui/mui/campo";
@@ -58,9 +50,7 @@ import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { Interruptor } from "@/components/ui/mui/interruptor";
 import { Selo } from "@/components/ui/mui/selo";
 import DialogoDownload from "@/components/conta/dialogo-download";
-import NavegacaoConfiguracoes, {
-  type CategoriaConfiguracoes,
-} from "@/components/gestao/configuracoes/navegacao-configuracoes";
+import { categoriaDe, type DestinoConfiguracoes } from "@/components/gestao/destinos-gestao";
 import SecaoCatalogo from "@/components/gestao/configuracoes/secao-catalogo";
 import SecaoConfiguracao from "../configuracoes/secao-configuracao";
 import SecaoChavesBi from "@/components/gestao/configuracoes/secao-chaves-bi";
@@ -83,6 +73,7 @@ import {
 } from "@/components/gestao/configuracoes/rascunho-configuracoes";
 
 interface Props {
+  destino: DestinoConfiguracoes;
   planilhaInicial?: "FREQUENCIA" | "SAIDAS" | "PARCIAL";
   configuracoes: Configuracoes;
   justificativas: JustificativaConfigurada[];
@@ -108,10 +99,6 @@ interface ResultadoImportacao {
   identicas: number;
   conflitos: number;
 }
-
-type AcaoEscola = "geral" | "frequencia" | "calendario" | "cadastros";
-type AcaoHorarios = "aulas" | "almoco" | "provas";
-type AcaoAcesso = "diretores" | "notificacoes" | "bi";
 
 const LIMITE_ARQUIVO = 25 * 1024 * 1024;
 
@@ -140,38 +127,6 @@ function contagem(n: number, singular: string, plural: string): string {
 
 const ESTILO_CAMPO_CODIGO = { minWidth: 0, width: { xs: "100%", sm: 128 } } as const;
 
-function PainelCategoria({
-  valor,
-  titulo,
-  atual,
-  children,
-}: {
-  valor: CategoriaConfiguracoes;
-  titulo: string;
-  atual: CategoriaConfiguracoes;
-  children: ReactNode;
-}) {
-  const oculto = valor !== atual;
-  const id = `config-grupo-${valor}`;
-
-  return (
-    <Stack
-      component="section"
-      id={id}
-      aria-labelledby={`${id}-titulo`}
-      hidden={oculto}
-      inert={oculto}
-      spacing={2}
-      sx={{ minWidth: 0, "&[hidden]": { display: "none" } }}
-    >
-      <Typography component="h2" variant="h5" id={`${id}-titulo`} tabIndex={-1}>
-        {titulo}
-      </Typography>
-      {children}
-    </Stack>
-  );
-}
-
 export default function AbaConfiguracoes(props: Props) {
   return (
     <ProvedorRascunhoConfiguracoes>
@@ -181,6 +136,7 @@ export default function AbaConfiguracoes(props: Props) {
 }
 
 function ConteudoConfiguracoes({
+  destino,
   planilhaInicial,
   series,
   turmas,
@@ -222,14 +178,7 @@ function ConteudoConfiguracoes({
     mutarChaves,
   } = useRascunhoConfiguracoes();
 
-  const [acaoEscola, setAcaoEscola] = useState<AcaoEscola>("geral");
-  const [acaoHorarios, setAcaoHorarios] = useState<AcaoHorarios>("aulas");
-  const [acaoAcesso, setAcaoAcesso] = useState<AcaoAcesso>("diretores");
-  const [categoria, setCategoria] = useState<CategoriaConfiguracoes>(
-    planilhaInicial ? "planilhas" : "escola",
-  );
-  // O editor de horários só monta na primeira visita e depois mantém o rascunho ao trocar de categoria.
-  const [horariosAbertos, setHorariosAbertos] = useState(false);
+  const categoria = categoriaDe(destino);
   const [abertoRecursos, setAbertoRecursos] = useState(true);
   const [abertoTurmasOrigem, setAbertoTurmasOrigem] = useState(false);
   const [confirmarSalvar, setConfirmarSalvar] = useState(false);
@@ -289,7 +238,9 @@ function ConteudoConfiguracoes({
 
   function focarCategoriaSemRascunho() {
     if (!rodapeRef.current && document.activeElement === document.body) {
-      paineisRef.current?.querySelector<HTMLElement>(`#config-grupo-${categoria}-titulo`)?.focus();
+      paineisRef.current
+        ?.querySelector<HTMLElement>(`#config-grupo-${categoria.valor}-titulo`)
+        ?.focus();
     }
   }
 
@@ -1439,45 +1390,30 @@ function ConteudoConfiguracoes({
               ? "Não foi possível concluir"
               : undefined;
 
-  const itensEscola = [
-    { valor: "geral" as const, rotulo: "Geral", icone: <TuneRoundedIcon />, conteudo: recursos },
+  const paineis = [
+    { valor: "geral", conteudo: recursos },
     {
-      valor: "frequencia" as const,
-      rotulo: "Frequência",
-      icone: <InsightsRoundedIcon />,
+      valor: "frequencia",
       conteudo: frequencia,
     },
     {
-      valor: "calendario" as const,
-      rotulo: "Calendário",
-      icone: <CalendarMonthRoundedIcon />,
+      valor: "calendario",
       conteudo: calendario,
     },
     {
-      valor: "cadastros" as const,
-      rotulo: "Cadastros",
-      icone: <AssignmentRoundedIcon />,
+      valor: "cadastros",
       conteudo: cadastros,
     },
-  ];
-
-  const itensAcesso = [
     {
-      valor: "diretores" as const,
-      rotulo: "Diretores",
-      icone: <ShieldRoundedIcon />,
+      valor: "diretores",
       conteudo: <SecaoAcessoDiretores parametros={atual.acesso} onMudar={mutarAcesso} />,
     },
     {
-      valor: "notificacoes" as const,
-      rotulo: "Notificações",
-      icone: <NotificationsRoundedIcon />,
+      valor: "notificacoes",
       conteudo: <SecaoNotificacoes configuracao={atual.notificacoes} onMudar={mutarNotificacoes} />,
     },
     {
-      valor: "bi" as const,
-      rotulo: "FrequenciBI",
-      icone: <InsightsRoundedIcon />,
+      valor: "bi",
       conteudo: (
         <SecaoChavesBi
           series={series}
@@ -1487,13 +1423,8 @@ function ConteudoConfiguracoes({
         />
       ),
     },
-  ];
-
-  const itensHorarios = [
     {
-      valor: "aulas" as const,
-      rotulo: "Aulas",
-      icone: <ScheduleRoundedIcon />,
+      valor: "aulas",
       conteudo: (
         <VistaHorarios
           turmas={turmas}
@@ -1506,9 +1437,7 @@ function ConteudoConfiguracoes({
       ),
     },
     {
-      valor: "almoco" as const,
-      rotulo: "Almoço",
-      icone: <RestaurantRoundedIcon />,
+      valor: "almoco",
       conteudo: (
         <SecaoOrdemAlmoco
           turmas={turmas}
@@ -1521,9 +1450,7 @@ function ConteudoConfiguracoes({
       ),
     },
     {
-      valor: "provas" as const,
-      rotulo: "Provas",
-      icone: <EventRepeatRoundedIcon />,
+      valor: "provas",
       conteudo: (
         <SecaoProvasBimestrais
           turmas={turmas}
@@ -1532,20 +1459,34 @@ function ConteudoConfiguracoes({
         />
       ),
     },
-  ];
+    {
+      valor: "planilhas",
+      conteudo: (
+        <Stack spacing={2}>
+          <IntegracaoPlanilha
+            turmas={turmas}
+            diaCorrente={diaCorrente}
+            abertoInicial={planilhaInicial === "FREQUENCIA"}
+          />
+          <IntegracaoSaidas
+            onAbrirSaidas={onAbrirSaidas}
+            abertoInicial={planilhaInicial === "SAIDAS"}
+          />
+          <IntegracaoParcial
+            onAbrirParcial={onAbrirParcial}
+            abertoInicial={planilhaInicial === "PARCIAL"}
+          />
+          <SecaoFilaPlanilha />
+        </Stack>
+      ),
+    },
+    { valor: "dados", conteudo: dados },
+  ] satisfies { valor: DestinoConfiguracoes; conteudo: React.ReactNode }[];
 
   return (
-    <Box
-      sx={{
-        display: "grid",
-        gap: 2,
-        alignItems: "start",
-        minWidth: 0,
-        gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "208px minmax(0, 1fr)" },
-      }}
-    >
+    <Stack spacing={2} sx={{ minWidth: 0 }}>
       {erro && !confirmarSalvar ? (
-        <Box sx={{ gridColumn: "1 / -1" }}>
+        <Box>
           <AlertaCompacto
             variante={varianteDoErro(erroStatus)}
             titulo={tituloErro}
@@ -1563,14 +1504,6 @@ function ConteudoConfiguracoes({
         </Box>
       ) : null}
 
-      <NavegacaoConfiguracoes
-        categoria={categoria}
-        onChange={(valor) => {
-          setCategoria(valor);
-          if (valor === "horarios") setHorariosAbertos(true);
-        }}
-      />
-
       <Box
         sx={{ minWidth: 0 }}
         onFocusCapture={(evento) => {
@@ -1578,57 +1511,24 @@ function ConteudoConfiguracoes({
         }}
         ref={paineisRef}
       >
-        <PainelCategoria valor="escola" titulo="Escola" atual={categoria}>
-          <Abas<AcaoEscola>
-            itens={itensEscola}
-            ativo={acaoEscola}
-            onChange={setAcaoEscola}
-            rotuloAcessivel="Ações da escola"
-            variant="scrollable"
-            dataPager="config-escola"
-          />
-        </PainelCategoria>
-        <PainelCategoria valor="horarios" titulo="Horários" atual={categoria}>
-          {horariosAbertos ? (
-            <Abas<AcaoHorarios>
-              itens={itensHorarios}
-              ativo={acaoHorarios}
-              onChange={setAcaoHorarios}
-              rotuloAcessivel="Ações dos horários"
-              variant="scrollable"
-              dataPager="config-horarios"
-            />
-          ) : null}
-        </PainelCategoria>
-        <PainelCategoria valor="planilhas" titulo="Planilhas" atual={categoria}>
-          <IntegracaoPlanilha
-            turmas={turmas}
-            diaCorrente={diaCorrente}
-            abertoInicial={planilhaInicial === "FREQUENCIA"}
-          />
-          <IntegracaoSaidas
-            onAbrirSaidas={onAbrirSaidas}
-            abertoInicial={planilhaInicial === "SAIDAS"}
-          />
-          <IntegracaoParcial
-            onAbrirParcial={onAbrirParcial}
-            abertoInicial={planilhaInicial === "PARCIAL"}
-          />
-          <SecaoFilaPlanilha />
-        </PainelCategoria>
-        <PainelCategoria valor="acesso" titulo="Acesso e avisos" atual={categoria}>
-          <Abas<AcaoAcesso>
-            itens={itensAcesso}
-            ativo={acaoAcesso}
-            onChange={setAcaoAcesso}
-            rotuloAcessivel="Ações de acesso e avisos"
-            variant="scrollable"
-            dataPager="config-acesso"
-          />
-        </PainelCategoria>
-        <PainelCategoria valor="dados" titulo="Dados" atual={categoria}>
-          {dados}
-        </PainelCategoria>
+        <Stack
+          component="section"
+          id={`config-grupo-${categoria.valor}`}
+          aria-labelledby={`config-grupo-${categoria.valor}-titulo`}
+          spacing={2}
+          sx={{ minWidth: 0 }}
+        >
+          <Typography
+            component="h2"
+            variant="h5"
+            id={`config-grupo-${categoria.valor}-titulo`}
+            tabIndex={-1}
+            data-titulo-configuracoes=""
+          >
+            {categoria.rotulo}
+          </Typography>
+          <PaineisVisitados ativo={destino} itens={paineis} />
+        </Stack>
       </Box>
 
       {alterado ? (
@@ -1639,7 +1539,6 @@ function ConteudoConfiguracoes({
           data-rodape-configuracoes=""
           variant="outlined"
           sx={{
-            gridColumn: { xs: "1 / -1", lg: 2 },
             position: "sticky",
             bottom: "max(8px, env(safe-area-inset-bottom))",
             zIndex: 20,
@@ -1840,7 +1739,7 @@ function ConteudoConfiguracoes({
           )
         }
       />
-    </Box>
+    </Stack>
   );
 }
 

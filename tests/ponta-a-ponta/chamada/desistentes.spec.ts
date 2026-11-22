@@ -1,5 +1,6 @@
 // Gestão da desistência e da troca de turma na interface, com massa sintética
 // isolada e limpeza ao final.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { hojeEDomingo } from "../helpers/dia";
@@ -55,7 +56,7 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Alunos" }).click();
+  await selecionarCadastroGestao(page, "Alunos");
   await page.locator("#busca-gestao-aluno").fill("E2E Desistente Um");
   await page.getByRole("button", { name: "Editar E2E Desistente Um" }).click();
   const edicao = page.getByRole("dialog", { name: "Editar E2E Desistente Um" });
@@ -74,7 +75,11 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
   }
   const aviso = page.getByText("Aluno movido de turma.");
   await expect(aviso).toBeVisible();
-  await expect(page.locator("#painel-alunos").getByText("Origem E2E Desistencia A")).toBeVisible();
+  await expect(
+    page
+      .getByRole("region", { name: "Gestão da escola", exact: true })
+      .getByText("Origem E2E Desistencia A"),
+  ).toBeVisible();
 
   const editar = page.getByRole("button", { name: "Editar E2E Desistente Um" });
   if (toque) {
@@ -90,7 +95,9 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
     .click();
   await page.getByRole("alertdialog").getByRole("button", { name: "Confirmar" }).click();
   await expect(
-    page.locator("#painel-alunos").getByText("Desistente", { exact: true }),
+    page
+      .getByRole("region", { name: "Gestão da escola", exact: true })
+      .getByText("Desistente", { exact: true }),
   ).toBeVisible();
 
   await trocarVisao(page, "Chamada", "chamada");

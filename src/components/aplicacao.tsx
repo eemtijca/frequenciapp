@@ -8,12 +8,15 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type ElementType,
 } from "react";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@mui/material/styles";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import AppBar from "@mui/material/AppBar";
 import Alert from "@mui/material/Alert";
 import Box from "@mui/material/Box";
@@ -28,11 +31,10 @@ import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemIcon from "@mui/material/ListItemIcon";
-import ListItemText from "@mui/material/ListItemText";
+import Slide from "@mui/material/Slide";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
@@ -83,10 +85,23 @@ import VistaMovimentacoes from "@/components/movimentacoes/vista-movimentacoes";
 import VistaRelatorios, { type AbaRelatorio } from "@/components/relatorios/vista-relatorios";
 import VistaAlunos from "@/components/alunos/vista-alunos";
 import VistaGestao from "@/components/gestao/vista-gestao";
+import {
+  categoriaDe,
+  type CadastroGestao,
+  type CategoriaConfiguracoes,
+  type DestinoConfiguracoes,
+} from "@/components/gestao/destinos-gestao";
+import {
+  ESTILO_LISTA_GAVETA,
+  OpcaoGaveta,
+  OpcoesConfiguracoes,
+  OpcoesGestao,
+} from "@/components/gestao/navegacao-gestao";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import DialogoSobre from "@/components/dialogo-sobre";
 import RegistroPwa from "@/components/pwa/registro-pwa";
+import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import { BREAKPOINTS, TOKENS_LAYOUT } from "@/theme/layout";
 
 export type Visao =
@@ -198,71 +213,108 @@ const ITENS_FIM: ItemNav[] = [
   { visao: "gestao", rotulo: "Gestão", icone: SettingsRoundedIcon },
 ];
 
-interface ItemNavegacaoProps {
-  item: ItemNav;
-  ativo: boolean;
-  pendente: boolean;
-  onTrocar: (visao: Visao) => void;
-}
+type NivelGaveta = "principal" | "gestao" | "configuracoes";
+type FocoNivel = "voltar" | "gestao" | "configuracoes";
+type EstadoGaveta = { nivel: NivelGaveta; foco?: FocoNivel; sentido?: "entrar" | "voltar" };
 
-function ItemNavegacao({ item, ativo, pendente, onTrocar }: ItemNavegacaoProps) {
-  const Icone = item.icone;
+function ListaGaveta({
+  estado,
+  movel,
+  children,
+}: {
+  estado: EstadoGaveta;
+  movel: boolean;
+  children: React.ReactNode;
+}) {
+  const opcoesRef = useRef<HTMLUListElement>(null);
+  const limiteRef = useRef<HTMLSpanElement>(null);
+  const nivelComFoco = useRef(estado.nivel);
+  // Montagens novas (incluindo reabertura do modal) não repetem a última entrada.
+  const [entrada, setEntrada] = useState<EstadoGaveta>({ nivel: estado.nivel });
+  if (entrada.nivel !== estado.nivel) setEntrada(estado);
+  const { animacoesAtivas } = useAnimacoesDaInterface();
+  const tema = useTheme();
+  const desktop = useMediaQuery(tema.breakpoints.up("md"));
+  const visivel = movel !== desktop;
+  const voltando = entrada.sentido === "voltar";
+
+  useLayoutEffect(() => {
+    if (nivelComFoco.current === estado.nivel) return;
+    nivelComFoco.current = estado.nivel;
+    const lista = opcoesRef.current;
+    if (!visivel || !lista?.getClientRects().length || !estado.foco) return;
+    lista.querySelector<HTMLElement>(`[data-foco-gaveta="${estado.foco}"]`)?.focus();
+  }, [estado, visivel]);
+
   return (
-    <ListItem disablePadding>
-      <ListItemButton
-        aria-current={ativo ? "page" : undefined}
-        selected={ativo}
-        onClick={() => onTrocar(item.visao)}
-        sx={(theme) => ({
-          minHeight: TOKENS_LAYOUT.navegacao,
-          px: 1.5,
-          gap: 1.25,
-          borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
-          color: ativo ? "text.primary" : "text.secondary",
-          "&.Mui-selected, &.Mui-selected:hover": {
-            bgcolor: `color-mix(in srgb, ${theme.vars.palette.primary.main} 14%, transparent)`,
-          },
-        })}
+    <Box component="nav" aria-label="Seções do aplicativo" sx={{ position: "relative" }}>
+      <Box
+        component="span"
+        ref={limiteRef}
+        aria-hidden="true"
+        sx={{ position: "absolute", top: 0, left: voltando ? "calc(100% - 24px)" : 24 }}
+      />
+      <Slide
+        key={estado.nivel}
+        in
+        appear={Boolean(entrada.sentido) && visivel && animacoesAtivas}
+        direction={voltando ? "right" : "left"}
+        container={(lista) => limiteRef.current ?? lista}
+        timeout={tema.transitions.duration.shorter}
       >
-        <ListItemIcon sx={{ minWidth: 0, color: "inherit" }}>
-          <Icone fontSize="small" sx={{ fontSize: 20 }} />
-        </ListItemIcon>
-        <ListItemText
-          primary={item.rotulo}
-          slotProps={{
-            primary: {
-              variant: "body2",
-              noWrap: true,
-              sx: { fontWeight: ativo ? 600 : 500 },
-            },
+        <List
+          ref={opcoesRef}
+          disablePadding
+          sx={{
+            ...ESTILO_LISTA_GAVETA,
+            // Cancela uma transição em curso sem remontar o item focado.
+            ...((!visivel || !animacoesAtivas) && { transition: "none !important" }),
           }}
-        />
-        {pendente ? (
-          <>
-            <Box component="span" sx={VISUALMENTE_OCULTO}>
-              Alterações não salvas
-            </Box>
-            <Box
-              component="span"
-              aria-hidden="true"
-              sx={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                bgcolor: "falta.main",
-                flexShrink: 0,
-                ml: 0.5,
-              }}
-            />
-          </>
-        ) : null}
-      </ListItemButton>
-    </ListItem>
+        >
+          {children}
+        </List>
+      </Slide>
+    </Box>
   );
 }
 
-type DestinoFocoMenu = "gatilho" | "conteudo" | "dialogo";
+type DestinoFocoMenu = "gatilho" | "titulo" | "dialogo" | { visao: Visao };
 type FecharMenu = (destino?: DestinoFocoMenu) => void;
+
+function focarTituloAtivo(conteudo: HTMLElement | null) {
+  const painel = conteudo?.querySelector<HTMLElement>("section:not([hidden])[role=group]");
+  const tituloConfiguracoes = painel?.querySelector<HTMLElement>(
+    "[data-titulo-configuracoes]:not([hidden] *)",
+  );
+  const titulo = tituloConfiguracoes ?? painel?.querySelector<HTMLElement>("h1:not([hidden] *)");
+  const alvo = titulo ?? painel ?? conteudo;
+  if (!alvo) return;
+  alvo.tabIndex = -1;
+  alvo.focus({ preventScroll: true });
+}
+
+// O MUI fixa o prazo no começo de cada fase. Encerrar pela API da transição
+// também libera o fundo quando a redução de movimento chega durante a saída.
+function useConcluirTransicaoSemMovimento() {
+  const { animacoesAtivas } = useAnimacoesDaInterface();
+  const concluir = useRef<(() => void) | null>(null);
+  useLayoutEffect(() => {
+    if (!animacoesAtivas) {
+      concluir.current?.();
+      concluir.current = null;
+    }
+  }, [animacoesAtivas]);
+
+  return {
+    duracao: animacoesAtivas ? undefined : 0,
+    registrarFim: (_no: HTMLElement, finalizar: () => void) => {
+      concluir.current = finalizar;
+    },
+    limparFim: () => {
+      concluir.current = null;
+    },
+  };
+}
 
 interface MenuMovelProps {
   /** Contêiner do app, que recebe a marca de gaveta aberta. */
@@ -270,6 +322,8 @@ interface MenuMovelProps {
   gatilhoRef: React.RefObject<HTMLButtonElement | null>;
   conteudoRef: React.RefObject<HTMLElement | null>;
   pendente: boolean;
+  onAbrir: () => void;
+  onFechado: (destino?: Visao) => void;
   renderizarConteudo: (fechar: FecharMenu) => React.ReactNode;
 }
 
@@ -282,6 +336,8 @@ function MenuMovel({
   gatilhoRef,
   conteudoRef,
   pendente,
+  onAbrir,
+  onFechado,
   renderizarConteudo,
 }: MenuMovelProps) {
   const [aberto, setAberto] = useState(false);
@@ -290,8 +346,10 @@ function MenuMovel({
   const [destinoFoco, setDestinoFoco] = useState<DestinoFocoMenu>("gatilho");
   const idMenu = useId();
   const idTitulo = useId();
+  const transicao = useConcluirTransicaoSemMovimento();
 
   function abrir() {
+    onAbrir();
     raizRef.current?.setAttribute("data-gaveta-aberta", "");
     setDestinoFoco("gatilho");
     setAberto(true);
@@ -301,13 +359,13 @@ function MenuMovel({
   useEffect(() => {
     const desktop = window.matchMedia(`(min-width: ${BREAKPOINTS.md}px)`);
     function aoMudarLargura() {
-      if (!desktop.matches) return;
-      setDestinoFoco("conteudo");
+      if (!desktop.matches || !aberto) return;
+      setDestinoFoco("titulo");
       setAberto(false);
     }
     desktop.addEventListener("change", aoMudarLargura);
     return () => desktop.removeEventListener("change", aoMudarLargura);
-  }, []);
+  }, [aberto]);
 
   const fechar = useCallback<FecharMenu>((destino = "gatilho") => {
     setDestinoFoco(destino);
@@ -316,15 +374,24 @@ function MenuMovel({
 
   function focarItemAtivo() {
     const painel = document.getElementById(idMenu);
-    const ativo = painel?.querySelector<HTMLElement>('nav [aria-current="page"]');
+    if (painel?.contains(document.activeElement) && document.activeElement !== painel) return;
+    const opcoes = painel?.querySelectorAll<HTMLElement>(
+      'nav [aria-current="page"], nav [data-foco-gaveta="voltar"]',
+    );
+    const visiveis = Array.from(opcoes ?? []).filter((opcao) => opcao.getClientRects().length);
+    const ativo =
+      visiveis.find((opcao) => opcao.getAttribute("aria-current") === "page") ?? visiveis[0];
     (ativo ?? painel)?.focus();
   }
 
   function concluirFechamento() {
     // Chega depois de o Material UI devolver o body; a marca já pode sair.
     raizRef.current?.removeAttribute("data-gaveta-aberta");
-    if (destinoFoco === "gatilho") gatilhoRef.current?.focus({ preventScroll: true });
-    if (destinoFoco === "conteudo") conteudoRef.current?.focus({ preventScroll: true });
+    onFechado(typeof destinoFoco === "object" ? destinoFoco.visao : undefined);
+    if (destinoFoco === "dialogo") return;
+    if (destinoFoco === "gatilho" && gatilhoRef.current?.getClientRects().length) {
+      gatilhoRef.current.focus({ preventScroll: true });
+    } else if (typeof destinoFoco === "string") focarTituloAtivo(conteudoRef.current);
   }
 
   return (
@@ -366,6 +433,7 @@ function MenuMovel({
         onClose={() => fechar("gatilho")}
         variant="temporary"
         anchor="left"
+        transitionDuration={transicao.duracao}
         disableRestoreFocus
         disableEnforceFocus={destinoFoco === "dialogo"}
         slotProps={{
@@ -382,8 +450,15 @@ function MenuMovel({
             },
           },
           transition: {
-            onEntered: focarItemAtivo,
-            onExited: concluirFechamento,
+            addEndListener: transicao.registrarFim,
+            onEntered: () => {
+              transicao.limparFim();
+              focarItemAtivo();
+            },
+            onExited: () => {
+              transicao.limparFim();
+              concluirFechamento();
+            },
           },
         }}
       >
@@ -422,6 +497,7 @@ function DialogoPendencia({
   const tituloId = useId();
   const descricaoId = useId();
   const padding = `${TOKENS_LAYOUT.dialogo.padding}px`;
+  const transicao = useConcluirTransicaoSemMovimento();
 
   return (
     <Dialog
@@ -433,6 +509,7 @@ function DialogoPendencia({
       aria-labelledby={tituloId}
       aria-describedby={descricaoId}
       disableRestoreFocus
+      transitionDuration={transicao.duracao}
       slotProps={{
         paper: {
           sx: {
@@ -440,7 +517,14 @@ function DialogoPendencia({
             borderRadius: `${TOKENS_LAYOUT.dialogo.raio}px`,
           },
         },
-        transition: { onExited: onFechado },
+        transition: {
+          addEndListener: transicao.registrarFim,
+          onEntered: transicao.limparFim,
+          onExited: () => {
+            transicao.limparFim();
+            onFechado();
+          },
+        },
       }}
     >
       <DialogTitle id={tituloId} sx={{ padding, paddingBottom: 0 }}>
@@ -497,6 +581,19 @@ export default function Aplicacao({
       ? pedida
       : "painel";
   const [visao, setVisao] = useState<Visao>(inicial);
+  const [cadastro, setCadastro] = useState<CadastroGestao>("series");
+  const [emConfiguracoes, setEmConfiguracoes] = useState(
+    Boolean(abaGestaoInicial || planilhaInicial),
+  );
+  const [destinoConfiguracoes, setDestinoConfiguracoes] = useState<DestinoConfiguracoes>(
+    planilhaInicial ? "planilhas" : "geral",
+  );
+  const [categoriaExpandida, setCategoriaExpandida] = useState<CategoriaConfiguracoes | null>(
+    planilhaInicial ? null : "escola",
+  );
+  const [gaveta, setGaveta] = useState<EstadoGaveta>(() => ({
+    nivel: inicial !== "gestao" ? "principal" : emConfiguracoes ? "configuracoes" : "gestao",
+  }));
   const [visitadas, setVisitadas] = useState<Set<Visao>>(() => new Set([inicial]));
   const [series, setSeries] = useState<Serie[]>(seriesIniciais);
   const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
@@ -527,6 +624,8 @@ export default function Aplicacao({
   const [sobreAberto, setSobreAberto] = useState(false);
   const gatilhoMenuRef = useRef<HTMLButtonElement | null>(null);
   const origemDialogoRef = useRef<HTMLElement | null>(null);
+  const destinoConfirmadoRef = useRef<Visao | null>(null);
+  const visaoAguardadaRef = useRef<Visao | null>(null);
   const conteudoRef = useRef<HTMLElement | null>(null);
   const raizRef = useRef<HTMLDivElement | null>(null);
   const [offline, setOffline] = useState(false);
@@ -534,6 +633,25 @@ export default function Aplicacao({
     abaRelatoriosDe(visaoInicial),
   );
   const pagerRef = useRef<HTMLDivElement | null>(null);
+
+  // O fechamento do modal e o commit da nova visão podem ocorrer em qualquer ordem.
+  const tentarFocarVisaoAtiva = useCallback(() => {
+    const conteudo = conteudoRef.current;
+    if (
+      !visaoAguardadaRef.current ||
+      conteudo?.dataset.visao !== visaoAguardadaRef.current ||
+      raizRef.current?.hasAttribute("data-gaveta-aberta")
+    )
+      return;
+    visaoAguardadaRef.current = null;
+    focarTituloAtivo(conteudo);
+  }, []);
+  useLayoutEffect(tentarFocarVisaoAtiva, [visao, tentarFocarVisaoAtiva]);
+
+  function focarDepoisDoFechamento(destino?: Visao) {
+    if (destino) visaoAguardadaRef.current = destino;
+    tentarFocarVisaoAtiva();
+  }
 
   const itemFinal = useMemo(
     () => ITENS_FIM.find((item) => item.visao === (ehAdmin ? "gestao" : "alunos")),
@@ -647,6 +765,12 @@ export default function Aplicacao({
       if (!itens.some((item) => item.visao === proxima)) return;
       guardarRolagemAtual();
       setVisao(proxima);
+      if (proxima === "gestao") {
+        setEmConfiguracoes(false);
+        setGaveta({ nivel: "gestao" });
+      } else {
+        setGaveta({ nivel: "principal" });
+      }
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
     },
     [guardarRolagemAtual, itens],
@@ -678,10 +802,35 @@ export default function Aplicacao({
       trocarVisao(proxima);
       return;
     }
-    fecharMenu();
-    // A gaveta fecha primeiro; a nova tela renderiza numa transição, sem
-    // segurar o início da animação de saída.
+    fecharMenu({ visao: proxima });
     startTransition(() => trocarVisao(proxima));
+  }
+
+  function abrirNivelGestao(fecharMenu?: FecharMenu) {
+    if (visao !== "gestao" && visaoComRascunho(visao)) {
+      origemDialogoRef.current = fecharMenu
+        ? gatilhoMenuRef.current
+        : document.activeElement instanceof HTMLElement
+          ? document.activeElement
+          : null;
+      fecharMenu?.("dialogo");
+      trocarVisao("gestao");
+      return;
+    }
+    if (visao !== "gestao") ativarVisao("gestao");
+    setGaveta({ nivel: "gestao", foco: "voltar", sentido: "entrar" });
+  }
+
+  function rolarGestaoAoTopo() {
+    pagerRef.current?.querySelector<HTMLElement>('[aria-label="Gestão"]')?.scrollTo({ top: 0 });
+    posicoes.current.delete("gestao");
+  }
+
+  function abrirNivelConfiguracoes() {
+    setEmConfiguracoes(true);
+    setCategoriaExpandida(categoriaDe(destinoConfiguracoes).valor);
+    setGaveta({ nivel: "configuracoes", foco: "voltar", sentido: "entrar" });
+    rolarGestaoAoTopo();
   }
 
   function devolverFocoDoDialogo() {
@@ -958,7 +1107,8 @@ export default function Aplicacao({
         {alvoVisao === "gestao" && ehAdmin && (
           <VistaGestao
             planilhaInicial={planilhaInicial}
-            abaInicial={abaGestaoInicial}
+            destino={emConfiguracoes ? "configuracoes" : cadastro}
+            destinoConfiguracoes={destinoConfiguracoes}
             usuarioId={usuario.id}
             series={series}
             turmas={turmas}
@@ -1047,50 +1197,78 @@ export default function Aplicacao({
             minHeight: 0,
             flex: 1,
             overflowY: "auto",
+            overflowX: "hidden",
             overscrollBehavior: "contain",
             px: 1.5,
             py: 1.5,
           }}
         >
-          <Box component="nav" aria-label="Seções do aplicativo">
-            <List disablePadding sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-              {itens.map((item) => (
-                <ItemNavegacao
-                  key={item.visao}
-                  item={item}
-                  ativo={visao === item.visao}
-                  pendente={
-                    pendencias.includes(item.visao) ||
-                    (item.visao === "gestao" &&
-                      (pendencias.includes("horarios") || configuracaoPendente))
-                  }
-                  onTrocar={
-                    fecharMenu ? (proxima) => navegarPeloMenu(proxima, fecharMenu) : trocarVisao
-                  }
-                />
-              ))}
-              {(usuario.papel === "ADMIN" || usuario.papel === "COORDENACAO") && (
-                <ListItem disablePadding>
-                  <ListItemButton
-                    component="a"
-                    href="/bi"
-                    target="_blank"
-                    rel="noopener"
-                    aria-label="FrequenciBI, nova aba"
-                    sx={{ minHeight: TOKENS_LAYOUT.navegacao, px: 1.5, gap: 1.25 }}
-                  >
-                    <ListItemIcon sx={{ minWidth: 0, color: "text.secondary" }}>
-                      <InsightsRoundedIcon fontSize="small" sx={{ fontSize: 20 }} />
-                    </ListItemIcon>
-                    <ListItemText
-                      primary="FrequenciBI"
-                      slotProps={{ primary: { variant: "body2", noWrap: true } }}
+          <ListaGaveta estado={ehAdmin ? gaveta : { nivel: "principal" }} movel={movel}>
+            {ehAdmin && gaveta.nivel === "gestao" ? (
+              <OpcoesGestao
+                atual={emConfiguracoes ? "configuracoes" : cadastro}
+                pendente={visaoComRascunho("gestao")}
+                onCadastro={(destino) => {
+                  rolarGestaoAoTopo();
+                  setCadastro(destino);
+                  setEmConfiguracoes(false);
+                  fecharMenu?.("titulo");
+                }}
+                onConfiguracoes={abrirNivelConfiguracoes}
+                onVoltar={() =>
+                  setGaveta({ nivel: "principal", foco: "gestao", sentido: "voltar" })
+                }
+              />
+            ) : ehAdmin && gaveta.nivel === "configuracoes" ? (
+              <OpcoesConfiguracoes
+                atual={destinoConfiguracoes}
+                expandida={categoriaExpandida}
+                onExpandir={setCategoriaExpandida}
+                onEscolher={(destino) => {
+                  rolarGestaoAoTopo();
+                  setDestinoConfiguracoes(destino);
+                  fecharMenu?.("titulo");
+                }}
+                onVoltar={() => {
+                  rolarGestaoAoTopo();
+                  setEmConfiguracoes(false);
+                  setGaveta({ nivel: "gestao", foco: "configuracoes", sentido: "voltar" });
+                }}
+              />
+            ) : (
+              <>
+                {itens.map((item) => (
+                  <ListItem key={item.visao} disablePadding>
+                    <OpcaoGaveta
+                      rotulo={item.rotulo}
+                      icone={item.icone}
+                      atual={visao === item.visao}
+                      foco={item.visao === "gestao" ? "gestao" : undefined}
+                      indicador={item.visao === "gestao" ? ChevronRightRoundedIcon : undefined}
+                      pendente={
+                        pendencias.includes(item.visao) ||
+                        (item.visao === "gestao" && visaoComRascunho("gestao"))
+                      }
+                      onEscolher={() => {
+                        if (item.visao === "gestao") abrirNivelGestao(fecharMenu);
+                        else if (fecharMenu) navegarPeloMenu(item.visao, fecharMenu);
+                        else trocarVisao(item.visao);
+                      }}
                     />
-                  </ListItemButton>
-                </ListItem>
-              )}
-            </List>
-          </Box>
+                  </ListItem>
+                ))}
+                {(usuario.papel === "ADMIN" || usuario.papel === "COORDENACAO") && (
+                  <ListItem disablePadding>
+                    <OpcaoGaveta
+                      rotulo="FrequenciBI"
+                      icone={InsightsRoundedIcon}
+                      novaAba={{ href: "/bi", rotulo: "FrequenciBI, nova aba" }}
+                    />
+                  </ListItem>
+                )}
+              </>
+            )}
+          </ListaGaveta>
           <Divider sx={{ mt: "auto" }} />
           <Box sx={{ pt: 1 }}>
             {movel && (
@@ -1220,6 +1398,10 @@ export default function Aplicacao({
                   gatilhoRef={gatilhoMenuRef}
                   conteudoRef={conteudoRef}
                   pendente={pendencias.length > 0 || configuracaoPendente}
+                  onAbrir={() => {
+                    visaoAguardadaRef.current = null;
+                  }}
+                  onFechado={focarDepoisDoFechamento}
                   renderizarConteudo={(fechar) => renderizarMenu(true, fechar)}
                 />
               </Box>
@@ -1368,9 +1550,16 @@ export default function Aplicacao({
           onConfirmar={() => {
             const proxima = visaoComPendencia;
             setVisaoComPendencia(null);
-            if (proxima) ativarVisao(proxima);
+            if (!proxima) return;
+            destinoConfirmadoRef.current = proxima;
+            startTransition(() => ativarVisao(proxima));
           }}
-          onFechado={devolverFocoDoDialogo}
+          onFechado={() => {
+            const destino = destinoConfirmadoRef.current;
+            destinoConfirmadoRef.current = null;
+            if (destino) focarDepoisDoFechamento(destino);
+            else devolverFocoDoDialogo();
+          }}
         />
 
         <DialogoSenha

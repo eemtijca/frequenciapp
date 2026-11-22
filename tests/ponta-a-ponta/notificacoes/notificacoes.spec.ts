@@ -1,5 +1,6 @@
 // Configuração dos avisos pela Gestão e preferências da equipe na interface,
 // com restauração das regras e imagens locais fora do versionamento.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import type { ConfiguracaoNotificacoes } from "@/domain/notificacoes";
 import { abrirNotificacoes, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -29,7 +30,7 @@ test.describe("configuração de notificações", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+    await abrirConfiguracoesDaGestao(page);
     const secao = page.locator('[data-secao="notificacoes"]');
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Notificações");
     await expect(secao.getByRole("heading", { name: "Notificações", exact: true })).toBeVisible();
@@ -56,7 +57,7 @@ test.describe("configuração de notificações", () => {
     await page.reload();
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+    await abrirConfiguracoesDaGestao(page);
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Notificações");
     await expect(secao.getByRole("heading", { name: "Notificações", exact: true })).toBeVisible();
     await expect(

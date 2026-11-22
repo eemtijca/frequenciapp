@@ -1,4 +1,5 @@
 // Barra de salvamento e foco da Chamada, além da atualização global da tela ativa.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
@@ -288,7 +289,7 @@ test("o botão global atualiza a tela ativa e não descarta um rascunho", async 
 
   // Em Configurações, o rascunho bloqueia a atualização com uma orientação clara.
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
+  await abrirConfiguracoesDaGestao(page);
   const recursos = page.locator('[data-secao="config-recursos"]');
   await recursos.getByRole("switch", { name: "Saídas e Entradas" }).click();
   const barra = page.getByRole("region", { name: "Rascunho de configurações", exact: true });

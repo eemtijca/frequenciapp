@@ -1,4 +1,5 @@
 // Confirmações da Gestão de alunos: desativar, reativar e aplicar origem em massa.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -10,7 +11,7 @@ async function abrirAlunos(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Alunos" }).click();
+  await selecionarCadastroGestao(page, "Alunos");
 }
 
 test("confirma desativar e reativar aluno", async ({ page }) => {

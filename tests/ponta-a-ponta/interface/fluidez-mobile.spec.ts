@@ -1,4 +1,5 @@
 // Regressões de fluidez no celular: busca, relatórios, foco e rolagem dos controles.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { nomeDoMes, rotuloMes } from "@/domain/frequencia";
@@ -95,8 +96,8 @@ async function abrirGestaoAlunos(page: Page): Promise<Locator> {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Alunos", exact: true }).click();
-  return page.getByRole("tabpanel", { name: "Alunos", exact: true });
+  await selecionarCadastroGestao(page, "Alunos");
+  return page.getByRole("region", { name: "Gestão da escola", exact: true });
 }
 
 async function aguardarQuadros(page: Page): Promise<void> {

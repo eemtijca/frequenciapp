@@ -1,5 +1,8 @@
 // Navegação dos cartões de saídas e chamada parcial, com integração sintética e rascunhos locais.
-import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { selecionarAcaoPlanilha } from "../helpers/planilhas";
@@ -10,7 +13,7 @@ async function abrirPlanilhas(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarCategoriaConfiguracoes(page, "Planilhas");
 }
 

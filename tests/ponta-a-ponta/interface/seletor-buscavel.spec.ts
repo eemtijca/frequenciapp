@@ -1,4 +1,5 @@
 // Busca compartilhada dentro de diálogo e em lista longa, com toque e área reduzida.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -19,7 +20,7 @@ test("buscar uma turma mantém o formulário aberto ao reduzir a tela e cancelar
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Alunos", exact: true }).click();
+  await selecionarCadastroGestao(page, "Alunos");
   await page.getByRole("button", { name: "Novo aluno", exact: true }).click();
   const formulario = page.getByRole("dialog", { name: "Novo aluno", exact: true });
   const turma = formulario.getByRole("combobox", { name: "Turma atual", exact: true });

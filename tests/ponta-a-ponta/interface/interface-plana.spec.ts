@@ -1,5 +1,9 @@
 // Identidade visual compartilhada: tipografia carregada, enquadramento,
 // superfícies planas e alternativas acessíveis, com capturas sintéticas.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCadastroGestao,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import { contraste, type Rgb } from "../../helpers/cor";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
@@ -186,13 +190,11 @@ test.describe("interface compartilhada", () => {
         }
         if (visao === "relatorios")
           await page.getByRole("tab", { name: "Resumo", exact: true }).click();
-        if (visao === "gestao")
-          await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+        if (visao === "gestao") await abrirConfiguracoesDaGestao(page);
         await capturar(page, info, `${visao}-${tema}`);
       }
 
-      await page.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
-      await page.getByRole("tab", { name: "Séries", exact: true }).click();
+      await selecionarCadastroGestao(page, "Séries");
       await page.getByRole("button", { name: "Nova série", exact: true }).click();
       const dialogo = page.getByRole("dialog", { name: "Nova série", exact: true });
       await conferirFonte(page, [

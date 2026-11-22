@@ -1,4 +1,5 @@
 // Avisos de sucesso preservam o acesso à Gestão no celular e no tablet.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "../helpers/configuracoes";
 import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -76,7 +77,7 @@ for (const largura of [390, 800]) {
       chamada.getByRole("button", { name: "Tentar novamente", exact: true }),
     ).toBeHidden();
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+    await abrirConfiguracoesDaGestao(page);
 
     // Mede o cabeçalho antes da janela curta do aviso.
     const caixaCabecalho = await page.getByRole("banner").boundingBox();
@@ -144,8 +145,14 @@ for (const largura of [390, 800]) {
     expect(registro.instante).toBeGreaterThan(0);
     await expect(
       page.getByRole("dialog", { name: "Menu do aplicativo", exact: true }),
-    ).toBeHidden();
+    ).toBeVisible();
+    await expect(
+      navegacao.getByRole("button", { name: "Voltar ao menu principal", exact: true }),
+    ).toBeFocused();
+    await navegacao.getByRole("button", { name: "Séries", exact: true }).click();
     await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
-    await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Séries", level: 1, exact: true }),
+    ).toBeFocused();
   });
 }

@@ -1,6 +1,10 @@
 // Diretores de turma: cadastro na Gestão com turma, palavra-chave mostrada
 // uma única vez, revogação com motivo, parâmetros de acesso e a visão só de
 // leitura do diretor, que entra pelo identificador e troca a palavra.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCadastroGestao,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { diaCorrente, diaDeChamada } from "../helpers/dia";
 import {
@@ -29,7 +33,7 @@ test.describe("diretores de turma na Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await selecionarCadastroGestao(page, "Diretores");
     await page
       .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
       .first()
@@ -59,7 +63,7 @@ test.describe("diretores de turma na Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await selecionarCadastroGestao(page, "Diretores");
 
     await page
       .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
@@ -101,7 +105,7 @@ test.describe("diretores de turma na Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await selecionarCadastroGestao(page, "Diretores");
     await page
       .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
       .first()
@@ -129,7 +133,7 @@ test.describe("diretores de turma na Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Config/ }).click();
+    await abrirConfiguracoesDaGestao(page);
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Diretores");
     const secao = page.locator('[data-secao="config-acesso-diretores"]');
     await expect(
@@ -163,7 +167,7 @@ test.describe("diretores de turma na Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await selecionarCadastroGestao(page, "Diretores");
     await page
       .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
       .first()

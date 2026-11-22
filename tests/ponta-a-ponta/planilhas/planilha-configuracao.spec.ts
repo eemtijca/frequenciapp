@@ -1,6 +1,9 @@
 // Configuração assistida com banco e Google sintéticos: leitura sem escrita,
 // diagnóstico mensal, recuperação de acesso e conferência antes de salvar o mapa.
-import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   diaLocal,
@@ -76,7 +79,7 @@ async function abrirPlanilha(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();

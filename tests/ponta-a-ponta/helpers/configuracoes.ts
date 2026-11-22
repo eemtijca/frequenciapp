@@ -107,14 +107,5 @@ export async function selecionarAcaoConfiguracoes(
     | "Notificações"
     | "FrequenciBI",
 ): Promise<void> {
-  const navegacoes = {
-    Escola: "Ações da escola",
-    Horários: "Ações dos horários",
-    "Acesso e avisos": "Ações de acesso e avisos",
-  };
-  await selecionarCategoriaConfiguracoes(page, categoria);
-  await page
-    .getByRole("tablist", { name: navegacoes[categoria], exact: true })
-    .getByRole("tab", { name: acao, exact: true })
-    .click();
+  await selecionarCategoriaConfiguracoes(page, categoria, acao);
 }

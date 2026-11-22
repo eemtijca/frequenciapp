@@ -1,6 +1,10 @@
 // Exportações protegidas nos três pontos do app, com senha local,
 // cancelamento, extração real e ausência de download em caso de falha.
-import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCadastroGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type Download, type Page } from "@playwright/test";
 import { Uint8ArrayReader, ZipReader } from "@zip.js/zip.js";
@@ -38,7 +42,8 @@ async function abrirDownload(
     await grade.getByRole("button", { name: "Baixar planilha (CSV)" }).click();
   } else {
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: tipo === "relacao" ? "Alunos" : "Configurações" }).click();
+    if (tipo === "relacao") await selecionarCadastroGestao(page, "Alunos");
+    else await abrirConfiguracoesDaGestao(page);
     if (tipo === "copia") {
       await selecionarCategoriaConfiguracoes(page, "Dados");
       const secao = page.locator('[data-secao="config-copia"]');

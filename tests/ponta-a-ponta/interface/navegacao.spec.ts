@@ -19,7 +19,7 @@ test.describe("navegação", () => {
     await page.getByRole("tab", { name: "Grade" }).click();
     await expect(page.getByRole("heading", { name: "Grade" })).toBeVisible();
     await trocarVisao(page, "Gestão", "gestao");
-    await expect(page.getByRole("heading", { name: "Gestão" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Séries", level: 1 })).toBeVisible();
   });
 
   test("troca de visão só pelos botões, sem gesto horizontal", async ({ page }) => {
@@ -76,8 +76,9 @@ test.describe("navegação", () => {
     await aguardarHidratacao(page);
     await expect(page.locator('[data-indicador="inferior"]')).toHaveCount(0);
     await trocarVisao(page, "Chamada", "chamada");
+    const titulo = page.getByRole("heading", { name: "Chamada", level: 1, exact: true });
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
-    await expect(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
+    await expect(titulo).toBeFocused();
     const navegacao = await abrirNavegacao(page);
     await expect(navegacao.getByRole("button", { name: "Chamada", exact: true })).toHaveAttribute(
       "aria-current",
@@ -85,7 +86,7 @@ test.describe("navegação", () => {
     );
     await navegacao.getByRole("button", { name: "Chamada", exact: true }).click();
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
-    await expect(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
+    await expect(titulo).toBeFocused();
   });
 
   test("um link direto para Gestão mantém o painel ativo no celular", async ({ page }) => {
@@ -93,9 +94,11 @@ test.describe("navegação", () => {
     await page.goto("/?visao=gestao");
     await aguardarHidratacao(page);
     await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
-    await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Séries", level: 1, exact: true }),
+    ).toBeVisible();
     const navegacao = await abrirNavegacao(page);
-    await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toHaveAttribute(
+    await expect(navegacao.getByRole("button", { name: "Séries", exact: true })).toHaveAttribute(
       "aria-current",
       "page",
     );
@@ -115,9 +118,14 @@ test.describe("navegação", () => {
       await expect(page.locator("header").getByRole("button", { name: "Gestão" })).toHaveCount(0);
 
       await trocarVisao(page, "Gestão", "gestao");
-      await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Séries", level: 1, exact: true }),
+      ).toBeVisible();
       navegacao = await abrirNavegacao(page);
-      await expect(gestao).toHaveAttribute("aria-current", "page");
+      await expect(navegacao.getByRole("button", { name: "Séries", exact: true })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
       await expect(navegacao.locator("[aria-current=page]")).toHaveCount(1);
       await expect(page.locator('[data-indicador="inferior"]')).toHaveCount(0);
 
@@ -131,7 +139,9 @@ test.describe("navegação", () => {
         navegacao.getByRole("button", { name: "Chamada Parcial", exact: true }),
       ).toHaveAttribute("aria-current", "page");
       await trocarVisao(page, "Gestão", "gestao");
-      await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Séries", level: 1, exact: true }),
+      ).toBeVisible();
     });
 
     test("a Chamada Parcial tem item próprio logo abaixo de Chamada", async ({ page }, info) => {

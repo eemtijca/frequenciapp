@@ -33,6 +33,9 @@ for (const tema of ["light", "dark"] as const) {
     expect(caixa?.height).toBeGreaterThanOrEqual(44);
     const conta = await abrirMenuConta(page, gaveta);
     await page.mouse.move(389, 843);
+    const movimento = conta.getByRole("group", { name: "Animações da interface" });
+    await expect(movimento.getByRole("menuitemradio", { name: "Sistema" })).toBeChecked();
+    await expect(movimento.getByRole("menuitemradio")).toHaveCount(3);
     for (const nome of ["Notificações", "Trocar senha", "Sobre", "Sair da conta"]) {
       const item = conta.getByRole("menuitem", { name: nome, exact: true });
       await expect(item).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");

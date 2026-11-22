@@ -1,5 +1,6 @@
 // Calendário anual de feriados: cadastro, bloqueio de chamadas e proteção do histórico.
 // A massa usa nomes próprios e datas livres, sem apagar registros preexistentes.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaLocal } from "@/domain/frequencia";
 import { comBanco } from "../helpers/banco";
@@ -110,7 +111,7 @@ async function abrirCalendario(page: Page): Promise<Locator> {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarAcaoConfiguracoes(page, "Escola", "Calendário");
   const secao = page.locator('[data-secao="config-calendario"]');
   const abrir = secao.getByRole("button", { name: /^Calendário letivo/ });

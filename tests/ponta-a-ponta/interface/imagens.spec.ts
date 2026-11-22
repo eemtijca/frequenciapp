@@ -1,4 +1,5 @@
 // Capturas do README: gera as imagens de docs/imagens com a semente aplicada e sem dados reais.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { test, type Page } from "@playwright/test";
@@ -137,7 +138,7 @@ test.describe("Capturas do README", () => {
     });
 
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Turmas" }).click();
+    await selecionarCadastroGestao(page, "Turmas");
     await page.waitForTimeout(900);
     await limparFoco(page);
     await page.screenshot({

@@ -221,8 +221,8 @@ Regras:
 
 - A gaveta é permanente a partir de 905 px e modal abaixo disso. No desktop, ela reserva seus 256 px uma vez, ao lado do conteúdo.
 - A barra superior tem `Toolbar` com a altura da faixa.
-- O item ativo usa `aria-current="page"` e o destaque verde suave.
-- O menu móvel prende o foco, fecha com Escape e devolve o foco ao botão que o abriu.
+- O item ativo usa `aria-current="page"` e o destaque verde suave. Se a seção ativa estiver recolhida, a categoria visível assume essa indicação até a seção reaparecer.
+- O menu móvel contém o foco. Escape, o botão Fechar menu e toque fora devolvem o foco a Abrir menu. Escolher um destino final ou ampliar para desktop leva o foco ao título ativo. Avisos de pendência e ações da conta transferem o foco ao próprio diálogo.
 - O conteúdo começa depois de um espaçador de `Toolbar`, sem `margin-top` mágico.
 - A faixa offline fica abaixo da barra superior e acima do conteúdo.
 - A barra de salvamento fica dentro do fluxo do conteúdo, como rodapé fixo com safe area, e nunca flutua sobre a lista sem reservar espaço.
@@ -336,7 +336,7 @@ Regras de composição:
 
 ### Gestão
 
-- Abas Séries, Turmas, Alunos, Equipe, Diretores e Configurações.
+- Séries, Turmas, Alunos, Equipe, Diretores e Configurações são destinos da mesma gaveta lateral. O retorno de nível fica no topo e a seleção do destino usa `aria-current`.
 - Formulários em diálogo e tabelas com ações.
 - Séries e Turmas mantêm `TabelaPadrao`: nomes longos quebram sem corte, Ordem e Aulas respeitam a largura legível do conteúdo, e as ações podem ocupar mais de uma linha no celular sem perder a identificação do registro nem reduzir os alvos de toque.
 - Nova série, Nova turma e Reorganizar turmas ficam no cabeçalho dos respectivos cadastros. Os estados sem registros mantêm os atalhos secundários Criar série e Criar turma, quando aplicáveis. Editar, excluir e abrir Horários ficam junto da linha correspondente.
@@ -344,9 +344,10 @@ Regras de composição:
 - Em Alunos, Novo aluno tem a maior ênfase no cabeçalho. Importar, exportar, definir e restaurar origem ficam no mesmo contexto, separados das ações de cada linha.
 - Alunos mantém `TabelaPadrao` em região de rolagem local acessível por teclado. Só Aluno fica fixo na horizontal; nomes quebram e as ações podem ocupar duas linhas no celular. Não há ganho demonstrado de Data Grid Community nesse cadastro.
 - O diálogo de cadastro e edição de aluno ocupa a tela no celular. Os seletores mantêm a busca e mostram os rótulos completos das turmas selecionadas e das opções.
-- Configurações tem título e retorno próprio. A navegação local de Escola, Horários, Planilhas, Acesso e avisos e Dados usa uma lista lateral a partir de 1240 px e um seletor rotulado abaixo disso.
+- Configurações mantém o título no conteúdo, sem uma segunda navegação. Escola, Horários, Planilhas, Acesso e avisos e Dados ficam na gaveta; grupos com várias seções expandem ali. A gaveta móvel permanece aberta nessas trocas de nível e de expansão.
+- A navegação anima apenas a lista na troca de nível, sem repetir a entrada ao reabrir a gaveta, ampliar a tela ou reativar movimento. A preferência Animações da interface, no perfil, persiste no navegador: Sistema segue o dispositivo e Ativadas ou Desativadas prevalecem quando escolhidas explicitamente. Sem movimento, a troca e o foco são imediatos e o carregamento mantém uma indicação estática. Desativar durante o fechamento da gaveta ou de um aviso de pendência conclui a transição em curso sem esperar a duração anterior. Ver [ADR-082](adr/082-navegacao-lateral-gestao.md).
 - Rascunho único, revisão, conflito e confirmação antes de salvar.
-- Em Horários, a aba Provas usa data, início, fim, disciplina e seleção de turmas por série, com checkbox tri-state e contagem.
+- Em Horários, Provas usa data, início, fim, disciplina e seleção de turmas por série, com checkbox tri-state e contagem.
 - A gravação das provas é imediata, fora do rascunho único.
 - O layout segue o CRUD do template, sem cartão aninhado e sem ação administrativa perdida.
 

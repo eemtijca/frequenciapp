@@ -1,15 +1,11 @@
-// Monta a aba real, com rede interceptada pelo teste e dados exclusivamente fictícios.
+// Monta o shell e a Gestão reais, com rede interceptada e dados fictícios.
+import { Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import CssBaseline from "@mui/material/CssBaseline";
-import { ThemeProvider } from "@mui/material/styles";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { ptBR } from "@mui/x-date-pickers/locales";
-import "dayjs/locale/pt-br";
-import AbaConfiguracoes from "../../../src/components/gestao/abas/aba-configuracoes";
+
+import Aplicacao from "../../../src/components/aplicacao";
 import { ProvedorAvisos } from "../../../src/components/ui/mui/avisos";
 import { CONFIGURACOES_PADRAO, type Turma } from "../../../src/domain/frequencia";
-import { tema } from "../../../src/theme/tema";
+import { ProvedorTema } from "../../../src/theme/provedor-tema";
 
 document.documentElement.setAttribute("data-mui-color-scheme", "light");
 
@@ -24,29 +20,31 @@ const turmas: Turma[] = ["A", "B", "C"].map((nome, i) => ({
 const root = document.getElementById("root");
 if (!root) throw new Error("Elemento raiz ausente");
 createRoot(root).render(
-  <ThemeProvider theme={tema}>
-    <CssBaseline enableColorScheme />
-    <LocalizationProvider
-      dateAdapter={AdapterDayjs}
-      adapterLocale="pt-br"
-      localeText={ptBR.components.MuiLocalizationProvider.defaultProps.localeText}
-    >
-      <main style={{ padding: 16 }}>
-        <AbaConfiguracoes
-          configuracoes={CONFIGURACOES_PADRAO}
-          justificativas={[]}
-          liberadores={[]}
-          series={[{ id: "serie-1", nome: "1º ano", ordem: 1 }]}
-          turmas={turmas}
-          diaCorrente="2026-03-10"
-          fuso="America/Sao_Paulo"
-          onMudanca={() => {}}
-          onJustificativasMudaram={async () => {}}
-          onLiberadoresMudaram={async () => {}}
-          onHorariosMudaram={() => {}}
-        />
-      </main>
-      <ProvedorAvisos />
-    </LocalizationProvider>
-  </ThemeProvider>,
+  <ProvedorTema>
+    <Suspense fallback={<p>Carregando tela de teste</p>}>
+      <Aplicacao
+        usuario={{
+          id: "teste",
+          nome: "Admin teste",
+          email: "teste@example.test",
+          papel: "ADMIN",
+          ativo: true,
+        }}
+        carregadoEm="2026-03-10T12:00:00.000Z"
+        diaCorrente="2026-03-10"
+        fuso="America/Sao_Paulo"
+        visaoInicial="gestao"
+        configuracoesIniciais={{ ...CONFIGURACOES_PADRAO, saidaAntecipada: true }}
+        justificativasIniciais={[]}
+        liberadoresIniciais={[]}
+        seriesIniciais={[{ id: "serie-1", nome: "1º ano", ordem: 1 }]}
+        turmasIniciais={turmas}
+        alunosIniciais={[]}
+        frequenciasIniciais={[]}
+        saidasIniciais={[]}
+        resumoInicial={null}
+      />
+    </Suspense>
+    <ProvedorAvisos />
+  </ProvedorTema>,
 );

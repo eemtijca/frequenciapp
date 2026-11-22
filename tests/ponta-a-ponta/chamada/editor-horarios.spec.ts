@@ -1,5 +1,10 @@
 // Editor semanal: acesso por turma, confirmação da grade, cópia e recuperação de falhas.
-import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
+import {
+  abrirConfiguracoesDaGestao,
+  exporConfiguracoes,
+  selecionarCadastroGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -102,7 +107,7 @@ async function abrirHorarios(page: Page, turma = origem): Promise<Locator> {
   await page.goto("/?visao=gestao");
   await aguardarHidratacao(page);
   await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
-  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarCategoriaConfiguracoes(page, "Horários");
   const vista = page.getByRole("region", { name: "Edição de horários", exact: true });
   await vista.getByRole("combobox", { name: "Turma", exact: true }).click();
@@ -198,11 +203,12 @@ test("abre o diálogo da turma selecionada e conta apenas aulas ativas na Gestã
   expect(gravacoes[0]?.method()).toBe("PATCH");
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
   await trocarVisao(page, "Gestão", "gestao");
-  await expect(page.getByRole("tab", { name: "Turmas", exact: true })).toBeHidden();
-  const voltar = page.getByRole("button", { name: "Voltar para Gestão", exact: true });
+  const nav = await exporConfiguracoes(page);
+  await expect(nav.getByRole("button", { name: "Turmas", exact: true })).toBeHidden();
+  const voltar = nav.getByRole("button", { name: "Voltar para Gestão", exact: true });
   await expect(voltar).toBeVisible();
   await voltar.click();
-  await page.getByRole("tab", { name: "Turmas", exact: true }).click();
+  await selecionarCadastroGestao(page, "Turmas");
   const turma = page.getByRole("row").filter({ has: page.getByText(origem, { exact: true }) });
   await expect(turma.getByText("2 aulas", { exact: true })).toBeVisible();
   await expect(turma.getByText("3 aulas", { exact: true })).toHaveCount(0);
@@ -351,6 +357,8 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
   const disciplina = formulario.getByRole("textbox", { name: "Disciplina", exact: true });
   await disciplina.fill("Ciências");
   const navegacao = await abrirNavegacao(page);
+  await navegacao.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
+  await navegacao.getByRole("button", { name: "Voltar ao menu principal", exact: true }).click();
   await navegacao.getByRole("button", { name: "Painel", exact: true }).click();
   const avisoSaida = page.getByRole("alertdialog", {
     name: "Há alterações não salvas nos Horários",
@@ -358,12 +366,21 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
   });
   await expect(avisoSaida).toBeVisible();
   expect(gravacoes).toHaveLength(0);
+  await avisoSaida.getByRole("button", { name: "Continuar aqui", exact: true }).click();
+  await expect(avisoSaida).toBeHidden();
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
+  await abrirConfiguracoesDaGestao(page);
+  await expect(disciplina).toHaveValue("Ciências");
+  const menuRetomado = await abrirNavegacao(page);
+  await menuRetomado.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
+  await menuRetomado.getByRole("button", { name: "Voltar ao menu principal", exact: true }).click();
+  await menuRetomado.getByRole("button", { name: "Painel", exact: true }).click();
   await avisoSaida.getByRole("button", { name: "Mudar de tela", exact: true }).click();
   await expect(page.locator("main").first()).toHaveAttribute("data-visao", "painel");
   await trocarVisao(page, "Gestão", "gestao");
+  await abrirConfiguracoesDaGestao(page);
   await expect(formulario).toBeVisible();
-  await page.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
-  await page.getByRole("tab", { name: "Turmas", exact: true }).click();
+  await selecionarCadastroGestao(page, "Turmas");
   await page.getByRole("button", { name: `Horários de ${origem}`, exact: true }).click();
   const dialogo = dialogoDaTurma(page, origem);
   await dialogo.getByRole("button", { name: "Desativar aula 1", exact: true }).click();
@@ -373,7 +390,7 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
     .click();
   await expect(page.getByText("Aula desativada.", { exact: true })).toBeVisible();
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
-  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await abrirConfiguracoesDaGestao(page);
   await expect(
     vista.getByText("Esta aula não está mais disponível na grade.", { exact: true }),
   ).toBeVisible();

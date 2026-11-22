@@ -11,7 +11,12 @@ import {
   type Page,
 } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
-import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
+import {
+  exporConfiguracoes,
+  exporNavegacao,
+  menuMovel,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 
 const requireVitest = createRequire(import.meta.url);
 const caminho = requireVitest.resolve("vite", {
@@ -20,6 +25,8 @@ const caminho = requireVitest.resolve("vite", {
 const { createServer } = await import(pathToFileURL(caminho).href);
 let servidor: Awaited<ReturnType<typeof createServer>>;
 let browser: Browser;
+const novaPagina = (largura: number, altura = 844) =>
+  browser.newPage({ viewport: { width: largura, height: altura }, serviceWorkers: "block" });
 let url: string;
 const completo = {
   configuracoes: {
@@ -67,7 +74,19 @@ beforeAll(async () => {
     cacheDir: path.join(tmpdir(), "vite-acoes-configuracoes"),
     define: { "process.env": "{}" },
     esbuild: { jsx: "automatic" },
-    resolve: { alias: { "@": path.resolve("src") } },
+    resolve: {
+      alias: [
+        {
+          find: "@/components/chamada/vista-frequencia",
+          replacement: path.resolve("tests/componentes/gestao/vista-chamada-lenta.tsx"),
+        },
+        { find: "@", replacement: path.resolve("src") },
+        {
+          find: "next/navigation",
+          replacement: path.resolve("tests/componentes/entrada/navegacao-falsa.ts"),
+        },
+      ],
+    },
     server: { host: "127.0.0.1", port: 0, hmr: false, watch: { ignored: ["**/*"] } },
   });
   await servidor.listen();
@@ -85,6 +104,8 @@ async function abrir(
   tema: "light" | "dark",
   simularGravacao = false,
   chamadasAlteradas?: number,
+  secaoInicial: string | null = "Cadastros",
+  chamadaLenta = false,
 ) {
   const gravacoes: string[] = [];
   const prova = {
@@ -153,7 +174,7 @@ async function abrir(
     }
     return route.fulfill({ status: 503, json: { error: "Indisponível no teste" } });
   });
-  await page.goto(url);
+  await page.goto(chamadaLenta ? `${url}?chamada-lenta` : url);
   await page.evaluate(
     (t) =>
       document.documentElement.setAttribute(
@@ -162,15 +183,12 @@ async function abrir(
       ),
     tema,
   );
-  await page
-    .getByRole("tablist", { name: "Ações da escola" })
-    .getByRole("tab", { name: "Cadastros" })
-    .click();
+  if (secaoInicial) await selecionarCategoriaConfiguracoes(page, "Escola", secaoInicial);
   return gravacoes;
 }
 
 it.each([320, 390, 1440])("separa os selos da planilha de frequência a %i px", async (largura) => {
-  const page = await browser.newPage({ viewport: { width: largura, height: 844 } });
+  const page = await novaPagina(largura, 844);
   try {
     await abrir(page, "light", false, 162);
     await selecionarCategoriaConfiguracoes(page, "Planilhas");
@@ -207,7 +225,7 @@ it.each([
 ] as const)(
   "mantém o raio de 12 px no grupo de preferências da planilha a $largura px ($tema)",
   async ({ largura, tema }) => {
-    const page = await browser.newPage({ viewport: { width: largura, height: 844 } });
+    const page = await novaPagina(largura, 844);
     try {
       await abrir(page, tema);
       await selecionarCategoriaConfiguracoes(page, "Planilhas");
@@ -232,7 +250,7 @@ it.each([
 );
 
 it("explica as opções da cópia e devolve o foco ao cancelar a importação", async () => {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const page = await novaPagina(390, 844);
   try {
     const gravacoes = await abrir(page, "light");
     await selecionarCategoriaConfiguracoes(page, "Dados");
@@ -259,9 +277,9 @@ it.each([
   { largura: 1440, tema: "light" },
   { largura: 1440, tema: "dark" },
 ] as const)(
-  "separa abas, títulos e textos de apoio em $largura px ($tema)",
+  "separa títulos e textos de apoio sem trilhos em $largura px ($tema)",
   async ({ largura, tema }) => {
-    const page = await browser.newPage({ viewport: { width: largura, height: 900 } });
+    const page = await novaPagina(largura, 900);
     try {
       await abrir(page, tema);
       async function espaco(antes: Locator, depois: Locator) {
@@ -273,18 +291,17 @@ it.each([
       }
       await expect(
         espaco(
-          page.getByRole("tablist", { name: "Ações da escola" }),
+          page.getByRole("heading", { name: "Escola", level: 2, exact: true }),
           page.getByText(/^As mudanças dos cadastros entram no rascunho/),
         ),
-      ).resolves.toBeCloseTo(12, 0);
+      ).resolves.toBeCloseTo(16, 0);
 
-      await selecionarCategoriaConfiguracoes(page, "Horários");
-      await page.getByRole("tab", { name: "Provas", exact: true }).click();
+      await selecionarCategoriaConfiguracoes(page, "Horários", "Provas");
       const titulo = page.getByRole("heading", { name: "Nova prova", exact: true });
       const descricao = page.getByText(/^Adicionar prova grava o horário na hora/);
       await expect(
-        espaco(page.getByRole("tablist", { name: "Ações dos horários" }), titulo),
-      ).resolves.toBeCloseTo(12, 0);
+        espaco(page.getByRole("heading", { name: "Horários", level: 2, exact: true }), titulo),
+      ).resolves.toBeCloseTo(16, 0);
       await expect(espaco(titulo, descricao)).resolves.toBeCloseTo(8, 0);
       expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(largura);
     } finally {
@@ -294,7 +311,7 @@ it.each([
 );
 
 it("grava a prova sem enviar o catálogo e só envia o lote na confirmação", async () => {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const page = await novaPagina(390, 844);
   try {
     const gravacoes = await abrir(page, "light", true);
     const justificativas = page.getByRole("region", { name: "Justificativas", exact: true });
@@ -304,18 +321,14 @@ it("grava a prova sem enviar o catálogo e só envia o lote na confirmação", a
     await justificativas.getByRole("button", { name: "Adicionar ao rascunho" }).click();
     expect(gravacoes).toEqual([]);
 
-    const categorias = page.getByRole("navigation", { name: "Categorias de configurações" });
-    const seletor = categorias.getByRole("combobox", { name: /^Categoria/ });
-    const escola = categorias.getByRole("button", { name: "Escola", exact: true });
-    await verificarTela(seletor).toHaveText("Escola");
-    await verificarTela(escola).toBeHidden();
     await page.setViewportSize({ width: 1240, height: 900 });
-    await verificarTela(seletor).toBeHidden();
-    await verificarTela(escola).toHaveAttribute("aria-current", "true");
+    const categorias = await exporConfiguracoes(page);
+    await verificarTela(
+      categorias.getByRole("button", { name: "Cadastros", exact: true }),
+    ).toHaveAttribute("aria-current", "page");
     await verificarTela(justificativas.getByText("Justificativa de teste")).toBeVisible();
 
-    await selecionarCategoriaConfiguracoes(page, "Horários");
-    await page.getByRole("tab", { name: "Provas", exact: true }).click();
+    await selecionarCategoriaConfiguracoes(page, "Horários", "Provas");
     const formulario = page.getByRole("form", { name: "Nova prova" });
     await verificarTela(formulario).toHaveAccessibleDescription(/fora do rascunho/);
     await formulario.getByLabel("Disciplina").fill("Matemática");
@@ -354,37 +367,352 @@ it("grava a prova sem enviar o catálogo e só envia o lote na confirmação", a
     await page.close();
   }
 });
-it("transfere o foco da categoria ao ampliar a tela com o seletor aberto", async () => {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+it("mantém o modal ao entrar em níveis, foca o cadastro ao selecionar e fecha no breakpoint", async () => {
+  const page = await novaPagina(390, 844);
+  const erros: string[] = [];
+  page.on("pageerror", (erro) => erros.push(erro.message));
+  try {
+    const gravacoes = await abrir(page, "light", false, undefined, null);
+    const nav = await exporNavegacao(page);
+    await verificarTela(
+      nav.getByRole("button", { name: "Voltar ao menu principal", exact: true }),
+    ).toBeVisible({ timeout: 3000 });
+    await nav.getByRole("button", { name: "Turmas", exact: true }).press("Space");
+    await verificarTela(menuMovel(page)).toBeHidden();
+    await verificarTela(page.getByRole("heading", { name: "Turmas", level: 1 })).toBeFocused();
+    await exporNavegacao(page);
+    const configuracoes = nav.getByRole("button", { name: "Configurações", exact: true });
+    await configuracoes.press("Enter");
+    const voltar = nav.getByRole("button", { name: "Voltar para Gestão", exact: true });
+    await verificarTela(voltar).toBeFocused();
+    const horarios = nav.getByRole("button", { name: "Horários", exact: true });
+    await horarios.press("Enter");
+    await verificarTela(horarios).toHaveAttribute("aria-expanded", "true");
+    await verificarTela(nav.getByRole("list", { name: "Horários", exact: true })).toBeVisible();
+    await page.setViewportSize({ width: 905, height: 844 });
+    await verificarTela(menuMovel(page)).toBeHidden();
+    await verificarTela(page.getByRole("heading", { name: "Escola", level: 2 })).toBeFocused();
+    await verificarTela(nav).toHaveCount(1);
+    await voltar.press("Enter");
+    await verificarTela(configuracoes).toBeFocused();
+    await verificarTela(nav.getByRole("button", { name: "Turmas", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(gravacoes).toEqual([]);
+    expect(erros).toEqual([]);
+  } finally {
+    await page.close();
+  }
+});
+
+it("preserva o rascunho ao voltar e ao cancelar a troca global, sem gravar", async () => {
+  const page = await novaPagina(390);
   try {
     const gravacoes = await abrir(page, "light");
-    const nav = page.getByRole("navigation", { name: "Categorias de configurações" });
-    const seletor = nav.getByRole("combobox", { name: /^Categoria/ });
-    await seletor.focus();
-    await seletor.press("Enter");
-    const opcoes = page.getByRole("listbox");
-    await verificarTela(opcoes).toBeVisible();
+    const justificativas = page.getByRole("region", { name: "Justificativas", exact: true });
+    await justificativas.getByRole("button", { name: "Adicionar justificativa" }).click();
+    await justificativas.getByLabel("Código", { exact: true }).fill("Ui");
+    await justificativas.getByLabel("Rótulo", { exact: true }).fill("Rascunho teste");
+    await justificativas.getByRole("button", { name: "Adicionar ao rascunho" }).click();
+    const barra = page.getByRole("region", { name: "Rascunho de configurações" });
+    await verificarTela(barra).toBeVisible();
+    await selecionarCategoriaConfiguracoes(page, "Dados");
+    await verificarTela(barra).toBeVisible();
 
-    await page.setViewportSize({ width: 1240, height: 900 });
-    await verificarTela(opcoes).toBeHidden({ timeout: 2000 });
-    const escola = nav.getByRole("button", { name: "Escola", exact: true });
-    await verificarTela(escola).toBeFocused();
-    await verificarTela(escola).toHaveAttribute("aria-current", "true");
+    const nav = await exporConfiguracoes(page);
+    await nav.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
+    await verificarTela(
+      nav.getByRole("button", { name: "Configurações Alterações não salvas", exact: true }),
+    ).toBeFocused();
+    await nav.getByRole("button", { name: "Voltar ao menu principal", exact: true }).click();
+    await verificarTela(
+      nav.getByRole("button", { name: "Gestão Alterações não salvas", exact: true }),
+    ).toBeFocused();
+    await nav.getByRole("button", { name: "Painel", exact: true }).click();
+    const aviso = page.getByRole("alertdialog", { name: "Há configurações não salvas" });
+    await verificarTela(aviso).toBeVisible();
+    await aviso.getByRole("button", { name: "Continuar aqui" }).click();
+    await verificarTela(aviso).toBeHidden();
+    await verificarTela(page.getByRole("heading", { name: "Séries", level: 1 })).toBeVisible();
+    await verificarTela(
+      page.getByRole("button", { name: "Abrir menu", exact: true }),
+    ).toBeFocused();
+
+    await selecionarCategoriaConfiguracoes(page, "Escola", "Cadastros");
+    await verificarTela(justificativas.getByText("Rascunho teste", { exact: true })).toBeVisible();
+    await verificarTela(barra).toBeVisible();
     expect(gravacoes).toEqual([]);
   } finally {
     await page.close();
   }
 });
 
+it("revisão: anuncia e foca a categoria recolhida do destino atual", async () => {
+  const page = await novaPagina(390);
+  try {
+    await abrir(page, "light", false, undefined, null);
+    const nav = await exporConfiguracoes(page);
+    const escola = nav.getByRole("button", { name: "Escola", exact: true });
+    const geral = nav.getByRole("button", { name: "Geral", exact: true });
+    await verificarTela(geral).toHaveAttribute("aria-current", "page");
+    await escola.press("Enter");
+    await verificarTela(geral).toBeHidden();
+    await verificarTela(escola).toHaveAttribute("aria-current", "page");
+    await page.keyboard.press("Escape");
+    await verificarTela(menuMovel(page)).toBeHidden();
+    await exporNavegacao(page);
+    await verificarTela(escola).toBeFocused();
+    await escola.press("Space");
+    await verificarTela(geral).toHaveAttribute("aria-current", "page");
+    await verificarTela(escola).not.toHaveAttribute("aria-current");
+  } finally {
+    await page.close();
+  }
+});
+
+it("revisão: foca o título global e devolve ao gatilho se dispensar", async () => {
+  const page = await novaPagina(390);
+  try {
+    await abrir(page, "light", false, undefined, null);
+    const nav = await exporNavegacao(page);
+    await nav.getByRole("button", { name: "Voltar ao menu principal" }).press("Enter");
+    await nav.getByRole("button", { name: "Chamada", exact: true }).press("Enter");
+    const titulo = page.getByRole("heading", { name: "Chamada", level: 1, exact: true });
+    await verificarTela(menuMovel(page)).toBeHidden();
+    await verificarTela(titulo).toBeFocused();
+    await exporNavegacao(page);
+    await page.keyboard.press("Escape");
+    await verificarTela(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
+    await verificarTela(titulo).toBeVisible();
+  } finally {
+    await page.close();
+  }
+});
+
+it("achados finais: fecha a gaveta antes de carregar a Chamada e só então foca o destino", async () => {
+  const page = await novaPagina(390);
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await abrir(page, "light", false, undefined, null, true);
+    const nav = await exporNavegacao(page);
+    await nav.getByRole("button", { name: "Voltar ao menu principal" }).press("Enter");
+    const origem = page.getByRole("heading", { name: "Séries", level: 1, exact: true });
+    const destino = page.getByRole("heading", { name: "Chamada", level: 1, exact: true });
+    const gatilho = page.locator('button[aria-label="Abrir menu"]');
+    await verificarTela(gatilho).toHaveAttribute("aria-expanded", "true");
+    await nav.getByRole("button", { name: "Chamada", exact: true }).press("Enter");
+    await verificarTela(gatilho).toHaveAttribute("aria-expanded", "false", { timeout: 2000 });
+    await verificarTela(menuMovel(page)).not.toBeAttached();
+    await verificarTela(origem).toBeVisible();
+    await verificarTela(origem).not.toBeFocused();
+    await verificarTela(destino).toBeHidden();
+    await page.evaluate(() => window.dispatchEvent(new Event("liberar-chamada-teste")));
+    await verificarTela(destino).toBeFocused();
+    await verificarTela(origem).toBeHidden();
+  } finally {
+    await page.close();
+  }
+});
+
+it("achados finais: confirma a troca com foco no destino, mas cancelamentos devolvem ao menu", async () => {
+  const page = await novaPagina(390);
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const gravacoes = await abrir(page, "light");
+    const justificativas = page.getByRole("region", { name: "Justificativas", exact: true });
+    await justificativas.getByRole("button", { name: "Adicionar justificativa" }).click();
+    await justificativas.getByLabel("Código", { exact: true }).fill("Ui");
+    await justificativas.getByLabel("Rótulo", { exact: true }).fill("Rascunho teste");
+    await justificativas.getByRole("button", { name: "Adicionar ao rascunho" }).click();
+    const nav = await exporNavegacao(page);
+    await nav.getByRole("button", { name: "Voltar para Gestão" }).press("Enter");
+    await nav.getByRole("button", { name: "Voltar ao menu principal" }).press("Enter");
+    const aviso = page.getByRole("alertdialog", { name: "Há configurações não salvas" });
+    const origem = page.getByRole("heading", { name: "Séries", level: 1, exact: true });
+    const destino = page.getByRole("heading", { name: "Chamada", level: 1, exact: true });
+    const gatilho = page.getByRole("button", { name: "Abrir menu", exact: true });
+    for (const acao of ["Continuar aqui", "Escape", "Mudar de tela"]) {
+      await exporNavegacao(page);
+      await nav.getByRole("button", { name: "Chamada", exact: true }).press("Enter");
+      await verificarTela(aviso.getByRole("button", { name: "Continuar aqui" })).toBeFocused();
+      if (acao === "Escape") await page.keyboard.press(acao);
+      else await aviso.getByRole("button", { name: acao, exact: true }).press("Enter");
+      await verificarTela(aviso).not.toBeAttached();
+      if (acao !== "Mudar de tela") {
+        await verificarTela(gatilho).toBeFocused();
+        await verificarTela(origem).toBeVisible();
+        await verificarTela(destino).toBeHidden();
+      }
+    }
+    await verificarTela(destino).toBeFocused({ timeout: 2000 });
+    await selecionarCategoriaConfiguracoes(page, "Escola", "Cadastros");
+    await verificarTela(justificativas.getByText("Rascunho teste", { exact: true })).toBeVisible();
+    expect(gravacoes).toEqual([]);
+  } finally {
+    await page.close();
+  }
+});
+
+it("achados finais: desloca a lista com transição CSS em sentidos opostos", async () => {
+  const page = await novaPagina(1440);
+  try {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await abrir(page, "light", false, undefined, null);
+    const nav = await exporNavegacao(page);
+    const direcao = () =>
+      nav
+        .getByRole("list")
+        .first()
+        .evaluate((lista) => {
+          const transicao = lista
+            .getAnimations()
+            .find((a) => a instanceof CSSTransition && a.transitionProperty === "transform");
+          const origem =
+            transicao?.effect instanceof KeyframeEffect
+              ? transicao.effect.getKeyframes()[0]?.transform
+              : undefined;
+          return typeof origem === "string" ? Math.sign(new DOMMatrixReadOnly(origem).m41) : 0;
+        });
+    await nav.getByRole("button", { name: "Configurações", exact: true }).press("Enter");
+    await verificarTela.poll(direcao, { timeout: 800 }).toBe(1);
+    await nav.getByRole("button", { name: "Voltar para Gestão" }).press("Enter");
+    await verificarTela.poll(direcao, { timeout: 800 }).toBe(-1);
+    await verificarTela(
+      nav.getByRole("button", { name: "Configurações", exact: true }),
+    ).toBeFocused();
+  } finally {
+    await page.close();
+  }
+});
+
+it("achados finais: alinha o link FrequenciBI aos outros itens da gaveta", async () => {
+  const page = await novaPagina(320);
+  try {
+    await abrir(page, "light", false, undefined, null);
+    const nav = await exporNavegacao(page);
+    await nav.getByRole("button", { name: "Voltar ao menu principal" }).press("Enter");
+    const bi = nav.getByRole("link", { name: "FrequenciBI, nova aba", exact: true });
+    for (const largura of [320, 1440]) {
+      await page.setViewportSize({ width: largura, height: 844 });
+      if (largura === 1440) await verificarTela(menuMovel(page)).not.toBeAttached();
+      await verificarTela(bi).toHaveAttribute("href", "/bi");
+      await verificarTela(bi).toHaveAttribute("target", "_blank");
+      await verificarTela(bi).toHaveAttribute("rel", "noopener");
+      const medidas = await bi.evaluate((no) => {
+        const icone = no.querySelector("svg")?.getBoundingClientRect();
+        return [getComputedStyle(no).paddingInlineStart, icone?.width, icone?.height];
+      });
+      expect(medidas).toEqual(["16px", 24, 24]);
+    }
+  } finally {
+    await page.close();
+  }
+});
+
+it("revisão: mantém 16 px de recuo e ícone de 24 px", async () => {
+  const page = await novaPagina(320);
+  try {
+    await abrir(page, "light", false, undefined, null);
+    const nav = await exporNavegacao(page);
+    const botao = nav.getByRole("button", { name: "Séries", exact: true });
+    const medidas = await botao.evaluate((no) => ({
+      recuo: getComputedStyle(no).paddingInlineStart,
+      icone: no.querySelector("svg")?.getBoundingClientRect().width,
+    }));
+    expect(medidas).toEqual({ recuo: "16px", icone: 24 });
+  } finally {
+    await page.close();
+  }
+});
+
+it("revisão: anima a troca de nível sem repetir ao reabrir, ampliar ou restaurar movimento", async () => {
+  const page = await novaPagina(390);
+  try {
+    await abrir(page, "light", false, undefined, null);
+    const nav = await exporNavegacao(page);
+    const animacoes = () => nav.evaluate((no) => no.querySelector("ul")?.getAnimations().length);
+    const configuracoes = nav.getByRole("button", { name: "Configurações", exact: true });
+    await configuracoes.press("Enter");
+    expect(await animacoes()).toBeGreaterThan(0);
+    await page.keyboard.press("Escape");
+    await verificarTela(menuMovel(page)).toBeHidden();
+    await exporNavegacao(page);
+    expect(await animacoes()).toBe(0);
+    await page.setViewportSize({ width: 905, height: 844 });
+    await verificarTela(menuMovel(page)).toBeHidden();
+    expect(await animacoes()).toBe(0);
+    await nav.getByRole("button", { name: "Voltar para Gestão", exact: true }).press("Enter");
+    expect(await animacoes()).toBeGreaterThan(0);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await verificarTela.poll(animacoes).toBe(0);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    expect(await animacoes()).toBe(0);
+    await verificarTela(configuracoes).toBeFocused();
+  } finally {
+    await page.close();
+  }
+});
+
+it.each(["gaveta", "aviso"] as const)(
+  "revisão: reduzir movimento durante a saída de %s libera fundo e foco antes do prazo anterior",
+  async (alvo) => {
+    const page = await novaPagina(390);
+    try {
+      await abrir(page, "light", false, undefined, alvo === "aviso" ? "Cadastros" : null);
+      const gatilho = page.getByRole("button", { name: "Abrir menu", exact: true });
+      let modal = menuMovel(page);
+      if (alvo === "aviso") {
+        const regiao = page.getByRole("region", { name: "Justificativas", exact: true });
+        await regiao.getByRole("button", { name: "Adicionar justificativa" }).click();
+        await regiao.getByLabel("Código", { exact: true }).fill("Ui");
+        await regiao.getByLabel("Rótulo", { exact: true }).fill("Rascunho teste");
+        await regiao.getByRole("button", { name: "Adicionar ao rascunho" }).click();
+        const nav = await exporNavegacao(page);
+        await nav.getByRole("button", { name: "Voltar para Gestão" }).press("Enter");
+        await nav.getByRole("button", { name: "Voltar ao menu principal" }).press("Enter");
+        await nav.getByRole("button", { name: "Painel", exact: true }).press("Enter");
+        await verificarTela(modal).toBeHidden();
+        modal = page.getByRole("alertdialog", { name: "Há configurações não salvas" });
+        await verificarTela(modal.getByRole("button", { name: "Continuar aqui" })).toBeFocused();
+      } else {
+        const nav = await exporNavegacao(page);
+        await verificarTela(nav.getByRole("button", { name: "Séries", exact: true })).toBeFocused();
+      }
+      const agora = new Date("2026-03-10T12:00:00Z");
+      await page.clock.install({ time: agora });
+      await page.clock.pauseAt(new Date(agora.getTime() + 1000));
+      await page.keyboard.press("Escape");
+      await verificarTela(modal).toBeAttached();
+      await verificarTela(page.getByRole("main")).toHaveCount(0);
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.clock.runFor(32);
+      await verificarTela(modal).not.toBeAttached({ timeout: 1500 });
+      await verificarTela(page.getByRole("main")).toBeVisible();
+      await verificarTela(gatilho).toBeFocused();
+      await gatilho.press("Enter");
+      await page.clock.runFor(32);
+      await verificarTela(menuMovel(page)).toBeVisible();
+      await page.clock.runFor(500);
+      await verificarTela(menuMovel(page)).toBeVisible();
+    } finally {
+      await page.close();
+    }
+  },
+);
+
 it("mantém o interruptor focado visível quando o primeiro rascunho mostra o rodapé", async () => {
-  const page = await browser.newPage({ viewport: { width: 320, height: 340 } });
+  const page = await novaPagina(320, 340);
   try {
     const gravacoes = await abrir(page, "light");
-    await page.getByRole("tab", { name: "Geral", exact: true }).click();
+    await selecionarCategoriaConfiguracoes(page, "Escola", "Geral");
     const recurso = page.getByRole("switch", { name: "Saídas e Entradas", exact: true });
     await recurso.focus();
     await recurso.evaluate((el) => {
-      window.scrollBy(0, el.getBoundingClientRect().bottom - (window.innerHeight - 12));
+      el.closest('section[aria-label="Gestão"]')?.scrollBy(
+        0,
+        el.getBoundingClientRect().bottom - (window.innerHeight - 12),
+      );
     });
     const gatilho = await recurso.boundingBox();
     expect(gatilho && gatilho.y + gatilho.height).toBeGreaterThan(300);
@@ -414,7 +742,7 @@ it("mantém o interruptor focado visível quando o primeiro rascunho mostra o ro
 });
 
 it("mantém o aviso de cadastro acima do rodapé sem bloquear a revisão", async () => {
-  const page = await browser.newPage({ viewport: { width: 320, height: 844 } });
+  const page = await novaPagina(320, 844);
   try {
     const gravacoes = await abrir(page, "light");
     const justificativas = page.getByRole("region", { name: "Justificativas", exact: true });
@@ -452,11 +780,7 @@ it("mantém o aviso de cadastro acima do rodapé sem bloquear a revisão", async
 });
 
 async function abrirAlmoco(page: Page) {
-  await selecionarCategoriaConfiguracoes(page, "Horários");
-  await page
-    .getByRole("tablist", { name: "Ações dos horários" })
-    .getByRole("tab", { name: "Almoço", exact: true })
-    .click();
+  await selecionarCategoriaConfiguracoes(page, "Horários", "Almoço");
   await page
     .locator('[data-secao="config-ordem-almoco"]')
     .getByRole("button", { name: /Ordem do almoço/ })
@@ -512,6 +836,7 @@ for (const tema of ["light", "dark"] as const) {
     const page = await browser.newPage({
       viewport: { width: 390, height: 900 },
       reducedMotion: "reduce",
+      serviceWorkers: "block",
     });
     try {
       await abrir(page, tema);
@@ -544,6 +869,7 @@ for (const tema of ["light", "dark"] as const) {
     const page = await browser.newPage({
       viewport: { width: 390, height: 900 },
       reducedMotion: "reduce",
+      serviceWorkers: "block",
     });
     try {
       await abrir(page, tema);
@@ -585,6 +911,7 @@ for (const tema of ["light", "dark"] as const) {
     const page = await browser.newPage({
       viewport: { width: 390, height: 900 },
       reducedMotion: "reduce",
+      serviceWorkers: "block",
     });
     try {
       const gravacoes = await abrir(page, tema);
@@ -633,6 +960,7 @@ for (const tema of ["light", "dark"] as const) {
     const page = await browser.newPage({
       viewport: { width: 390, height: 900 },
       reducedMotion: "reduce",
+      serviceWorkers: "block",
     });
     try {
       const gravacoes = await abrir(page, tema);

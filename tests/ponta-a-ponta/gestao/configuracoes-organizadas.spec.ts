@@ -1,5 +1,10 @@
 // Navegação das configurações no celular, preservando o rascunho e a revisão antes de gravar.
-import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
+import {
+  abrirConfiguracoesDaGestao,
+  exporConfiguracoes,
+  menuMovel,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { descartarConfiguracoes, selecionarAcaoConfiguracoes } from "../helpers/configuracoes";
@@ -10,7 +15,7 @@ async function abrir(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await abrirConfiguracoesDaGestao(page);
 }
 
 test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar antes da revisão", async ({
@@ -28,8 +33,10 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
     return rota.fulfill({ status: 500, json: { error: "E2E Gravação inesperada." } });
   });
   await abrir(page);
-  const escola = page.getByRole("tablist", { name: "Ações da escola", exact: true });
-  await escola.getByRole("tab", { name: "Cadastros", exact: true }).tap();
+  const nav = await exporConfiguracoes(page);
+  const escola = nav.getByRole("list", { name: "Escola", exact: true });
+  await escola.getByRole("button", { name: "Cadastros", exact: true }).tap();
+  await expect(menuMovel(page)).toBeHidden();
   const justificativas = page.locator('[data-secao="config-justificativas"]');
   await expect(
     justificativas.getByRole("heading", { name: "Justificativas", exact: true }),
@@ -40,10 +47,12 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
   await justificativas.getByLabel("Rótulo", { exact: true }).fill("E2E Cadastro em revisão");
   await justificativas.getByRole("button", { name: "Adicionar ao rascunho", exact: true }).tap();
   await expect(justificativas.getByText("E2E Cadastro em revisão", { exact: true })).toBeVisible();
-  const frequencia = escola.getByRole("tab", { name: "Frequência", exact: true });
+  await exporConfiguracoes(page);
+  const frequencia = escola.getByRole("button", { name: "Frequência", exact: true });
   await frequencia.focus();
   await page.keyboard.press("Enter");
-  await expect(frequencia).toHaveAttribute("aria-selected", "true");
+  await expect(menuMovel(page)).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Escola", level: 2, exact: true })).toBeFocused();
   await expect(justificativas).toBeHidden();
   await selecionarCategoriaConfiguracoes(page, "Dados");
   const copia = page.locator('[data-secao="config-copia"]');
@@ -79,36 +88,29 @@ test("as tarefas das categorias cabem no celular e seus painéis ficam acessíve
 }) => {
   await abrir(page);
   const grupos = [
-    {
-      categoria: "Escola",
-      nome: "Ações da escola",
-      acoes: ["Geral", "Frequência", "Calendário", "Cadastros"],
-    },
-    { categoria: "Horários", nome: "Ações dos horários", acoes: ["Aulas", "Almoço", "Provas"] },
-    {
-      categoria: "Acesso e avisos",
-      nome: "Ações de acesso e avisos",
-      acoes: ["Diretores", "Notificações", "FrequenciBI"],
-    },
+    { categoria: "Escola", acoes: ["Geral", "Frequência", "Calendário", "Cadastros"] },
+    { categoria: "Horários", acoes: ["Aulas", "Almoço", "Provas"] },
+    { categoria: "Acesso e avisos", acoes: ["Diretores", "Notificações", "FrequenciBI"] },
   ] as const;
-  for (const grupo of grupos) {
-    await selecionarCategoriaConfiguracoes(page, grupo.categoria);
-    const navegacao = page.getByRole("tablist", { name: grupo.nome, exact: true });
-    for (const acao of grupo.acoes) {
-      const botao = navegacao.getByRole("tab", { name: acao, exact: true });
+  for (const { categoria, acoes } of grupos) {
+    for (const acao of acoes) {
+      const nav = await exporConfiguracoes(page);
+      const grupo = nav.getByRole("button", { name: categoria, exact: true });
+      if ((await grupo.getAttribute("aria-expanded")) === "false") await grupo.tap();
+      const lista = nav.getByRole("list", { name: categoria, exact: true });
+      await expect(grupo).toHaveAttribute("aria-controls", (await lista.getAttribute("id")) ?? "");
+      const botao = lista.getByRole("button", { name: acao, exact: true });
+      expect((await botao.boundingBox())?.height).toBeGreaterThanOrEqual(48);
       await botao.tap();
-      await expect(botao).toHaveAttribute("aria-selected", "true");
-      const painelId = await botao.getAttribute("aria-controls");
-      expect(painelId).toBeTruthy();
-      const painel = page.locator(`[id="${painelId}"]`);
+      await expect(menuMovel(page)).toBeHidden();
+      const painel = page.getByRole("region", { name: categoria, exact: true });
       await expect(painel).toBeVisible();
+      await expect(painel.getByRole("tablist")).toHaveCount(0);
       for (const gatilho of await painel
         .locator('[data-secao] button[aria-expanded="false"]')
         .all()) {
         if (await gatilho.isVisible()) await gatilho.tap();
       }
-      const caixa = await botao.boundingBox();
-      expect(caixa?.height).toBeGreaterThanOrEqual(44);
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
       );

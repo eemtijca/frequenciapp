@@ -1,5 +1,8 @@
 // Configuração dos limites de infrequência na Gestão e leitura pela API.
-import { conferirCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
+import {
+  abrirConfiguracoesDaGestao,
+  conferirCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import type { Configuracoes } from "@/domain/frequencia";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -16,7 +19,7 @@ test("a Gestão grava os limites de infrequência e a API devolve os valores", a
 
   try {
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Configurações/ }).click();
+    await abrirConfiguracoesDaGestao(page);
     await conferirCategoriaConfiguracoes(page, "Escola");
 
     await selecionarAcaoConfiguracoes(page, "Escola", "Frequência");

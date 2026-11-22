@@ -6,6 +6,7 @@ import { personalizacaoVaziaBi } from "@/domain/bi-personalizacao";
 import { massaDeDemonstracaoPresente } from "../helpers/banco";
 import {
   abrirConfiguracoesDaGestao,
+  selecionarCadastroGestao,
   selecionarCategoriaConfiguracoes,
 } from "../../helpers/categorias-configuracoes";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -318,9 +319,7 @@ async function prepararGestao(page: Page, aba: string): Promise<void> {
   if (aba === "Configurações") {
     await abrirConfiguracoesDaGestao(page);
   } else {
-    const voltar = page.getByRole("button", { name: "Voltar para Gestão", exact: true });
-    if (await voltar.isVisible()) await voltar.click();
-    await selecionarAba(page, aba);
+    await selecionarCadastroGestao(page, aba);
   }
   await expect(page.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
 }
