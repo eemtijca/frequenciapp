@@ -338,6 +338,9 @@ Regras de composição:
 
 - Abas Séries, Turmas, Alunos, Equipe, Diretores e Configurações.
 - Formulários em diálogo e tabelas com ações.
+- Séries e Turmas mantêm `TabelaPadrao`: nomes longos quebram sem corte, Ordem e Aulas respeitam a largura legível do conteúdo, e as ações podem ocupar mais de uma linha no celular sem perder a identificação do registro nem reduzir os alvos de toque.
+- Nova série, Nova turma e Reorganizar turmas ficam no cabeçalho dos respectivos cadastros. Os estados sem registros mantêm os atalhos secundários Criar série e Criar turma, quando aplicáveis. Editar, excluir e abrir Horários ficam junto da linha correspondente.
+- No editor de Turmas, o seletor Série mostra tanto o rótulo selecionado quanto as opções por inteiro. Títulos longos do editor e das confirmações de exclusão quebram dentro do diálogo.
 - Em Alunos, Novo aluno tem a maior ênfase no cabeçalho. Importar, exportar, definir e restaurar origem ficam no mesmo contexto, separados das ações de cada linha.
 - Alunos mantém `TabelaPadrao` em região de rolagem local acessível por teclado. Só Aluno fica fixo na horizontal; nomes quebram e as ações podem ocupar duas linhas no celular. Não há ganho demonstrado de Data Grid Community nesse cadastro.
 - O diálogo de cadastro e edição de aluno ocupa a tela no celular. Os seletores mantêm a busca e mostram os rótulos completos das turmas selecionadas e das opções.

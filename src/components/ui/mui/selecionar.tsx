@@ -22,6 +22,7 @@ export interface SelecionarProps {
   disabled?: boolean;
   ariaLabel?: string;
   buscavel?: boolean;
+  quebrarRotuloSelecionado?: boolean;
   quebrarRotulosDasOpcoes?: boolean;
   mostrarRotuloSelecionado?: boolean;
 }
@@ -35,6 +36,7 @@ export function Selecionar({
   disabled,
   ariaLabel,
   buscavel = false,
+  quebrarRotuloSelecionado = false,
   quebrarRotulosDasOpcoes = false,
   mostrarRotuloSelecionado = false,
 }: SelecionarProps) {
@@ -83,11 +85,20 @@ export function Selecionar({
         }
         return opcoes.find((opcao) => opcao.valor === atual)?.rotulo ?? atual;
       }}
-      sx={{
+      sx={(tema) => ({
         minHeight: TOKENS_LAYOUT.campo.medio,
         borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
         "& .MuiSelect-select": { minHeight: 0, py: 2 },
-      }}
+        ...(quebrarRotuloSelecionado && {
+          // A especificidade extra reserva o espaço do indicador no Select outlined.
+          "&& .MuiSelect-select.MuiSelect-select": {
+            display: "block",
+            paddingInlineEnd: tema.spacing(6),
+            whiteSpace: "normal",
+            overflowWrap: "anywhere",
+          },
+        }),
+      })}
     >
       {opcoes.length === 0 ? (
         <MenuItem disabled value="">

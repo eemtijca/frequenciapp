@@ -42,6 +42,7 @@ interface Formulario {
 
 const VAZIO: Formulario = { nome: "", ordem: "1" };
 
+const ESPACO_ACOES = 0.5;
 const ALVO_ACAO = {
   width: TOKENS_LAYOUT.alvoToque,
   height: TOKENS_LAYOUT.alvoToque,
@@ -158,8 +159,18 @@ export default function AbaSeries({ series, onMudanca }: Props) {
           <TableHead>
             <TableRow>
               <TableCell scope="col">Série</TableCell>
-              <TableCell scope="col">Ordem</TableCell>
               <TableCell scope="col" align="right">
+                Ordem
+              </TableCell>
+              <TableCell
+                scope="col"
+                align="right"
+                sx={(tema) => ({
+                  width: {
+                    sm: `calc(${2 * TOKENS_LAYOUT.alvoToque + 2 * TOKENS_LAYOUT.tabela.padding}px + ${tema.spacing(ESPACO_ACOES)})`,
+                  },
+                })}
+              >
                 Ações
               </TableCell>
             </TableRow>
@@ -167,7 +178,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
           <TableBody>
             {filtradas.map((serie) => (
               <TableRow key={serie.id}>
-                <TableCell component="th" scope="row">
+                <TableCell component="th" scope="row" sx={{ overflowWrap: "anywhere" }}>
                   <Typography component="span" variant="body1" sx={{ fontWeight: 500 }}>
                     {serie.nome}
                   </Typography>
@@ -176,8 +187,9 @@ export default function AbaSeries({ series, onMudanca }: Props) {
                 <TableCell align="right">
                   <Stack
                     direction="row"
-                    spacing={0.5}
-                    sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}
+                    spacing={ESPACO_ACOES}
+                    useFlexGap
+                    sx={{ justifyContent: "flex-end", flexWrap: { xs: "wrap", sm: "nowrap" } }}
                   >
                     <BotaoIcone
                       rotulo={`Editar série ${serie.nome}`}
@@ -259,6 +271,7 @@ export default function AbaSeries({ series, onMudanca }: Props) {
       <DialogoConfirmacao
         aberto={excluirAlvo !== null}
         titulo={`Excluir a série ${excluirAlvo?.nome ?? ""}?`}
+        quebrarTitulo
         descricao="A exclusão só é possível quando a série não tem turmas."
         rotuloConfirmar="Excluir"
         destrutivo

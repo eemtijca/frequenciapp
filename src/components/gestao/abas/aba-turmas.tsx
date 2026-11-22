@@ -8,6 +8,7 @@ import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -46,6 +47,7 @@ interface Formulario {
   nome: string;
 }
 
+const ESPACO_ACOES = 0.5;
 const ALVO_ACAO = {
   width: TOKENS_LAYOUT.alvoToque,
   height: TOKENS_LAYOUT.alvoToque,
@@ -209,17 +211,26 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
             />
           ) : (
             gruposFiltrados.map(([serieId, grupo]) => (
-              <Stack key={serieId} component="section" spacing={1}>
+              <Stack
+                key={serieId}
+                component="section"
+                spacing={1}
+                sx={{ "& caption": { overflowWrap: "anywhere" } }}
+              >
                 <Stack
                   direction="row"
                   spacing={1}
                   useFlexGap
                   sx={{ alignItems: "baseline", justifyContent: "space-between" }}
                 >
-                  <Typography component="h2" variant="subtitle1">
+                  <Typography
+                    component="h2"
+                    variant="subtitle1"
+                    sx={{ minWidth: 0, overflowWrap: "anywhere" }}
+                  >
                     {grupo.serie?.nome ?? "Série"}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  <Typography variant="caption" sx={{ color: "text.secondary", flexShrink: 0 }}>
                     {grupo.turmas.length} {grupo.turmas.length === 1 ? "turma" : "turmas"}
                   </Typography>
                 </Stack>
@@ -228,7 +239,15 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                     <TableRow>
                       <TableCell scope="col">Turma</TableCell>
                       <TableCell scope="col">Aulas</TableCell>
-                      <TableCell scope="col" align="right">
+                      <TableCell
+                        scope="col"
+                        align="right"
+                        sx={(tema) => ({
+                          width: {
+                            sm: `calc(${3 * TOKENS_LAYOUT.alvoToque + 2 * TOKENS_LAYOUT.tabela.padding}px + ${tema.spacing(2 * ESPACO_ACOES)})`,
+                          },
+                        })}
+                      >
                         Ações
                       </TableCell>
                     </TableRow>
@@ -238,19 +257,30 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                       const aulasAtivas = turma.horarios.filter((aula) => aula.ativo).length;
                       return (
                         <TableRow key={turma.id}>
-                          <TableCell component="th" scope="row">
+                          <TableCell component="th" scope="row" sx={{ overflowWrap: "anywhere" }}>
                             {turma.rotulo}
                           </TableCell>
-                          <TableCell>
-                            {aulasAtivas === 0
-                              ? "sem aulas ativas"
-                              : `${aulasAtivas} ${aulasAtivas === 1 ? "aula" : "aulas"}`}
+                          <TableCell sx={{ whiteSpace: aulasAtivas ? "nowrap" : { sm: "nowrap" } }}>
+                            {aulasAtivas ? (
+                              `${aulasAtivas} ${aulasAtivas === 1 ? "aula" : "aulas"}`
+                            ) : (
+                              <>
+                                sem{" "}
+                                <Box component="span" sx={{ whiteSpace: "nowrap" }}>
+                                  aulas ativas
+                                </Box>
+                              </>
+                            )}
                           </TableCell>
                           <TableCell align="right">
                             <Stack
                               direction="row"
-                              spacing={0.5}
-                              sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}
+                              spacing={ESPACO_ACOES}
+                              useFlexGap
+                              sx={{
+                                justifyContent: "flex-end",
+                                flexWrap: { xs: "wrap", sm: "nowrap" },
+                              }}
                             >
                               <BotaoIcone
                                 rotulo={`Horários de ${turma.rotulo}`}
@@ -297,6 +327,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
         aberto={dialogoAberto}
         onFechar={() => setDialogoAberto(false)}
         titulo={emEdicao ? `Editar turma ${emEdicao.rotulo}` : "Nova turma"}
+        quebrarTitulo
         acoes={
           <>
             <Botao variante="texto" onClick={() => setDialogoAberto(false)}>
@@ -321,6 +352,8 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
                 valor={formulario.serieId}
                 onValor={(serieId) => setFormulario((atual) => ({ ...atual, serieId }))}
                 opcoes={opcoesSerie}
+                quebrarRotuloSelecionado
+                quebrarRotulosDasOpcoes
               />
             </Campo>
             <Campo
@@ -347,6 +380,7 @@ export default function AbaTurmas({ series, turmas, onMudanca, onOrdenacao }: Pr
       <DialogoConfirmacao
         aberto={excluirAlvo !== null}
         titulo={`Excluir a turma ${excluirAlvo?.rotulo ?? ""}?`}
+        quebrarTitulo
         descricao="A exclusão só é possível quando a turma não tem alunos nem frequências."
         rotuloConfirmar="Excluir"
         destrutivo
