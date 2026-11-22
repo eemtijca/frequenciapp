@@ -198,6 +198,10 @@ test("abre o diálogo da turma selecionada e conta apenas aulas ativas na Gestã
   expect(gravacoes[0]?.method()).toBe("PATCH");
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
   await trocarVisao(page, "Gestão", "gestao");
+  await expect(page.getByRole("tab", { name: "Turmas", exact: true })).toBeHidden();
+  const voltar = page.getByRole("button", { name: "Voltar para Gestão", exact: true });
+  await expect(voltar).toBeVisible();
+  await voltar.click();
   await page.getByRole("tab", { name: "Turmas", exact: true }).click();
   const turma = page.getByRole("row").filter({ has: page.getByText(origem, { exact: true }) });
   await expect(turma.getByText("2 aulas", { exact: true })).toBeVisible();
