@@ -55,6 +55,7 @@ import { Cartao } from "@/components/ui/mui/cartao";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
@@ -120,17 +121,20 @@ function IconePausa({ pausa }: { pausa: Pausa }) {
   return <Icone fontSize="small" aria-hidden="true" />;
 }
 
-function PausaDoDia({ pausa }: { pausa: Pausa }) {
+function PausaDoDia({ pausa, editavel }: { pausa: Pausa; editavel: boolean }) {
   return (
-    <ListItem divider sx={{ gap: 2, py: 1.5, backgroundColor: "action.hover" }}>
+    <ListItem
+      divider
+      sx={{ gap: editavel ? 2 : 1.5, py: editavel ? 1.5 : 1, backgroundColor: "action.hover" }}
+    >
       <Box
         aria-hidden="true"
         sx={{
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: 44,
-          height: 44,
+          width: editavel ? 44 : 32,
+          height: editavel ? 44 : 32,
           flexShrink: 0,
         }}
       >
@@ -285,19 +289,24 @@ function AulasDoDia({
       disablePadding
     >
       {itens.map((item) => {
-        if (item.tipo === "pausa") return <PausaDoDia key={item.pausa.id} pausa={item.pausa} />;
+        if (item.tipo === "pausa")
+          return <PausaDoDia key={item.pausa.id} pausa={item.pausa} editavel={editavel} />;
         const aula = item.aula;
         const disciplina = aula.disciplinas?.[String(dia)]?.trim();
         return (
-          <ListItem key={aula.id} divider sx={{ display: "block", py: 2 }}>
-            <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start" }}>
+          <ListItem key={aula.id} divider sx={{ display: "block", py: editavel ? 2 : 1 }}>
+            <Stack
+              direction="row"
+              spacing={editavel ? 2 : 1.5}
+              sx={{ alignItems: editavel ? "flex-start" : "center" }}
+            >
               <Box
                 sx={{
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  width: 44,
-                  height: 44,
+                  width: editavel ? 44 : 32,
+                  height: editavel ? 44 : 32,
                   flexShrink: 0,
                   border: 1,
                   borderColor: "divider",
@@ -683,57 +692,83 @@ export default function VistaHorarios({
   }
 
   const navegacaoBloqueada = rascunho !== null || enviando;
+  const campoTurma = (
+    <Campo id={`${base}-turma`} rotulo="Turma">
+      <Selecionar
+        valor={turma?.id ?? ""}
+        onValor={setTurmaId}
+        opcoes={turmas.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
+        buscavel={editavel}
+        quebrarRotulosDasOpcoes={!editavel}
+        disabled={turmas.length === 0 || navegacaoBloqueada}
+      />
+    </Campo>
+  );
+  const campoDia = (
+    <Campo id={`${base}-dia`} rotulo="Dia da semana">
+      <Selecionar
+        valor={diaSelecionado}
+        onValor={setDiaSelecionado}
+        opcoes={[
+          { valor: "0", rotulo: "Semana completa" },
+          ...DIAS_DA_SEMANA.map((item) => ({
+            valor: String(item.valor),
+            rotulo: rotuloDia(item.valor),
+          })),
+        ]}
+        disabled={turmas.length === 0 || navegacaoBloqueada}
+      />
+    </Campo>
+  );
 
   return (
     <Stack
       component="section"
       aria-label={editavel ? "Edição de horários" : "Horários semanais"}
-      spacing={3}
+      spacing={editavel ? 3 : 2}
+      useFlexGap={!editavel}
       sx={{ minWidth: 0, pb: editavel ? 0 : 3 }}
     >
       {editavel ? (
-        <Box component="h2" sx={TEXTO_INVISIVEL}>
-          Horários das turmas
-        </Box>
+        <>
+          <Box component="h2" sx={TEXTO_INVISIVEL}>
+            Horários das turmas
+          </Box>
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>{campoTurma}</Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>{campoDia}</Grid>
+          </Grid>
+        </>
       ) : (
-        <Box component="h1" sx={TEXTO_INVISIVEL}>
-          Horários
-        </Box>
+        <>
+          <CabecalhoPagina titulo="Horários" compacto acoes={<AtualizadoDaVisao fuso={fuso} />} />
+          <Stack
+            role="group"
+            aria-label="Filtros de horários"
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            useFlexGap
+            sx={{ alignItems: { sm: "flex-start" } }}
+          >
+            <Box
+              sx={(tema) => ({
+                flex: { sm: 2 },
+                minWidth: 0,
+                // A especificidade extra supera o padding do Select outlined do MUI.
+                "&& .MuiSelect-select.MuiSelect-select": {
+                  display: "block",
+                  paddingInlineEnd: tema.spacing(6),
+                  whiteSpace: "normal",
+                  overflowWrap: "anywhere",
+                },
+              })}
+            >
+              {campoTurma}
+            </Box>
+            <Box sx={{ flex: { sm: 1 }, minWidth: 0 }}>{campoDia}</Box>
+          </Stack>
+        </>
       )}
-      {!editavel ? (
-        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-          <AtualizadoDaVisao fuso={fuso} />
-        </Box>
-      ) : null}
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Campo id={`${base}-turma`} rotulo="Turma">
-            <Selecionar
-              valor={turma?.id ?? ""}
-              onValor={setTurmaId}
-              opcoes={turmas.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
-              buscavel={editavel}
-              disabled={turmas.length === 0 || navegacaoBloqueada}
-            />
-          </Campo>
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Campo id={`${base}-dia`} rotulo="Dia da semana">
-            <Selecionar
-              valor={diaSelecionado}
-              onValor={setDiaSelecionado}
-              opcoes={[
-                { valor: "0", rotulo: "Semana completa" },
-                ...DIAS_DA_SEMANA.map((item) => ({
-                  valor: String(item.valor),
-                  rotulo: rotuloDia(item.valor),
-                })),
-              ]}
-              disabled={turmas.length === 0 || navegacaoBloqueada}
-            />
-          </Campo>
-        </Grid>
-      </Grid>
 
       {!editavel ? (
         <CartaoProvasBimestrais
@@ -795,17 +830,36 @@ export default function VistaHorarios({
         </Stack>
       ) : semanaCompleta ? (
         <>
-          <Box sx={{ display: { xs: "none", lg: "block" } }}>
+          <Box
+            sx={{
+              display: { xs: "none", lg: "block" },
+              ...(!editavel && {
+                "& table": { tableLayout: "fixed", minWidth: `${7 + diasDaGrade.length * 8}rem` },
+                // Cada dia recebe a mesma largura; só o cabeçalho de linha fica fixo.
+                "& tr > th:first-child": {
+                  position: "sticky",
+                  left: 0,
+                  zIndex: 1,
+                  backgroundColor: "background.paper",
+                },
+              }),
+            }}
+          >
             <TabelaPadrao
               caption={`Grade semanal de ${turma?.rotulo ?? "turma"}`}
-              primeiraColunaFixa
+              primeiraColunaFixa={editavel}
+              rotuloRolagem={editavel ? undefined : "Rolagem da grade semanal"}
             >
               <TableHead>
                 <TableRow>
                   <TableCell
                     component="th"
                     scope="col"
-                    sx={{ width: 128, fontWeight: 500, backgroundColor: "action.hover" }}
+                    sx={{
+                      width: editavel ? 128 : "7rem",
+                      fontWeight: 500,
+                      backgroundColor: "action.hover",
+                    }}
                   >
                     Aula
                   </TableCell>

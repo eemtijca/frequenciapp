@@ -11,7 +11,7 @@ import {
   proximasProvasDaTurma,
   type ProvaBimestral,
 } from "@/domain/provas-bimestrais";
-import { Cartao } from "@/components/ui/mui/cartao";
+import { Cartao, CartaoCabecalho, CartaoTitulo } from "@/components/ui/mui/cartao";
 import { Selo } from "@/components/ui/mui/selo";
 
 interface Props {
@@ -42,27 +42,33 @@ export default function CartaoProvasBimestrais({
       aria-label={`Provas bimestrais de ${turmaRotulo}`}
       sx={{ padding: 0, overflow: "hidden" }}
     >
-      <Stack
-        direction="row"
-        spacing={1}
+      <CartaoCabecalho
         sx={{
-          alignItems: "center",
+          justifyContent: "flex-start",
+          mb: 0,
           px: 2,
-          py: 1.5,
+          py: 1,
           backgroundColor: "action.hover",
           borderBottom: 1,
           borderColor: "divider",
         }}
       >
         <EventNoteRoundedIcon fontSize="small" aria-hidden="true" />
-        <Typography component="h2" variant="subtitle2">
-          Provas bimestrais · {turmaRotulo}
-        </Typography>
-      </Stack>
+        <CartaoTitulo>Provas bimestrais</CartaoTitulo>
+      </CartaoCabecalho>
       <List disablePadding>
-        {dias.map((grupo) => (
-          <ListItem key={grupo.dia} divider sx={{ display: "block", px: 2, py: 1.5 }}>
-            <Stack direction="row" spacing={1} sx={{ alignItems: "center", mb: 1 }}>
+        {dias.map((grupo, indice) => (
+          <ListItem
+            key={grupo.dia}
+            divider={indice < dias.length - 1}
+            sx={{ display: "block", px: 2, py: 1 }}
+          >
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              sx={{ alignItems: "center", flexWrap: "wrap" }}
+            >
               <Typography component="h3" variant="subtitle2">
                 {rotuloDoDia(grupo.dia)}
               </Typography>
@@ -70,7 +76,16 @@ export default function CartaoProvasBimestrais({
             </Stack>
             <List disablePadding>
               {grupo.provas.map((prova) => (
-                <ListItem key={prova.id} disableGutters sx={{ gap: 2, py: 0.5 }}>
+                <ListItem
+                  key={prova.id}
+                  disableGutters
+                  sx={{
+                    flexDirection: { xs: "column", sm: "row" },
+                    alignItems: { xs: "stretch", sm: "baseline" },
+                    gap: { xs: 0.5, sm: 2 },
+                    py: 0.5,
+                  }}
+                >
                   <Typography
                     variant="body2"
                     sx={{ flex: 1, minWidth: 0, overflowWrap: "anywhere" }}

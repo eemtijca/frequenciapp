@@ -22,6 +22,7 @@ export interface SelecionarProps {
   disabled?: boolean;
   ariaLabel?: string;
   buscavel?: boolean;
+  quebrarRotulosDasOpcoes?: boolean;
 }
 
 export function Selecionar({
@@ -33,6 +34,7 @@ export function Selecionar({
   disabled,
   ariaLabel,
   buscavel = false,
+  quebrarRotulosDasOpcoes = false,
 }: SelecionarProps) {
   const campo = useCampo();
   const idFinal = campo?.id ?? id;
@@ -92,7 +94,10 @@ export function Selecionar({
           <MenuItem
             key={opcao.valor}
             value={opcao.valor}
-            sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+            sx={{
+              minHeight: TOKENS_LAYOUT.alvoToque,
+              ...(quebrarRotulosDasOpcoes && { whiteSpace: "normal", overflowWrap: "anywhere" }),
+            }}
           >
             {opcao.rotulo}
           </MenuItem>
