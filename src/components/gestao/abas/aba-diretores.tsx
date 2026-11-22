@@ -19,10 +19,8 @@ import FormControlLabel from "@mui/material/FormControlLabel";
 import Stack from "@mui/material/Stack";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
@@ -46,6 +44,7 @@ import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { TabelaCadastrosAdministrativos } from "./tabela-cadastros-administrativos";
 
 interface Props {
   turmas: Turma[];
@@ -295,7 +294,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                   : "diretores ativos"
               }`}
         </Typography>
-        <Botao variante="secundario" icone={<AddRoundedIcon />} onClick={abrirNovo}>
+        <Botao variante="principal" icone={<AddRoundedIcon />} onClick={abrirNovo}>
           Novo diretor
         </Botao>
       </Stack>
@@ -340,61 +339,61 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
               descricao="Tente outro termo de busca."
             />
           ) : (
-            <TabelaPadrao caption="Diretores de turma, com a situação da palavra-chave.">
-              <TableHead>
-                <TableRow>
-                  <TableCell scope="col">Diretor</TableCell>
-                  <TableCell scope="col" align="right">
-                    Ações
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
+            <TabelaCadastrosAdministrativos
+              caption="Diretores de turma, com a situação da palavra-chave."
+              identidade="Diretor"
+            >
+              <TableBody role="rowgroup">
                 {filtrados.map((diretor) => {
                   const emitindo = chaveAtiva === `emitir-${diretor.id}`;
+                  const primeiraEmissao = diretor.estado === "sem_palavra";
                   return (
-                    <TableRow
-                      key={diretor.id}
-                      data-diretor={diretor.identificador}
-                      sx={{ opacity: diretor.ativo ? 1 : 0.6 }}
-                    >
-                      <TableCell component="th" scope="row">
+                    <TableRow key={diretor.id} data-diretor={diretor.identificador} role="row">
+                      <TableCell component="th" scope="row" role="rowheader">
                         <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 600 }}>{diretor.nome}</Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{ color: "text.secondary", fontVariantNumeric: "tabular-nums" }}
+                          >
+                            {diretor.identificador}
+                          </Typography>
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                            {diretor.turmas.length > 0
+                              ? diretor.turmas.map((vinculo) => vinculo.turma).join(", ")
+                              : "Sem turma vinculada"}
+                          </Typography>
                           <Stack
                             direction="row"
                             spacing={1}
                             useFlexGap
                             sx={{ alignItems: "center", flexWrap: "wrap" }}
                           >
-                            <Typography sx={{ fontWeight: 500 }}>{diretor.nome}</Typography>
                             <Selo
                               rotulo={ROTULOS_ESTADO_CREDENCIAL[diretor.estado]}
                               tom={VARIANTE_ESTADO[diretor.estado]}
+                              sx={{
+                                height: "auto",
+                                minHeight: 24,
+                                "& .MuiChip-label": { whiteSpace: "normal" },
+                              }}
                             />
                             {!diretor.ativo ? <Selo rotulo="desativado" /> : null}
                           </Stack>
-                          <Typography
-                            variant="body2"
-                            noWrap
-                            sx={{ color: "text.secondary", fontVariantNumeric: "tabular-nums" }}
-                          >
-                            {diretor.identificador}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            {diretor.turmas.length > 0
-                              ? diretor.turmas.map((vinculo) => vinculo.turma).join(", ")
-                              : "Sem turma vinculada"}
-                            {diretor.expiraEm &&
-                            (diretor.estado === "emitida" || diretor.estado === "em_uso")
-                              ? ` · palavra válida até ${dataCurta(diretor.expiraEm)}`
-                              : ""}
-                            {diretor.estado === "revogada" && diretor.motivoRevogacao
-                              ? ` · revogada: ${diretor.motivoRevogacao}`
-                              : ""}
-                          </Typography>
+                          {diretor.expiraEm &&
+                          (diretor.estado === "emitida" || diretor.estado === "em_uso") ? (
+                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                              Palavra válida até {dataCurta(diretor.expiraEm)}
+                            </Typography>
+                          ) : null}
+                          {diretor.estado === "revogada" && diretor.motivoRevogacao ? (
+                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                              Motivo: {diretor.motivoRevogacao}
+                            </Typography>
+                          ) : null}
                         </Stack>
                       </TableCell>
-                      <TableCell align="right">
+                      <TableCell align="right" role="cell">
                         <Stack
                           direction="row"
                           spacing={1}
@@ -410,15 +409,18 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                             icone={<KeyRoundedIcon />}
                             carregando={emitindo}
                             disabled={!diretor.ativo}
+                            aria-label={`Gerar ${primeiraEmissao ? "" : "nova "}palavra-chave para ${diretor.nome}`}
+                            sx={{
+                              height: "auto",
+                              minHeight: TOKENS_LAYOUT.alvoToque,
+                              maxWidth: "100%",
+                              textAlign: "left",
+                            }}
                             onClick={() =>
-                              diretor.estado === "sem_palavra"
-                                ? emitir(diretor)
-                                : setEmitirAlvo(diretor)
+                              primeiraEmissao ? emitir(diretor) : setEmitirAlvo(diretor)
                             }
                           >
-                            {diretor.estado === "sem_palavra"
-                              ? "Gerar palavra-chave"
-                              : "Gerar nova"}
+                            {primeiraEmissao ? "Gerar palavra-chave" : "Gerar nova"}
                           </Botao>
                           <BotaoIcone
                             rotulo={`Editar ${diretor.nome}`}
@@ -457,7 +459,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                   );
                 })}
               </TableBody>
-            </TabelaPadrao>
+            </TabelaCadastrosAdministrativos>
           )}
         </Stack>
       )}
@@ -466,6 +468,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
         aberto={dialogoAberto}
         onFechar={() => setDialogoAberto(false)}
         titulo={emEdicao ? `Editar ${emEdicao.nome}` : "Novo diretor de turma"}
+        quebrarTitulo
         tamanho="grande"
         acoes={
           <>
@@ -521,7 +524,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                 placeholder="ex.: 3a-maria"
               />
             </Campo>
-            <Box component="fieldset" sx={{ border: 0, margin: 0, padding: 0 }}>
+            <Box component="fieldset" sx={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
               <Typography component="legend" variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
                 Turmas acompanhadas
               </Typography>
@@ -562,7 +565,9 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
                         m: 0,
                         px: 1,
                         borderRadius: 1,
+                        minWidth: 0,
                         width: { xs: "100%", sm: "calc(50% - 4px)" },
+                        "& .MuiFormControlLabel-label": { overflowWrap: "anywhere" },
                         "&:hover": { backgroundColor: "action.selected" },
                       }}
                     />
@@ -597,6 +602,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
       <DialogoConfirmacao
         aberto={emitirAlvo !== null}
         titulo={`Gerar nova palavra-chave para ${emitirAlvo?.nome ?? ""}?`}
+        quebrarTitulo
         descricao="A palavra atual deixa de valer na hora e as sessões abertas caem. A nova aparece uma única vez."
         rotuloConfirmar="Gerar nova"
         operacaoEmAndamento={emitirAlvo !== null && chaveAtiva === `emitir-${emitirAlvo.id}`}
@@ -612,6 +618,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
         aberto={palavraEmitida !== null}
         onFechar={() => setPalavraEmitida(null)}
         titulo={`Palavra-chave de ${palavraEmitida?.diretor.nome ?? ""}`}
+        quebrarTitulo
         descricao="Ela aparece só agora. Entregue ao diretor em mãos ou por mensagem direta; no primeiro acesso ele troca por uma palavra própria."
         acoes={
           <>
@@ -644,7 +651,9 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
             Identificador
           </Typography>
-          <Typography sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 500 }}>
+          <Typography
+            sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 500, overflowWrap: "anywhere" }}
+          >
             {palavraEmitida?.diretor.identificador}
           </Typography>
           <Typography variant="caption" sx={{ color: "text.secondary", mt: 1 }}>
@@ -675,6 +684,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
           if (chaveAtiva !== `revogar-${revogarAlvo?.id}`) setRevogarAlvo(null);
         }}
         titulo={`Revogar a palavra-chave de ${revogarAlvo?.nome ?? ""}?`}
+        quebrarTitulo
         descricao="O acesso cai na hora, em todos os aparelhos. Use em saída da função, suspeita de vazamento ou desligamento. O motivo fica registrado."
         acoes={
           <>

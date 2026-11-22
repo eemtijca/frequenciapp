@@ -45,6 +45,8 @@ Em Minhas turmas, o rótulo só é atualizado após a consulta de estatísticas 
 
 ## Fluxo de um toque
 
+Em Gestão, Equipe e Diretores exibem os dados e as ações lado a lado quando há espaço. Abaixo de 600 px de largura útil, as ações ficam sob os dados do mesmo registro. Em Diretores, o identificador, as turmas e a situação da palavra-chave ficam junto do nome. A emissão continua mostrando a palavra-chave uma única vez, e a revogação exige motivo.
+
 As listas reutilizam índices de nomes, agrupamentos e opções enquanto os dados não mudam. Alunos, Grade e Relatórios por aluno deixam o campo responder antes de atualizar a lista filtrada; cálculos mensais não são repetidos durante a digitação. A busca da Gestão mantém a seleção em massa sincronizada com o filtro visível. Marcação de falta, rascunhos e confirmação RS continuam imediatos; a gravação continua imediata depois da confirmação. Painel e Grade cancelam somente leituras ao ocultar a visão e consultam novamente ao retornar, preservando filtros e resultados.
 
 O seletor de horário mantém o foco sem deslocar a tela ou o formulário atrás do painel: só a coluna de opções rola. A altura acompanha o espaço disponível. Listas buscáveis agrupam os eventos de redimensionamento do teclado em um ajuste por quadro. Diálogos de confirmação têm altura limitada à tela e rolagem própria, mantendo Cancelar e a ação de confirmação alcançáveis em telas baixas.

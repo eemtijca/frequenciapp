@@ -82,7 +82,9 @@ test.describe("diretores de turma na Gestão", () => {
     await expect(item.getByText("Sem palavra-chave")).toBeVisible();
     await expect(item.getByText("E2E Ano A")).toBeVisible();
 
-    await item.getByRole("button", { name: "Gerar palavra-chave" }).click();
+    await item
+      .getByRole("button", { name: "Gerar palavra-chave para E2E Diretora", exact: true })
+      .click();
     const palavra = page.locator("[data-palavra-chave]");
     await expect(palavra).toHaveText(/^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
     await page.getByRole("button", { name: "Já entreguei" }).click();
@@ -96,7 +98,7 @@ test.describe("diretores de turma na Gestão", () => {
     await revogar.getByRole("button", { name: "Revogar", exact: true }).click();
     await expect(page.getByText("Palavra-chave revogada.")).toBeVisible();
     await expect(item.getByText("Revogada", { exact: true })).toBeVisible();
-    await expect(item.getByText(/revogada: Teste de ponta a ponta/)).toBeVisible();
+    await expect(item.getByText("Motivo: Teste de ponta a ponta", { exact: true })).toBeVisible();
   });
 
   test("desativa e reativa o diretor, bloqueando a palavra-chave enquanto desativado", async ({
@@ -121,12 +123,16 @@ test.describe("diretores de turma na Gestão", () => {
     await item.getByRole("button", { name: "Desativar E2E Desativar" }).click();
     await expect(page.getByText("Diretor desativado.")).toBeVisible();
     await expect(item.getByText("desativado")).toBeVisible();
-    await expect(item.getByRole("button", { name: "Gerar palavra-chave" })).toBeDisabled();
+    const gerar = item.getByRole("button", {
+      name: "Gerar palavra-chave para E2E Desativar",
+      exact: true,
+    });
+    await expect(gerar).toBeDisabled();
 
     await item.getByRole("button", { name: "Reativar E2E Desativar" }).click();
     await expect(page.getByText("Diretor reativado.")).toBeVisible();
     await expect(item.getByText("desativado")).toHaveCount(0);
-    await expect(item.getByRole("button", { name: "Gerar palavra-chave" })).toBeEnabled();
+    await expect(gerar).toBeEnabled();
   });
 
   test("ajusta os parâmetros de acesso em Configurações", async ({ page }) => {
@@ -178,7 +184,9 @@ test.describe("diretores de turma na Gestão", () => {
     await formulario.getByLabel("E2E Ano A").check();
     await formulario.getByRole("button", { name: "Cadastrar" }).click();
     const item = page.locator('[data-diretor="e2e-leitor"]');
-    await item.getByRole("button", { name: "Gerar palavra-chave" }).click();
+    await item
+      .getByRole("button", { name: "Gerar palavra-chave para E2E Leitor", exact: true })
+      .click();
     const palavra = (await page.locator("[data-palavra-chave]").textContent()) ?? "";
     expect(palavra).toMatch(/^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
     await page.getByRole("button", { name: "Já entreguei" }).click();

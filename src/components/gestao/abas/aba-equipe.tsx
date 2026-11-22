@@ -13,10 +13,8 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Stack from "@mui/material/Stack";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
-import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
@@ -35,6 +33,7 @@ import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { TabelaCadastrosAdministrativos } from "./tabela-cadastros-administrativos";
 
 interface Props {
   usuarioId: string;
@@ -197,7 +196,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
             ? "Carregando..."
             : `${usuarios.filter((u) => u.papel === "COORDENACAO").length} coordenação · ${usuarios.filter((u) => u.papel === "ADMIN").length} administração`}
         </Typography>
-        <Botao variante="secundario" icone={<AddRoundedIcon />} onClick={abrirNovo}>
+        <Botao variante="principal" icone={<AddRoundedIcon />} onClick={abrirNovo}>
           Nova conta
         </Botao>
       </Stack>
@@ -242,50 +241,44 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
               descricao="Tente outro termo de busca."
             />
           ) : (
-            <TabelaPadrao caption="Contas da coordenação e da administração.">
-              <TableHead>
-                <TableRow>
-                  <TableCell scope="col">Conta</TableCell>
-                  <TableCell scope="col" align="right">
-                    Ações
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
+            <TabelaCadastrosAdministrativos
+              caption="Contas da coordenação e da administração."
+              identidade="Conta"
+            >
+              <TableBody role="rowgroup">
                 {usuariosFiltrados.map((usuario) => {
                   const propria = usuario.id === usuarioId;
                   const ultimoAdmin =
                     usuario.papel === "ADMIN" && usuario.ativo && administradoresAtivos === 1;
                   return (
-                    <TableRow
-                      key={usuario.id}
-                      data-conta={usuario.id}
-                      sx={{ opacity: usuario.ativo ? 1 : 0.6 }}
-                    >
-                      <TableCell component="th" scope="row">
+                    <TableRow key={usuario.id} data-conta={usuario.id} role="row">
+                      <TableCell component="th" scope="row" role="rowheader">
                         <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 600 }}>{usuario.nome}</Typography>
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                            {usuario.email}
+                          </Typography>
                           <Stack
                             direction="row"
                             spacing={1}
                             useFlexGap
                             sx={{ alignItems: "center", flexWrap: "wrap" }}
                           >
-                            <Typography sx={{ fontWeight: 500 }}>{usuario.nome}</Typography>
                             <Selo
                               rotulo={rotuloDePapel(usuario.papel)}
                               tom={usuario.papel === "ADMIN" ? "atencao" : "neutro"}
                             />
                             {propria ? <Selo rotulo="Você" tom="sucesso" /> : null}
+                            {!usuario.ativo ? <Selo rotulo="desativada" /> : null}
                           </Stack>
-                          <Typography variant="body2" noWrap sx={{ color: "text.secondary" }}>
-                            {usuario.email}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                            {usuario.ativo ? "ativa" : "desativada"}
-                          </Typography>
+                          {usuario.ativo ? (
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                              ativa
+                            </Typography>
+                          ) : null}
                         </Stack>
                       </TableCell>
-                      <TableCell align="right">
+                      <TableCell align="right" role="cell">
                         <Stack
                           direction="row"
                           spacing={0.5}
@@ -333,7 +326,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                   );
                 })}
               </TableBody>
-            </TabelaPadrao>
+            </TabelaCadastrosAdministrativos>
           )}
         </Stack>
       )}
@@ -342,6 +335,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
         aberto={dialogoAberto}
         onFechar={() => setDialogoAberto(false)}
         titulo={emEdicao ? `Editar ${emEdicao.nome}` : "Nova conta"}
+        quebrarTitulo
         tamanho="grande"
         acoes={
           <>
@@ -437,6 +431,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
       <DialogoConfirmacao
         aberto={excluirAlvo !== null}
         titulo={`Excluir a conta de ${excluirAlvo?.nome ?? ""}?`}
+        quebrarTitulo
         descricao="A exclusão remove o acesso. As frequências da escola são preservadas, sem a autoria desta conta."
         rotuloConfirmar="Excluir"
         destrutivo
