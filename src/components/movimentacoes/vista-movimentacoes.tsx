@@ -115,55 +115,51 @@ export default function VistaMovimentacoes({
 
   return (
     <Stack spacing={2}>
-      <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: "flex-start" }}>
-        <Box sx={{ minWidth: 0, flex: 1 }}>
-          <Abas
-            rotuloAcessivel="Tipo de registro"
-            itens={itens}
-            ativo={aba}
-            onChange={aoTrocar}
-            variant="fullWidth"
-            dataPager="movimentacoes"
-          />
-        </Box>
-        <Botao
-          type="button"
-          variante="contorno"
-          tamanho="pequeno"
-          aria-label="Enviar saídas e entradas para a planilha"
-          disabled={!estadoPlanilha?.podeEnviar}
-          title={
-            estadoPlanilha?.podeEnviar
-              ? "Enviar as saídas e as entradas do mês para o Google Planilhas"
-              : "Planilha não conectada. Configure em Gestão."
-          }
-          onClick={() => setEnvioAberto(true)}
-          sx={(tema) => ({
-            flexShrink: 0,
-            mt: 0.5,
-            height: TOKENS_LAYOUT.alvoToque,
-            width: { xs: TOKENS_LAYOUT.alvoToque, sm: "auto" },
-            minWidth: TOKENS_LAYOUT.alvoToque,
-            px: { xs: 0, sm: 1.5 },
-            gap: 0.75,
-            "&&": {
-              bgcolor: "transparent",
-              borderColor: "bordaControle",
-              "&:hover": { bgcolor: "action.hover" },
-              "&:active": { bgcolor: "action.selected" },
-              "&.Mui-disabled": {
-                background: "transparent !important",
-                borderColor: `${tema.vars.palette.divider} !important`,
+      <Abas
+        rotuloAcessivel="Tipo de registro"
+        itens={itens}
+        ativo={aba}
+        onChange={aoTrocar}
+        variant="fullWidth"
+        dataPager="movimentacoes"
+        acaoNoTrilho={
+          <Botao
+            type="button"
+            variante="contorno"
+            tamanho="pequeno"
+            aria-label="Enviar saídas e entradas para a planilha"
+            disabled={!estadoPlanilha?.podeEnviar}
+            title={
+              estadoPlanilha?.podeEnviar
+                ? "Enviar as saídas e as entradas do mês para o Google Planilhas"
+                : "Planilha não conectada. Configure em Gestão."
+            }
+            onClick={() => setEnvioAberto(true)}
+            sx={(tema) => ({
+              height: TOKENS_LAYOUT.alvoToque,
+              width: { xs: TOKENS_LAYOUT.alvoToque, sm: "auto" },
+              minWidth: TOKENS_LAYOUT.alvoToque,
+              px: { xs: 0, sm: 1.5 },
+              gap: 0.75,
+              "&&": {
+                bgcolor: "transparent",
+                borderColor: "bordaControle",
+                "&:hover": { bgcolor: "action.hover" },
+                "&:active": { bgcolor: "action.selected" },
+                "&.Mui-disabled": {
+                  background: "transparent !important",
+                  borderColor: `${tema.vars.palette.divider} !important`,
+                },
               },
-            },
-          })}
-        >
-          <TableChartOutlinedIcon sx={{ fontSize: 20 }} />
-          <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-            Planilha
-          </Box>
-        </Botao>
-      </Stack>
+            })}
+          >
+            <TableChartOutlinedIcon sx={{ fontSize: 20 }} />
+            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+              Planilha
+            </Box>
+          </Botao>
+        }
+      />
       <DialogoEnvioSaidas
         aberto={envioAberto}
         onAbrir={setEnvioAberto}

@@ -231,3 +231,37 @@ test("Planilha disponível abre a mesma janela por teclado nas Entradas", async 
   await expect(janela).toBeHidden();
   await expect(botao).toBeFocused();
 });
+
+for (const largura of [390, 1440]) {
+  test(`Saídas e Entradas: a Planilha não reduz a largura dos painéis a ${largura} px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: largura, height: 900 });
+    await page.goto("/?visao=saidas&aba=saidas");
+    await aguardarHidratacao(page);
+
+    const abas = page.getByRole("tablist", { name: "Tipo de registro", exact: true });
+    const planilha = page.getByRole("button", {
+      name: "Enviar saídas e entradas para a planilha",
+      exact: true,
+    });
+    for (const nome of ["Saídas", "Entradas"]) {
+      await abas.getByRole("tab", { name: nome, exact: true }).click();
+      const painel = page.getByRole("tabpanel", { name: nome, exact: true });
+      const proximoDia = painel.getByRole("button", { name: "Dia seguinte", exact: true });
+      await expect(proximoDia).toBeVisible();
+      const [trilho, botao, conteudo, seta] = await Promise.all([
+        abas.boundingBox(),
+        planilha.boundingBox(),
+        painel.boundingBox(),
+        proximoDia.boundingBox(),
+      ]);
+      if (!trilho || !botao || !conteudo || !seta) {
+        throw new Error("Controles ou painel indisponíveis.");
+      }
+      expect(conteudo.x).toBeCloseTo(trilho.x, 0);
+      expect(conteudo.x + conteudo.width).toBeCloseTo(botao.x + botao.width, 0);
+      expect(seta.x + seta.width).toBeCloseTo(botao.x + botao.width, 0);
+    }
+  });
+}

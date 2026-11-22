@@ -39,6 +39,8 @@ export interface AbasProps<T extends string> {
   dataPager?: string;
   /** Permite uma apresentação de página sem desmontar os painéis visitados. */
   ocultarTrilho?: boolean;
+  /** Ação ao lado do trilho, fora da tablist e sem reduzir a largura dos painéis. */
+  acaoNoTrilho?: ReactNode;
 }
 
 const RECUO_TRILHO = 4;
@@ -82,6 +84,7 @@ export function Abas<T extends string>({
   rotuloAcessivel,
   dataPager,
   ocultarTrilho = false,
+  acaoNoTrilho,
 }: AbasProps<T>) {
   const [visitados, setVisitados] = useState<ReadonlySet<T>>(() => new Set<T>([ativo]));
   const referencias = useRef<(HTMLButtonElement | null)[]>([]);
@@ -125,70 +128,88 @@ export function Abas<T extends string>({
   const idAba = (valor: T) => `aba-${valor}`;
   const idPainel = (valor: T) => `painel-${valor}`;
 
+  const trilho = (
+    <Box
+      role="tablist"
+      aria-label={rotuloAcessivel}
+      hidden={ocultarTrilho}
+      onKeyDown={aoTeclar}
+      sx={(tema) => ({
+        display: ocultarTrilho ? "none" : "grid",
+        gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))`,
+        gap: 0.5,
+        p: `${RECUO_TRILHO}px`,
+        // O raio externo acompanha a curva da aba a uma distância igual ao recuo.
+        borderRadius: `${RAIO_ABA + RECUO_TRILHO}px`,
+        backgroundColor: tema.vars.palette.action.hover,
+      })}
+    >
+      {itens.map((item, indice) => {
+        const selecionado = item.valor === ativo;
+        return (
+          <ButtonBase
+            key={item.valor}
+            ref={(elemento) => {
+              referencias.current[indice] = elemento;
+              if (item.referencia) item.referencia.current = elemento;
+            }}
+            role="tab"
+            aria-label={
+              item.rotuloCurto && typeof item.rotulo === "string" ? item.rotulo : undefined
+            }
+            id={idAba(item.valor)}
+            aria-controls={idPainel(item.valor)}
+            aria-selected={selecionado}
+            tabIndex={selecionado ? 0 : -1}
+            disabled={item.desabilitado}
+            onClick={() => trocar(item.valor)}
+            sx={(tema) => estiloAba(tema, selecionado)}
+          >
+            {item.icone ? (
+              <Box component="span" aria-hidden="true" sx={{ display: "flex", flexShrink: 0 }}>
+                {item.icone}
+              </Box>
+            ) : null}
+            <Box
+              component="span"
+              sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+            >
+              {item.rotuloCurto ? (
+                <>
+                  <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
+                    {item.rotuloCurto}
+                  </Box>
+                  <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                    {item.rotulo}
+                  </Box>
+                </>
+              ) : (
+                item.rotulo
+              )}
+            </Box>
+          </ButtonBase>
+        );
+      })}
+    </Box>
+  );
+
   return (
     <Box sx={{ minWidth: 0 }}>
-      <Box
-        role="tablist"
-        aria-label={rotuloAcessivel}
-        hidden={ocultarTrilho}
-        onKeyDown={aoTeclar}
-        sx={(tema) => ({
-          display: ocultarTrilho ? "none" : "grid",
-          gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))`,
-          gap: 0.5,
-          p: `${RECUO_TRILHO}px`,
-          // O raio externo acompanha a curva da aba a uma distância igual ao recuo.
-          borderRadius: `${RAIO_ABA + RECUO_TRILHO}px`,
-          backgroundColor: tema.vars.palette.action.hover,
-        })}
-      >
-        {itens.map((item, indice) => {
-          const selecionado = item.valor === ativo;
-          return (
-            <ButtonBase
-              key={item.valor}
-              ref={(elemento) => {
-                referencias.current[indice] = elemento;
-                if (item.referencia) item.referencia.current = elemento;
-              }}
-              role="tab"
-              aria-label={
-                item.rotuloCurto && typeof item.rotulo === "string" ? item.rotulo : undefined
-              }
-              id={idAba(item.valor)}
-              aria-controls={idPainel(item.valor)}
-              aria-selected={selecionado}
-              tabIndex={selecionado ? 0 : -1}
-              disabled={item.desabilitado}
-              onClick={() => trocar(item.valor)}
-              sx={(tema) => estiloAba(tema, selecionado)}
-            >
-              {item.icone ? (
-                <Box component="span" aria-hidden="true" sx={{ display: "flex", flexShrink: 0 }}>
-                  {item.icone}
-                </Box>
-              ) : null}
-              <Box
-                component="span"
-                sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
-              >
-                {item.rotuloCurto ? (
-                  <>
-                    <Box component="span" sx={{ display: { xs: "inline", sm: "none" } }}>
-                      {item.rotuloCurto}
-                    </Box>
-                    <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
-                      {item.rotulo}
-                    </Box>
-                  </>
-                ) : (
-                  item.rotulo
-                )}
-              </Box>
-            </ButtonBase>
-          );
-        })}
-      </Box>
+      {acaoNoTrilho && !ocultarTrilho ? (
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) auto",
+            gap: 1,
+            alignItems: "center",
+          }}
+        >
+          {trilho}
+          {acaoNoTrilho}
+        </Box>
+      ) : (
+        trilho
+      )}
       <Box
         data-pager={dataPager}
         sx={{ minWidth: 0, pt: ocultarTrilho ? undefined : ESPACO_COMPOSICAO.aposAbas }}
