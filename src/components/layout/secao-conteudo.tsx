@@ -8,13 +8,20 @@ import Typography from "@mui/material/Typography";
 import { ESPACO_COMPOSICAO } from "@/theme/layout";
 
 interface SecaoConteudoProps {
-  titulo?: string;
+  titulo?: ReactNode;
+  rotuloAcessivel?: string;
   descricao?: string;
   acoes?: ReactNode;
   children: ReactNode;
 }
 
-export function SecaoConteudo({ titulo, descricao, acoes, children }: SecaoConteudoProps) {
+export function SecaoConteudo({
+  titulo,
+  rotuloAcessivel,
+  descricao,
+  acoes,
+  children,
+}: SecaoConteudoProps) {
   const tituloId = useId();
   const temCabecalho = Boolean(titulo || descricao || acoes);
 
@@ -22,7 +29,8 @@ export function SecaoConteudo({ titulo, descricao, acoes, children }: SecaoConte
     <Paper
       component="section"
       variant="outlined"
-      aria-labelledby={titulo ? tituloId : undefined}
+      aria-label={rotuloAcessivel}
+      aria-labelledby={titulo && !rotuloAcessivel ? tituloId : undefined}
       sx={{ p: { xs: 2, sm: 3 }, boxShadow: "none" }}
     >
       {temCabecalho ? (

@@ -10,11 +10,18 @@ import { TOKENS_LAYOUT } from "@/theme/layout";
 interface EstadoVazioProps {
   icone: ReactNode;
   titulo: string;
+  nivelTitulo?: "h2" | "h3";
   descricao: string;
   acao?: ReactNode;
 }
 
-export function EstadoVazio({ icone, titulo, descricao, acao }: EstadoVazioProps) {
+export function EstadoVazio({
+  icone,
+  titulo,
+  nivelTitulo = "h2",
+  descricao,
+  acao,
+}: EstadoVazioProps) {
   return (
     <Stack
       component="section"
@@ -36,7 +43,7 @@ export function EstadoVazio({ icone, titulo, descricao, acao }: EstadoVazioProps
         {icone}
       </Box>
       <Stack spacing={1} sx={{ alignItems: "center" }}>
-        <Typography component="h2" variant="h6">
+        <Typography component={nivelTitulo} variant="h6">
           {titulo}
         </Typography>
         <Typography variant="body2" sx={{ color: "text.secondary" }}>

@@ -307,12 +307,13 @@ Regras de composição:
 ### Saídas e Entradas
 
 - Abas Saídas e Entradas, com a aba ativa na URL.
-- Formulário com data, turma, aluno, momento, horário, justificativa e responsável.
-- Busca de aluno com contador.
-- Lista do dia com desbloqueio e remoção confirmada.
+- Data e última atualização agrupadas, com folga de 8 px. Só o trilho das abas divide espaço com a ação Planilha.
+- Formulário com busca de aluno e ação de registro no rodapé. Abaixo de 905 px usa uma coluna; a partir de 905 px, Turma e Aluno, Momento e Horário só ficam lado a lado se cada campo tiver pelo menos 240 px. A justificativa ocupa toda a largura.
+- Histórico do dia em uma seção distinta, com contagem após a leitura bem-sucedida, alunos separados por divisores e remoção confirmada. O histórico de saídas começa bloqueado; o de entradas mantém o filtro por turma.
+- `SecaoConteudo` e `EstadoVazio` compõem o histórico. A região de status permanece montada e anuncia a contagem após a leitura. Durante o carregamento ou uma falha, a lista, a contagem e as ações de remoção ficam ocultas. Tentar novamente consulta apenas o dia e, em Entradas, a turma selecionada.
+- Na revisão, os rótulos e valores se empilham abaixo de 600 px; em telas mais largas ficam lado a lado.
 - Resumo de domingo com todas as turmas e registro do dia.
 - Envio para Google Planilhas com prévia e confirmação.
-- Duas colunas no desktop e uma no celular.
 
 ### Relatórios
 

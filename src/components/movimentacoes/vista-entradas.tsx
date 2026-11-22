@@ -1,7 +1,7 @@
 "use client";
 
 // Registro e consulta de chegadas atrasadas com envio revisado para aba própria.
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -28,7 +28,8 @@ import type { EntradaAtrasada } from "@/domain/entradas";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { avisarSucesso } from "@/lib/avisos";
-import { useContextoAtualizacao } from "@/components/atualizacao/contexto-atualizacao";
+
+import { FormularioPadrao } from "@/components/layout/formulario-padrao";
 import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
@@ -38,6 +39,8 @@ import { CamposMovimentacao } from "@/components/movimentacoes/campos-movimentac
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
 import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo-confirmar-movimentacao";
+import { HistoricoDiarioMovimentacoes } from "@/components/movimentacoes/historico-diario-movimentacoes";
+import { useHistoricoDiario } from "@/components/movimentacoes/use-historico-movimentacoes";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { useMinutoCorrente } from "@/lib/use-relogio";
 
@@ -86,6 +89,11 @@ function IndicadorCarregando({ texto }: { texto: string }) {
   );
 }
 
+async function lerEntradas(url: string) {
+  const { entradas } = await pedir<{ entradas: EntradaAtrasada[] }>(url);
+  return entradas;
+}
+
 export default function VistaEntradas({
   diaCorrente,
   fuso,
@@ -116,49 +124,21 @@ export default function VistaEntradas({
   const [formaJustificativa, setFormaJustificativa] = useState<"catalogo" | "texto">("catalogo");
   const [justificativa, setJustificativa] = useState("");
   const [observacao, setObservacao] = useState("");
-  const [entradas, setEntradas] = useState<EntradaAtrasada[]>([]);
   const [confirmacaoAberta, setConfirmacaoAberta] = useState(false);
   const [erro, setErro] = useState("");
-  const [recorteCarregado, setRecorteCarregado] = useState("");
   const [versao, setVersao] = useState(0);
   const [remover, setRemover] = useState<EntradaAtrasada | null>(null);
   const [verDomingo, setVerDomingo] = useState(false);
   const [entradasDomingo, setEntradasDomingo] = useState<EntradaAtrasada[]>([]);
   const [carregandoDomingo, setCarregandoDomingo] = useState(false);
-  const marcarAtualizado = useContextoAtualizacao()?.marcarAtualizado;
-  const mensagemErro = useCallback(
-    (erro: unknown) =>
-      erro instanceof ErroApi
-        ? erro.message
-        : "Não foi possível concluir a operação. Tente novamente.",
-    [],
+  const { leitura, reler } = useHistoricoDiario(
+    nav.resumo ? null : `/api/entradas?de=${dia}&ate=${dia}${turma ? `&turmaId=${turma}` : ""}`,
+    lerEntradas,
+    atualizacao + versao,
+    "Não foi possível carregar as entradas.",
   );
-  const recorte = `${dia}|${turma}|${versao}|${atualizacao}`;
-  const carregando = !nav.resumo && recorteCarregado !== recorte;
-  useEffect(() => {
-    if (nav.resumo) return;
-    let viva = true;
-    pedir<{ entradas: EntradaAtrasada[] }>(
-      `/api/entradas?de=${dia}&ate=${dia}${turma ? `&turmaId=${turma}` : ""}`,
-    )
-      .then((dados) => {
-        if (!viva) return;
-        setEntradas(dados.entradas);
-        marcarAtualizado?.("saidas");
-      })
-      .catch((erro: unknown) => {
-        if (viva) {
-          setEntradas([]);
-          setErro(mensagemErro(erro));
-        }
-      })
-      .finally(() => {
-        if (viva) setRecorteCarregado(recorte);
-      });
-    return () => {
-      viva = false;
-    };
-  }, [dia, turma, versao, recorte, mensagemErro, nav.resumo, marcarAtualizado]);
+  const carregando = leitura.estado === "carregando";
+  const entradas = leitura.estado === "pronto" ? leitura.registros : [];
 
   useEffect(() => {
     if (!verDomingo || !nav.domingo) return;
@@ -187,7 +167,11 @@ export default function VistaEntradas({
         await acao();
       } catch (erro) {
         setRemover(null);
-        setErro(mensagemErro(erro));
+        setErro(
+          erro instanceof ErroApi
+            ? erro.message
+            : "Não foi possível concluir a operação. Tente novamente.",
+        );
       }
     });
   const opcoesResponsavel = useMemo(
@@ -307,61 +291,63 @@ export default function VistaEntradas({
 
   return (
     <Box
-      sx={{ display: "flex", flexDirection: "column", gap: 2.5, pb: 3 }}
+      sx={{ display: "flex", flexDirection: "column", gap: { xs: 1.5, sm: 2 }, pb: 3 }}
       component="section"
       aria-label="Entradas atrasadas"
     >
       <Typography component="h1" sx={ESTILO_LEITOR}>
         Entradas atrasadas
       </Typography>
-      <Stack direction="row" spacing={1} sx={{ alignItems: "stretch" }}>
-        <BotaoIcone
-          rotulo="Dia anterior"
-          variante="contorno"
-          icone={<ChevronLeftRoundedIcon />}
-          sx={ESTILO_NAVEGACAO}
-          disabled={executando}
-          onClick={() => {
-            setVerDomingo(false);
-            nav.anterior();
-          }}
-        />
-        <Box sx={{ minWidth: 0, flex: 1, display: "flex", "& > button": { flex: 1 } }}>
-          <SeletorPeriodo
-            id="entrada-dia"
-            modo="dia"
-            valor={nav.resumo ? (nav.domingo ?? "") : dia}
-            max={diaCorrente}
-            calendarioSemanal
-            mostrarSelo={!nav.resumo}
-            rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da entrada"}
-            rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : dia.split("-").reverse().join("/")}
-            detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
+      <Stack spacing={1} useFlexGap>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "stretch" }}>
+          <BotaoIcone
+            rotulo="Dia anterior"
+            variante="contorno"
+            icone={<ChevronLeftRoundedIcon />}
+            sx={ESTILO_NAVEGACAO}
             disabled={executando}
-            onAbertoChange={setCalendarioAberto}
-            onValor={(proximo) => {
+            onClick={() => {
               setVerDomingo(false);
-              escolherDia(proximo);
+              nav.anterior();
             }}
           />
-        </Box>
-        <BotaoIcone
-          rotulo="Dia seguinte"
-          variante="contorno"
-          icone={<ChevronRightRoundedIcon />}
-          sx={ESTILO_NAVEGACAO}
-          disabled={executando || nav.seguinteDesabilitado}
-          onClick={() => {
-            setVerDomingo(false);
-            nav.seguinte();
-          }}
-        />
+          <Box sx={{ minWidth: 0, flex: 1, display: "flex", "& > button": { flex: 1 } }}>
+            <SeletorPeriodo
+              id="entrada-dia"
+              modo="dia"
+              valor={nav.resumo ? (nav.domingo ?? "") : dia}
+              max={diaCorrente}
+              calendarioSemanal
+              mostrarSelo={!nav.resumo}
+              rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da entrada"}
+              rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : dia.split("-").reverse().join("/")}
+              detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
+              disabled={executando}
+              onAbertoChange={setCalendarioAberto}
+              onValor={(proximo) => {
+                setVerDomingo(false);
+                escolherDia(proximo);
+              }}
+            />
+          </Box>
+          <BotaoIcone
+            rotulo="Dia seguinte"
+            variante="contorno"
+            icone={<ChevronRightRoundedIcon />}
+            sx={ESTILO_NAVEGACAO}
+            disabled={executando || nav.seguinteDesabilitado}
+            onClick={() => {
+              setVerDomingo(false);
+              nav.seguinte();
+            }}
+          />
+        </Stack>
+        {!nav.resumo && (
+          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <AtualizadoDaVisao fuso={fuso} sx={{ whiteSpace: "normal" }} />
+          </Box>
+        )}
       </Stack>
-      {!nav.resumo && (
-        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-          <AtualizadoDaVisao fuso={fuso} />
-        </Box>
-      )}
       {nav.resumo && nav.semana ? (
         <VistaResumoMovimentacoes
           tipo="entrada"
@@ -466,139 +452,112 @@ export default function VistaEntradas({
             noValidate
             sx={{ p: 2, boxShadow: "none" }}
           >
-            <Stack spacing={2}>
+            <Stack spacing={1} useFlexGap>
               <Typography component="h2" variant="h6" sx={{ fontWeight: 600 }}>
                 Registrar entrada
               </Typography>
-              <CamposMovimentacao
-                tipo="entrada"
-                turma={turma}
-                alunoId={alunoId}
-                momento={momento}
-                horario={horarioEfetivo}
-                responsavel={responsavelCodigo}
-                forma={formaJustificativa}
-                texto={motivo}
-                justificativa={justificativa}
-                observacao={observacao}
-                opcoesTurma={opcoesTurma}
-                opcoesAluno={opcoesAluno}
-                opcoesMomento={OPCOES_MOMENTO}
-                opcoesJustificativa={opcoesJustificativa}
-                opcoesResponsavel={opcoesResponsavel}
-                fuso={fuso}
-                enviando={executando}
-                textoObrigatorio
-                mostrarObservacao
-                responsavelDepois
-                descricaoResponsavel={
-                  opcoesResponsavel.length === 0
-                    ? "Nenhum responsável cadastrado. Cadastre em Gestão, Configurações."
-                    : undefined
+              <FormularioPadrao
+                colunas={1}
+                acoes={
+                  <Botao
+                    variante="secundario"
+                    type="submit"
+                    disabled={
+                      !alunoId ||
+                      !momento ||
+                      !responsavelCodigo ||
+                      carregando ||
+                      opcoesResponsavel.length === 0 ||
+                      (formaJustificativa === "catalogo" && !justificativa)
+                    }
+                    carregando={executando}
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
+                  >
+                    Registrar entrada
+                  </Botao>
                 }
-                onTurma={(valor) => {
-                  setTurma(valor);
-                  setErro("");
-                  setAlunoId("");
-                }}
-                onAluno={setAlunoId}
-                onMomento={setMomento}
-                onHorario={setHorario}
-                onResponsavel={setResponsavelCodigo}
-                onForma={(valor) => {
-                  setFormaJustificativa(valor);
-                  setMotivo("");
-                  setJustificativa("");
-                  setObservacao("");
-                }}
-                onTexto={setMotivo}
-                onJustificativa={setJustificativa}
-                onObservacao={setObservacao}
-              />
-              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                <Botao
-                  variante="secundario"
-                  type="submit"
-                  disabled={
-                    !alunoId ||
-                    !momento ||
-                    !responsavelCodigo ||
-                    carregando ||
-                    opcoesResponsavel.length === 0 ||
-                    (formaJustificativa === "catalogo" && !justificativa)
-                  }
-                  carregando={executando}
-                  sx={{ width: { xs: "100%", sm: "auto" } }}
-                >
-                  Registrar entrada
-                </Botao>
-              </Box>
+              >
+                <Stack spacing={1} useFlexGap>
+                  <CamposMovimentacao
+                    tipo="entrada"
+                    turma={turma}
+                    alunoId={alunoId}
+                    momento={momento}
+                    horario={horarioEfetivo}
+                    responsavel={responsavelCodigo}
+                    forma={formaJustificativa}
+                    texto={motivo}
+                    justificativa={justificativa}
+                    observacao={observacao}
+                    opcoesTurma={opcoesTurma}
+                    opcoesAluno={opcoesAluno}
+                    opcoesMomento={OPCOES_MOMENTO}
+                    opcoesJustificativa={opcoesJustificativa}
+                    opcoesResponsavel={opcoesResponsavel}
+                    fuso={fuso}
+                    enviando={executando}
+                    textoObrigatorio
+                    mostrarObservacao
+                    responsavelDepois
+                    descricaoResponsavel={
+                      opcoesResponsavel.length === 0
+                        ? "Nenhum responsável cadastrado. Cadastre em Gestão, Configurações."
+                        : undefined
+                    }
+                    onTurma={(valor) => {
+                      setTurma(valor);
+                      setErro("");
+                      setAlunoId("");
+                    }}
+                    onAluno={setAlunoId}
+                    onMomento={setMomento}
+                    onHorario={setHorario}
+                    onResponsavel={setResponsavelCodigo}
+                    onForma={(valor) => {
+                      setFormaJustificativa(valor);
+                      setMotivo("");
+                      setJustificativa("");
+                      setObservacao("");
+                    }}
+                    onTexto={setMotivo}
+                    onJustificativa={setJustificativa}
+                    onObservacao={setObservacao}
+                  />
+                </Stack>
+              </FormularioPadrao>
             </Stack>
           </Paper>
           {erro && <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />}
-          <Box component="section" aria-label="Entradas registradas">
-            <Stack spacing={1.5}>
-              <Typography component="h2" variant="h6" sx={{ fontWeight: 600 }}>
-                Entradas em {rotuloData(dia)}{" "}
-                <Box component="span" sx={{ color: "text.secondary", fontWeight: 400 }}>
-                  ({entradas.length})
-                </Box>
-              </Typography>
-              {carregando ? (
-                <IndicadorCarregando texto="Carregando entradas..." />
-              ) : entradas.length === 0 ? (
-                <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  Nenhuma entrada registrada neste recorte.
-                </Typography>
-              ) : (
-                entradas.map((entrada) => (
-                  <Paper
-                    key={entrada.id}
-                    component="article"
-                    variant="outlined"
-                    sx={{ p: 2, boxShadow: "none" }}
-                  >
-                    <Stack direction="row" spacing={2} sx={{ alignItems: "flex-start" }}>
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography
-                          component="h3"
-                          variant="subtitle1"
-                          sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
-                        >
-                          {entrada.nome}
-                        </Typography>
-                        <CaixasDeInfo
-                          itens={[
-                            entrada.turmaRotulo,
-                            entrada.horario,
-                            entrada.momento ? rotuloMomento(entrada.momento) : "",
-                          ]}
-                          sx={{ mt: 1 }}
-                        />
-                        <CaixasDeInfo itens={partesDoMotivo(entrada.motivo)} sx={{ mt: 1 }} />
-                        <Typography
-                          variant="caption"
-                          component="p"
-                          sx={{ mt: 1, color: "text.secondary" }}
-                        >
-                          Responsável pelo registro:{" "}
-                          {entrada.responsavelRegistroNome ?? entrada.registradoPorNome}
-                        </Typography>
-                      </Box>
-                      <BotaoIcone
-                        rotulo={`Remover entrada de ${entrada.nome}`}
-                        variante="texto"
-                        icone={<DeleteOutlineRoundedIcon />}
-                        sx={{ color: "falta.texto" }}
-                        disabled={executando}
-                        onClick={() => setRemover(entrada)}
-                      />
-                    </Stack>
-                  </Paper>
-                ))
-              )}
-            </Stack>
-          </Box>
+          <HistoricoDiarioMovimentacoes
+            titulo={`Entradas em ${rotuloData(dia)}`}
+            rotuloRegiao="Entradas registradas"
+            carregando={carregando}
+            falha={leitura.estado === "falha" ? leitura.falha : undefined}
+            onTentarNovamente={reler}
+            textoCarregando="Carregando entradas..."
+            textoVazio="Nenhuma entrada registrada neste recorte."
+            registros={entradas.map((entrada) => ({
+              id: entrada.id,
+              nome: entrada.nome,
+              itens: [
+                entrada.turmaRotulo,
+                entrada.horario,
+                entrada.momento ? rotuloMomento(entrada.momento) : "",
+                ...partesDoMotivo(entrada.motivo),
+              ],
+              rodape: `Responsável pelo registro: ${entrada.responsavelRegistroNome ?? entrada.registradoPorNome}`,
+              acao: (
+                <BotaoIcone
+                  rotulo={`Remover entrada de ${entrada.nome}`}
+                  variante="texto"
+                  icone={<DeleteOutlineRoundedIcon />}
+                  sx={{ color: "falta.texto" }}
+                  disabled={executando}
+                  onClick={() => setRemover(entrada)}
+                />
+              ),
+            }))}
+          />
         </>
       )}
       <DialogoConfirmarMovimentacao

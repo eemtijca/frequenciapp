@@ -59,7 +59,7 @@ import type {
   Serie,
   Turma,
 } from "@/domain/frequencia";
-import { diasDoMes } from "@/domain/frequencia";
+import { useSaidasMensais } from "@/components/movimentacoes/use-historico-movimentacoes";
 import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
 import { expurgarBiNoLogout } from "@/lib/bi-armazenamento";
@@ -505,7 +505,11 @@ export default function Aplicacao({
   const [carregandoFrequencias, setCarregandoFrequencias] = useState(false);
   const [erroFrequencias, setErroFrequencias] = useState("");
   const pedidoFrequencias = useRef(0);
-  const [saidas, setSaidas] = useState<SaidaAntecipada[]>(saidasIniciais);
+  const {
+    registros: saidas,
+    leitura: leituraSaidasMensais,
+    recarregar: recarregarSaidas,
+  } = useSaidasMensais(diaCorrente.slice(0, 7), saidasIniciais);
   const [justificativas, setJustificativas] =
     useState<JustificativaConfigurada[]>(justificativasIniciais);
   const [liberadores, setLiberadores] = useState<LiberadorConfigurado[]>(liberadoresIniciais);
@@ -604,23 +608,6 @@ export default function Aplicacao({
     },
     [diaCorrente],
   );
-
-  const recarregarSaidas = useCallback(async (novoMes: string) => {
-    const dias = diasDoMes(novoMes);
-    const primeiro = dias[0] ?? `${novoMes}-01`;
-    const ultimo = dias[dias.length - 1] ?? `${novoMes}-28`;
-    try {
-      const dados = await pedir<{ saidas: SaidaAntecipada[] }>(
-        `/api/saidas?de=${primeiro}&ate=${ultimo}`,
-      );
-      setSaidas(dados.saidas);
-    } catch (excecao) {
-      avisarErro(excecao, {
-        contexto: "Não foi possível atualizar as saídas.",
-        descricao: "As informações na tela podem estar desatualizadas.",
-      });
-    }
-  }, []);
 
   // Troca de mês nos relatórios recarrega frequências e saídas juntas.
   const recarregarMes = useCallback(
@@ -928,6 +915,7 @@ export default function Aplicacao({
             catalogoJustificativas={justificativas}
             liberadores={liberadores}
             saidas={saidas}
+            leituraMensal={leituraSaidasMensais}
             onSaidasMudaram={recarregarSaidas}
             ativo={ativo}
             onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}

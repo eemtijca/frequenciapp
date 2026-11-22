@@ -167,6 +167,7 @@ const telas = {
       liberadores={[]}
       catalogoJustificativas={[]}
       saidas={[]}
+      leituraMensal={{ mes: "2026-11", estado: "pronto" }}
       onSaidasMudaram={vazio}
     />
   ),

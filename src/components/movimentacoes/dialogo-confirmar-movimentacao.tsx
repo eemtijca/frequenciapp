@@ -1,7 +1,7 @@
 "use client";
 
 // Confirmação explícita de um registro de saída ou entrada antes de gravar.
-import Box from "@mui/material/Box";
+
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
@@ -42,34 +42,31 @@ export function DialogoConfirmarMovimentacao({
             {descricao}
           </Typography>
           {visiveis.length > 0 ? (
-            <Box component="dl" sx={{ m: 0 }}>
-              <Stack spacing={1}>
-                {visiveis.map((item) => (
-                  <Stack
-                    key={item.rotulo}
-                    component="div"
-                    direction="row"
-                    spacing={1}
-                    sx={{ alignItems: "flex-start" }}
+            <Stack component="dl" spacing={1} useFlexGap sx={{ m: 0 }}>
+              {visiveis.map((item) => (
+                <Stack
+                  key={item.rotulo}
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={{ xs: 0.5, sm: 1 }}
+                  useFlexGap
+                >
+                  <Typography
+                    component="dt"
+                    variant="body2"
+                    sx={{ width: { sm: 112 }, flexShrink: 0, color: "text.secondary" }}
                   >
-                    <Typography
-                      component="dt"
-                      variant="body2"
-                      sx={{ width: 112, flexShrink: 0, color: "text.secondary" }}
-                    >
-                      {item.rotulo}
-                    </Typography>
-                    <Typography
-                      component="dd"
-                      variant="body2"
-                      sx={{ m: 0, minWidth: 0, color: "text.primary", overflowWrap: "anywhere" }}
-                    >
-                      {item.valor}
-                    </Typography>
-                  </Stack>
-                ))}
-              </Stack>
-            </Box>
+                    {item.rotulo}
+                  </Typography>
+                  <Typography
+                    component="dd"
+                    variant="body2"
+                    sx={{ m: 0, minWidth: 0, color: "text.primary", overflowWrap: "anywhere" }}
+                  >
+                    {item.valor}
+                  </Typography>
+                </Stack>
+              ))}
+            </Stack>
           ) : null}
         </Stack>
       }

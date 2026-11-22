@@ -40,7 +40,8 @@ import {
   rotuloMomento,
 } from "@/domain/frequencia";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { useContextoAtualizacao } from "@/components/atualizacao/contexto-atualizacao";
+
+import { FormularioPadrao } from "@/components/layout/formulario-padrao";
 import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
@@ -51,6 +52,11 @@ import { CamposMovimentacao } from "@/components/movimentacoes/campos-movimentac
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { VistaResumoMovimentacoes } from "@/components/movimentacoes/resumo-semana-movimentacoes";
 import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo-confirmar-movimentacao";
+import { HistoricoDiarioMovimentacoes } from "@/components/movimentacoes/historico-diario-movimentacoes";
+import {
+  useHistoricoDiario,
+  type LeituraMensalSaidas,
+} from "@/components/movimentacoes/use-historico-movimentacoes";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { useMinutoCorrente } from "@/lib/use-relogio";
 
@@ -63,6 +69,7 @@ interface Props {
   catalogoJustificativas: JustificativaConfigurada[];
   liberadores: LiberadorConfigurado[];
   saidas: SaidaAntecipada[];
+  leituraMensal: LeituraMensalSaidas;
   onSaidasMudaram: (mes: string) => Promise<void>;
   /** Usado pela área de movimentações; esta vista não precisa dele. */
   ativo?: boolean;
@@ -107,6 +114,11 @@ function IndicadorCarregando({ texto }: { texto: string }) {
   );
 }
 
+async function lerSaidas(url: string) {
+  const { saidas } = await pedir<{ saidas: SaidaAntecipada[] }>(url);
+  return saidas;
+}
+
 export default function VistaSaidas({
   diaCorrente,
   fuso,
@@ -116,6 +128,7 @@ export default function VistaSaidas({
   catalogoJustificativas,
   liberadores,
   saidas,
+  leituraMensal,
   onSaidasMudaram,
   ativo = true,
   atualizacao = 0,
@@ -152,13 +165,11 @@ export default function VistaSaidas({
   const [erroHistorico, setErroHistorico] = useState("");
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
-  const [doDia, setDoDia] = useState<{ dia: string; saidas: SaidaAntecipada[] } | null>(null);
   const [recarregarDia, setRecarregarDia] = useState(0);
   const [saidaRemover, setSaidaRemover] = useState<SaidaAntecipada | null>(null);
   const [verDomingo, setVerDomingo] = useState(false);
   const [registrosDomingo, setRegistrosDomingo] = useState<SaidaAntecipada[]>([]);
   const [carregandoDomingo, setCarregandoDomingo] = useState(false);
-  const marcarAtualizado = useContextoAtualizacao()?.marcarAtualizado;
 
   const diaReferencia = nav.resumo ? (nav.domingo ?? dia) : dia;
   useEffect(() => {
@@ -192,35 +203,26 @@ export default function VistaSaidas({
 
   const alunosPorId = useMemo(() => new Map(alunos.map((aluno) => [aluno.id, aluno])), [alunos]);
 
-  const compartilhado = dia.startsWith(mes);
+  const ehDoMes = dia.startsWith(mes);
+  // Uma nova tentativa após falha mensal consulta só o dia, sem trocar o cache dos relatórios.
+  const recorteMensal = useMemo(() => ({ dia, leituraMensal }), [dia, leituraMensal]);
+  const [tentarDia, setTentarDia] = useState<typeof recorteMensal | null>(null);
+  const compartilhado = ehDoMes && leituraMensal.mes === mes && tentarDia !== recorteMensal;
+  const { leitura: leituraDiaria, reler } = useHistoricoDiario(
+    nav.resumo || compartilhado ? null : `/api/saidas?dia=${dia}`,
+    lerSaidas,
+    atualizacao + recarregarDia,
+    "Não foi possível carregar as saídas.",
+  );
+  const leitura = compartilhado ? leituraMensal : leituraDiaria;
   const duranteAula = ehMomentoDeAula(momento);
-  // Enquanto a leitura do dia escolhido não chega, a lista fica carregando.
-  const carregandoDia = !nav.resumo && !compartilhado && doDia?.dia !== dia;
   const listaBloqueada = diaLiberado !== dia;
   const domingoBloqueado = diaLiberado !== nav.domingo;
 
-  useEffect(() => {
-    if (nav.resumo || compartilhado) return;
-    let viva = true;
-    pedir<{ saidas: SaidaAntecipada[] }>(`/api/saidas?dia=${dia}`)
-      .then((dados) => {
-        if (!viva) return;
-        setDoDia({ dia, saidas: dados.saidas });
-        marcarAtualizado?.("saidas");
-      })
-      .catch((excecao: unknown) => {
-        if (viva) {
-          setDoDia({ dia, saidas: [] });
-          setErro(
-            excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar as saídas.",
-          );
-          setErroVariante(estadoDeErro(excecao));
-        }
-      });
-    return () => {
-      viva = false;
-    };
-  }, [compartilhado, dia, recarregarDia, atualizacao, nav.resumo, marcarAtualizado]);
+  function tentarNovamente() {
+    if (compartilhado) setTentarDia(recorteMensal);
+    else reler();
+  }
 
   useEffect(() => {
     if (!verDomingo || !nav.domingo) return;
@@ -241,10 +243,11 @@ export default function VistaSaidas({
   }, [verDomingo, nav.domingo, recarregarDia, atualizacao]);
 
   const saidasDoDia = useMemo(() => {
-    if (compartilhado) return saidas.filter((saida) => saida.dia === dia);
-    // A lista só é exibida quando pertence ao dia escolhido.
-    return doDia?.dia === dia ? doDia.saidas : [];
-  }, [compartilhado, dia, saidas, doDia]);
+    if (compartilhado) {
+      return leituraMensal.estado === "pronto" ? saidas.filter((saida) => saida.dia === dia) : [];
+    }
+    return leituraDiaria.estado === "pronto" ? leituraDiaria.registros : [];
+  }, [compartilhado, dia, saidas, leituraMensal, leituraDiaria]);
 
   const opcoesTurma = useMemo(() => {
     const comAlunos = new Set(alunos.filter((aluno) => aluno.ativo).map((aluno) => aluno.turmaId));
@@ -363,7 +366,7 @@ export default function VistaSaidas({
       confirmacaoHistoricaRef.current = { confirmar: false, motivo: "" };
       setMotivoHistorico("");
       setErroHistorico("");
-      if (compartilhado) {
+      if (ehDoMes) {
         await onSaidasMudaram(dia.slice(0, 7));
       } else {
         setRecarregarDia((valor) => valor + 1);
@@ -404,7 +407,7 @@ export default function VistaSaidas({
       try {
         await pedir<{ ok: boolean }>(`/api/saidas/${saida.id}`, { method: "DELETE" });
         avisarSucesso("Saída removida.");
-        if (compartilhado) {
+        if (ehDoMes) {
           await onSaidasMudaram(dia.slice(0, 7));
         } else {
           setRecarregarDia((valor) => valor + 1);
@@ -460,58 +463,60 @@ export default function VistaSaidas({
     <Box
       component="section"
       aria-label="Saídas antecipadas"
-      sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 3 }}
+      sx={{ display: "flex", flexDirection: "column", gap: { xs: 1.5, sm: 2 }, pb: 3 }}
     >
       <Typography component="h1" sx={ESTILO_LEITOR}>
         Saiu mais cedo
       </Typography>
 
-      <Stack direction="row" spacing={1} sx={{ alignItems: "stretch" }}>
-        <BotaoIcone
-          rotulo="Dia anterior"
-          variante="contorno"
-          icone={<ChevronLeftRoundedIcon />}
-          sx={ESTILO_NAVEGACAO}
-          onClick={() => {
-            setVerDomingo(false);
-            nav.anterior();
-          }}
-        />
-        <Box sx={{ minWidth: 0, flex: 1, display: "flex", "& > button": { flex: 1 } }}>
-          <SeletorPeriodo
-            id="dia-saidas"
-            modo="dia"
-            valor={nav.resumo ? (nav.domingo ?? "") : dia}
-            max={diaCorrente}
-            calendarioSemanal
-            mostrarSelo={!nav.resumo}
-            rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da saída"}
-            rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
-            detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
-            onAbertoChange={setCalendarioAberto}
-            onValor={(proximo) => {
+      <Stack spacing={1} useFlexGap>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "stretch" }}>
+          <BotaoIcone
+            rotulo="Dia anterior"
+            variante="contorno"
+            icone={<ChevronLeftRoundedIcon />}
+            sx={ESTILO_NAVEGACAO}
+            onClick={() => {
               setVerDomingo(false);
-              nav.escolherDia(proximo);
+              nav.anterior();
             }}
           />
-        </Box>
-        <BotaoIcone
-          rotulo="Dia seguinte"
-          variante="contorno"
-          icone={<ChevronRightRoundedIcon />}
-          sx={ESTILO_NAVEGACAO}
-          disabled={nav.seguinteDesabilitado}
-          onClick={() => {
-            setVerDomingo(false);
-            nav.seguinte();
-          }}
-        />
+          <Box sx={{ minWidth: 0, flex: 1, display: "flex", "& > button": { flex: 1 } }}>
+            <SeletorPeriodo
+              id="dia-saidas"
+              modo="dia"
+              valor={nav.resumo ? (nav.domingo ?? "") : dia}
+              max={diaCorrente}
+              calendarioSemanal
+              mostrarSelo={!nav.resumo}
+              rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Data da saída"}
+              rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
+              detalhe={nav.resumo ? "semana" : rotuloDiaSemana(dia).replace("-feira", "")}
+              onAbertoChange={setCalendarioAberto}
+              onValor={(proximo) => {
+                setVerDomingo(false);
+                nav.escolherDia(proximo);
+              }}
+            />
+          </Box>
+          <BotaoIcone
+            rotulo="Dia seguinte"
+            variante="contorno"
+            icone={<ChevronRightRoundedIcon />}
+            sx={ESTILO_NAVEGACAO}
+            disabled={nav.seguinteDesabilitado}
+            onClick={() => {
+              setVerDomingo(false);
+              nav.seguinte();
+            }}
+          />
+        </Stack>
+        {!nav.resumo && (
+          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <AtualizadoDaVisao fuso={fuso} sx={{ whiteSpace: "normal" }} />
+          </Box>
+        )}
       </Stack>
-      {!nav.resumo && (
-        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-          <AtualizadoDaVisao fuso={fuso} />
-        </Box>
-      )}
 
       {nav.resumo && nav.semana ? (
         <VistaResumoMovimentacoes
@@ -634,170 +639,126 @@ export default function VistaSaidas({
             noValidate
             sx={{ p: 2, boxShadow: "none" }}
           >
-            <Stack spacing={2}>
+            <Stack spacing={1} useFlexGap>
               <Typography component="h2" variant="h6" sx={{ fontWeight: 600 }}>
                 Registrar saída
               </Typography>
-              <CamposMovimentacao
-                tipo="saida"
-                turma={turmaFiltro}
-                alunoId={alunoId}
-                momento={momento}
-                horario={horarioEfetivo}
-                responsavel={responsavelCodigo}
-                forma={formaJustificativa}
-                texto={texto}
-                justificativa={justificativa}
-                observacao={observacao}
-                opcoesTurma={opcoesTurma}
-                opcoesAluno={opcoesAluno}
-                opcoesMomento={MOMENTOS_SAIDA.map((item) => ({
-                  valor: item.codigo,
-                  rotulo: item.rotulo,
-                }))}
-                opcoesJustificativa={opcoesJustificativa}
-                opcoesResponsavel={opcoesLiberador}
-                fuso={fuso}
-                enviando={enviando}
-                mostrarTextoCatalogo={duranteAula}
-                mostrarObservacao={!duranteAula && justificativa === JUSTIFICATIVA_OUTROS}
-                catalogoEmDuasColunas
-                descricaoResponsavel={
-                  opcoesLiberador.length === 0
-                    ? "Nenhum responsável cadastrado. Cadastre em Gestão, Configurações."
-                    : undefined
+              <FormularioPadrao
+                colunas={1}
+                acoes={
+                  <Botao
+                    type="submit"
+                    variante="secundario"
+                    carregando={enviando}
+                    disabled={opcoesLiberador.length === 0}
+                    sx={{ width: { xs: "100%", sm: "auto" } }}
+                  >
+                    Registrar saída
+                  </Botao>
                 }
-                onTurma={(valor) => {
-                  setTurmaFiltro(valor);
-                  setAlunoId("");
-                }}
-                onAluno={setAlunoId}
-                onMomento={setMomento}
-                onHorario={setHorario}
-                onResponsavel={setResponsavelCodigo}
-                onForma={(valor) => {
-                  setFormaJustificativa(valor);
-                  if (valor === "texto") {
-                    setJustificativa("");
-                    setObservacao("");
-                    return;
-                  }
-                  setTexto("");
-                }}
-                onTexto={setTexto}
-                onJustificativa={setJustificativa}
-                onObservacao={setObservacao}
-              />
-              {erro && <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-                <Botao
-                  type="submit"
-                  variante="secundario"
-                  carregando={enviando}
-                  disabled={opcoesLiberador.length === 0}
-                  sx={{ width: { xs: "100%", sm: "auto" } }}
-                >
-                  Registrar saída
-                </Botao>
-              </Box>
+              >
+                <Stack spacing={1} useFlexGap>
+                  <CamposMovimentacao
+                    tipo="saida"
+                    turma={turmaFiltro}
+                    alunoId={alunoId}
+                    momento={momento}
+                    horario={horarioEfetivo}
+                    responsavel={responsavelCodigo}
+                    forma={formaJustificativa}
+                    texto={texto}
+                    justificativa={justificativa}
+                    observacao={observacao}
+                    opcoesTurma={opcoesTurma}
+                    opcoesAluno={opcoesAluno}
+                    opcoesMomento={MOMENTOS_SAIDA.map((item) => ({
+                      valor: item.codigo,
+                      rotulo: item.rotulo,
+                    }))}
+                    opcoesJustificativa={opcoesJustificativa}
+                    opcoesResponsavel={opcoesLiberador}
+                    fuso={fuso}
+                    enviando={enviando}
+                    mostrarTextoCatalogo={duranteAula}
+                    mostrarObservacao={!duranteAula && justificativa === JUSTIFICATIVA_OUTROS}
+                    catalogoEmDuasColunas
+                    descricaoResponsavel={
+                      opcoesLiberador.length === 0
+                        ? "Nenhum responsável cadastrado. Cadastre em Gestão, Configurações."
+                        : undefined
+                    }
+                    onTurma={(valor) => {
+                      setTurmaFiltro(valor);
+                      setAlunoId("");
+                    }}
+                    onAluno={setAlunoId}
+                    onMomento={setMomento}
+                    onHorario={setHorario}
+                    onResponsavel={setResponsavelCodigo}
+                    onForma={(valor) => {
+                      setFormaJustificativa(valor);
+                      if (valor === "texto") {
+                        setJustificativa("");
+                        setObservacao("");
+                        return;
+                      }
+                      setTexto("");
+                    }}
+                    onTexto={setTexto}
+                    onJustificativa={setJustificativa}
+                    onObservacao={setObservacao}
+                  />
+                  {erro && (
+                    <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+                  )}
+                </Stack>
+              </FormularioPadrao>
             </Stack>
           </Paper>
 
-          {carregandoDia ? (
-            <IndicadorCarregando texto="Carregando saídas..." />
-          ) : (
-            saidasDoDia.length > 0 && (
-              <Box>
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  spacing={1}
-                  sx={{
-                    alignItems: { xs: "stretch", sm: "center" },
-                    justifyContent: "space-between",
-                    mb: 1.5,
-                  }}
-                >
-                  <Typography component="h2" variant="h6" sx={{ fontWeight: 600 }}>
-                    Saídas de {rotuloDia}
-                  </Typography>
-                  <Botao
-                    variante="contorno"
-                    icone={listaBloqueada ? <LockOpenRoundedIcon /> : <LockRoundedIcon />}
-                    aria-label={`${listaBloqueada ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloDia}`}
-                    disabled={removendoId !== null}
-                    onClick={() => setDiaLiberado(listaBloqueada ? dia : null)}
-                  >
-                    {listaBloqueada ? "Desbloquear" : "Bloquear"}
-                  </Botao>
-                </Stack>
-                <List
-                  aria-label={`Saídas de ${rotuloDia}`}
-                  sx={{ display: "flex", flexDirection: "column", gap: 1.5, p: 0 }}
-                >
-                  {saidasDoDia.map((saida) => {
-                    const aluno = alunosPorId.get(saida.alunoId);
-                    const nome = aluno?.nome ?? "Aluno";
-                    const dataRegistro = dataNoFuso(saida.criadoEm, fuso);
-                    const horaRegistro = horaNoFuso(saida.criadoEm, fuso);
-                    return (
-                      <ListItem
-                        key={saida.id}
-                        sx={{
-                          p: 2,
-                          border: "1px solid",
-                          borderColor: "divider",
-                          borderRadius: 2,
-                          bgcolor: "background.paper",
-                        }}
-                      >
-                        <Stack
-                          direction="row"
-                          spacing={2}
-                          sx={{ width: "100%", alignItems: "flex-start" }}
-                        >
-                          <Box sx={{ minWidth: 0, flex: 1 }}>
-                            <Typography
-                              variant="body1"
-                              sx={{ fontWeight: 600, overflowWrap: "anywhere" }}
-                            >
-                              {nome}
-                            </Typography>
-                            <CaixasDeInfo
-                              itens={partesDaSaida(
-                                saida,
-                                saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
-                              )}
-                              sx={{ mt: 1 }}
-                            />
-                            <Typography
-                              variant="caption"
-                              component="p"
-                              sx={{ mt: 1, color: "text.secondary" }}
-                            >
-                              Liberado por {saida.liberadoPorNome ?? "registro anterior"}
-                              {dataRegistro && horaRegistro
-                                ? ` em ${dataRegistro} às ${horaRegistro}`
-                                : ""}
-                            </Typography>
-                          </Box>
-                          {!listaBloqueada && (
-                            <BotaoIcone
-                              rotulo={`Remover saída de ${nome}`}
-                              variante="texto"
-                              icone={<DeleteOutlineRoundedIcon />}
-                              sx={{ color: "falta.texto" }}
-                              disabled={removendoId === saida.id}
-                              onClick={() => remover(saida)}
-                            />
-                          )}
-                        </Stack>
-                      </ListItem>
-                    );
-                  })}
-                </List>
-              </Box>
-            )
-          )}
+          <HistoricoDiarioMovimentacoes
+            titulo={`Saídas de ${rotuloDia}`}
+            carregando={leitura.estado === "carregando"}
+            falha={leitura.estado === "falha" ? leitura.falha : undefined}
+            onTentarNovamente={tentarNovamente}
+            textoCarregando="Carregando saídas..."
+            textoVazio="Nenhuma saída registrada neste dia."
+            acao={
+              <Botao
+                variante="contorno"
+                icone={listaBloqueada ? <LockOpenRoundedIcon /> : <LockRoundedIcon />}
+                aria-label={`${listaBloqueada ? "Desbloquear" : "Bloquear"} remoção das saídas de ${rotuloDia}`}
+                disabled={removendoId !== null}
+                onClick={() => setDiaLiberado(listaBloqueada ? dia : null)}
+              >
+                {listaBloqueada ? "Desbloquear" : "Bloquear"}
+              </Botao>
+            }
+            registros={saidasDoDia.map((saida) => {
+              const nome = alunosPorId.get(saida.alunoId)?.nome ?? "Aluno";
+              const dataRegistro = dataNoFuso(saida.criadoEm, fuso);
+              const horaRegistro = horaNoFuso(saida.criadoEm, fuso);
+              return {
+                id: saida.id,
+                nome,
+                itens: partesDaSaida(
+                  saida,
+                  saida.turmaHistoricaNome ?? "Turma histórica desconhecida",
+                ),
+                rodape: `Liberado por ${saida.liberadoPorNome ?? "registro anterior"}${dataRegistro && horaRegistro ? ` em ${dataRegistro} às ${horaRegistro}` : ""}`,
+                acao: !listaBloqueada && (
+                  <BotaoIcone
+                    rotulo={`Remover saída de ${nome}`}
+                    variante="texto"
+                    icone={<DeleteOutlineRoundedIcon />}
+                    sx={{ color: "falta.texto" }}
+                    disabled={removendoId === saida.id}
+                    onClick={() => remover(saida)}
+                  />
+                ),
+              };
+            })}
+          />
         </>
       )}
       <DialogoConfirmarMovimentacao
