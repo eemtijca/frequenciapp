@@ -121,6 +121,51 @@ async function escolher(page: Page, campo: Locator, opcao: string) {
 }
 
 it.each(["light", "dark"] as const)(
+  "alinha as faixas de pausa às bordas internas do cartão somente no celular (%s)",
+  async (tema) => {
+    await consultar(320, tema, async (page, vista) => {
+      async function conferir(turno: "Manhã" | "Tarde", pausa: string, largura: number) {
+        const nome = `Aulas de Segunda-feira · ${turno}`;
+        const cartao = vista.getByRole("region", { name: nome, exact: true });
+        const lista = cartao.getByRole("list", { name: nome, exact: true });
+        const item = lista
+          .getByRole("listitem")
+          .filter({ has: page.getByText(pausa, { exact: true }) });
+        await item.waitFor();
+        const medidas = await item.evaluate((linha) => {
+          const cartao = linha.closest("section");
+          const texto = linha.querySelector("p");
+          if (!cartao || !texto) throw new Error("Lista de aulas incompleta");
+          const borda = getComputedStyle(cartao);
+          const caixa = cartao.getBoundingClientRect();
+          const faixa = linha.getBoundingClientRect();
+          return {
+            esquerda: faixa.left - caixa.left - parseFloat(borda.borderLeftWidth),
+            direita: caixa.right - faixa.right - parseFloat(borda.borderRightWidth),
+            recuoDoTexto:
+              texto.getBoundingClientRect().left - caixa.left - parseFloat(borda.borderLeftWidth),
+            larguraDocumento: document.documentElement.scrollWidth,
+          };
+        });
+        const recuo = largura < 600 ? 0 : 8;
+        expect.soft(medidas.esquerda, `${pausa} à esquerda, ${largura} px`).toBeCloseTo(recuo, 0);
+        expect.soft(medidas.direita, `${pausa} à direita, ${largura} px`).toBeCloseTo(recuo, 0);
+        expect.soft(medidas.recuoDoTexto).toBeCloseTo(68, 0);
+        expect(medidas.larguraDocumento).toBeLessThanOrEqual(largura);
+      }
+      for (const largura of [320, 390, 599, 600, 1440]) {
+        await page.setViewportSize({ width: largura, height: 844 });
+        await conferir("Manhã", "Intervalo", largura);
+      }
+      await page.setViewportSize({ width: 390, height: 844 });
+      await vista.getByRole("tab", { name: "Tarde", exact: true }).click();
+      await conferir("Tarde", "Almoço", 390);
+      await conferir("Tarde", "Intervalo", 390);
+    });
+  },
+);
+
+it.each(["light", "dark"] as const)(
   "mantém turma, provas e aulas legíveis e selecionáveis a 320 px (%s)",
   async (tema) => {
     await consultar(320, tema, async (page, vista) => {

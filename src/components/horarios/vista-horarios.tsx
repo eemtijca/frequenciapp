@@ -125,7 +125,12 @@ function PausaDoDia({ pausa, editavel }: { pausa: Pausa; editavel: boolean }) {
   return (
     <ListItem
       divider
-      sx={{ gap: editavel ? 2 : 1.5, py: editavel ? 1.5 : 1, backgroundColor: "action.hover" }}
+      sx={{
+        gap: editavel ? 2 : 1.5,
+        py: editavel ? 1.5 : 1,
+        ...(!editavel && { px: { xs: 3, sm: 2 } }),
+        backgroundColor: "action.hover",
+      }}
     >
       <Box
         aria-hidden="true"
@@ -287,6 +292,7 @@ function AulasDoDia({
       component="ol"
       aria-label={`Aulas de ${rotuloDia(dia)}${turno ? ` · ${turno}` : ""}`}
       disablePadding
+      sx={editavel ? undefined : { px: { xs: 0, sm: 1 } }}
     >
       {itens.map((item) => {
         if (item.tipo === "pausa")
@@ -294,7 +300,16 @@ function AulasDoDia({
         const aula = item.aula;
         const disciplina = aula.disciplinas?.[String(dia)]?.trim();
         return (
-          <ListItem key={aula.id} divider sx={{ display: "block", py: editavel ? 2 : 1 }}>
+          <ListItem
+            key={aula.id}
+            divider
+            sx={{
+              display: "block",
+              py: editavel ? 2 : 1,
+              // Preserva o recuo das aulas; só as faixas de pausa ocupam a largura toda.
+              ...(!editavel && { mx: { xs: 1, sm: 0 }, width: { xs: "auto", sm: "100%" } }),
+            }}
+          >
             <Stack
               direction="row"
               spacing={editavel ? 2 : 1.5}
