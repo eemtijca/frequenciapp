@@ -26,6 +26,7 @@ import { AtualizadoEm } from "@/components/ui/mui/atualizado-em";
 import { BotaoAtualizar } from "@/components/ui/mui/botao-atualizar";
 import { BotaoIcone } from "@/components/ui/mui/botao";
 import { SeletorTema } from "@/components/ui/mui/seletor-tema";
+import { SeletorAnimacoes } from "@/components/conta/seletor-animacoes";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import DialogoSobre from "@/components/dialogo-sobre";
@@ -129,6 +130,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
             >
               <SeletorTema />
             </Box>
+            <SeletorAnimacoes />
             {!contexto.trocaObrigatoria ? (
               <BotaoIcone
                 rotulo="Configurar notificações"

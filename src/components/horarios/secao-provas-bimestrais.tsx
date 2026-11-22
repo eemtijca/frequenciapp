@@ -18,6 +18,7 @@ import ListItem from "@mui/material/ListItem";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import dayjs, { type Dayjs } from "dayjs";
+import { useReduzirAnimacoesDosSeletores } from "@/theme/animacoes-da-interface";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import {
   diaDaSemanaIso,
@@ -127,9 +128,11 @@ interface SeletorDataProps {
 /** Data civil da prova em DatePicker, ligada ao Campo pelo contexto do formulário. */
 function SeletorDataProva({ id, valor, min, max, disabled, onValor }: SeletorDataProps) {
   const campo = useCampo();
+  const reduzirAnimacoes = useReduzirAnimacoesDosSeletores();
 
   return (
     <DatePicker
+      reduceAnimations={reduzirAnimacoes}
       value={comoDia(valor)}
       onChange={(novo) => {
         const convertido = paraDiaCivil(novo?.toDate() ?? null);

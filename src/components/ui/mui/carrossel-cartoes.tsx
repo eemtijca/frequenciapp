@@ -5,6 +5,7 @@ import { useEffect, useId, useMemo, useRef, type KeyboardEvent, type ReactNode }
 import Box from "@mui/material/Box";
 import type { SxProps, Theme } from "@mui/material/styles";
 import { AquecimentoGraficos } from "@/components/graficos/aquecimento-graficos";
+import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 export interface ItemCarrossel {
@@ -35,6 +36,7 @@ export function CarrosselCartoes({
   sx,
   children,
 }: CarrosselCartoesProps) {
+  const { animacoesAtivas } = useAnimacoesDaInterface();
   const statusId = useId();
   const trilho = useRef<HTMLDivElement>(null);
   const cartaoAtivo = useRef<HTMLDivElement>(null);
@@ -63,13 +65,12 @@ export function CarrosselCartoes({
     const area = trilho.current;
     const cartao = cartaoAtivo.current;
     if (!area || !cartao) return;
-    const reduzido = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     alvoRolagem.current = valor;
     area.scrollTo({
       left: cartao.offsetLeft,
-      behavior: reduzido ? "auto" : "smooth",
+      behavior: animacoesAtivas ? "smooth" : "instant",
     });
-  }, [valor]);
+  }, [animacoesAtivas, valor]);
 
   useEffect(() => {
     const area = trilho.current;
@@ -77,8 +78,8 @@ export function CarrosselCartoes({
     const alinhar = () => {
       const cartao = cartaoAtivo.current;
       if (!cartao || area.clientWidth === 0) return;
-      alvoRolagem.current = valor;
-      area.scrollTo({ left: cartao.offsetLeft, behavior: "auto" });
+      alvoRolagem.current = cartao.dataset.cartao ?? null;
+      area.scrollTo({ left: cartao.offsetLeft, behavior: "instant" });
     };
     const observador = new ResizeObserver(alinhar);
     observador.observe(area);
@@ -87,7 +88,7 @@ export function CarrosselCartoes({
       observador.disconnect();
       window.removeEventListener("resize", alinhar);
     };
-  }, [valor]);
+  }, []);
 
   function liberarRolagemManual() {
     alvoRolagem.current = null;
@@ -182,9 +183,6 @@ export function CarrosselCartoes({
           scrollSnapType: "x mandatory",
           scrollBehavior: "smooth",
           WebkitOverflowScrolling: "touch",
-          "@media (prefers-reduced-motion: reduce)": {
-            scrollBehavior: "auto",
-          },
         }}
       >
         {itens.map((item, posicao) => {

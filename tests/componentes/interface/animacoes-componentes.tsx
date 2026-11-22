@@ -2,31 +2,24 @@
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
 import Box from "@mui/material/Box";
-import CssBaseline from "@mui/material/CssBaseline";
-import GlobalStyles from "@mui/material/GlobalStyles";
-import { ThemeProvider } from "@mui/material/styles";
+import CircularProgress from "@mui/material/CircularProgress";
+import LinearProgress from "@mui/material/LinearProgress";
+import Drawer from "@mui/material/Drawer";
+import Skeleton from "@mui/material/Skeleton";
+import { CarrosselCartoes } from "@/components/ui/mui/carrossel-cartoes";
+import { SeletorAnimacoes } from "@/components/conta/seletor-animacoes";
+import { SeletorTurmaChamada } from "@/components/chamada/seletor-turma-chamada";
+import { MenuConta } from "@/components/conta/menu-conta";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { Botao } from "@/components/ui/mui/botao";
 import { Dialogo } from "@/components/ui/mui/dialogo";
-import { tema } from "@/theme/tema";
-
-// Mesmo bloco global do provedor de tema, necessário para o teste de movimento reduzido.
-const estilosGlobais = {
-  "@media (prefers-reduced-motion: reduce)": {
-    "*, *::before, *::after": {
-      animationDuration: "0.01ms !important",
-      animationDelay: "0ms !important",
-      animationIterationCount: 1,
-      transitionDuration: "0.01ms !important",
-      transitionDelay: "0ms !important",
-      scrollBehavior: "auto !important",
-    },
-  },
-};
+import { ProvedorTema } from "@/theme/provedor-tema";
 
 function Aplicacao() {
   const [modal, setModal] = useState(false);
   const [aberto, setAberto] = useState(false);
+  const [gaveta, setGaveta] = useState(false);
+  const [cartao, setCartao] = useState("primeiro");
   return (
     <Box sx={{ p: 2 }}>
       <Botao type="button" onClick={() => setModal(true)}>
@@ -39,6 +32,65 @@ function Aplicacao() {
         <button type="button">Ação interna</button>
       </Acordeao>
       <button type="button">Ação externa</button>
+      <MenuConta
+        usuario={{
+          id: "qa",
+          nome: "Pessoa sintética",
+          email: "qa@escola.test",
+          papel: "ADMIN",
+          ativo: true,
+        }}
+        movel={false}
+        saindo={false}
+        onAcao={() => undefined}
+      />
+      <SeletorAnimacoes />
+      <button type="button" onClick={() => setGaveta(true)}>
+        Abrir gaveta
+      </button>
+      <Drawer
+        open={gaveta}
+        onClose={() => setGaveta(false)}
+        slotProps={{ paper: { "aria-label": "Gaveta de teste" } }}
+      >
+        <button type="button" onClick={() => setGaveta(false)}>
+          Fechar gaveta
+        </button>
+      </Drawer>
+      <CircularProgress aria-label="Carregamento circular" />
+      <LinearProgress aria-label="Carregamento linear" />
+      <Skeleton animation="wave" data-testid="esqueleto" />
+      <SeletorTurmaChamada
+        turmas={[
+          {
+            id: "turma-qa",
+            serieId: "serie-qa",
+            nome: "QA",
+            rotulo: "1ª série QA",
+            serieNome: "1º ano",
+            horarios: [],
+          },
+        ]}
+        alunos={[]}
+        turmaId="turma-qa"
+        dia="2026-11-20"
+        frequencias={[]}
+        coberturaDisponivel
+        carregando={false}
+        temAlteracoes={false}
+        travado={false}
+        onEscolher={() => undefined}
+      />
+      <CarrosselCartoes
+        rotuloAcessivel="Gráficos de teste"
+        itens={[
+          { id: "primeiro", rotulo: "Primeiro", render: () => <p>Primeiro gráfico</p> },
+          { id: "segundo", rotulo: "Segundo", render: () => <p>Segundo gráfico</p> },
+        ]}
+        visitados={["primeiro", "segundo"]}
+        valor={cartao}
+        onValor={setCartao}
+      />
     </Box>
   );
 }
@@ -46,9 +98,7 @@ function Aplicacao() {
 const raiz = document.getElementById("root");
 if (raiz)
   createRoot(raiz).render(
-    <ThemeProvider theme={tema}>
-      <CssBaseline enableColorScheme />
-      <GlobalStyles styles={estilosGlobais} />
+    <ProvedorTema>
       <Aplicacao />
-    </ThemeProvider>,
+    </ProvedorTema>,
   );

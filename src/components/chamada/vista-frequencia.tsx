@@ -48,6 +48,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { type Theme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
+import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import { publicarAviso } from "@/components/ui/mui/avisos";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -302,7 +303,7 @@ export default function VistaFrequencia({
   const [confirmacaoHistoricaAberta, setConfirmacaoHistoricaAberta] = useState(false);
   const [motivoHistorico, setMotivoHistorico] = useState("");
   const [erroHistorico, setErroHistorico] = useState("");
-  const semMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const semMovimento = !useAnimacoesDaInterface().animacoesAtivas;
   const painelLateral = useMediaQuery((tema: Theme) => tema.breakpoints.up("xl"));
 
   const restaurarFocoDaBarra = useCallback((acao: string | null | undefined) => {

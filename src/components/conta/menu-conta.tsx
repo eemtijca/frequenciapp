@@ -19,6 +19,7 @@ import type { Theme } from "@mui/material/styles";
 import type { Identidade } from "@/domain/usuarios";
 import { rotuloDePapel } from "@/domain/usuarios";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { OpcoesAnimacoes } from "./seletor-animacoes";
 
 export type AcaoConta = "notificacoes" | "senha" | "sobre" | "sair";
 
@@ -119,7 +120,7 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
         />
       </ListItemButton>
       <Menu
-        id={idMenu}
+        variant="menu"
         anchorEl={ancora}
         open={aberto}
         onClose={() => setAncora(null)}
@@ -127,7 +128,7 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
         transformOrigin={{ vertical: "bottom", horizontal: "left" }}
         marginThreshold={8}
         slotProps={{
-          list: { "aria-label": "Conta" },
+          list: { id: idMenu, "aria-label": "Conta" },
           paper: { sx: { width: 272, maxWidth: "calc(100vw - 24px)" } },
         }}
       >
@@ -159,7 +160,9 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
           rotulo="Sobre"
           onClick={() => acionar("sobre")}
         />
-        <Divider sx={{ my: 0.75 }} />
+        <Divider component="li" role="separator" sx={{ my: 0.75 }} />
+        <OpcoesAnimacoes />
+        <Divider component="li" role="separator" sx={{ my: 0.75 }} />
         <Item
           icone={<LogoutRoundedIcon fontSize="small" aria-hidden="true" />}
           rotulo={saindo ? "Saindo..." : "Sair da conta"}

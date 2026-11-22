@@ -8,7 +8,7 @@ import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
 import Collapse from "@mui/material/Collapse";
 import type { Theme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
+import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import { alunoDesistenteNoDia, type Aluno, type Frequencia, type Turma } from "@/domain/frequencia";
 import { coberturaDoDia } from "@/domain/relatorios";
 import { TOKENS_LAYOUT } from "@/theme/layout";
@@ -213,7 +213,7 @@ export function SeletorTurmaChamada({
   const [aberto, setAberto] = useState(false);
   const gatilho = useRef<HTMLButtonElement>(null);
   const [serieRecolhida, setSerieRecolhida] = useState<string | null>(null);
-  const semMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const semMovimento = !useAnimacoesDaInterface().animacoesAtivas;
   const tempoColapso = semMovimento ? 0 : 180;
 
   const series = useMemo(() => {

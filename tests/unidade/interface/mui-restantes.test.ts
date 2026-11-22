@@ -233,7 +233,8 @@ describe("CarrosselCartoes", () => {
     expect(texto).toContain("scrollSnapType");
     expect(texto).toContain("scrollSnapAlign");
     expect(texto).toContain("overflowX");
-    expect(texto).toContain("prefers-reduced-motion");
+    expect(texto).toContain("useAnimacoesDaInterface");
+    expect(texto).not.toContain("prefers-reduced-motion");
     expect(texto).toContain("ArrowLeft");
     expect(texto).toContain("ArrowRight");
     expect(texto).toContain("Home");

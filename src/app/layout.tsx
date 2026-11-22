@@ -5,6 +5,7 @@ import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import { ProvedorAvisos } from "@/components/ui/mui/avisos";
 import { CORES_NAVEGADOR } from "@/theme/paleta";
+import { iniciarAnimacoes } from "@/theme/preferencia-animacoes";
 import { ProvedorTema } from "@/theme/provedor-tema";
 
 const fonteInterface = Plus_Jakarta_Sans({
@@ -78,6 +79,7 @@ export default async function LayoutRaiz({
           modeStorageKey="theme"
           nonce={nonce}
         />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: iniciarAnimacoes }} />
         <ProvedorTema nonce={nonce}>
           {children}
           <ProvedorAvisos />

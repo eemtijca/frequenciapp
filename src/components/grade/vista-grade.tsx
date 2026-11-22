@@ -18,7 +18,7 @@ import TableCell from "@mui/material/TableCell";
 import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
-import useMediaQuery from "@mui/material/useMediaQuery";
+import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import type { Aluno, Frequencia, ModoPeriodo, ResumoAcumulado, Turma } from "@/domain/frequencia";
 import {
   diasDoMes,
@@ -82,7 +82,7 @@ export default function VistaGrade({
   origens,
   onMes,
 }: Props) {
-  const semMovimento = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const semMovimento = !useAnimacoesDaInterface().animacoesAtivas;
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [busca, setBusca] = useState("");
@@ -418,7 +418,12 @@ export default function VistaGrade({
           descricao="Quando houver alunos nas suas turmas, a consulta aparece aqui."
         />
       ) : (
-        <Fade key={`${turmaEfetiva}-${modo}`} in appear timeout={semMovimento ? 0 : 220}>
+        <Fade
+          key={`${turmaEfetiva}-${modo}`}
+          in
+          appear={!semMovimento}
+          timeout={semMovimento ? 0 : 220}
+        >
           <Box sx={{ minWidth: 0 }}>
             <BarraBusca
               id="busca-grade"

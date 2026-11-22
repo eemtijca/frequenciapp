@@ -2,6 +2,7 @@
 
 // Seletor de horário em 24 horas com TimePicker, valor HH:mm, pt-BR e alvo de 48 dp.
 import dayjs, { type Dayjs } from "dayjs";
+import { useReduzirAnimacoesDosSeletores } from "@/theme/animacoes-da-interface";
 import { TimePicker } from "@mui/x-date-pickers/TimePicker";
 import { renderMultiSectionDigitalClockTimeView } from "@mui/x-date-pickers/timeViewRenderers";
 import { TOKENS_LAYOUT } from "@/theme/layout";
@@ -54,12 +55,14 @@ export function SeletorHorario({
   onValor,
 }: SeletorHorarioProps) {
   const campo = useCampo();
+  const reduzirAnimacoes = useReduzirAnimacoesDosSeletores();
   const idFinal = campo?.id ?? id;
   const desabilitado = disabled ?? campo?.disabled ?? false;
   const referencia = paraHorario(agora ?? "") ?? REFERENCIA;
 
   return (
     <TimePicker
+      reduceAnimations={reduzirAnimacoes}
       value={paraHorario(valor)}
       onChange={(novo) => onValor(deHorario(novo))}
       format={FORMATO_HORARIO}

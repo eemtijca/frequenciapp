@@ -13,6 +13,30 @@ import { ptBR } from "@mui/x-date-pickers/locales";
 import "dayjs/locale/pt-br";
 import { tema } from "./tema";
 import { CorDoTema } from "./esquema-cores";
+import { ContextoAnimacoes, usePreferenciaAnimacoes } from "./animacoes-da-interface";
+import { ATRIBUTO_ANIMACOES } from "./preferencia-animacoes";
+
+const temaSemMovimento: Theme = { ...tema, motion: { reducedMotion: "always" } };
+
+// O seletor na raiz cobre conteúdo portado e vale antes da hidratação.
+const estilosSemMovimento = {
+  "&, *, *::before, *::after": {
+    animationName: "none !important",
+    transitionDuration: "0ms !important",
+    transitionDelay: "0ms !important",
+    scrollBehavior: "auto !important",
+  },
+  ".MuiLinearProgress-indeterminate .MuiLinearProgress-bar1, .MuiLinearProgress-query .MuiLinearProgress-bar1":
+    {
+      left: "30%",
+      right: "auto",
+      width: "40%",
+    },
+  ".MuiLinearProgress-indeterminate .MuiLinearProgress-bar2, .MuiLinearProgress-query .MuiLinearProgress-bar2":
+    {
+      display: "none",
+    },
+};
 
 const estilosGlobais = (temaAtual: Theme) => ({
   ":root": {
@@ -55,18 +79,9 @@ const estilosGlobais = (temaAtual: Theme) => ({
     whiteSpace: "nowrap",
     border: 0,
   },
+  [`html[${ATRIBUTO_ANIMACOES}="desativadas"]`]: estilosSemMovimento,
   "@media (prefers-reduced-motion: reduce)": {
-    "*, *::before, *::after": {
-      animationDuration: "0.01ms !important",
-      animationDelay: "0ms !important",
-      animationIterationCount: 1,
-      transitionDuration: "0.01ms !important",
-      transitionDelay: "0ms !important",
-      scrollBehavior: "auto !important",
-    },
-    ".MuiCircularProgress-root, .MuiLinearProgress-root, .MuiSkeleton-root": {
-      animationDuration: "1.4s !important",
-    },
+    [`html:not([${ATRIBUTO_ANIMACOES}="ativadas"])`]: estilosSemMovimento,
   },
   "@media (forced-colors: active)": {
     "*": {
@@ -101,6 +116,8 @@ const estilosGlobais = (temaAtual: Theme) => ({
 });
 
 export function ProvedorTema({ children, nonce }: { children: ReactNode; nonce?: string }) {
+  const animacoes = usePreferenciaAnimacoes();
+
   // Cores forçadas: o anel global perde para o outline zerado dos campos do MUI.
   // A modalidade de teclado restaura o foco visível sem contornar o autofoco por toque.
   useEffect(() => {
@@ -122,7 +139,7 @@ export function ProvedorTema({ children, nonce }: { children: ReactNode; nonce?:
   return (
     <AppRouterCacheProvider options={{ nonce }}>
       <ThemeProvider
-        theme={tema}
+        theme={animacoes.hidratado && !animacoes.animacoesAtivas ? temaSemMovimento : tema}
         defaultMode="system"
         modeStorageKey="theme"
         disableTransitionOnChange
@@ -134,8 +151,10 @@ export function ProvedorTema({ children, nonce }: { children: ReactNode; nonce?:
           adapterLocale="pt-br"
           localeText={ptBR.components.MuiLocalizationProvider.defaultProps.localeText}
         >
-          {children}
-          <CorDoTema />
+          <ContextoAnimacoes.Provider value={animacoes}>
+            {children}
+            <CorDoTema />
+          </ContextoAnimacoes.Provider>
         </LocalizationProvider>
       </ThemeProvider>
     </AppRouterCacheProvider>
