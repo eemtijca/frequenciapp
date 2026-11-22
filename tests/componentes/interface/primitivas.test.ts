@@ -43,7 +43,8 @@ interface Medida {
 interface MedidaFoco {
   ativo: boolean;
   focoVisivel: boolean;
-  sombra: string;
+  contorno: string;
+  larguraContorno: string;
   bordaPx: string;
   bordaFoco: Rgb;
   tokenFoco: Rgb;

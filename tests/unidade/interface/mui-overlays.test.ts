@@ -230,12 +230,16 @@ describe("abas", () => {
       onChange: () => {},
       rotuloAcessivel: "Seções do relatório",
     });
-    const controles = extrairAtributo(html, "aria-controls");
-    const rotuloPainel = extrairAtributo(html, "aria-labelledby");
-    expect(html).toContain(`id="${controles}"`);
-    expect(html).toContain(`id="${rotuloPainel}"`);
-    expect(html).toContain('tabindex="0"');
-    expect(html).toContain('aria-hidden="false"');
+    for (const { valor } of itens) {
+      const aba = html.match(new RegExp(`<button[^>]* id="aba-${valor}"[^>]*>`))?.[0];
+      expect(aba).toContain('role="tab"');
+      expect(aba).toContain(`aria-controls="painel-${valor}"`);
+    }
+    const painel = html.match(/<div[^>]* id="painel-resumo"[^>]*>/)?.[0];
+    expect(painel).toContain('role="tabpanel"');
+    expect(painel).toContain('aria-labelledby="aba-resumo"');
+    expect(painel).toContain('tabindex="0"');
+    expect(painel).toContain('aria-hidden="false"');
   });
 
   it("omite data-pager quando não informado e usa variante padrão", () => {
@@ -255,8 +259,24 @@ describe("abas", () => {
     expect(texto).toContain("inert={!selecionado}");
     expect(texto).toContain("hidden={!selecionado}");
     expect(texto).toContain("aria-hidden={!selecionado}");
-    expect(texto).toContain("aria-labelledby={idAba(item.valor)}");
+    expect(texto).toContain(
+      "aria-labelledby={ocultarTrilho && selecionado ? undefined : idAba(item.valor)}",
+    );
     expect(texto).toContain("aria-controls={idPainel(item.valor)}");
+
+    const html = renderizarAbas({
+      itens,
+      ativo: "resumo",
+      onChange: () => {},
+      rotuloAcessivel: "Seções do relatório",
+      ocultarTrilho: true,
+    });
+    expect(html).toMatch(/<div[^>]*role="tablist"[^>]* hidden=""/);
+    const painel = html.match(/<div[^>]* id="painel-resumo"[^>]*>/)?.[0];
+    expect(painel).toContain('aria-hidden="false"');
+    expect(painel).not.toMatch(/ (?:role|aria-labelledby|hidden|inert|tabindex)=/);
+    expect(html).toContain("Painel de resumo");
+    expect(html).not.toContain("Painel de histórico");
   });
 });
 

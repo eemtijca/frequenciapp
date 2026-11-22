@@ -329,11 +329,28 @@ describe("guardrails de composição", () => {
     }
   });
 
-  it("reserva maxWidth para o LayoutConteudo", () => {
+  it("reserva a largura de página ao LayoutConteudo", () => {
     for (const { nome, texto } of fontesDoLayout()) {
       if (nome === "layout-conteudo.tsx") continue;
-      expect(texto, nome).not.toContain("maxWidth");
+      // Não é uma largura de conteúdo: o grupo de ações pode quebrar dentro do cabeçalho.
+      const semLimiteDasAcoes =
+        nome === "cabecalho-pagina.tsx"
+          ? texto.replace('...(compacto && { maxWidth: "100%" }),', "")
+          : texto;
+      expect(semLimiteDasAcoes, nome).not.toContain("maxWidth");
     }
+
+    const acoes = createElement("button", null, "Nova turma");
+    const padrao = renderizar(criar(CabecalhoPagina, { titulo: "Turmas", acoes }));
+    const compacto = renderizar(
+      criar(CabecalhoPagina, { titulo: "Turmas", acoes, compacto: true }),
+    );
+    expect(padrao).not.toContain("max-width:");
+    const grupo = compacto.match(/<div class="([^"]+)"[^>]*><button>Nova turma<\/button>/)?.[1];
+    const classeCss = grupo?.split(" ").find((classe) => classe.startsWith("css-"));
+    if (!classeCss) throw new Error("Estilo do grupo de ações compacto ausente");
+    expect(compacto.match(/max-width:[^;}]+/g)).toEqual(["max-width:100%"]);
+    expect(compacto).toMatch(new RegExp(`\\.${classeCss}\\{[^{}]*max-width:100%[;}]`));
   });
 
   it("não cria display grid fora dos componentes de grade", () => {
