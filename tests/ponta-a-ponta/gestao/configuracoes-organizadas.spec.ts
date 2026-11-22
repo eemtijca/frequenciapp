@@ -17,6 +17,12 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
   page,
 }) => {
   const gravacoes: unknown[] = [];
+  let importacoes = 0;
+  page.on("request", (pedido) => {
+    if (new URL(pedido.url()).pathname === "/api/backup" && pedido.method() === "POST") {
+      importacoes++;
+    }
+  });
   await page.route("**/api/configuracoes/lote", (rota) => {
     gravacoes.push(rota.request().postDataJSON());
     return rota.fulfill({ status: 500, json: { error: "E2E Gravação inesperada." } });
@@ -45,10 +51,16 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
     copia.getByRole("heading", { name: "Cópia de segurança", exact: true }),
   ).toBeVisible();
   await expect(copia.getByText(/sem substituir os que já existem/)).toBeVisible();
-  await copia.getByRole("button", { name: "Importar cópia", exact: true }).tap();
+  await expect(copia.getByText(/Por padrão, o ZIP é protegido por senha/)).toBeVisible();
+  await expect(copia.getByText(/JSON original sem senha/)).toBeVisible();
+  const importarCopia = copia.getByRole("button", { name: "Importar cópia", exact: true });
+  await importarCopia.focus();
+  await page.keyboard.press("Enter");
   const importar = page.getByRole("alertdialog", { name: "Importar cópia?", exact: true });
   await expect(importar).toContainText("registros que já existem são mantidos");
   await importar.getByRole("button", { name: "Cancelar", exact: true }).tap();
+  await expect(importarCopia).toBeFocused();
+  expect(importacoes).toBe(0);
   await selecionarAcaoConfiguracoes(page, "Escola", "Cadastros");
   await expect(justificativas.getByText("E2E Cadastro em revisão", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Revisar alterações", exact: true }).tap();
@@ -59,6 +71,7 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
   await descartarConfiguracoes(page);
   await expect(justificativas.getByText("E2E Cadastro em revisão", { exact: true })).toHaveCount(0);
   expect(gravacoes).toHaveLength(0);
+  expect(importacoes).toBe(0);
 });
 
 test("as tarefas das categorias cabem no celular e seus painéis ficam acessíveis", async ({

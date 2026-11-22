@@ -8,6 +8,7 @@ import FactCheckRoundedIcon from "@mui/icons-material/FactCheckRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import PlaylistAddCheckRoundedIcon from "@mui/icons-material/PlaylistAddCheckRounded";
 import Box from "@mui/material/Box";
+import Divider from "@mui/material/Divider";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import type { SvgIconComponent } from "@mui/icons-material";
@@ -16,6 +17,7 @@ import { Campo } from "@/components/ui/mui/campo";
 import { Interruptor } from "@/components/ui/mui/interruptor";
 import { SeletorHorario } from "@/components/ui/mui/seletor-horario";
 import { Selo } from "@/components/ui/mui/selo";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 import SecaoConfiguracao from "./secao-configuracao";
 import {
   NOTIFICACOES_PADRAO,
@@ -90,27 +92,24 @@ export default function SecaoNotificacoes({
       descricao="Defina quais avisos a escola oferece e quando são enviados. As mudanças entram no rascunho."
       resumo={<Selo>{`${ativos} ${ativos === 1 ? "aviso ativo" : "avisos ativos"}`}</Selo>}
     >
-      <Stack spacing={2}>
+      <Stack divider={<Divider />} spacing={2} useFlexGap>
         {CAMPOS.map(({ tipo, titulo, rotulo, destinatarios, icone }) => (
-          <Box
+          <Stack
+            component="section"
             key={tipo}
-            sx={(tema) => ({
-              display: "flex",
-              flexDirection: "column",
-              gap: 2,
-              padding: 2,
-              border: `1px solid ${tema.vars.palette.divider}`,
-              borderRadius: 2,
-            })}
+            spacing={2}
+            aria-labelledby={`titulo-aviso-${tipo}`}
           >
             <Stack direction="row" spacing={2} sx={{ alignItems: "center", minWidth: 0 }}>
               <IconeDoAviso icone={icone} />
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography variant="subtitle2">{titulo}</Typography>
+              <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
+                <Typography component="h4" variant="subtitle2" id={`titulo-aviso-${tipo}`}>
+                  {titulo}
+                </Typography>
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   {destinatarios}
                 </Typography>
-              </Box>
+              </Stack>
             </Stack>
             <Interruptor
               id={`aviso-${tipo}`}
@@ -152,29 +151,29 @@ export default function SecaoNotificacoes({
                 </Campo>
               </Box>
             ) : null}
-          </Box>
-        ))}
-        <Acordeao
-          titulo="Sobre os avisos"
-          nivelTitulo="h4"
-          resumo={
-            <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
-              <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />
-              <span>Como os horários são usados</span>
-            </Stack>
-          }
-        >
-          <Stack spacing={1} sx={{ color: "text.secondary" }}>
-            <Typography variant="body2">Resumo diário nos dias com chamada salva.</Typography>
-            <Typography variant="body2">
-              Pendências diárias para turmas com aula prevista e alunos ativos.
-            </Typography>
-            <Typography variant="body2">
-              Horários da escola. Ativação na conta, por dispositivo.
-            </Typography>
           </Stack>
-        </Acordeao>
+        ))}
       </Stack>
+      <Acordeao
+        titulo="Sobre os avisos"
+        nivelTitulo="h4"
+        resumo={
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+            <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />
+            <span>Como os horários são usados</span>
+          </Stack>
+        }
+      >
+        <Stack spacing={1} sx={{ color: "text.secondary" }}>
+          <Typography variant="body2">Resumo diário nos dias com chamada salva.</Typography>
+          <Typography variant="body2">
+            Pendências diárias para turmas com aula prevista e alunos ativos.
+          </Typography>
+          <Typography variant="body2">
+            Horários da escola. Ativação na conta, por dispositivo.
+          </Typography>
+        </Stack>
+      </Acordeao>
     </SecaoConfiguracao>
   );
 }

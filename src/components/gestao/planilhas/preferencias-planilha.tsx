@@ -13,6 +13,7 @@ export default function PreferenciasPlanilha({ children }: { children: ReactNode
       sx={{
         m: 0,
         p: 2,
+        pt: ESPACO_COMPOSICAO.tituloDescricao,
         minWidth: 0,
         border: 1,
         borderColor: "divider",

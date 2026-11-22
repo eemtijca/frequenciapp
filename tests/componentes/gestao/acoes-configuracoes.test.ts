@@ -144,6 +144,28 @@ async function abrir(page: Page, tema: "light" | "dark", simularGravacao = false
   return gravacoes;
 }
 
+it("explica as opções da cópia e devolve o foco ao cancelar a importação", async () => {
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  try {
+    const gravacoes = await abrir(page, "light");
+    await selecionarCategoriaConfiguracoes(page, "Dados");
+    const secao = page.getByRole("region", { name: "Cópia de segurança", exact: true });
+    await verificarTela(secao.getByText(/Por padrão, o ZIP é protegido por senha/)).toBeVisible();
+    await verificarTela(secao.getByText(/JSON original sem senha/)).toBeVisible();
+    const importar = secao.getByRole("button", { name: "Importar cópia", exact: true });
+    await importar.focus();
+    await page.keyboard.press("Enter");
+    const dialogo = page.getByRole("alertdialog", { name: "Importar cópia?" });
+    await verificarTela(dialogo).toBeVisible();
+    await page.keyboard.press("Escape");
+    await verificarTela(dialogo).toBeHidden();
+    await verificarTela(importar).toBeFocused();
+    expect(gravacoes).toEqual([]);
+  } finally {
+    await page.close();
+  }
+});
+
 it.each([
   { largura: 320, tema: "light" },
   { largura: 390, tema: "dark" },

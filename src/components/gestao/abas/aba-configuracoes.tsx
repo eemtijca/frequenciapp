@@ -1325,9 +1325,9 @@ function ConteudoConfiguracoes({
         {[
           {
             rotulo: "Baixar cópia",
-            titulo: "Arquivo protegido",
+            titulo: "Exportação dos dados",
             descricao:
-              "Baixe os dados da escola em JSON, dentro de um arquivo ZIP protegido por senha.",
+              "Por padrão, o ZIP é protegido por senha. Também é possível escolher o JSON original sem senha.",
             icone: <FileDownloadRoundedIcon />,
             executar: () => setDownloadAberto(true),
           },

@@ -306,7 +306,7 @@ export default function SecaoChavesBi({
                 sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}
               >
                 <Typography
-                  component="h3"
+                  component="h4"
                   variant="subtitle1"
                   sx={{ minWidth: 0, fontWeight: 600, overflowWrap: "anywhere" }}
                 >
@@ -337,7 +337,7 @@ export default function SecaoChavesBi({
               </Stack>
               <Acordeao
                 titulo="Detalhes da chave"
-                nivelTitulo="h4"
+                nivelTitulo="h5"
                 resumo={
                   <Typography
                     component="span"
