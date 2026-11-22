@@ -23,6 +23,7 @@ export interface SelecionarProps {
   ariaLabel?: string;
   buscavel?: boolean;
   quebrarRotulosDasOpcoes?: boolean;
+  mostrarRotuloSelecionado?: boolean;
 }
 
 export function Selecionar({
@@ -35,6 +36,7 @@ export function Selecionar({
   ariaLabel,
   buscavel = false,
   quebrarRotulosDasOpcoes = false,
+  mostrarRotuloSelecionado = false,
 }: SelecionarProps) {
   const campo = useCampo();
   const idFinal = campo?.id ?? id;
@@ -49,6 +51,8 @@ export function Selecionar({
         placeholder={placeholder}
         disabled={disabled}
         ariaLabel={ariaLabel}
+        quebrarRotulosDasOpcoes={quebrarRotulosDasOpcoes}
+        mostrarRotuloSelecionado={mostrarRotuloSelecionado}
       />
     );
   }

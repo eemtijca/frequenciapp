@@ -79,6 +79,15 @@ const ALVO_ACAO = {
   height: TOKENS_LAYOUT.alvoToque,
 } as const;
 
+const COLUNA_ALUNO = {
+  position: "sticky",
+  left: 0,
+  zIndex: 1,
+  bgcolor: "background.paper",
+  minWidth: { xs: "7rem", sm: "12rem" },
+  overflowWrap: "anywhere",
+} as const;
+
 const LinhaAluno = memo(function LinhaAluno({
   aluno,
   origem,
@@ -91,11 +100,8 @@ const LinhaAluno = memo(function LinhaAluno({
   onExcluir,
 }: PropsLinhaAluno) {
   return (
-    <TableRow sx={{ opacity: aluno.ativo ? 1 : 0.55 }}>
-      <TableCell sx={{ width: 64, color: "text.secondary", fontVariantNumeric: "tabular-nums" }}>
-        {String(aluno.ordem).padStart(2, "0")}
-      </TableCell>
-      <TableCell component="th" scope="row">
+    <TableRow>
+      <TableCell component="th" scope="row" sx={COLUNA_ALUNO}>
         <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
           {modoSelecao ? (
             <BotaoIcone
@@ -114,9 +120,7 @@ const LinhaAluno = memo(function LinhaAluno({
             />
           ) : null}
           <Box sx={{ minWidth: 0 }}>
-            <Typography noWrap sx={{ fontWeight: 500 }}>
-              {aluno.nome}
-            </Typography>
+            <Typography sx={{ fontWeight: 500 }}>{aluno.nome}</Typography>
             {aluno.turmaOriginalId !== aluno.turmaId ? (
               <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
                 Origem {origem}
@@ -134,12 +138,24 @@ const LinhaAluno = memo(function LinhaAluno({
           </Box>
         </Stack>
       </TableCell>
+      <TableCell sx={{ width: 64, color: "text.secondary", fontVariantNumeric: "tabular-nums" }}>
+        {String(aluno.ordem).padStart(2, "0")}
+      </TableCell>
       {!modoSelecao ? (
-        <TableCell align="right">
+        <TableCell align="right" sx={{ width: 0 }}>
           <Stack
             direction="row"
             spacing={0.5}
-            sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}
+            useFlexGap
+            sx={{
+              width: {
+                xs: `calc(${2 * TOKENS_LAYOUT.alvoToque}px + 0.25rem)`,
+                sm: `calc(${3 * TOKENS_LAYOUT.alvoToque}px + 0.5rem)`,
+              },
+              ml: "auto",
+              justifyContent: "flex-end",
+              flexWrap: "wrap",
+            }}
           >
             <BotaoIcone
               rotulo={`Editar ${aluno.nome}`}
@@ -449,8 +465,9 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         : "O aluno volta a aparecer nas chamadas futuras. O histórico existente é preservado.";
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ minWidth: 0 }}>
       <Stack
+        component="header"
         direction={{ xs: "column", lg: "row" }}
         spacing={2}
         useFlexGap
@@ -478,42 +495,9 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             </Botao>
           </Stack>
         ) : (
-          <Stack
-            direction="row"
-            spacing={1}
-            useFlexGap
-            sx={{ flexWrap: "wrap", justifyContent: { xs: "flex-start", sm: "flex-end" } }}
-          >
+          <Stack spacing={1} useFlexGap sx={{ alignItems: { xs: "flex-start", lg: "flex-end" } }}>
             <Botao
-              variante="contorno"
-              icone={<FileUploadRoundedIcon />}
-              sx={{ whiteSpace: "nowrap" }}
-              onClick={() => setImportarAberto(true)}
-              disabled={turmas.length === 0}
-            >
-              Importar relação
-            </Botao>
-            <Botao
-              variante="contorno"
-              icone={<FileDownloadRoundedIcon />}
-              sx={{ whiteSpace: "nowrap" }}
-              onClick={() => setDownloadAberto(true)}
-              disabled={ativos === 0}
-            >
-              Exportar relação
-            </Botao>
-            <Botao
-              variante="contorno"
-              icone={<CheckRoundedIcon />}
-              sx={{ whiteSpace: "nowrap" }}
-              onClick={() => setModoSelecao(true)}
-              disabled={turmas.length === 0 || alunos.length === 0}
-            >
-              Definir origem
-            </Botao>
-            <DialogoRestaurarOrigens turmas={turmas} alunos={alunos} onMudanca={onMudanca} />
-            <Botao
-              variante="secundario"
+              variante="principal"
               icone={<AddRoundedIcon />}
               sx={{ whiteSpace: "nowrap" }}
               onClick={abrirNovo}
@@ -521,6 +505,40 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
             >
               Novo aluno
             </Botao>
+            <Stack
+              role="group"
+              aria-label="Ações do cadastro de alunos"
+              direction="row"
+              spacing={1}
+              useFlexGap
+              sx={{ flexWrap: "wrap", justifyContent: { xs: "flex-start", lg: "flex-end" } }}
+            >
+              <Botao
+                variante="contorno"
+                icone={<FileUploadRoundedIcon />}
+                onClick={() => setImportarAberto(true)}
+                disabled={turmas.length === 0}
+              >
+                Importar relação
+              </Botao>
+              <Botao
+                variante="contorno"
+                icone={<FileDownloadRoundedIcon />}
+                onClick={() => setDownloadAberto(true)}
+                disabled={ativos === 0}
+              >
+                Exportar relação
+              </Botao>
+              <Botao
+                variante="contorno"
+                icone={<CheckRoundedIcon />}
+                onClick={() => setModoSelecao(true)}
+                disabled={turmas.length === 0 || alunos.length === 0}
+              >
+                Definir origem
+              </Botao>
+              <DialogoRestaurarOrigens turmas={turmas} alunos={alunos} onMudanca={onMudanca} />
+            </Stack>
           </Stack>
         )}
       </Stack>
@@ -579,11 +597,16 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
           }
         />
       ) : (
-        <TabelaPadrao caption="Alunos por turma, com a origem quando ela difere da turma atual.">
+        <TabelaPadrao
+          caption="Alunos por turma, com a origem quando ela difere da turma atual."
+          rotuloRolagem="Tabela de alunos"
+        >
           <TableHead>
             <TableRow>
+              <TableCell scope="col" sx={COLUNA_ALUNO}>
+                Aluno
+              </TableCell>
               <TableCell scope="col">Ordem</TableCell>
-              <TableCell scope="col">Aluno</TableCell>
               {!modoSelecao ? (
                 <TableCell scope="col" align="right">
                   Ações
@@ -603,10 +626,14 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
                       useFlexGap
                       sx={{ alignItems: "baseline", justifyContent: "space-between" }}
                     >
-                      <Typography component="h2" variant="subtitle2" sx={{ m: 0 }}>
+                      <Typography
+                        component="h2"
+                        variant="subtitle2"
+                        sx={{ m: 0, overflowWrap: "anywhere" }}
+                      >
                         {turma?.rotulo ?? "Turma"}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                      <Typography variant="caption" sx={{ color: "text.secondary", flexShrink: 0 }}>
                         {lista.filter((aluno) => aluno.ativo).length} ativos
                       </Typography>
                     </Stack>
@@ -639,6 +666,8 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         aberto={dialogoAberto}
         onFechar={() => setDialogoAberto(false)}
         titulo={emEdicao ? `Editar ${emEdicao.nome}` : "Novo aluno"}
+        quebrarTitulo
+        telaCheiaNoCelular
         acoes={
           <>
             <Botao variante="texto" onClick={() => setDialogoAberto(false)}>
@@ -680,6 +709,8 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
               <Selecionar
                 valor={formulario.turmaId}
                 buscavel
+                quebrarRotulosDasOpcoes
+                mostrarRotuloSelecionado
                 onValor={(turmaId) =>
                   setFormulario((atual) => ({
                     ...atual,
@@ -715,6 +746,8 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
               <Selecionar
                 valor={formulario.turmaOriginalId}
                 buscavel
+                quebrarRotulosDasOpcoes
+                mostrarRotuloSelecionado
                 onValor={(turmaOriginalId) =>
                   setFormulario((atual) => ({ ...atual, turmaOriginalId }))
                 }
@@ -731,6 +764,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
       <DialogoConfirmacao
         aberto={acaoAluno !== null}
         titulo={tituloAcao}
+        quebrarTitulo
         descricao={descricaoAcao}
         rotuloConfirmar={
           acaoAluno?.tipo === "excluir"
@@ -747,6 +781,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
 
       <DialogoConfirmacao
         aberto={confirmarDesistencia && emEdicao !== null}
+        quebrarTitulo
         titulo={
           emEdicao?.desistenteEm
             ? `Desfazer a desistência de ${emEdicao.nome}?`

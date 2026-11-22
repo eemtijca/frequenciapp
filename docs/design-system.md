@@ -329,8 +329,8 @@ Regras de composição:
 ### Alunos
 
 - Lista agrupada por turma atual ou por turma de origem.
-- Busca por nome.
-- Origem ou turma atual destacada quando difere.
+- Cabeçalho compacto com contagem e última atualização, próximo do agrupamento e da busca por nome.
+- Nomes longos quebram sem corte. Origem ou turma atual aparece quando difere; a situação é indicada por texto.
 - Consulta apenas para a coordenação, sem ação de escrita.
 - O cadastro e a importação ficam na Gestão.
 
@@ -338,6 +338,9 @@ Regras de composição:
 
 - Abas Séries, Turmas, Alunos, Equipe, Diretores e Configurações.
 - Formulários em diálogo e tabelas com ações.
+- Em Alunos, Novo aluno tem a maior ênfase no cabeçalho. Importar, exportar, definir e restaurar origem ficam no mesmo contexto, separados das ações de cada linha.
+- Alunos mantém `TabelaPadrao` em região de rolagem local acessível por teclado. Só Aluno fica fixo na horizontal; nomes quebram e as ações podem ocupar duas linhas no celular. Não há ganho demonstrado de Data Grid Community nesse cadastro.
+- O diálogo de cadastro e edição de aluno ocupa a tela no celular. Os seletores mantêm a busca e mostram os rótulos completos das turmas selecionadas e das opções.
 - Configurações tem título e retorno próprio. A navegação local de Escola, Horários, Planilhas, Acesso e avisos e Dados usa uma lista lateral a partir de 1240 px e um seletor rotulado abaixo disso.
 - Rascunho único, revisão, conflito e confirmação antes de salvar.
 - Em Horários, a aba Provas usa data, início, fim, disciplina e seleção de turmas por série, com checkbox tri-state e contagem.

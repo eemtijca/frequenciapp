@@ -2,7 +2,6 @@
 
 // Alunos: consulta do professor por turma atual ou de origem, com busca e estados.
 import { memo, useDeferredValue, useMemo, useState } from "react";
-import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import PersonOffRoundedIcon from "@mui/icons-material/PersonOffRounded";
 import SearchOffRoundedIcon from "@mui/icons-material/SearchOffRounded";
 import Box from "@mui/material/Box";
@@ -10,13 +9,14 @@ import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
-import { ESPACO_COMPOSICAO } from "@/theme/layout";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 import Typography from "@mui/material/Typography";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
 import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
 import { Botao } from "@/components/ui/mui/botao";
+import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { Selo } from "@/components/ui/mui/selo";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
@@ -47,7 +47,7 @@ const GrupoAlunos = memo(function GrupoAlunos({ turma, lista, agrupamento, rotul
     <Paper variant="outlined" sx={{ overflow: "hidden", boxShadow: "none" }}>
       <Stack
         direction="row"
-        spacing={2}
+        spacing={1}
         sx={{
           alignItems: "center",
           justifyContent: "space-between",
@@ -58,12 +58,12 @@ const GrupoAlunos = memo(function GrupoAlunos({ turma, lista, agrupamento, rotul
           py: 1,
         }}
       >
-        <Typography component="h2" variant="subtitle2">
+        <Typography component="h2" variant="subtitle2" sx={{ overflowWrap: "anywhere" }}>
           {turma?.rotulo ?? "Turma"}
         </Typography>
         <Typography
           variant="caption"
-          sx={{ color: "text.secondary", fontVariantNumeric: "tabular-nums" }}
+          sx={{ color: "text.secondary", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
         >
           {lista.filter((aluno) => aluno.ativo).length} ativos
         </Typography>
@@ -74,9 +74,8 @@ const GrupoAlunos = memo(function GrupoAlunos({ turma, lista, agrupamento, rotul
             key={aluno.id}
             divider
             sx={{
-              gap: 2,
+              gap: 1,
               py: 1,
-              opacity: aluno.ativo ? 1 : 0.55,
               "&:last-of-type": { borderBottom: 0 },
             }}
           >
@@ -92,10 +91,8 @@ const GrupoAlunos = memo(function GrupoAlunos({ turma, lista, agrupamento, rotul
             >
               {String(aluno.ordem).padStart(2, "0")}
             </Typography>
-            <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography noWrap sx={{ fontWeight: 500 }}>
-                {aluno.nome}
-              </Typography>
+            <Box sx={{ minWidth: 0, flex: 1, overflowWrap: "anywhere" }}>
+              <Typography sx={{ fontWeight: 500 }}>{aluno.nome}</Typography>
               {agrupamento === "atual" && aluno.turmaOriginalId !== aluno.turmaId ? (
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Origem {rotuloDe(aluno.turmaOriginalId, "outra turma")}
@@ -185,52 +182,24 @@ export default function VistaAlunos({ alunos, turmas, fuso, onAtualizar }: Props
       aria-busy={busca !== buscaAplicada}
       sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 3, minWidth: 0 }}
     >
-      <Stack
-        direction="row"
-        spacing={2}
-        sx={{ alignItems: "flex-end", justifyContent: "space-between" }}
-      >
-        <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap>
-          <Typography component="h1" variant="h4">
-            Alunos
-          </Typography>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            {alunos.length} no total · {ativos} ativos
-          </Typography>
-        </Stack>
-        <GroupsRoundedIcon aria-hidden="true" sx={{ color: "text.secondary" }} />
-      </Stack>
-      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-        <AtualizadoDaVisao fuso={fuso} />
-      </Box>
+      <CabecalhoPagina
+        compacto
+        titulo="Alunos"
+        descricao={`${alunos.length} no total · ${ativos} ativos`}
+        acoes={<AtualizadoDaVisao fuso={fuso} sx={{ whiteSpace: "normal" }} />}
+      />
 
-      <Typography
-        variant="caption"
-        sx={{
-          bgcolor: "action.hover",
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 1,
-          px: 2,
-          py: 1.5,
-          lineHeight: 1.6,
-        }}
-      >
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>
         Cadastros, transferências e desligamentos são feitos pelo administrador em Gestão.
       </Typography>
 
-      <Box
+      <Stack
         role="group"
         aria-label="Agrupamento da lista"
-        sx={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 1,
-          p: 1,
-          border: 1,
-          borderColor: "divider",
-          borderRadius: 1,
-        }}
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: "wrap" }}
       >
         {AGRUPAMENTOS.map((opcao) => {
           const selecionado = agrupamento === opcao.valor;
@@ -241,6 +210,7 @@ export default function VistaAlunos({ alunos, turmas, fuso, onAtualizar }: Props
               aria-pressed={selecionado}
               onClick={() => setAgrupamento(opcao.valor)}
               sx={{
+                minHeight: TOKENS_LAYOUT.alvoToque,
                 bgcolor: selecionado ? "action.selected" : "transparent",
                 borderColor: selecionado ? "primary.main" : "divider",
               }}
@@ -249,10 +219,10 @@ export default function VistaAlunos({ alunos, turmas, fuso, onAtualizar }: Props
             </Botao>
           );
         })}
-      </Box>
+      </Stack>
 
       {agrupamento === "origem" ? (
-        <Typography variant="caption" sx={{ color: "text.secondary", mt: -1 }}>
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
           Turma da matrícula, usada na Grade e na planilha.
         </Typography>
       ) : null}

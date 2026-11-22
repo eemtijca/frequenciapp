@@ -20,6 +20,7 @@ interface DialogoProps {
   aberto: boolean;
   onFechar: () => void;
   titulo: string;
+  quebrarTitulo?: boolean;
   descricao?: ReactNode;
   children: ReactNode;
   acoes?: ReactNode;
@@ -38,6 +39,7 @@ export function Dialogo({
   aberto,
   onFechar,
   titulo,
+  quebrarTitulo = false,
   descricao,
   children,
   acoes,
@@ -83,6 +85,7 @@ export function Dialogo({
             padding,
             paddingBottom: 0,
             paddingRight: `calc(${padding} + ${TOKENS_LAYOUT.alvoToque}px)`,
+            ...(quebrarTitulo && { overflowWrap: "anywhere" }),
           }}
         >
           {titulo}

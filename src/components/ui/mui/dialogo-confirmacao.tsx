@@ -13,6 +13,7 @@ import { RAIOS, TOKENS_LAYOUT } from "@/theme/layout";
 interface DialogoConfirmacaoProps {
   aberto: boolean;
   titulo: string;
+  quebrarTitulo?: boolean;
   descricao?: ReactNode;
   onConfirmar: () => void;
   onCancelar: () => void;
@@ -26,6 +27,7 @@ interface DialogoConfirmacaoProps {
 export function DialogoConfirmacao({
   aberto,
   titulo,
+  quebrarTitulo = false,
   descricao,
   onConfirmar,
   onCancelar,
@@ -64,7 +66,10 @@ export function DialogoConfirmacao({
         },
       }}
     >
-      <DialogTitle id={tituloId} sx={{ padding, paddingBottom: 0 }}>
+      <DialogTitle
+        id={tituloId}
+        sx={{ padding, paddingBottom: 0, ...(quebrarTitulo && { overflowWrap: "anywhere" }) }}
+      >
         {titulo}
       </DialogTitle>
       <DialogContent sx={{ padding }}>
