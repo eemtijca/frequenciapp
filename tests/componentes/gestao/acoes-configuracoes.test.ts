@@ -80,7 +80,12 @@ afterAll(async () => {
   await browser?.close();
   await servidor?.close();
 });
-async function abrir(page: Page, tema: "light" | "dark", simularGravacao = false) {
+async function abrir(
+  page: Page,
+  tema: "light" | "dark",
+  simularGravacao = false,
+  chamadasAlteradas?: number,
+) {
   const gravacoes: string[] = [];
   const prova = {
     id: "prova-teste",
@@ -97,6 +102,26 @@ async function abrir(page: Page, tema: "light" | "dark", simularGravacao = false
     if (metodo !== "GET") gravacoes.push(`${metodo} ${pathname}`);
     if (pathname === "/api/configuracoes/completo" && metodo === "GET") {
       return route.fulfill({ json: completo });
+    }
+    if (pathname === "/api/planilha" && metodo === "GET" && chamadasAlteradas !== undefined) {
+      return route.fulfill({
+        json: {
+          integracao: {
+            ativa: false,
+            envioAutomatico: false,
+            googleConectado: false,
+            googlePlanilha: null,
+            esquema: null,
+            esquemaEm: null,
+            modo: "conservador",
+            modoCompletoAte: null,
+            fuso: "America/Fortaleza",
+            alteradasDepois: chamadasAlteradas,
+            ultimoErro: null,
+            sincronizacoes: [],
+          },
+        },
+      });
     }
     if (simularGravacao && pathname === "/api/provas-bimestrais") {
       if (metodo === "POST") {
@@ -143,6 +168,38 @@ async function abrir(page: Page, tema: "light" | "dark", simularGravacao = false
     .click();
   return gravacoes;
 }
+
+it.each([320, 390, 1440])("separa os selos da planilha de frequência a %i px", async (largura) => {
+  const page = await browser.newPage({ viewport: { width: largura, height: 844 } });
+  try {
+    await abrir(page, "light", false, 162);
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
+    const cabecalho = page.getByRole("button", { name: /Planilha de frequência/ });
+    await cabecalho.click();
+    const posicao = async (rotulo: string) => {
+      const texto = cabecalho.getByText(rotulo, { exact: true });
+      await verificarTela(texto).toBeVisible();
+      return texto.evaluate((el) => {
+        const { left, right, top, bottom } = (el.parentElement ?? el).getBoundingClientRect();
+        return { left, right, top, bottom };
+      });
+    };
+    const desligada = await posicao("Desligada");
+    const semConexao = await posicao("Sem conexão");
+    const alteradas = await posicao("162 chamadas alteradas");
+    expect(semConexao.top).toBe(desligada.top);
+    expect(semConexao.left - desligada.right).toBe(8);
+    if (largura === 1440) {
+      expect(alteradas.top).toBe(semConexao.top);
+      expect(alteradas.left - semConexao.right).toBe(8);
+    } else {
+      expect(alteradas.left).toBe(desligada.left);
+      expect(alteradas.top - semConexao.bottom).toBe(8);
+    }
+  } finally {
+    await page.close();
+  }
+});
 
 it.each([
   { largura: 390, tema: "light" },

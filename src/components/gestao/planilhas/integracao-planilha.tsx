@@ -891,19 +891,27 @@ export default function IntegracaoPlanilha({
       <Acordeao
         titulo="Planilha de frequência"
         resumo={
-          <>
-            <Selo tom={ativaRascunho ? "sucesso" : "neutro"}>
+          <Stack component="span" direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+            <Selo component="span" tom={ativaRascunho ? "sucesso" : "neutro"}>
               {ativaRascunho ? "Ligada" : "Desligada"}
             </Selo>
-            <Selo tom={conectada && estruturaSalva ? "sucesso" : "atencao"}>
+            <Selo component="span" tom={conectada && estruturaSalva ? "sucesso" : "atencao"}>
               {!conectada ? "Sem conexão" : estruturaSalva ? "Google conectado" : "Configurar abas"}
             </Selo>
-            {completoAtivo ? <Selo tom="atencao">Modo completo</Selo> : null}
-            {(integracao?.alteradasDepois ?? 0) > 0 ? (
-              <Selo>{integracao?.alteradasDepois} chamadas alteradas</Selo>
+            {completoAtivo ? (
+              <Selo component="span" tom="atencao">
+                Modo completo
+              </Selo>
             ) : null}
-            {integracao?.ultimoErro ? <Selo tom="perigo">Último envio com erro</Selo> : null}
-          </>
+            {(integracao?.alteradasDepois ?? 0) > 0 ? (
+              <Selo component="span">{integracao?.alteradasDepois} chamadas alteradas</Selo>
+            ) : null}
+            {integracao?.ultimoErro ? (
+              <Selo component="span" tom="perigo">
+                Último envio com erro
+              </Selo>
+            ) : null}
+          </Stack>
         }
         aberto={aberto}
         onChange={setAberto}
