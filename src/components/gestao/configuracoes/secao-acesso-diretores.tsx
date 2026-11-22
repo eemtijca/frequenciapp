@@ -19,11 +19,11 @@ import {
   type ParametroNumerico,
   type ParametrosAcesso,
 } from "@/domain/diretores";
-import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Campo } from "@/components/ui/mui/campo";
 import { CampoTexto } from "@/components/ui/mui/text-field";
 import { Selo } from "@/components/ui/mui/selo";
+import SecaoConfiguracao from "./secao-configuracao";
 
 const GRUPOS = [
   {
@@ -69,7 +69,6 @@ export default function SecaoAcessoDiretores({
   parametros: ParametrosAcesso;
   onMudar: (parametros: ParametrosAcesso) => void;
 }) {
-  const [aberto, setAberto] = useState(false);
   const [textos, setTextos] = useState<Partial<Record<ParametroNumerico, string>>>({});
   const [erro, setErro] = useState("");
   const [parametrosAnteriores, setParametrosAnteriores] = useState(parametros);
@@ -111,110 +110,108 @@ export default function SecaoAcessoDiretores({
   }
 
   return (
-    <Box data-secao="config-acesso-diretores">
-      <Acordeao
-        titulo="Acesso dos diretores de turma"
-        resumo={
-          <>
-            <Selo>Palavra por {parametros.validadePalavraDias} dias</Selo>
-            <Selo>
-              {parametros.categoriasDiretor.length}{" "}
-              {parametros.categoriasDiretor.length === 1
-                ? "categoria visível"
-                : "categorias visíveis"}
-            </Selo>
-          </>
-        }
-        aberto={aberto}
-        onChange={setAberto}
+    <SecaoConfiguracao
+      id="config-acesso-diretores"
+      titulo="Acesso dos diretores de turma"
+      descricao="Ajuste a validade, a segurança da entrada e o que os diretores de turma podem ver. As mudanças entram no rascunho."
+      resumo={
+        <>
+          <Selo>Palavra por {parametros.validadePalavraDias} dias</Selo>
+          <Selo>
+            {parametros.categoriasDiretor.length}{" "}
+            {parametros.categoriasDiretor.length === 1
+              ? "categoria visível"
+              : "categorias visíveis"}
+          </Selo>
+        </>
+      }
+    >
+      <Box
+        component="form"
+        noValidate
+        onSubmit={(evento) => evento.preventDefault()}
+        sx={{ display: "flex", flexDirection: "column", gap: 2 }}
       >
-        <Box
-          component="form"
-          noValidate
-          onSubmit={(evento) => evento.preventDefault()}
-          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-        >
-          {GRUPOS.map(({ titulo, icone: Icone, campos }) => (
-            <Box key={titulo} component="fieldset" sx={GRUPO}>
-              <Typography component="legend" variant="subtitle2" sx={LEGENDA}>
-                <Icone fontSize="small" aria-hidden="true" /> {titulo}
-              </Typography>
-              {titulo === "Segurança da entrada" ? (
-                <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                  Limites para todos os perfis.
-                </Typography>
-              ) : null}
-              <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
-                {campos.map((campo) => {
-                  const faixa = FAIXAS_PARAMETROS[campo];
-                  return (
-                    <Campo
-                      key={campo}
-                      id={`parametro-${campo}`}
-                      rotulo={faixa.rotulo}
-                      descricao={`${faixa.unidade} · ${faixa.minimo} a ${faixa.maximo}`}
-                    >
-                      <CampoTexto
-                        id={`parametro-${campo}`}
-                        valor={textos[campo] ?? String(parametros[campo])}
-                        onValor={(valor) => alterarNumero(campo, valor)}
-                        inputMode="numeric"
-                      />
-                    </Campo>
-                  );
-                })}
-              </Box>
-            </Box>
-          ))}
-          <Box component="fieldset" sx={GRUPO}>
+        {GRUPOS.map(({ titulo, icone: Icone, campos }) => (
+          <Box key={titulo} component="fieldset" sx={GRUPO}>
             <Typography component="legend" variant="subtitle2" sx={LEGENDA}>
-              <RemoveRedEyeRoundedIcon fontSize="small" aria-hidden="true" /> O que o diretor vê
+              <Icone fontSize="small" aria-hidden="true" /> {titulo}
             </Typography>
-            <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { sm: "1fr 1fr" } }}>
-              {CATEGORIAS_DIRETOR.map((categoria) => (
-                <FormControlLabel
-                  key={categoria}
-                  control={
-                    <Checkbox
-                      checked={parametros.categoriasDiretor.includes(categoria)}
-                      disabled={categoria === "faltas"}
-                      onChange={(evento) => alternarCategoria(categoria, evento.target.checked)}
+            {titulo === "Segurança da entrada" ? (
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Limites para todos os perfis.
+              </Typography>
+            ) : null}
+            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
+              {campos.map((campo) => {
+                const faixa = FAIXAS_PARAMETROS[campo];
+                return (
+                  <Campo
+                    key={campo}
+                    id={`parametro-${campo}`}
+                    rotulo={faixa.rotulo}
+                    descricao={`${faixa.unidade} · ${faixa.minimo} a ${faixa.maximo}`}
+                  >
+                    <CampoTexto
+                      id={`parametro-${campo}`}
+                      valor={textos[campo] ?? String(parametros[campo])}
+                      onValor={(valor) => alterarNumero(campo, valor)}
+                      inputMode="numeric"
                     />
-                  }
-                  label={ROTULOS_CATEGORIA_DIRETOR[categoria]}
-                  sx={(tema) => ({
-                    minHeight: 48,
-                    margin: 0,
-                    paddingX: 1,
-                    borderRadius: 2,
-                    backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 5%, transparent)`,
-                  })}
-                />
-              ))}
-            </Box>
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              Faltas sempre visíveis. Libere dados sensíveis apenas quando necessário.
-            </Typography>
-            <Box sx={{ borderTop: 1, borderColor: "divider", paddingTop: 2 }}>
-              <Campo
-                id="parametro-limiteRiscoPercentual"
-                rotulo={FAIXAS_PARAMETROS.limiteRiscoPercentual.rotulo}
-                descricao={`De ${FAIXAS_PARAMETROS.limiteRiscoPercentual.minimo} a ${FAIXAS_PARAMETROS.limiteRiscoPercentual.maximo}% dos dias com chamada.`}
-              >
-                <CampoTexto
-                  id="parametro-limiteRiscoPercentual"
-                  valor={textos.limiteRiscoPercentual ?? String(parametros.limiteRiscoPercentual)}
-                  onValor={(valor) => alterarNumero("limiteRiscoPercentual", valor)}
-                  inputMode="numeric"
-                />
-              </Campo>
+                  </Campo>
+                );
+              })}
             </Box>
           </Box>
-          {erro ? (
-            <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
-          ) : null}
+        ))}
+        <Box component="fieldset" sx={GRUPO}>
+          <Typography component="legend" variant="subtitle2" sx={LEGENDA}>
+            <RemoveRedEyeRoundedIcon fontSize="small" aria-hidden="true" /> O que o diretor vê
+          </Typography>
+          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { sm: "1fr 1fr" } }}>
+            {CATEGORIAS_DIRETOR.map((categoria) => (
+              <FormControlLabel
+                key={categoria}
+                control={
+                  <Checkbox
+                    checked={parametros.categoriasDiretor.includes(categoria)}
+                    disabled={categoria === "faltas"}
+                    onChange={(evento) => alternarCategoria(categoria, evento.target.checked)}
+                  />
+                }
+                label={ROTULOS_CATEGORIA_DIRETOR[categoria]}
+                sx={(tema) => ({
+                  minHeight: 48,
+                  margin: 0,
+                  paddingX: 1,
+                  borderRadius: 2,
+                  backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 5%, transparent)`,
+                })}
+              />
+            ))}
+          </Box>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Faltas sempre visíveis. Libere dados sensíveis apenas quando necessário.
+          </Typography>
+          <Box sx={{ borderTop: 1, borderColor: "divider", paddingTop: 2 }}>
+            <Campo
+              id="parametro-limiteRiscoPercentual"
+              rotulo={FAIXAS_PARAMETROS.limiteRiscoPercentual.rotulo}
+              descricao={`De ${FAIXAS_PARAMETROS.limiteRiscoPercentual.minimo} a ${FAIXAS_PARAMETROS.limiteRiscoPercentual.maximo}% dos dias com chamada.`}
+            >
+              <CampoTexto
+                id="parametro-limiteRiscoPercentual"
+                valor={textos.limiteRiscoPercentual ?? String(parametros.limiteRiscoPercentual)}
+                onValor={(valor) => alterarNumero("limiteRiscoPercentual", valor)}
+                inputMode="numeric"
+              />
+            </Campo>
+          </Box>
         </Box>
-      </Acordeao>
-    </Box>
+        {erro ? (
+          <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
+        ) : null}
+      </Box>
+    </SecaoConfiguracao>
   );
 }

@@ -32,7 +32,7 @@ test.describe("configuração de notificações", () => {
     await page.getByRole("tab", { name: "Configurações", exact: true }).click();
     const secao = page.locator('[data-secao="notificacoes"]');
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Notificações");
-    await secao.getByRole("button", { name: /Notificações/ }).click();
+    await expect(secao.getByRole("heading", { name: "Notificações", exact: true })).toBeVisible();
     const pendencias = secao.getByRole("switch", { name: "Chamadas pendentes para a coordenação" });
     await expect(pendencias).not.toBeChecked();
     await pendencias.click();
@@ -58,7 +58,7 @@ test.describe("configuração de notificações", () => {
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("tab", { name: "Configurações", exact: true }).click();
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Notificações");
-    await secao.getByRole("button", { name: /Notificações/ }).click();
+    await expect(secao.getByRole("heading", { name: "Notificações", exact: true })).toBeVisible();
     await expect(
       secao.getByRole("switch", { name: "Chamadas pendentes para a coordenação" }),
     ).toBeChecked();

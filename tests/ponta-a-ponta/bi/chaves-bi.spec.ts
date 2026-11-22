@@ -16,8 +16,7 @@ async function abrir(page: Page) {
   await page.getByRole("tab", { name: "Configurações" }).click();
   await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "FrequenciBI");
   const secao = page.locator('[data-secao="config-chaves-bi"]');
-  const gatilho = secao.getByRole("button", { name: /^FrequenciBI/ });
-  if ((await gatilho.getAttribute("aria-expanded")) !== "true") await gatilho.click();
+  await expect(secao.getByRole("heading", { name: "FrequenciBI", exact: true })).toBeVisible();
   await expect(secao.getByRole("button", { name: "Criar chave", exact: true })).toBeVisible();
   return secao;
 }

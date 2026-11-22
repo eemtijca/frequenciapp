@@ -132,7 +132,9 @@ test.describe("diretores de turma na Gestão", () => {
     await page.getByRole("tab", { name: /Config/ }).click();
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Diretores");
     const secao = page.locator('[data-secao="config-acesso-diretores"]');
-    await secao.getByRole("button", { name: /Acesso dos diretores/ }).click();
+    await expect(
+      secao.getByRole("heading", { name: "Acesso dos diretores de turma", exact: true }),
+    ).toBeVisible();
     const validade = secao.getByLabel("Validade da palavra-chave");
     await expect(validade).toHaveValue("90");
     await validade.fill("30");

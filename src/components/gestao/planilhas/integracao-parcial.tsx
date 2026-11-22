@@ -10,6 +10,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import LinkOffRoundedIcon from "@mui/icons-material/LinkOffRounded";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
+import PreferenciasPlanilha from "./preferencias-planilha";
 import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
@@ -210,13 +211,23 @@ export default function IntegracaoParcial({
           onChange={setAberto}
         >
           <Stack spacing={2}>
-            <Interruptor
-              id="planilha-parcial-ativa"
-              rotulo="Integração de chamada parcial ativa"
-              checked={ativaRascunho}
-              disabled={ocupado || !integracao?.preparada}
-              onChange={(valor) => void alternarAtiva(valor)}
-            />
+            <PreferenciasPlanilha>
+              <Interruptor
+                id="planilha-parcial-ativa"
+                rotulo="Integração de chamada parcial ativa"
+                checked={ativaRascunho}
+                disabled={ocupado || !integracao?.preparada}
+                onChange={(valor) => void alternarAtiva(valor)}
+              />
+            </PreferenciasPlanilha>
+            <Stack spacing={1} useFlexGap>
+              <Typography component="h4" variant="subtitle2">
+                Operações da planilha
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                As ações confirmadas aqui não dependem de Salvar configurações.
+              </Typography>
+            </Stack>
             {carregando ? (
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 Conferindo a integração...

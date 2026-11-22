@@ -41,7 +41,10 @@ test("troca tarefas por toque e teclado sem perder o cadastro pendente ou gravar
   await expect(justificativas).toBeHidden();
   await selecionarCategoriaConfiguracoes(page, "Dados");
   const copia = page.locator('[data-secao="config-copia"]');
-  await copia.getByRole("button", { name: /^Cópia de segurança/ }).tap();
+  await expect(
+    copia.getByRole("heading", { name: "Cópia de segurança", exact: true }),
+  ).toBeVisible();
+  await expect(copia.getByText(/sem substituir os que já existem/)).toBeVisible();
   await copia.getByRole("button", { name: "Importar cópia", exact: true }).tap();
   const importar = page.getByRole("alertdialog", { name: "Importar cópia?", exact: true });
   await expect(importar).toContainText("registros que já existem são mantidos");
@@ -97,5 +100,37 @@ test("as tarefas das categorias cabem no celular e seus painéis ficam acessíve
         true,
       );
     }
+  }
+});
+
+test("Planilhas separa preferências em rascunho das operações de cada integração", async ({
+  page,
+}) => {
+  await abrir(page);
+  await selecionarCategoriaConfiguracoes(page, "Planilhas");
+  const finalidades = [
+    ["Planilha de frequência", ["Integração ativa", "Enviar ao salvar a chamada"]],
+    [
+      "Planilha de entradas e saídas",
+      ["Integração de entradas e saídas ativa", "Enviar ao registrar saídas e entradas"],
+    ],
+    ["Planilha de chamada parcial", ["Integração de chamada parcial ativa"]],
+  ] as const;
+  for (const [titulo, rotulos] of finalidades) {
+    const gatilho = page
+      .getByRole("heading", { level: 3 })
+      .filter({ has: page.getByText(titulo, { exact: true }) })
+      .getByRole("button");
+    await gatilho.tap();
+    const preferencias = page.getByRole("group", { name: "Preferências no rascunho", exact: true });
+    for (const rotulo of rotulos) {
+      await expect(preferencias.getByRole("switch", { name: rotulo, exact: true })).toBeVisible();
+    }
+    await expect(
+      page.getByRole("heading", { name: "Operações da planilha", exact: true }),
+    ).toBeVisible();
+    await expect(preferencias.getByRole("tablist")).toHaveCount(0);
+    await gatilho.tap();
+    await expect(preferencias).toBeHidden();
   }
 });

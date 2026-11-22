@@ -11,6 +11,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import ViewQuiltRoundedIcon from "@mui/icons-material/ViewQuiltRounded";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
+import PreferenciasPlanilha from "./preferencias-planilha";
 import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
@@ -437,19 +438,6 @@ export default function IntegracaoPlanilha({
             Enviar todas as turmas
           </Botao>
         </Stack>
-        <Box sx={CAIXA}>
-          <Interruptor
-            id="planilha-envio-automatico"
-            rotulo="Enviar ao salvar a chamada"
-            descricao="Preenche somente células vazias."
-            checked={envioRascunho}
-            disabled={
-              salvando ||
-              (!envioRascunho && (!ativaRascunho || !conectada || !estruturaSalva || completoAtivo))
-            }
-            onChange={(valor) => void alternarEnvioAutomatico(valor)}
-          />
-        </Box>
         <Stack spacing={1}>
           <Typography variant="caption" sx={{ color: "text.secondary" }}>
             {integracao?.alteradasDepois ?? 0}{" "}
@@ -921,13 +909,35 @@ export default function IntegracaoPlanilha({
         onChange={setAberto}
       >
         <Stack spacing={2}>
-          <Interruptor
-            id="planilha-ativa"
-            rotulo="Integração ativa"
-            checked={ativaRascunho}
-            disabled={salvando || !conectada}
-            onChange={(valor) => void alternarAtiva(valor)}
-          />
+          <PreferenciasPlanilha>
+            <Interruptor
+              id="planilha-ativa"
+              rotulo="Integração ativa"
+              checked={ativaRascunho}
+              disabled={salvando || !conectada}
+              onChange={(valor) => void alternarAtiva(valor)}
+            />
+            <Interruptor
+              id="planilha-envio-automatico"
+              rotulo="Enviar ao salvar a chamada"
+              descricao="Preenche somente células vazias."
+              checked={envioRascunho}
+              disabled={
+                salvando ||
+                (!envioRascunho &&
+                  (!ativaRascunho || !conectada || !estruturaSalva || completoAtivo))
+              }
+              onChange={(valor) => void alternarEnvioAutomatico(valor)}
+            />
+          </PreferenciasPlanilha>
+          <Stack spacing={1} useFlexGap>
+            <Typography component="h4" variant="subtitle2">
+              Operações da planilha
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              As ações confirmadas aqui não dependem de Salvar configurações.
+            </Typography>
+          </Stack>
           <Abas<PainelFrequencia>
             itens={[
               {

@@ -62,6 +62,7 @@ import NavegacaoConfiguracoes, {
   type CategoriaConfiguracoes,
 } from "@/components/gestao/configuracoes/navegacao-configuracoes";
 import SecaoCatalogo from "@/components/gestao/configuracoes/secao-catalogo";
+import SecaoConfiguracao from "../configuracoes/secao-configuracao";
 import SecaoChavesBi from "@/components/gestao/configuracoes/secao-chaves-bi";
 import SecaoAcessoDiretores from "@/components/gestao/configuracoes/secao-acesso-diretores";
 import SecaoNotificacoes from "@/components/gestao/configuracoes/secao-notificacoes";
@@ -230,7 +231,6 @@ function ConteudoConfiguracoes({
   // O editor de horários só monta na primeira visita e depois mantém o rascunho ao trocar de categoria.
   const [horariosAbertos, setHorariosAbertos] = useState(false);
   const [abertoRecursos, setAbertoRecursos] = useState(true);
-  const [abertoCopia, setAbertoCopia] = useState(false);
   const [abertoTurmasOrigem, setAbertoTurmasOrigem] = useState(false);
   const [confirmarSalvar, setConfirmarSalvar] = useState(false);
   const [confirmarDescartar, setConfirmarDescartar] = useState(false);
@@ -1316,99 +1316,114 @@ function ConteudoConfiguracoes({
   );
 
   const dados = (
-    <Box data-secao="config-copia">
-      <Acordeao
-        titulo="Cópia de segurança"
-        resumo={<Selo>Arquivo JSON</Selo>}
-        aberto={abertoCopia}
-        onChange={setAbertoCopia}
-      >
-        <Box
-          role="region"
-          aria-label="Cópia de segurança"
-          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
-        >
-          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1fr 1fr" }}>
-            <Botao
-              type="button"
-              variante="contorno"
-              icone={<FileDownloadRoundedIcon />}
-              onClick={() => setDownloadAberto(true)}
-              disabled={importando}
-              sx={{ minHeight: 96, flexDirection: "column", gap: 1 }}
-            >
-              Baixar cópia
-            </Botao>
-            <Botao
-              type="button"
-              variante="contorno"
-              icone={<FileUploadRoundedIcon />}
-              onClick={() => setConfirmarImportacao(true)}
-              disabled={importando}
-              sx={{ minHeight: 96, flexDirection: "column", gap: 1 }}
-            >
-              Importar cópia
-            </Botao>
-          </Box>
-          <input
-            ref={arquivoRef}
-            type="file"
-            accept=".json,application/json"
-            hidden
-            onChange={(evento) => {
-              const arquivo = evento.target.files?.[0];
-              if (arquivo) void importar(arquivo);
-            }}
-          />
-          <Acordeao
-            titulo="Ajuda"
-            nivelTitulo="h4"
-            resumo={
-              <Typography
-                component="span"
-                variant="body2"
-                sx={{ display: "flex", alignItems: "center", gap: 1 }}
-              >
-                <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />O que a importação
-                altera
-              </Typography>
-            }
+    <SecaoConfiguracao
+      id="config-copia"
+      titulo="Cópia de segurança"
+      descricao="A exportação e a importação são independentes do rascunho de configurações."
+    >
+      <Stack divider={<Divider />} spacing={2}>
+        {[
+          {
+            rotulo: "Baixar cópia",
+            titulo: "Arquivo protegido",
+            descricao:
+              "Baixe os dados da escola em JSON, dentro de um arquivo ZIP protegido por senha.",
+            icone: <FileDownloadRoundedIcon />,
+            executar: () => setDownloadAberto(true),
+          },
+          {
+            rotulo: "Importar cópia",
+            titulo: "Mesclagem de dados",
+            descricao:
+              "Adicione registros ausentes a partir de um JSON, sem substituir os que já existem.",
+            icone: <FileUploadRoundedIcon />,
+            executar: () => setConfirmarImportacao(true),
+          },
+        ].map(({ rotulo, titulo, descricao, icone, executar }) => (
+          <Stack
+            key={rotulo}
+            direction={{ xs: "column", sm: "row" }}
+            spacing={{ xs: ESPACO_COMPOSICAO.textoAcaoEmpilhada, sm: 2 }}
+            useFlexGap
+            sx={{ alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between" }}
           >
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              A importação adiciona dados ausentes e preserva os existentes. Chaves do FrequenciBI
-              precisam ser geradas novamente.
-            </Typography>
-          </Acordeao>
-          {erroCopia ? (
-            <AlertaCompacto variante="dados_invalidos" descricao={erroCopia} tamanho="linha" />
-          ) : null}
-          {resultado ? (
-            <Box
-              role="status"
-              sx={(tema) => ({
-                paddingX: 2,
-                paddingY: 1.5,
-                borderRadius: 2,
-                backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 6%, transparent)`,
-              })}
+            <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
+              <Typography component="h4" variant="subtitle2">
+                {titulo}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {descricao}
+              </Typography>
+            </Stack>
+            <Botao
+              type="button"
+              variante="contorno"
+              icone={icone}
+              onClick={executar}
+              disabled={importando}
+              sx={{ flexShrink: 0, minHeight: TOKENS_LAYOUT.alvoToque }}
             >
-              <Typography variant="body2">
-                {resultado.adicionadas}{" "}
-                {resultado.adicionadas === 1 ? "registro adicionado" : "registros adicionados"},{" "}
-                {resultado.identicas}{" "}
-                {resultado.identicas === 1 ? "já era igual" : "já eram iguais"} e{" "}
-                {resultado.conflitos}{" "}
-                {resultado.conflitos === 1 ? "conflito mantido" : "conflitos mantidos"}.
-              </Typography>
-              <Typography variant="caption" sx={{ display: "block", marginTop: 1 }}>
-                Chaves do FrequenciBI não são restauradas. Gere novas chaves na Gestão quando
-                necessário.
-              </Typography>
-            </Box>
-          ) : null}
-        </Box>
+              {rotulo}
+            </Botao>
+          </Stack>
+        ))}
+      </Stack>
+      <input
+        ref={arquivoRef}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={(evento) => {
+          const arquivo = evento.target.files?.[0];
+          if (arquivo) void importar(arquivo);
+        }}
+      />
+      <Acordeao
+        titulo="Ajuda"
+        nivelTitulo="h4"
+        resumo={
+          <Typography
+            component="span"
+            variant="body2"
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+          >
+            <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />O que a importação
+            altera
+          </Typography>
+        }
+      >
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          A importação adiciona dados ausentes e preserva os existentes. Chaves do FrequenciBI
+          precisam ser geradas novamente.
+        </Typography>
       </Acordeao>
-    </Box>
+      {erroCopia ? (
+        <AlertaCompacto variante="dados_invalidos" descricao={erroCopia} tamanho="linha" />
+      ) : null}
+      {resultado ? (
+        <Box
+          role="status"
+          sx={(tema) => ({
+            paddingX: 2,
+            paddingY: 1.5,
+            borderRadius: 2,
+            backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 6%, transparent)`,
+          })}
+        >
+          <Typography variant="body2">
+            {resultado.adicionadas}{" "}
+            {resultado.adicionadas === 1 ? "registro adicionado" : "registros adicionados"},{" "}
+            {resultado.identicas} {resultado.identicas === 1 ? "já era igual" : "já eram iguais"} e{" "}
+            {resultado.conflitos}{" "}
+            {resultado.conflitos === 1 ? "conflito mantido" : "conflitos mantidos"}.
+          </Typography>
+          <Typography variant="caption" sx={{ display: "block", marginTop: 1 }}>
+            Chaves do FrequenciBI não são restauradas. Gere novas chaves na Gestão quando
+            necessário.
+          </Typography>
+        </Box>
+      ) : null}
+    </SecaoConfiguracao>
   );
 
   const tituloErro =

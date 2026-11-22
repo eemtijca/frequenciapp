@@ -29,6 +29,7 @@ import { Dialogo } from "@/components/ui/mui/dialogo";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorHorario } from "@/components/ui/mui/seletor-horario";
 import { Selo } from "@/components/ui/mui/selo";
+import SecaoConfiguracao from "./secao-configuracao";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
 type Acao = "criar" | "editar" | "rotacionar" | "revogar" | "revogar-todas" | "limpar";
@@ -95,7 +96,6 @@ export default function SecaoChavesBi({
   chaves: ChaveBiDesejada[];
   onMudar: (chaves: ChaveBiDesejada[]) => void;
 }) {
-  const [aberto, setAberto] = useState(false);
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState("recentes");
@@ -222,243 +222,235 @@ export default function SecaoChavesBi({
   }
 
   return (
-    <Box data-secao="config-chaves-bi">
-      <Acordeao
-        titulo="FrequenciBI"
-        resumo={<Selo>{contar(ativas, "ativa", "ativas")}</Selo>}
-        aberto={aberto}
-        onChange={setAberto}
-      >
+    <SecaoConfiguracao
+      id="config-chaves-bi"
+      titulo="FrequenciBI"
+      descricao="A criação, a substituição e a revogação de chaves entram no rascunho. Salvar exige a senha do administrador."
+      resumo={<Selo>{contar(ativas, "ativa", "ativas")}</Selo>}
+    >
+      <Stack spacing={2}>
         <Box
-          role="region"
-          aria-label="FrequenciBI"
-          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+          sx={{
+            display: "grid",
+            gap: 1,
+            gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
+          }}
         >
-          <Box
-            sx={{
-              display: "grid",
-              gap: 1,
-              gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
-            }}
+          <Botao variante="primario" icone={<KeyRoundedIcon />} onClick={() => preparar("criar")}>
+            Criar chave
+          </Botao>
+          <Botao
+            variante="contorno"
+            icone={<BlockRoundedIcon />}
+            onClick={() => preparar("revogar-todas")}
+            disabled={!chaves.some((c) => c.estado === "ativa" && !estaRevogada(c))}
           >
-            <Botao variante="primario" icone={<KeyRoundedIcon />} onClick={() => preparar("criar")}>
-              Criar chave
-            </Botao>
-            <Botao
-              variante="contorno"
-              icone={<BlockRoundedIcon />}
-              onClick={() => preparar("revogar-todas")}
-              disabled={!chaves.some((c) => c.estado === "ativa" && !estaRevogada(c))}
-            >
-              Revogar todas
-            </Botao>
-            <Botao
-              variante="contorno"
-              icone={<DeleteOutlineRoundedIcon />}
-              onClick={() => preparar("limpar")}
-              disabled={!naoAtivas}
-            >
-              Limpar histórico
-            </Botao>
+            Revogar todas
+          </Botao>
+          <Botao
+            variante="contorno"
+            icone={<DeleteOutlineRoundedIcon />}
+            onClick={() => preparar("limpar")}
+            disabled={!naoAtivas}
+          >
+            Limpar histórico
+          </Botao>
+        </Box>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
+          <ShieldRoundedIcon fontSize="small" aria-hidden="true" sx={{ flexShrink: 0 }} />
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
+            Chaves acessam dados pessoais. Compartilhe apenas com a equipe autorizada.
+          </Typography>
+        </Stack>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ flexWrap: "wrap" }}>
+          <Box sx={{ flex: 1, minWidth: { sm: 200 } }}>
+            <CampoTexto
+              id="config-bi-busca"
+              valor={busca}
+              onValor={setBusca}
+              placeholder="Buscar chave"
+              ariaLabel="Buscar chave"
+              tamanho="pequeno"
+            />
           </Box>
-          <Stack direction="row" spacing={1} sx={{ alignItems: "flex-start" }}>
-            <ShieldRoundedIcon fontSize="small" aria-hidden="true" sx={{ flexShrink: 0 }} />
-            <Typography variant="caption" sx={{ color: "text.secondary" }}>
-              Chaves acessam dados pessoais. Compartilhe apenas com a equipe autorizada.
-            </Typography>
-          </Stack>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ flexWrap: "wrap" }}>
-            <Box sx={{ flex: 1, minWidth: { sm: 200 } }}>
-              <CampoTexto
-                id="config-bi-busca"
-                valor={busca}
-                onValor={setBusca}
-                placeholder="Buscar chave"
-                ariaLabel="Buscar chave"
-                tamanho="pequeno"
-              />
-            </Box>
-            <Box sx={{ minWidth: 0, width: { sm: 180 } }}>
-              <Selecionar
-                ariaLabel="Ordenar chaves"
-                valor={ordem}
-                onValor={setOrdem}
-                opcoes={[
-                  { valor: "recentes", rotulo: "Mais recentes" },
-                  { valor: "nome", rotulo: "Nome" },
-                  { valor: "uso", rotulo: "Mais usadas" },
-                ]}
-              />
-            </Box>
-          </Stack>
-          {erro ? (
-            <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
-          ) : null}
-          {visiveis.length === 0 ? (
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Nenhuma chave encontrada.
-            </Typography>
-          ) : null}
-          {visiveis.map((c) => {
-            const nova = c.id.startsWith("novo-");
-            const revogada = estaRevogada(c);
-            const acionavel = c.estado === "ativa" && !revogada;
-            return (
-              <Box component="article" key={c.id} sx={CARTAO}>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}
-                >
-                  <Typography
-                    component="h3"
-                    variant="subtitle1"
-                    sx={{ minWidth: 0, fontWeight: 600, overflowWrap: "anywhere" }}
-                  >
-                    {c.rotulo}
-                  </Typography>
-                  <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                    <Selo>{c.estado}</Selo>
-                    {nova ? <Selo>Nova</Selo> : null}
-                    {c.rotacionar ? <Selo tom="atencao">Substituir ao salvar</Selo> : null}
-                  </Stack>
-                </Stack>
+          <Box sx={{ minWidth: 0, width: { sm: 180 } }}>
+            <Selecionar
+              ariaLabel="Ordenar chaves"
+              valor={ordem}
+              onValor={setOrdem}
+              opcoes={[
+                { valor: "recentes", rotulo: "Mais recentes" },
+                { valor: "nome", rotulo: "Nome" },
+                { valor: "uso", rotulo: "Mais usadas" },
+              ]}
+            />
+          </Box>
+        </Stack>
+        {erro ? (
+          <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
+        ) : null}
+        {visiveis.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Nenhuma chave encontrada.
+          </Typography>
+        ) : null}
+        {visiveis.map((c) => {
+          const nova = c.id.startsWith("novo-");
+          const revogada = estaRevogada(c);
+          const acionavel = c.estado === "ativa" && !revogada;
+          return (
+            <Box component="article" key={c.id} sx={CARTAO}>
+              <Stack
+                direction="row"
+                spacing={1}
+                sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}
+              >
                 <Typography
-                  variant="caption"
-                  sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                  component="h3"
+                  variant="subtitle1"
+                  sx={{ minWidth: 0, fontWeight: 600, overflowWrap: "anywhere" }}
                 >
-                  {resumoDoEscopo(c.escopo)}
+                  {c.rotulo}
                 </Typography>
                 <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                  <Selo>{c.usos} consultas</Selo>
-                  <Selo>
-                    {c.expiraEm
-                      ? `Até ${new Date(c.expiraEm).toLocaleDateString("pt-BR")}`
-                      : "Sem prazo"}
-                  </Selo>
-                  {c.inativa && c.estado === "ativa" ? (
-                    <Selo>Revisar: sem uso há 90 dias</Selo>
-                  ) : null}
+                  <Selo>{c.estado}</Selo>
+                  {nova ? <Selo>Nova</Selo> : null}
+                  {c.rotacionar ? <Selo tom="atencao">Substituir ao salvar</Selo> : null}
                 </Stack>
-                <Acordeao
-                  titulo="Detalhes da chave"
-                  nivelTitulo="h4"
-                  resumo={
-                    <Typography
-                      component="span"
-                      variant="body2"
-                      sx={{ display: "flex", alignItems: "center", gap: 1 }}
-                    >
-                      <HistoryRoundedIcon fontSize="inherit" aria-hidden="true" />
-                      Datas e usos registrados
-                    </Typography>
-                  }
-                >
-                  <Box
-                    component="dl"
-                    sx={{
-                      display: "grid",
-                      gap: 2,
-                      gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-                      margin: 0,
-                    }}
+              </Stack>
+              <Typography
+                variant="caption"
+                sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+              >
+                {resumoDoEscopo(c.escopo)}
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                <Selo>{c.usos} consultas</Selo>
+                <Selo>
+                  {c.expiraEm
+                    ? `Até ${new Date(c.expiraEm).toLocaleDateString("pt-BR")}`
+                    : "Sem prazo"}
+                </Selo>
+                {c.inativa && c.estado === "ativa" ? (
+                  <Selo>Revisar: sem uso há 90 dias</Selo>
+                ) : null}
+              </Stack>
+              <Acordeao
+                titulo="Detalhes da chave"
+                nivelTitulo="h4"
+                resumo={
+                  <Typography
+                    component="span"
+                    variant="body2"
+                    sx={{ display: "flex", alignItems: "center", gap: 1 }}
                   >
-                    <Box>
-                      <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
-                        Criação
-                      </Typography>
-                      <Typography component="dd" variant="body2" sx={{ margin: 0 }}>
-                        {new Date(c.criadaEm).toLocaleDateString("pt-BR")}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
-                        Validade
-                      </Typography>
-                      <Typography component="dd" variant="body2" sx={{ margin: 0 }}>
-                        {c.expiraEm ? new Date(c.expiraEm).toLocaleString("pt-BR") : "Sem prazo"}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
-                        Primeiro uso
-                      </Typography>
-                      <Typography component="dd" variant="body2" sx={{ margin: 0 }}>
-                        {c.primeiroUsoEm
-                          ? new Date(c.primeiroUsoEm).toLocaleString("pt-BR")
-                          : "Sem uso"}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
-                        Último uso
-                      </Typography>
-                      <Typography component="dd" variant="body2" sx={{ margin: 0 }}>
-                        {c.ultimoUsoEm
-                          ? new Date(c.ultimoUsoEm).toLocaleString("pt-BR")
-                          : "Sem uso"}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Acordeao>
-                {acionavel ? (
-                  <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
-                    <Botao
-                      variante="contorno"
-                      tamanho="pequeno"
-                      icone={<EditRoundedIcon />}
-                      onClick={() => preparar("editar", c)}
-                    >
-                      Editar
-                    </Botao>
-                    {!nova ? (
-                      c.rotacionar ? (
-                        <Botao
-                          variante="contorno"
-                          tamanho="pequeno"
-                          icone={<RestartAltRoundedIcon />}
-                          onClick={() => desfazerRotacao(c)}
-                        >
-                          Desfazer substituição
-                        </Botao>
-                      ) : (
-                        <Botao
-                          variante="contorno"
-                          tamanho="pequeno"
-                          icone={<RestartAltRoundedIcon />}
-                          onClick={() => preparar("rotacionar", c)}
-                        >
-                          Substituir
-                        </Botao>
-                      )
-                    ) : null}
-                    <Botao
-                      variante="destrutivo"
-                      tamanho="pequeno"
-                      icone={<BlockRoundedIcon />}
-                      onClick={() => preparar("revogar", c)}
-                    >
-                      Revogar
-                    </Botao>
-                  </Stack>
-                ) : null}
-                {c.revogada ? (
+                    <HistoryRoundedIcon fontSize="inherit" aria-hidden="true" />
+                    Datas e usos registrados
+                  </Typography>
+                }
+              >
+                <Box
+                  component="dl"
+                  sx={{
+                    display: "grid",
+                    gap: 2,
+                    gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                    margin: 0,
+                  }}
+                >
                   <Box>
-                    <Botao
-                      variante="contorno"
-                      tamanho="pequeno"
-                      icone={<BlockRoundedIcon />}
-                      onClick={() => desfazerRevogacao(c)}
-                    >
-                      Desfazer revogação
-                    </Botao>
+                    <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
+                      Criação
+                    </Typography>
+                    <Typography component="dd" variant="body2" sx={{ margin: 0 }}>
+                      {new Date(c.criadaEm).toLocaleDateString("pt-BR")}
+                    </Typography>
                   </Box>
-                ) : null}
-              </Box>
-            );
-          })}
-        </Box>
-      </Acordeao>
+                  <Box>
+                    <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
+                      Validade
+                    </Typography>
+                    <Typography component="dd" variant="body2" sx={{ margin: 0 }}>
+                      {c.expiraEm ? new Date(c.expiraEm).toLocaleString("pt-BR") : "Sem prazo"}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
+                      Primeiro uso
+                    </Typography>
+                    <Typography component="dd" variant="body2" sx={{ margin: 0 }}>
+                      {c.primeiroUsoEm
+                        ? new Date(c.primeiroUsoEm).toLocaleString("pt-BR")
+                        : "Sem uso"}
+                    </Typography>
+                  </Box>
+                  <Box>
+                    <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
+                      Último uso
+                    </Typography>
+                    <Typography component="dd" variant="body2" sx={{ margin: 0 }}>
+                      {c.ultimoUsoEm ? new Date(c.ultimoUsoEm).toLocaleString("pt-BR") : "Sem uso"}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Acordeao>
+              {acionavel ? (
+                <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                  <Botao
+                    variante="contorno"
+                    tamanho="pequeno"
+                    icone={<EditRoundedIcon />}
+                    onClick={() => preparar("editar", c)}
+                  >
+                    Editar
+                  </Botao>
+                  {!nova ? (
+                    c.rotacionar ? (
+                      <Botao
+                        variante="contorno"
+                        tamanho="pequeno"
+                        icone={<RestartAltRoundedIcon />}
+                        onClick={() => desfazerRotacao(c)}
+                      >
+                        Desfazer substituição
+                      </Botao>
+                    ) : (
+                      <Botao
+                        variante="contorno"
+                        tamanho="pequeno"
+                        icone={<RestartAltRoundedIcon />}
+                        onClick={() => preparar("rotacionar", c)}
+                      >
+                        Substituir
+                      </Botao>
+                    )
+                  ) : null}
+                  <Botao
+                    variante="destrutivo"
+                    tamanho="pequeno"
+                    icone={<BlockRoundedIcon />}
+                    onClick={() => preparar("revogar", c)}
+                  >
+                    Revogar
+                  </Botao>
+                </Stack>
+              ) : null}
+              {c.revogada ? (
+                <Box>
+                  <Botao
+                    variante="contorno"
+                    tamanho="pequeno"
+                    icone={<BlockRoundedIcon />}
+                    onClick={() => desfazerRevogacao(c)}
+                  >
+                    Desfazer revogação
+                  </Botao>
+                </Box>
+              ) : null}
+            </Box>
+          );
+        })}
+      </Stack>
 
       <Dialogo
         aberto={acao !== null}
@@ -730,6 +722,6 @@ export default function SecaoChavesBi({
           </Stack>
         </Box>
       </Dialogo>
-    </Box>
+    </SecaoConfiguracao>
   );
 }

@@ -42,7 +42,9 @@ async function abrirDownload(
     if (tipo === "copia") {
       await selecionarCategoriaConfiguracoes(page, "Dados");
       const secao = page.locator('[data-secao="config-copia"]');
-      await secao.getByRole("button", { name: "Cópia de segurança" }).click();
+      await expect(
+        secao.getByRole("heading", { name: "Cópia de segurança", exact: true }),
+      ).toBeVisible();
       await secao.getByRole("button", { name: "Baixar cópia" }).click();
     } else {
       await page.getByRole("button", { name: "Exportar relação" }).click();

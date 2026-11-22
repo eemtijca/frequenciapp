@@ -12,6 +12,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import ViewQuiltRoundedIcon from "@mui/icons-material/ViewQuiltRounded";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
+import PreferenciasPlanilha from "./preferencias-planilha";
 import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
@@ -336,16 +337,6 @@ export default function IntegracaoSaidas({
           </Botao>
         ) : null}
       </Stack>
-      <Box sx={CAIXA}>
-        <Interruptor
-          id="saidas-envio-automatico"
-          rotulo="Enviar ao registrar saídas e entradas"
-          descricao="Acrescenta os novos registros automaticamente."
-          checked={envioRascunho}
-          disabled={salvando || !ativaRascunho || !conectada || !estruturaSalva}
-          onChange={(valor) => void alternarEnvioAutomatico(valor)}
-        />
-      </Box>
       <Stack spacing={1}>
         {integracao?.ultimoErro ? (
           <Typography variant="caption" color="error">
@@ -626,13 +617,31 @@ export default function IntegracaoSaidas({
         onChange={setAberto}
       >
         <Stack spacing={2}>
-          <Interruptor
-            id="planilha-saidas-ativa"
-            rotulo="Integração de entradas e saídas ativa"
-            checked={ativaRascunho}
-            disabled={salvando || !conectada}
-            onChange={(valor) => void alternarAtiva(valor)}
-          />
+          <PreferenciasPlanilha>
+            <Interruptor
+              id="planilha-saidas-ativa"
+              rotulo="Integração de entradas e saídas ativa"
+              checked={ativaRascunho}
+              disabled={salvando || !conectada}
+              onChange={(valor) => void alternarAtiva(valor)}
+            />
+            <Interruptor
+              id="saidas-envio-automatico"
+              rotulo="Enviar ao registrar saídas e entradas"
+              descricao="Acrescenta os novos registros automaticamente."
+              checked={envioRascunho}
+              disabled={salvando || !ativaRascunho || !conectada || !estruturaSalva}
+              onChange={(valor) => void alternarEnvioAutomatico(valor)}
+            />
+          </PreferenciasPlanilha>
+          <Stack spacing={1} useFlexGap>
+            <Typography component="h4" variant="subtitle2">
+              Operações da planilha
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              As ações confirmadas aqui não dependem de Salvar configurações.
+            </Typography>
+          </Stack>
           <Abas<PainelSaidas>
             itens={[
               {
