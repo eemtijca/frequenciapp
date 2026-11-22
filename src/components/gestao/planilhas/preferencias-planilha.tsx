@@ -17,7 +17,7 @@ export default function PreferenciasPlanilha({ children }: { children: ReactNode
         minWidth: 0,
         border: 1,
         borderColor: "divider",
-        borderRadius: TOKENS_LAYOUT.campo.raio,
+        borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
       }}
     >
       <Typography component="legend" variant="subtitle2" sx={{ px: 1 }}>

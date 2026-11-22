@@ -144,6 +144,36 @@ async function abrir(page: Page, tema: "light" | "dark", simularGravacao = false
   return gravacoes;
 }
 
+it.each([
+  { largura: 390, tema: "light" },
+  { largura: 1440, tema: "dark" },
+] as const)(
+  "mantém o raio de 12 px no grupo de preferências da planilha a $largura px ($tema)",
+  async ({ largura, tema }) => {
+    const page = await browser.newPage({ viewport: { width: largura, height: 844 } });
+    try {
+      await abrir(page, tema);
+      await selecionarCategoriaConfiguracoes(page, "Planilhas");
+      const planilha = page.locator('[data-secao="planilha-frequencia"]');
+      await planilha.getByRole("button", { name: /Planilha de frequência/ }).click();
+      const grupo = planilha.getByRole("group", { name: "Preferências no rascunho" });
+      await verificarTela(grupo).toBeVisible();
+      const raios = await grupo.evaluate((el) => {
+        const c = getComputedStyle(el);
+        return [
+          c.borderTopLeftRadius,
+          c.borderTopRightRadius,
+          c.borderBottomRightRadius,
+          c.borderBottomLeftRadius,
+        ];
+      });
+      expect(raios).toEqual(["12px", "12px", "12px", "12px"]);
+    } finally {
+      await page.close();
+    }
+  },
+);
+
 it("explica as opções da cópia e devolve o foco ao cancelar a importação", async () => {
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
   try {
