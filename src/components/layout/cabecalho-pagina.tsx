@@ -10,18 +10,27 @@ interface CabecalhoPaginaProps {
   titulo: string;
   descricao?: string;
   acoes?: ReactNode;
+  compacto?: boolean;
 }
 
-export function CabecalhoPagina({ titulo, descricao, acoes }: CabecalhoPaginaProps) {
+export function CabecalhoPagina({
+  titulo,
+  descricao,
+  acoes,
+  compacto = false,
+}: CabecalhoPaginaProps) {
   return (
     <Stack
       component="header"
       direction={{ xs: "column", sm: "row" }}
-      spacing={2}
+      spacing={compacto ? 1.5 : 2}
+      useFlexGap={compacto || undefined}
       sx={{
-        alignItems: { xs: "stretch", sm: "flex-start" },
+        alignItems: compacto
+          ? { xs: "flex-start", sm: "center" }
+          : { xs: "stretch", sm: "flex-start" },
         justifyContent: "space-between",
-        mb: { xs: 2, sm: 3 },
+        ...(compacto ? { flexWrap: "wrap" } : { mb: { xs: 2, sm: 3 } }),
       }}
     >
       <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
@@ -42,6 +51,7 @@ export function CabecalhoPagina({ titulo, descricao, acoes }: CabecalhoPaginaPro
           sx={{
             flexWrap: "wrap",
             flexShrink: 0,
+            ...(compacto && { maxWidth: "100%" }),
             justifyContent: { xs: "flex-start", sm: "flex-end" },
           }}
         >

@@ -44,6 +44,51 @@ afterAll(async () => {
   if (cache) rmSync(cache, { recursive: true, force: true });
 });
 
+it("mantém nome longo e ação acessíveis na rolagem da tabela", async () => {
+  const page = await navegador.newPage({ viewport: { width: 1440, height: 900 } });
+  try {
+    await page.route("**/api/**", (route) => {
+      const caminho = new URL(route.request().url()).pathname;
+      if (route.request().method() !== "GET") return route.abort();
+      if (caminho === "/api/frequencias-personalizadas")
+        return route.fulfill({ json: { registros: [], feriado: null } });
+      if (caminho === "/api/planilha-parcial/estado")
+        return route.fulfill({ json: { podeEnviar: false, planilhaNome: null } });
+      if (caminho === "/api/configuracoes/justificativas")
+        return route.fulfill({ json: { justificativas: [] } });
+      return route.abort();
+    });
+    await page.goto(`${url}?nome-longo`);
+    const tabela = page.getByRole("table");
+    const nome = "W".repeat(100);
+    const cabecalho = tabela.getByRole("rowheader", { name: nome, exact: true });
+    await cabecalho.waitFor();
+    const espaco = await cabecalho.evaluate((celula) => {
+      const tabela = celula.closest("table");
+      const contenedor = tabela?.parentElement;
+      if (!tabela || !contenedor) throw new Error("Tabela sem área de rolagem");
+      const antes = celula.getBoundingClientRect();
+      tabela.style.minWidth = `${contenedor.clientWidth + 240}px`;
+      contenedor.scrollLeft = contenedor.scrollWidth - contenedor.clientWidth;
+      const depois = celula.getBoundingClientRect();
+      return {
+        espacoLivre: contenedor.clientWidth - depois.width,
+        deslocamentoNome: depois.left - antes.left,
+        rolagem: contenedor.scrollLeft,
+      };
+    });
+    expect(espaco.espacoLivre).toBeGreaterThanOrEqual(208);
+    expect(espaco.deslocamentoNome).toBe(0);
+    expect(espaco.rolagem).toBeGreaterThan(0);
+    await tabela.getByRole("button", { name: `Registrar frequência parcial de ${nome}` }).click();
+    const dialogo = page.getByRole("dialog", { name: "Registrar frequência parcial" });
+    await dialogo.getByRole("button", { name: "Cancelar" }).click();
+    await dialogo.waitFor({ state: "hidden" });
+  } finally {
+    await page.close();
+  }
+});
+
 it("alinha a tabela no desktop, mantém os cartões no celular e responde à largura do conteúdo", async () => {
   const falhas: string[] = [];
   for (const { width, fonte, coluna } of [
@@ -58,9 +103,7 @@ it("alinha a tabela no desktop, mantém os cartões no celular e responde à lar
       const page = await navegador.newPage({ viewport: { width, height: 900 } });
       try {
         await page.emulateMedia({ colorScheme: tema });
-        await page.addInitScript((tamanho: number) => {
-          document.documentElement.style.fontSize = `${tamanho}px`;
-        }, fonte);
+
         const confirmacoes: unknown[] = [];
         await page.route("**/api/**", async (route) => {
           const pedido = route.request();
@@ -137,10 +180,16 @@ it("alinha a tabela no desktop, mantém os cartões no celular e responde à lar
           return route.abort();
         });
         await page.goto(url);
-        await page.evaluate((larguraMaxima: number) => {
-          const conteudo = document.querySelector<HTMLElement>('[data-testid="conteudo-fixture"]');
-          if (larguraMaxima && conteudo) conteudo.style.maxWidth = `${larguraMaxima}px`;
-        }, coluna);
+        await page.evaluate(
+          ({ larguraMaxima, fonte }) => {
+            document.documentElement.style.fontSize = `${fonte}px`;
+            const conteudo = document.querySelector<HTMLElement>(
+              '[data-testid="conteudo-fixture"]',
+            );
+            if (larguraMaxima && conteudo) conteudo.style.maxWidth = `${larguraMaxima}px`;
+          },
+          { larguraMaxima: coluna, fonte },
+        );
         await page.getByRole("switch", { name: "Registro na Seduc: Aluno Justificado" }).waitFor();
         expect(await page.getByRole("switch", { name: /Registro na Seduc: Aluno/ }).count()).toBe(
           2,
@@ -195,7 +244,7 @@ it("alinha a tabela no desktop, mantém os cartões no celular e responde à lar
             if (!painelBusca || !painelFiltro) return ["Busca ou filtro ausentes"];
 
             const painel = painelTurma.closest(".MuiPaper-root");
-            const filtros = painelBusca.closest(".MuiPaper-root");
+            const filtros = painelBusca.closest('[aria-label="Alunos da chamada parcial"]');
             if (!painel || !filtros) return ["Painéis ausentes"];
             if (
               !dentro(caixa(painelTurma), caixa(painel)) ||
@@ -221,6 +270,16 @@ it("alinha a tabela no desktop, mantém os cartões no celular e responde à lar
             )
               erros.push("Busca e filtro não se adaptaram à largura do painel");
 
+            const primeiraLinha = no.querySelector('[data-testid="parcial-aluno-aluno-0"]');
+            if (!primeiraLinha) return ["Primeiro aluno ausente"];
+            if (
+              largura < larguraFiltros &&
+              getComputedStyle(document.documentElement).fontSize === "16px"
+            ) {
+              const distancia = caixa(primeiraLinha).top - filtroCaixa.bottom;
+              if (distancia > 48) erros.push(`Filtro distante do primeiro aluno: ${distancia}px`);
+            }
+
             if (largura >= larguraTabela) {
               const tabela = no.querySelector("table");
               const cabecalhos = tabela ? Array.from(tabela.querySelectorAll("thead th")) : [];
@@ -230,6 +289,18 @@ it("alinha a tabela no desktop, mantém os cartões no celular e responde à lar
               const textos = cabecalhos.map((item) => item.textContent?.trim());
               if (textos.join("|") !== "Aluno|Situação|Registro na Seduc|Ações")
                 erros.push(`Cabeçalhos inesperados: ${textos.join("|")}`);
+              const nomes = tabela.querySelectorAll("tr > th:first-child");
+              if (
+                nomes.length !== linhas.length + 1 ||
+                Array.from(nomes).some((nome) => getComputedStyle(nome).position !== "sticky")
+              )
+                erros.push("Identificação do aluno não permanece fixa na tabela");
+              if (
+                Array.from(tabela.querySelectorAll("tr > :nth-child(n+2)")).some(
+                  (celula) => getComputedStyle(celula).position === "sticky",
+                )
+              )
+                erros.push("Somente a primeira coluna deve ficar fixa na tabela");
               const limite = caixa(tabela);
               for (const linha of linhas) {
                 const nome = linha.querySelector("th");
@@ -344,6 +415,32 @@ it("alinha a tabela no desktop, mantém os cartões no celular e responde à lar
         falhas.push(
           ...erros.map((erro) => `${width}/${fonte}/${coluna || "normal"}/${tema}: ${erro}`),
         );
+        if (width === 1440 && fonte === 16 && !coluna) {
+          const deslocamento = await page.getByRole("table").evaluate((tabela) => {
+            const contenedor = tabela.parentElement;
+            const nome = tabela.querySelector("tbody tr > th");
+            const situacao = tabela.querySelector("tbody tr > td");
+            if (!(tabela instanceof HTMLElement) || !contenedor || !nome || !situacao)
+              throw new Error("Tabela ou colunas ausentes");
+            const larguraInicial = tabela.style.minWidth;
+            try {
+              // Produz rolagem local sem mudar o breakpoint da tela.
+              tabela.style.minWidth = `${contenedor.clientWidth + 240}px`;
+              const xNome = nome.getBoundingClientRect().left;
+              const xSituacao = situacao.getBoundingClientRect().left;
+              contenedor.scrollLeft = 120;
+              return {
+                rolagem: contenedor.scrollLeft,
+                nome: xNome - nome.getBoundingClientRect().left,
+                situacao: xSituacao - situacao.getBoundingClientRect().left,
+              };
+            } finally {
+              contenedor.scrollLeft = 0;
+              tabela.style.minWidth = larguraInicial;
+            }
+          });
+          expect(deslocamento).toEqual({ rolagem: 120, nome: 0, situacao: 120 });
+        }
         if (width === 1024 && fonte === 20 && !coluna && tema === "dark")
           await page.screenshot({ path: "test-results/colunas-parcial.png", fullPage: true });
         if (width === 320 && fonte === 20 && !coluna && tema === "dark")
@@ -359,6 +456,14 @@ it("alinha a tabela no desktop, mantém os cartões no celular e responde à lar
             (width === 1440 && fonte === 16)) &&
           !coluna
         ) {
+          const alunos = page.getByRole("region", { name: "Alunos da chamada parcial" });
+          const busca = alunos.getByRole("searchbox", { name: "Buscar aluno" });
+          await busca.fill("sem correspondência");
+          await alunos.getByText("Nenhum aluno encontrado com estes filtros.").waitFor();
+          expect(await alunos.getByText("0 alunos", { exact: true }).count()).toBe(1);
+          await alunos.getByRole("button", { name: "Ver todos" }).click();
+          expect(await busca.inputValue()).toBe("");
+          expect(await alunos.getByText("5 alunos", { exact: true }).count()).toBe(1);
           await page
             .getByRole("button", { name: "Editar frequência parcial de Aluno Parcial" })
             .click();

@@ -63,6 +63,7 @@ import { Selo, type TomSelo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { TabelaPadrao } from "@/components/layout/tabela-padrao";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 import {
   DialogoFrequenciaParcial,
   assinaturaDaEdicao,
@@ -157,6 +158,13 @@ function estiloAcaoBase(tema: Theme) {
 }
 
 const ESTILO_ACAO = (tema: Theme) => estiloAcaoBase(tema);
+
+const ESTILO_COLUNA_ALUNO = {
+  position: "sticky",
+  left: 0,
+  zIndex: 2,
+  bgcolor: "background.paper",
+} as const;
 
 const ESTILO_ACAO_ICONE = (tema: Theme) => ({
   ...estiloAcaoBase(tema),
@@ -774,6 +782,7 @@ export default function VistaFrequenciaParcial({
     >
       <CabecalhoPagina
         titulo="Chamada parcial"
+        compacto
         acoes={
           <Botao
             type="button"
@@ -781,7 +790,7 @@ export default function VistaFrequenciaParcial({
             onClick={() => setEnvioAberto(true)}
             disabled={!estadoPlanilha?.podeEnviar || ocupado || sujo}
             icone={<FileDownloadRoundedIcon />}
-            sx={{ flexShrink: 0 }}
+            sx={{ minHeight: TOKENS_LAYOUT.alvoToque, maxWidth: "100%", whiteSpace: "normal" }}
           >
             Enviar para a planilha
           </Botao>
@@ -789,14 +798,17 @@ export default function VistaFrequenciaParcial({
       />
 
       <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
-        <Box
+        <Stack
+          direction={painelEmLinha ? "row" : "column"}
+          spacing={{ xs: 1.5, sm: 2 }}
+          useFlexGap
           sx={{
-            display: "grid",
-            gridTemplateColumns: painelEmLinha
-              ? "minmax(0, 1fr) minmax(0, 1.35fr)"
-              : "minmax(0, 1fr)",
-            gap: 2,
-            alignItems: "end",
+            ...(painelEmLinha && {
+              alignItems: "flex-end",
+              "& > :first-child": { flex: 1 },
+              "& > :last-child": { flex: 1.35 },
+            }),
+            "& .MuiSelect-select": { whiteSpace: "normal", overflowWrap: "anywhere" },
           }}
         >
           <Campo id="parcial-turma" rotulo="Turma">
@@ -849,7 +861,7 @@ export default function VistaFrequenciaParcial({
               />
             </Stack>
           </Campo>
-        </Box>
+        </Stack>
         {(!nav.resumo || nav.mostrarVoltar) && (
           <Stack
             direction="row"
@@ -913,14 +925,18 @@ export default function VistaFrequenciaParcial({
           onAbrirChamada={(diaAberto) => onAbrirChamada?.(diaAberto, turmaId)}
         />
       ) : (
-        <Stack spacing={2} sx={{ minWidth: 0 }}>
-          <Paper variant="outlined" sx={{ p: { xs: 1.5, sm: 2 } }}>
-            <Box
+        <Stack component="section" aria-label="Alunos da chamada parcial" spacing={1} useFlexGap>
+          <Stack spacing={0.5} useFlexGap>
+            <Stack
+              direction={filtrosEmLinha ? "row" : "column"}
+              spacing={1.5}
+              useFlexGap
               sx={{
-                display: "grid",
-                gridTemplateColumns: filtrosEmLinha ? "minmax(0, 1fr) 13rem" : "minmax(0, 1fr)",
-                gap: 2,
-                alignItems: "center",
+                ...(filtrosEmLinha && {
+                  alignItems: "center",
+                  "& > :first-child": { flex: 1, minWidth: 0 },
+                  "& > :last-child": { flex: "0 0 13rem" },
+                }),
               }}
             >
               <BarraBusca
@@ -941,11 +957,12 @@ export default function VistaFrequenciaParcial({
                   { valor: "registrados", rotulo: "Registrados na Seduc" },
                 ]}
               />
-            </Box>
+            </Stack>
             <Stack
               direction="row"
               spacing={1}
-              sx={{ mt: 1, minHeight: 36, alignItems: "center", justifyContent: "space-between" }}
+              useFlexGap
+              sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}
             >
               <Typography
                 variant="caption"
@@ -963,13 +980,13 @@ export default function VistaFrequenciaParcial({
                     setFiltro("todos");
                     setBusca("");
                   }}
-                  sx={{ px: 1 }}
+                  sx={{ px: 1, minHeight: TOKENS_LAYOUT.alvoToque }}
                 >
                   Ver todos
                 </Botao>
               ) : null}
             </Stack>
-          </Paper>
+          </Stack>
 
           {erro ? (
             <AlertaCompacto
@@ -1011,7 +1028,7 @@ export default function VistaFrequenciaParcial({
             >
               <TableHead>
                 <TableRow>
-                  <TableCell scope="col" sx={{ minWidth: 200 }}>
+                  <TableCell scope="col" sx={{ ...ESTILO_COLUNA_ALUNO, minWidth: 200, zIndex: 3 }}>
                     Aluno
                   </TableCell>
                   <TableCell scope="col" sx={{ width: 176 }}>
@@ -1037,8 +1054,21 @@ export default function VistaFrequenciaParcial({
                       hover
                       sx={{ verticalAlign: "middle" }}
                     >
-                      <TableCell component="th" scope="row" sx={{ fontWeight: 400 }}>
-                        <Typography component="span" variant="body2" sx={{ fontWeight: 600 }}>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{ ...ESTILO_COLUNA_ALUNO, fontWeight: 400 }}
+                      >
+                        <Typography
+                          component="span"
+                          variant="body2"
+                          sx={{
+                            display: "block",
+                            maxWidth: 240,
+                            overflowWrap: "anywhere",
+                            fontWeight: 600,
+                          }}
+                        >
                           {aluno.nome}
                         </Typography>
                         {aluno.desistente ? (

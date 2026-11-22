@@ -24,7 +24,10 @@ const alunos: Aluno[] = [
   "Maria Eduarda de Albuquerque e Silva",
 ].map((nome, indice) => ({
   id: `aluno-${indice}`,
-  nome: `Aluno ${nome}`,
+  nome:
+    indice === 4 && new URLSearchParams(location.search).has("nome-longo")
+      ? "W".repeat(100)
+      : `Aluno ${nome}`,
   turmaId: turma.id,
   turmaOriginalId: turma.id,
   ordem: indice,
