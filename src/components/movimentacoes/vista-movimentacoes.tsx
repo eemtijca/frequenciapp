@@ -136,6 +136,7 @@ export default function VistaMovimentacoes({
             }
             onClick={() => setEnvioAberto(true)}
             sx={(tema) => ({
+              flexShrink: 0,
               height: TOKENS_LAYOUT.alvoToque,
               width: { xs: TOKENS_LAYOUT.alvoToque, sm: "auto" },
               minWidth: TOKENS_LAYOUT.alvoToque,

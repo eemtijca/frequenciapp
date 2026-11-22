@@ -12,6 +12,7 @@ import {
 } from "react";
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
+import Stack from "@mui/material/Stack";
 import { alpha, type Theme } from "@mui/material/styles";
 import { ESPACO_COMPOSICAO } from "@/theme/layout";
 import { brand } from "@/theme/paleta";
@@ -136,6 +137,8 @@ export function Abas<T extends string>({
       onKeyDown={aoTeclar}
       sx={(tema) => ({
         display: ocultarTrilho ? "none" : "grid",
+        flex: 1,
+        minWidth: 0,
         gridTemplateColumns: `repeat(${itens.length}, minmax(0, 1fr))`,
         gap: 0.5,
         p: `${RECUO_TRILHO}px`,
@@ -195,21 +198,10 @@ export function Abas<T extends string>({
 
   return (
     <Box sx={{ minWidth: 0 }}>
-      {acaoNoTrilho && !ocultarTrilho ? (
-        <Box
-          sx={{
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr) auto",
-            gap: 1,
-            alignItems: "center",
-          }}
-        >
-          {trilho}
-          {acaoNoTrilho}
-        </Box>
-      ) : (
-        trilho
-      )}
+      <Stack direction="row" spacing={1} useFlexGap sx={{ alignItems: "center" }}>
+        {trilho}
+        {!ocultarTrilho && acaoNoTrilho}
+      </Stack>
       <Box
         data-pager={dataPager}
         sx={{ minWidth: 0, pt: ocultarTrilho ? undefined : ESPACO_COMPOSICAO.aposAbas }}
