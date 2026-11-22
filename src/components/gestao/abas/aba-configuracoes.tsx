@@ -76,7 +76,7 @@ import SecaoInfrequencia from "@/components/gestao/configuracoes/secao-infrequen
 import VistaHorarios from "@/components/horarios/vista-horarios";
 import SecaoProvasBimestrais from "@/components/horarios/secao-provas-bimestrais";
 import SecaoOrdemAlmoco from "@/components/gestao/configuracoes/secao-ordem-almoco";
-import { TOKENS_LAYOUT } from "@/theme/layout";
+import { ESPACO_COMPOSICAO, TOKENS_LAYOUT } from "@/theme/layout";
 import {
   ProvedorRascunhoConfiguracoes,
   useRascunhoConfiguracoes,
