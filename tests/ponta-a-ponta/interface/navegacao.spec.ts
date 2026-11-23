@@ -1,7 +1,12 @@
 // Fumaça do shell: troca de visão pela navegação e tema.
 import { expect, test } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import {
+  selecionarRelatorio,
+  abrirNavegacao,
+  aguardarHidratacao,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.describe("navegação", () => {
   test("troca de visão pela navegação", async ({ page }) => {
@@ -15,8 +20,10 @@ test.describe("navegação", () => {
       page.getByRole("region", { name: "Horários semanais", exact: true }),
     ).toBeVisible();
     await trocarVisao(page, "Relatórios", "relatorios");
-    await expect(page.getByRole("heading", { name: "Relatórios" })).toBeVisible();
-    await page.getByRole("tab", { name: "Grade" }).click();
+    await expect(
+      page.getByRole("region", { name: "Resumo dos relatórios", exact: true }),
+    ).toBeVisible();
+    await selecionarRelatorio(page, "Grade");
     await expect(page.getByRole("heading", { name: "Grade" })).toBeVisible();
     await trocarVisao(page, "Gestão", "gestao");
     await expect(page.getByRole("heading", { name: "Séries", level: 1 })).toBeVisible();

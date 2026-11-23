@@ -5,7 +5,12 @@ import { mesSeguinte, ultimoDiaDeChamada } from "@/domain/frequencia";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { escolherMesNoPeriodo } from "../helpers/calendario";
 import { diaCorrente } from "../helpers/dia";
-import { aguardarHidratacao, escolherDataNoPeriodo, trocarVisao } from "../helpers/pagina";
+import {
+  selecionarRelatorio,
+  aguardarHidratacao,
+  escolherDataNoPeriodo,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.beforeAll(criarMassaE2E);
 test.afterAll(limparMassaE2E);
@@ -72,8 +77,7 @@ test.describe("atualização do Painel ao voltar para a aba", () => {
           },
         });
       });
-      await trocarVisao(page, "Relatórios", "relatorios");
-      await page.getByRole("tab", { name: "Histórico" }).click();
+      await selecionarRelatorio(page, "Histórico");
       const historico = page.getByRole("region", { name: "Histórico de frequências", exact: true });
       const cargaDoMes = page.waitForResponse((resposta) => {
         const url = new URL(resposta.url());

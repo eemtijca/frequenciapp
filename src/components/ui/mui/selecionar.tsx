@@ -1,6 +1,7 @@
 "use client";
 
 // Seletor de lista com Select do MUI, placeholder, ariaLabel e descrição vinda do Campo.
+import { useId } from "react";
 import Box from "@mui/material/Box";
 import MenuItem from "@mui/material/MenuItem";
 import Select, { type SelectChangeEvent } from "@mui/material/Select";
@@ -23,6 +24,7 @@ export interface SelecionarProps {
   ariaLabel?: string;
   buscavel?: boolean;
   quebrarRotuloSelecionado?: boolean;
+  truncarRotuloSelecionado?: boolean;
   quebrarRotulosDasOpcoes?: boolean;
   mostrarRotuloSelecionado?: boolean;
 }
@@ -37,11 +39,13 @@ export function Selecionar({
   ariaLabel,
   buscavel = false,
   quebrarRotuloSelecionado = false,
+  truncarRotuloSelecionado = false,
   quebrarRotulosDasOpcoes = false,
   mostrarRotuloSelecionado = false,
 }: SelecionarProps) {
   const campo = useCampo();
   const idFinal = campo?.id ?? id;
+  const idRotuloSelecionado = useId();
 
   if (buscavel) {
     return (
@@ -60,6 +64,11 @@ export function Selecionar({
   }
 
   const desabilitado = disabled ?? campo?.disabled ?? false;
+  const rotuloEmUmaLinha = truncarRotuloSelecionado && !quebrarRotuloSelecionado;
+  const descritoPor =
+    [campo?.descritoPor, rotuloEmUmaLinha && valor !== "" ? idRotuloSelecionado : undefined]
+      .filter(Boolean)
+      .join(" ") || undefined;
 
   function aoMudar(evento: SelectChangeEvent<string>) {
     onValor(evento.target.value);
@@ -74,7 +83,7 @@ export function Selecionar({
       disabled={desabilitado}
       fullWidth
       labelId={ariaLabel ? undefined : campo?.idRotulo}
-      inputProps={{ "aria-label": ariaLabel, "aria-describedby": campo?.descritoPor }}
+      inputProps={{ "aria-label": ariaLabel, "aria-describedby": descritoPor }}
       renderValue={(atual) => {
         if (atual === "") {
           return (
@@ -83,19 +92,38 @@ export function Selecionar({
             </Box>
           );
         }
-        return opcoes.find((opcao) => opcao.valor === atual)?.rotulo ?? atual;
+        const rotulo = opcoes.find((opcao) => opcao.valor === atual)?.rotulo ?? atual;
+        if (!rotuloEmUmaLinha) return rotulo;
+        return (
+          <Box
+            component="span"
+            id={idRotuloSelecionado}
+            sx={{
+              display: "block",
+              flex: 1,
+              minWidth: 0,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {rotulo}
+          </Box>
+        );
       }}
       sx={(tema) => ({
         minHeight: TOKENS_LAYOUT.campo.medio,
         borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
         "& .MuiSelect-select": { minHeight: 0, py: 2 },
-        ...(quebrarRotuloSelecionado && {
+        ...((quebrarRotuloSelecionado || rotuloEmUmaLinha) && {
           // A especificidade extra reserva o espaço do indicador no Select outlined.
           "&& .MuiSelect-select.MuiSelect-select": {
-            display: "block",
             paddingInlineEnd: tema.spacing(6),
-            whiteSpace: "normal",
-            overflowWrap: "anywhere",
+            ...(quebrarRotuloSelecionado && {
+              display: "block",
+              whiteSpace: "normal",
+              overflowWrap: "anywhere",
+            }),
           },
         }),
       })}

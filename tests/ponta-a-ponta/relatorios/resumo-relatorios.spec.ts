@@ -2,7 +2,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import type { Aluno, Frequencia } from "@/domain/frequencia";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarRelatorio, aguardarHidratacao } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(criarMassaE2E);
@@ -11,8 +11,7 @@ test.afterAll(limparMassaE2E);
 async function abrir(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Resumo", exact: true }).click();
+  await selecionarRelatorio(page, "Resumo");
   const painel = page.getByRole("region", { name: "Resumo dos relatórios", exact: true });
   await expect(painel).toHaveAttribute("aria-busy", "false");
   const resposta = await page.request.get("/api/alunos");
@@ -236,16 +235,16 @@ test("descarta a resposta atrasada de um mês anterior", async ({ page }) => {
     await rota.fulfill({ json: { frequencias: [{ ...chamada, dia: `${mes}-01` }] } });
   });
   try {
-    await page.getByRole("tab", { name: "Histórico", exact: true }).click();
+    await selecionarRelatorio(page, "Histórico");
     const historico = page.getByRole("region", { name: "Histórico de frequências", exact: true });
     await historico.getByRole("button", { name: "Mês anterior", exact: true }).click();
     await expect.poll(() => primeiraUrl).not.toBe("");
-    await page.getByRole("tab", { name: "Resumo", exact: true }).click();
+    await selecionarRelatorio(page, "Resumo");
     await expect(painel.getByRole("status")).toHaveText("Carregando resumo...");
     await expect(painel.locator("dd")).toHaveCount(0);
-    await page.getByRole("tab", { name: "Histórico", exact: true }).click();
+    await selecionarRelatorio(page, "Histórico");
     await historico.getByRole("button", { name: "Mês anterior", exact: true }).click();
-    await page.getByRole("tab", { name: "Resumo", exact: true }).click();
+    await selecionarRelatorio(page, "Resumo");
     await expect(painel.locator("dd")).toHaveText(["1", "0", "0", "50%"]);
     const respostaAntiga = page.waitForResponse((resposta) => resposta.url() === primeiraUrl);
     liberar();

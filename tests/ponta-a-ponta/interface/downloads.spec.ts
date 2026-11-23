@@ -9,7 +9,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type Download, type Page } from "@playwright/test";
 import { Uint8ArrayReader, ZipReader } from "@zip.js/zip.js";
 import { ADMIN_E2E, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarRelatorio, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 const SENHA = "E2E frase exclusiva de exportação 2026!";
 test.use({ serviceWorkers: "block" });
@@ -24,8 +24,7 @@ async function abrirDownload(
   await page.goto("/");
   await aguardarHidratacao(page);
   if (tipo === "grade") {
-    await trocarVisao(page, "Relatórios", "relatorios");
-    await page.getByRole("tab", { name: "Grade" }).click();
+    await selecionarRelatorio(page, "Grade");
     const grade = page.locator('section[aria-label="Grade de frequência"]');
     const turma = grade.getByRole("button", { name: /E2E Ano A/ });
     if (await turma.isVisible().catch(() => false))

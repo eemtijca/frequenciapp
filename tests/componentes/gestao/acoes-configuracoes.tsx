@@ -19,6 +19,7 @@ const turmas: Turma[] = ["A", "B", "C"].map((nome, i) => ({
 }));
 const root = document.getElementById("root");
 if (!root) throw new Error("Elemento raiz ausente");
+const parametros = new URLSearchParams(location.search);
 createRoot(root).render(
   <ProvedorTema>
     <Suspense fallback={<p>Carregando tela de teste</p>}>
@@ -27,13 +28,13 @@ createRoot(root).render(
           id: "teste",
           nome: "Admin teste",
           email: "teste@example.test",
-          papel: "ADMIN",
+          papel: parametros.has("coordenacao") ? "COORDENACAO" : "ADMIN",
           ativo: true,
         }}
         carregadoEm="2026-03-10T12:00:00.000Z"
         diaCorrente="2026-03-10"
         fuso="America/Sao_Paulo"
-        visaoInicial="gestao"
+        visaoInicial={parametros.get("visao") ?? "gestao"}
         configuracoesIniciais={{ ...CONFIGURACOES_PADRAO, saidaAntecipada: true }}
         justificativasIniciais={[]}
         liberadoresIniciais={[]}

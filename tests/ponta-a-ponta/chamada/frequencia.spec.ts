@@ -14,6 +14,7 @@ import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { escolherMesNoPeriodo } from "../helpers/calendario";
 import { diaCorrente, diaDeChamada, tituloResumoDoDia } from "../helpers/dia";
 import {
+  selecionarRelatorio,
   abrirDiaSeResumo,
   aguardarHidratacao,
   desbloquearChamada,
@@ -214,8 +215,7 @@ test.describe("chamada com saída por aula", () => {
     await painel.getByRole("button", { name: "Ver todos", exact: true }).click();
     await expect(alunoPresente).toBeVisible();
 
-    await trocarVisao(page, "Relatórios", "relatorios");
-    await page.getByRole("tab", { name: "Histórico" }).click();
+    await selecionarRelatorio(page, "Histórico");
     const historico = page.locator('section[aria-label="Histórico de frequências"]');
     await escolherMesNoPeriodo(page, historico, "Mês do histórico", diaDeChamada().slice(0, 7));
     await expect(
@@ -268,7 +268,7 @@ test.describe("chamada com saída por aula", () => {
     await historico.getByRole("button", { name: "Voltar para este mês" }).click();
     await expect(historico.getByText("Este mês", { exact: true })).toBeVisible();
 
-    await page.getByRole("tab", { name: "Grade" }).click();
+    await selecionarRelatorio(page, "Grade");
     const grade = page.locator('section[aria-label="Grade de frequência"]');
     // Com a semente local, escolha a turma de origem do teste.
     const pilulaGrade = grade.getByRole("button", { name: /E2E Ano A/ });

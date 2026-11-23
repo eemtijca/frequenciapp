@@ -4,7 +4,7 @@ import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
 import { escolherMesNoPeriodo } from "../helpers/calendario";
 import { nomeDoMes } from "@/domain/frequencia";
-import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarRelatorio, abrirDiaSeResumo, aguardarHidratacao } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(criarMassaE2E);
@@ -98,8 +98,7 @@ test("mantém faltas e retrato quando a grade ganha aulas", async ({ page }) => 
   await expect(resumoDia).toContainText("1 presença parcial");
 
   // Resumo dos Relatórios: integral e parcial contam na turma filtrada.
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Resumo", exact: true }).click();
+  await selecionarRelatorio(page, "Resumo");
   const painel = page.getByRole("region", { name: "Resumo dos relatórios", exact: true });
   await expect(painel).toHaveAttribute("aria-busy", "false");
   const mesDaMassa = massa.dia.slice(0, 7);

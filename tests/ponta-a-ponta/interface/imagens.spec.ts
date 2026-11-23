@@ -3,7 +3,7 @@ import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { test, type Page } from "@playwright/test";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarRelatorio, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { massaDeDemonstracaoPresente } from "../helpers/banco";
 
 const pastaImagens = path.resolve(process.cwd(), "docs/imagens");
@@ -119,9 +119,7 @@ test.describe("Capturas do README", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
 
-    await trocarVisao(page, "Relatórios", "relatorios");
-    const resumo = page.getByRole("tab", { name: "Resumo" });
-    if ((await resumo.getAttribute("aria-selected")) !== "true") await resumo.click();
+    await selecionarRelatorio(page, "Resumo");
     await page.waitForTimeout(900);
     await limparFoco(page);
     await page.screenshot({

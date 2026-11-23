@@ -5,7 +5,12 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { nomeDoMes, rotuloMes } from "@/domain/frequencia";
 import { comBanco } from "../helpers/banco";
 import { diasEscolaresDaFixture } from "../helpers/dias-escolares-fixture";
-import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import {
+  selecionarRelatorio,
+  abrirDiaSeResumo,
+  aguardarHidratacao,
+  trocarVisao,
+} from "../helpers/pagina";
 
 const serie = "E2E Fluidez";
 const turmaA = `${serie} A`;
@@ -238,8 +243,7 @@ test("selecionar todos respeita a busca e a edição usa os dados atuais da linh
 test("a busca e o grupo da turma preservam os totais e o detalhe do aluno", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Por aluno", exact: true }).click();
+  await selecionarRelatorio(page, "Por aluno");
   const relatorio = page.getByRole("region", {
     name: "Relatório por aluno",
     exact: true,
@@ -303,8 +307,7 @@ test("os grupos de série e turma recolhem a lista, a busca reabre e Emitir rela
 }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Por aluno", exact: true }).click();
+  await selecionarRelatorio(page, "Por aluno");
   const relatorio = page.getByRole("region", { name: "Relatório por aluno", exact: true });
   const grupoSerie = relatorio.getByRole("region", { name: serie, exact: true });
   const grupoA = relatorio.getByRole("region", { name: turmaA, exact: true });
@@ -353,8 +356,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
   });
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Grade", exact: true }).click();
+  await selecionarRelatorio(page, "Grade");
   const grade = page.getByRole("region", {
     name: "Grade de frequência",
     exact: true,
@@ -372,7 +374,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
   await (await primeira).finished();
   const antes = consultas.length;
 
-  await page.getByRole("tab", { name: "Histórico", exact: true }).click();
+  await selecionarRelatorio(page, "Histórico");
   const historico = page.getByRole("region", {
     name: "Histórico de frequências",
     exact: true,
@@ -387,7 +389,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
   expect(consultas).toHaveLength(antes);
 
   const retomada = page.waitForResponse((resposta) => consultaDeUmDia(resposta.url()));
-  await page.getByRole("tab", { name: "Grade", exact: true }).click();
+  await selecionarRelatorio(page, "Grade");
   await (await retomada).finished();
   await expect(grade.getByRole("searchbox", { name: "Buscar aluno", exact: true })).toHaveValue(
     "alvaro",
@@ -402,7 +404,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
   await aguardarQuadros(page);
   expect(consultas).toHaveLength(aposAba);
   const volta = page.waitForResponse((resposta) => new URL(resposta.url()).searchParams.has("de"));
-  await trocarVisao(page, "Relatórios", "relatorios");
+  await trocarVisao(page, "Relatórios", "relatorios", { relatorio: "Grade" });
   await (await volta).finished();
   await expect(grade.getByRole("searchbox", { name: "Buscar aluno", exact: true })).toHaveValue(
     "alvaro",
@@ -480,8 +482,7 @@ test("buscar e percorrer horários com teclado rola apenas o painel de opções"
 test("preserva a rolagem ao trocar de visão", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Por aluno", exact: true }).click();
+  await selecionarRelatorio(page, "Por aluno");
   await expect(
     page.getByRole("region", { name: "Relatório por aluno", exact: true }),
   ).toBeVisible();
@@ -494,7 +495,7 @@ test("preserva a rolagem ao trocar de visão", async ({ page }) => {
   expect(antes).toBeGreaterThan(0);
 
   await trocarVisao(page, "Painel", "painel");
-  await trocarVisao(page, "Relatórios", "relatorios");
+  await trocarVisao(page, "Relatórios", "relatorios", { relatorio: "Por aluno" });
   await expect
     .poll(() => painelDaTela(page).evaluate((elemento) => elemento.scrollTop))
     .toBeGreaterThanOrEqual(antes - 1);

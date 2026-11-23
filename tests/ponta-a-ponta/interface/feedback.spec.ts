@@ -2,7 +2,7 @@
 import { expect, test } from "@playwright/test";
 import { ADMIN_E2E, comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { entrar } from "../helpers/auth";
-import { liberarSabadoSeNecessario, trocarVisao } from "../helpers/pagina";
+import { selecionarRelatorio, liberarSabadoSeNecessario, trocarVisao } from "../helpers/pagina";
 
 test.describe("toasts e toque duplo", () => {
   test.beforeAll(async () => {
@@ -57,17 +57,11 @@ test.describe("toasts e toque duplo", () => {
 
   test("a exportação CSV avisa com um toast", async ({ page }) => {
     await page.goto("/");
-    await trocarVisao(page, "Relatórios", "relatorios");
-    const painel = page.locator('section[aria-label="Relatórios"]');
-    await painel.getByRole("tab", { name: "Grade" }).click();
+    const painel = await selecionarRelatorio(page, "Grade");
     const pilula = painel.getByRole("button", { name: /E2E Ano A/ });
     if (await pilula.isVisible().catch(() => false))
       await pilula.evaluate((elemento: HTMLElement) => elemento.click());
-    await painel
-      .getByRole("tabpanel", { name: "Grade", exact: true })
-      .locator("table")
-      .first()
-      .waitFor();
+    await painel.getByRole("table").first().waitFor();
     await page.getByRole("button", { name: "Baixar planilha (CSV)" }).click();
     const downloadDialogo = page.getByRole("dialog", { name: "Preparar download" });
     await downloadDialogo.getByLabel("Arquivo original sem senha").check();

@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { navegarAno } from "../helpers/calendario-historico";
-import { aguardarHidratacao, escolherTurmaNaGrade, trocarVisao } from "../helpers/pagina";
+import { selecionarRelatorio, aguardarHidratacao, escolherTurmaNaGrade } from "../helpers/pagina";
 
 const nomes = {
   serie: "E2E Histórico de presenças",
@@ -93,8 +93,7 @@ test.afterEach(limpar);
 test("restaura os pontos verdes sem salvar novamente nem apagar faltas", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Grade", exact: true }).click();
+  await selecionarRelatorio(page, "Grade");
   const grade = page.getByRole("region", { name: "Grade de frequência" });
   await escolherTurmaNaGrade(page, new RegExp(`${nomes.serie} A`));
   await grade.locator("#mes-grade").click();

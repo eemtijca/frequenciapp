@@ -6,10 +6,17 @@ import { personalizacaoVaziaBi } from "@/domain/bi-personalizacao";
 import { massaDeDemonstracaoPresente } from "../helpers/banco";
 import {
   abrirConfiguracoesDaGestao,
+  fecharNavegacaoMovel,
   selecionarCadastroGestao,
   selecionarCategoriaConfiguracoes,
 } from "../../helpers/categorias-configuracoes";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import {
+  exporRelatorios,
+  selecionarRelatorio,
+  type Relatorio,
+  aguardarHidratacao,
+  trocarVisao,
+} from "../helpers/pagina";
 import {
   capturarTela,
   iniciarGaleria,
@@ -278,17 +285,16 @@ async function prepararEntradas(page: Page): Promise<void> {
   await voltarParaDiaLetivo(page, /^Data da entrada:/, "Dia anterior");
 }
 
-async function selecionarAba(page: Page, aba: string): Promise<void> {
-  const tab = page.getByRole("tab", { name: aba, exact: true });
-  if ((await tab.getAttribute("aria-selected")) !== "true") await tab.click();
-  await expect(tab).toHaveAttribute("aria-selected", "true");
-}
-
-async function prepararRelatorios(page: Page, aba: string): Promise<void> {
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await selecionarAba(page, aba);
+async function prepararRelatorios(page: Page, destino: Relatorio): Promise<void> {
+  await selecionarRelatorio(page, destino);
+  const nav = await exporRelatorios(page);
+  await expect(nav.getByRole("button", { name: destino, exact: true })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await fecharNavegacaoMovel(page);
   await expect(page.getByText(/^Carregando /).first()).toBeHidden({ timeout: 15_000 });
-  if (aba === "Saídas e Entradas") {
+  if (destino === "Saídas e Entradas") {
     const vazio = page.getByText("Nenhuma saída ou entrada neste período.", { exact: true });
     for (let tentativa = 0; tentativa < 4; tentativa += 1) {
       if ((await vazio.count()) === 0) break;

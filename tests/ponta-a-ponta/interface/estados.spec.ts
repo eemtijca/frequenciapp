@@ -3,7 +3,12 @@ import { expect, test } from "@playwright/test";
 import { mesSeguinte, ultimoDiaDeChamada } from "@/domain/frequencia";
 import { escolherMesNoPeriodo } from "../helpers/calendario";
 import { diaCorrente } from "../helpers/dia";
-import { aguardarHidratacao, escolherDataNoPeriodo, trocarVisao } from "../helpers/pagina";
+import {
+  selecionarRelatorio,
+  aguardarHidratacao,
+  escolherDataNoPeriodo,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.describe("telas de estado", () => {
   // A consulta interceptada deve passar pelo navegador; o worker tem suíte própria.
@@ -30,8 +35,7 @@ test.describe("telas de estado", () => {
 
       await page.goto("/");
       await aguardarHidratacao(page);
-      await trocarVisao(page, "Relatórios", "relatorios");
-      await page.getByRole("tab", { name: "Histórico" }).click();
+      await selecionarRelatorio(page, "Histórico");
       const historico = page.getByRole("region", { name: "Histórico de frequências", exact: true });
       const cargaDoMes = page.waitForResponse((resposta) => {
         const url = new URL(resposta.url());

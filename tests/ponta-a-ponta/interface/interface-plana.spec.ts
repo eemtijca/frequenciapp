@@ -8,7 +8,12 @@ import { expect, test, type Locator, type Page, type TestInfo } from "@playwrigh
 import { contraste, type Rgb } from "../../helpers/cor";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { tituloResumoDoDia } from "../helpers/dia";
-import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "../helpers/pagina";
+import {
+  selecionarRelatorio,
+  aguardarHidratacao,
+  escolherTurmaNaChamada,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block", actionTimeout: 15_000 });
 
@@ -188,8 +193,7 @@ test.describe("interface compartilhada", () => {
             }),
           ).toBeVisible();
         }
-        if (visao === "relatorios")
-          await page.getByRole("tab", { name: "Resumo", exact: true }).click();
+        if (visao === "relatorios") await selecionarRelatorio(page, "Resumo");
         if (visao === "gestao") await abrirConfiguracoesDaGestao(page);
         await capturar(page, info, `${visao}-${tema}`);
       }

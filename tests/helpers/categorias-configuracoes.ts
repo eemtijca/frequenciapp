@@ -1,5 +1,5 @@
 // Percorre os níveis da gaveta com os mesmos controles no desktop e no celular.
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export const menuMovel = (page: Page) =>
   page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
@@ -20,10 +20,28 @@ export async function fecharNavegacaoMovel(page: Page) {
   await expect(modal).toBeHidden();
 }
 
+export async function voltarAoMenuPrincipal(nav: Locator) {
+  const painel = nav.getByRole("button", { name: "Painel", exact: true });
+  const gestao = nav.getByRole("button", { name: "Voltar para Gestão", exact: true });
+  const principal = nav.getByRole("button", { name: "Voltar ao menu principal", exact: true });
+  await expect(painel.or(gestao).or(principal).first()).toBeVisible();
+  if (await gestao.isVisible()) {
+    await gestao.click();
+    await expect(principal).toBeVisible();
+  }
+  if (await principal.isVisible()) await principal.click();
+  await expect(painel).toBeVisible();
+}
+
 export async function exporNivelGestao(page: Page) {
   const nav = await exporNavegacao(page);
   const voltar = nav.getByRole("button", { name: "Voltar para Gestão", exact: true });
+  const resumo = nav.getByRole("button", { name: "Resumo", exact: true });
+  const series = nav.getByRole("button", { name: "Séries", exact: true });
+  const painel = nav.getByRole("button", { name: "Painel", exact: true });
+  await expect(voltar.or(resumo).or(series).or(painel).first()).toBeVisible();
   if (await voltar.isVisible()) await voltar.click();
+  else if (await resumo.isVisible()) await voltarAoMenuPrincipal(nav);
   const gestao = nav.getByRole("button", { name: /^Gestão(?: Alterações não salvas)?$/ });
   if (await gestao.isVisible()) await gestao.click();
   return nav;

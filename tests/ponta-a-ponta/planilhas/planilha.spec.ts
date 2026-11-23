@@ -8,7 +8,12 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { criarGoogleFalso, type GoogleFalso } from "../../helpers/google-falso";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, escolherTurmaNaGrade, trocarVisao } from "../helpers/pagina";
+import {
+  selecionarRelatorio,
+  aguardarHidratacao,
+  escolherTurmaNaGrade,
+  trocarVisao,
+} from "../helpers/pagina";
 import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 
 // A resposta simulada por page.route exige que o service worker não intercepte a requisição.
@@ -225,8 +230,7 @@ test.describe("Google Planilhas", () => {
     await previaGeral.getByRole("button", { name: "Fechar" }).last().click();
 
     // Prévia na Grade, sem enviar.
-    await trocarVisao(page, "Relatórios", "relatorios");
-    await page.getByRole("tab", { name: "Grade" }).click();
+    await selecionarRelatorio(page, "Grade");
     await escolherTurmaNaGrade(page, /E2E Ano A/);
     await page.getByRole("button", { name: "Enviar para a planilha" }).click();
     const dialogo = page.getByRole("dialog");
@@ -256,8 +260,7 @@ test.describe("Google Planilhas", () => {
   test("baixa o CSV da turma de origem", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Relatórios", "relatorios");
-    await page.getByRole("tab", { name: "Grade" }).click();
+    await selecionarRelatorio(page, "Grade");
     const grade = page.locator('section[aria-label="Grade de frequência"]');
     const pilula = grade.getByRole("button", { name: /E2E Ano A/ });
     if (await pilula.isVisible().catch(() => false)) await pilula.click();

@@ -317,13 +317,13 @@ Regras de composição:
 
 ### Relatórios
 
-- Sub-abas Resumo, Histórico, Grade, Por aluno e Saídas e Entradas.
+- Resumo, Histórico, Grade, Por aluno e Saídas e Entradas são destinos no painel lateral da aplicação, sem barra de abas no conteúdo. O destino ativo usa `aria-current`. Voltar ao menu principal não troca a seção; reescolher a seção ativa preserva filtros e rolagem.
 - Filtros de mês, série, turma e período.
 - Rankings de faltas, justificadas e sem justificativa.
 - Gráfico diário com tabela de dados e visualizações lado a lado no desktop.
-- Grade com P, F, FJ e S, primeira coluna fixa, total e exportação CSV.
+- Grade com P, F, FJ e S, primeira coluna fixa, total e exportação CSV. Abaixo de 600 px, o valor fechado do seletor de turma ocupa uma linha, com espaço reservado para o indicador e reticências só quando necessárias. O nome e a contagem completos continuam na descrição acessível e nas opções do menu, que podem ocupar mais de uma linha.
 - Por aluno com agrupamento por série e turma.
-- Relatório de saídas e entradas independente do mês das outras abas.
+- Relatório de saídas e entradas independente do mês das outras seções.
 - Gráficos em MUI X e tabelas no padrão de 56 e 52 px.
 
 ### Alunos

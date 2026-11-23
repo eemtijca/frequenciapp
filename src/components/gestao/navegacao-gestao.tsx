@@ -42,7 +42,7 @@ type OpcaoGavetaProps = {
   pendente?: boolean;
   expandido?: boolean;
   controla?: string;
-  foco?: "voltar" | "gestao" | "configuracoes";
+  foco?: "voltar" | "gestao" | "configuracoes" | "relatorios";
 } & (
   | { onEscolher: () => void; novaAba?: never }
   | { onEscolher?: never; novaAba: { href: string; rotulo: string } }

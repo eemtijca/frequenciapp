@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
 import {
   chromium,
+  webkit,
   expect as verificarTela,
   type Browser,
   type Locator,
@@ -17,6 +18,7 @@ import {
   menuMovel,
   selecionarCategoriaConfiguracoes,
 } from "../../helpers/categorias-configuracoes";
+import { selecionarRelatorio } from "../../ponta-a-ponta/helpers/pagina";
 
 const requireVitest = createRequire(import.meta.url);
 const caminho = requireVitest.resolve("vite", {
@@ -80,6 +82,10 @@ beforeAll(async () => {
           find: "@/components/chamada/vista-frequencia",
           replacement: path.resolve("tests/componentes/gestao/vista-chamada-lenta.tsx"),
         },
+        {
+          find: "@/components/grade/vista-grade",
+          replacement: path.resolve("tests/componentes/gestao/vista-grade-lenta.tsx"),
+        },
         { find: "@", replacement: path.resolve("src") },
         {
           find: "next/navigation",
@@ -93,7 +99,9 @@ beforeAll(async () => {
   const endereco = servidor.httpServer?.address();
   if (!endereco || typeof endereco === "string") throw new Error("Servidor indisponível");
   url = `http://127.0.0.1:${endereco.port}/tests/componentes/gestao/acoes-configuracoes.html`;
-  browser = await chromium.launch({ headless: true });
+  browser = await (process.env.NAVEGADOR_COMPONENTES === "webkit" ? webkit : chromium).launch({
+    headless: true,
+  });
 });
 afterAll(async () => {
   await browser?.close();
@@ -186,6 +194,331 @@ async function abrir(
   if (secaoInicial) await selecionarCategoriaConfiguracoes(page, "Escola", secaoInicial);
   return gravacoes;
 }
+
+const secoesRelatorios = [
+  ["Resumo", "Resumo do mês"],
+  ["Histórico", "Histórico"],
+  ["Grade", "Grade"],
+  ["Por aluno", "Por aluno"],
+  ["Saídas e Entradas", "Saídas e Entradas"],
+] as const;
+
+const gatilhoGaveta = (page: Page) => page.getByRole("button", { name: "Abrir menu", exact: true });
+const opcaoGaveta = (nav: Locator, nome: string) =>
+  nav.getByRole("button", { name: nome, exact: true });
+async function abrirRelatoriosDeTeste(page: Page, consulta = "relatorios") {
+  await page.route("**/api/**", (route) => route.fulfill({ status: 503, json: {} }));
+  await page.goto(`${url}?visao=${consulta}`);
+}
+
+it.each(["Escape", "Fechar menu", "véu"])(
+  "gaveta de Relatórios: dispensar por %s mantém o Painel, o endereço e o foco",
+  async (dispensa) => {
+    const page = await novaPagina(390);
+    try {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await abrirRelatoriosDeTeste(page, "painel");
+      await verificarTela(page.getByRole("group", { name: "Painel", exact: true })).toBeVisible();
+      await verificarTela(page).not.toHaveURL(/visao=/);
+      const antes = page.url();
+
+      const nav = await exporNavegacao(page);
+      await opcaoGaveta(nav, "Relatórios").press("Enter");
+      await verificarTela(opcaoGaveta(nav, "Voltar ao menu principal")).toBeFocused();
+      if (dispensa === "Escape") await page.keyboard.press("Escape");
+      else if (dispensa === "Fechar menu") await opcaoGaveta(menuMovel(page), dispensa).click();
+      else await page.mouse.click(385, 400); // Fora do painel, no véu do modal.
+
+      await verificarTela(menuMovel(page)).not.toBeAttached();
+      await verificarTela(gatilhoGaveta(page)).toBeFocused();
+      await verificarTela(page.getByRole("group", { name: "Painel", exact: true })).toBeVisible();
+      await verificarTela(page).toHaveURL(antes);
+      await exporNavegacao(page);
+      await verificarTela(opcaoGaveta(nav, "Painel")).toHaveAttribute("aria-current", "page");
+    } finally {
+      await page.close();
+    }
+  },
+);
+
+it("gaveta de Relatórios: reescolher mantém a rolagem e o filtro sem atualizar", async () => {
+  const page = await novaPagina(390, 260);
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const pedidos: string[] = [];
+    page.on("request", (pedido) => {
+      if (new URL(pedido.url()).pathname.startsWith("/api/")) pedidos.push(pedido.url());
+    });
+    await abrirRelatoriosDeTeste(page);
+    const nav = await exporNavegacao(page);
+    const opcao = opcaoGaveta(nav, "Por aluno");
+    await opcao.press("Enter");
+    await verificarTela(menuMovel(page)).not.toBeAttached();
+    const painel = page.getByRole("group", { name: "Relatórios", exact: true });
+    const titulo = painel.getByRole("heading", { name: "Por aluno", exact: true });
+    const busca = painel.getByRole("searchbox", { name: "Buscar aluno", exact: true });
+    await busca.fill("Pessoa sintética");
+    const rolagem = () => painel.evaluate((el) => el.scrollTop);
+    await painel.evaluate((el) => el.scrollTo({ top: 80 }));
+    await verificarTela.poll(rolagem).toBeGreaterThan(20);
+    const antes = await rolagem();
+
+    await exporNavegacao(page);
+    await verificarTela(opcao).toHaveAttribute("aria-current", "page");
+    await verificarTela(opcao).toBeFocused();
+    const total = pedidos.length;
+    await opcao.press("Enter");
+    await verificarTela(menuMovel(page)).not.toBeAttached();
+    await verificarTela(titulo).toBeFocused();
+    expect(await rolagem()).toBe(antes);
+    await verificarTela(busca).toHaveValue("Pessoa sintética");
+    expect(pedidos).toHaveLength(total);
+  } finally {
+    await page.close();
+  }
+});
+
+it("gaveta de Relatórios: fecha com a Grade suspensa e foca só o título novo", async () => {
+  const page = await novaPagina(390);
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await abrirRelatoriosDeTeste(page, "relatorios&grade-lenta");
+    const origem = page.getByRole("heading", { name: "Resumo do mês", exact: true });
+    const destino = page.getByRole("heading", { name: "Grade", exact: true });
+    await verificarTela(origem).toBeVisible();
+    await origem.evaluate((cabecalho) => {
+      cabecalho.addEventListener("focus", () => cabecalho.setAttribute("data-focado-no-teste", ""));
+    });
+    const nav = await exporNavegacao(page);
+    await opcaoGaveta(nav, "Grade").press("Enter");
+    await verificarTela(menuMovel(page)).not.toBeAttached({ timeout: 2000 });
+    await verificarTela(origem).toBeVisible();
+    await verificarTela(origem).not.toBeFocused();
+    await verificarTela(destino).toBeHidden();
+    await page.evaluate(() => window.dispatchEvent(new Event("liberar-grade-teste")));
+    await verificarTela(destino).toBeFocused();
+    await verificarTela(origem).toBeHidden();
+    await verificarTela(page.locator("[data-focado-no-teste]")).toHaveCount(0);
+  } finally {
+    await page.close();
+  }
+});
+
+it("gaveta de Relatórios: atravessar 904/905 com o modal aberto não escolhe o Resumo", async () => {
+  const page = await novaPagina(904);
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await abrirRelatoriosDeTeste(page, "painel");
+    const nav = await exporNavegacao(page);
+    await opcaoGaveta(nav, "Relatórios").press("Enter");
+    await verificarTela(opcaoGaveta(nav, "Voltar ao menu principal")).toBeFocused();
+    await page.setViewportSize({ width: 905, height: 844 });
+    await verificarTela(menuMovel(page)).not.toBeAttached();
+    await verificarTela(opcaoGaveta(nav, "Painel")).toHaveAttribute("aria-current", "page");
+    await verificarTela(opcaoGaveta(nav, "Painel")).toBeFocused();
+    await opcaoGaveta(nav, "Relatórios").press("Enter");
+    await verificarTela(page.getByRole("heading", { name: "Resumo do mês" })).toBeVisible();
+  } finally {
+    await page.close();
+  }
+});
+
+it("gaveta de Relatórios: helper espera a saída móvel sem apertar Fechar menu", async () => {
+  const page = await novaPagina(390);
+  try {
+    page.setDefaultTimeout(3000);
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await abrirRelatoriosDeTeste(page);
+    const nav = await exporNavegacao(page);
+    await verificarTela(opcaoGaveta(nav, "Resumo")).toBeFocused();
+    const dispensas: string[] = [];
+    await page.exposeFunction("registrarDispensa", () => dispensas.push("Fechar menu"));
+    await opcaoGaveta(menuMovel(page), "Fechar menu").evaluate((botao) => {
+      const janela = window as Window & { registrarDispensa?: () => Promise<number> };
+      botao.addEventListener("click", () => void janela.registrarDispensa?.());
+    });
+    const painel = await selecionarRelatorio(page, "Por aluno");
+    await verificarTela(menuMovel(page)).not.toBeAttached();
+    await verificarTela(painel.getByRole("heading", { name: "Por aluno" })).toBeFocused();
+    expect(dispensas).toEqual([]);
+
+    await exporNavegacao(page);
+    const anterior = opcaoGaveta(nav, "Por aluno");
+    await verificarTela(anterior).toHaveAttribute("aria-current", "page");
+    await verificarTela(anterior).toBeFocused();
+    await page.keyboard.press("Tab");
+    await verificarTela(opcaoGaveta(nav, "Saídas e Entradas")).toBeFocused();
+  } finally {
+    await page.close();
+  }
+});
+
+it.each([
+  { largura: 320, papel: "coordenacao" },
+  { largura: 390, papel: "admin" },
+  { largura: 904, papel: "coordenacao" },
+  { largura: 905, papel: "admin" },
+  { largura: 1440, papel: "coordenacao" },
+])("Relatórios: cinco destinos na gaveta a $largura px ($papel)", async ({ largura, papel }) => {
+  const page = await novaPagina(largura);
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.route("**/api/**", (route) =>
+      route.fulfill({ status: 503, json: { error: "Indisponível no teste" } }),
+    );
+    await page.goto(`${url}?visao=painel&${papel}`);
+    const nav = await exporNavegacao(page);
+    const menu = menuMovel(page);
+    const movel = largura < 905;
+    const opcao = (name: string) => nav.getByRole("button", { name, exact: true });
+    await verificarTela(opcao("Gestão")).toHaveCount(papel === "admin" ? 1 : 0);
+    await opcao("Relatórios").press("Enter");
+    await verificarTela(opcao("Voltar ao menu principal")).toBeFocused({ timeout: 3000 });
+    await verificarTela(menu)[movel ? "toBeVisible" : "toBeHidden"]();
+    expect(await nav.getByRole("button").allTextContents()).toEqual([
+      "Voltar ao menu principal",
+      ...secoesRelatorios.map(([rotulo]) => rotulo),
+    ]);
+    if (movel) await verificarTela(nav.locator('[aria-current="page"]')).toHaveCount(0);
+    else await verificarTela(opcao("Resumo")).toHaveAttribute("aria-current", "page");
+
+    const relatorios = page.getByRole("group", { name: "Relatórios", exact: true });
+    for (const [rotulo, titulo] of secoesRelatorios) {
+      await exporNavegacao(page);
+      await opcao(rotulo).press("Space");
+      await verificarTela(menu).not.toBeAttached();
+      const cabecalho = relatorios.getByRole("heading", { name: titulo, exact: true });
+      await verificarTela(cabecalho).toBeVisible();
+      if (movel) await verificarTela(cabecalho).toBeFocused();
+      await verificarTela(
+        relatorios.locator('[role="tablist"], [role="tab"], [role="tabpanel"]'),
+      ).toHaveCount(0);
+      await exporNavegacao(page);
+      await verificarTela(nav.locator('[aria-current="page"]')).toHaveText(rotulo);
+    }
+
+    await opcao("Voltar ao menu principal").press("Enter");
+    await verificarTela(opcao("Relatórios")).toBeFocused();
+    await verificarTela(opcao("Relatórios")).toHaveAttribute("aria-current", "page");
+    if (movel) {
+      await page.keyboard.press("Escape");
+      await verificarTela(menu).not.toBeAttached();
+      await verificarTela(
+        page.getByRole("button", { name: "Abrir menu", exact: true }),
+      ).toBeFocused();
+    }
+    await verificarTela(
+      relatorios.getByRole("heading", { name: "Saídas e Entradas", exact: true }),
+    ).toBeVisible();
+  } finally {
+    await page.close();
+  }
+});
+
+it.each([
+  { alias: "grade", titulo: "Grade", largura: 390 },
+  { alias: "historico", titulo: "Histórico", largura: 905 },
+])(
+  "Relatórios: link antigo $alias abre o destino e o nível correspondente",
+  async ({ alias, titulo, largura }) => {
+    const page = await novaPagina(largura);
+    try {
+      await page.route("**/api/**", (route) => route.fulfill({ status: 503, json: {} }));
+      await page.goto(`${url}?visao=${alias}&coordenacao`);
+      const cabecalho = page.getByRole("heading", { name: titulo, exact: true });
+      await verificarTela(cabecalho).toBeVisible();
+      await verificarTela(menuMovel(page)).not.toBeAttached();
+      const nav = await exporNavegacao(page);
+      await verificarTela(nav.locator('[aria-current="page"]')).toHaveText(titulo);
+      await verificarTela(
+        nav.getByRole("button", { name: "Voltar ao menu principal" }),
+      ).toBeVisible();
+      const atual = new URL(page.url());
+      expect(atual.searchParams.get("visao")).toBe("relatorios");
+    } finally {
+      await page.close();
+    }
+  },
+);
+
+it("Relatórios: preserva busca, destino e atualização ao voltar e ao sair da visão", async () => {
+  const page = await novaPagina(1440);
+  try {
+    // O Chromium sem rede externa sinaliza offline mesmo servindo a fixture local.
+    await page.addInitScript(() => Object.defineProperty(navigator, "onLine", { get: () => true }));
+    await page.route("**/api/**", (route) => {
+      const url = new URL(route.request().url());
+      if (url.pathname === "/api/frequencias" && url.searchParams.has("mes"))
+        return route.fulfill({ json: { frequencias: [] } });
+      if (url.pathname === "/api/frequencias/resumo")
+        return route.fulfill({ json: { resumo: null } });
+      return route.fulfill({ status: 503, json: {} });
+    });
+    await page.goto(`${url}?visao=relatorios`);
+    const nav = await exporNavegacao(page);
+    const escolher = (name: string) => nav.getByRole("button", { name, exact: true }).click();
+    await escolher("Por aluno");
+    const busca = page.getByRole("searchbox", { name: "Buscar aluno", exact: true });
+    await busca.fill("Pessoa sintética");
+    await escolher("Histórico");
+    await verificarTela(busca).toBeHidden();
+    await escolher("Por aluno");
+    await verificarTela(busca).toHaveValue("Pessoa sintética");
+    await escolher("Voltar ao menu principal");
+    await verificarTela(busca).toHaveValue("Pessoa sintética");
+    await escolher("Painel");
+    await verificarTela(busca).toBeHidden();
+    await escolher("Relatórios");
+    await verificarTela(nav.locator('[aria-current="page"]')).toHaveText("Por aluno");
+    await verificarTela(busca).toHaveValue("Pessoa sintética");
+    const resposta = page.waitForResponse(
+      (r) =>
+        new URL(r.url()).pathname === "/api/frequencias" &&
+        new URL(r.url()).searchParams.get("mes") === "2026-03",
+    );
+    await page.getByRole("button", { name: "Atualizar tela", exact: true }).click();
+    expect((await resposta).status()).toBe(200);
+    await verificarTela(busca).toHaveValue("Pessoa sintética");
+  } finally {
+    await page.close();
+  }
+});
+
+it("Relatórios: cancelar a troca mantém o rascunho e confirmar não grava", async () => {
+  const page = await novaPagina(390);
+  try {
+    const gravacoes = await abrir(page, "light");
+    const justificativas = page.getByRole("region", { name: "Justificativas", exact: true });
+    await justificativas.getByRole("button", { name: "Adicionar justificativa" }).click();
+    await justificativas.getByLabel("Código", { exact: true }).fill("Ui");
+    await justificativas.getByLabel("Rótulo", { exact: true }).fill("Rascunho sintético");
+    await justificativas.getByRole("button", { name: "Adicionar ao rascunho" }).click();
+    const aviso = page.getByRole("alertdialog", { name: "Há configurações não salvas" });
+    const porAluno = page.getByRole("heading", { name: "Por aluno", exact: true });
+    for (const decisao of ["Continuar aqui", "Mudar de tela"]) {
+      const nav = await exporNavegacao(page);
+      await nav.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
+      await nav.getByRole("button", { name: "Voltar ao menu principal", exact: true }).click();
+      await nav.getByRole("button", { name: "Relatórios", exact: true }).click();
+      await verificarTela(aviso).toBeHidden();
+      await opcaoGaveta(nav, "Por aluno").click();
+      await aviso.getByRole("button", { name: decisao, exact: true }).click();
+      await verificarTela(aviso).toBeHidden();
+      if (decisao === "Continuar aqui") {
+        await verificarTela(porAluno).toBeHidden();
+        await verificarTela(gatilhoGaveta(page)).toBeFocused();
+        await selecionarCategoriaConfiguracoes(page, "Escola", "Cadastros");
+        await verificarTela(justificativas.getByText("Rascunho sintético")).toBeVisible();
+      }
+    }
+    await verificarTela(porAluno).toBeFocused();
+    await selecionarCategoriaConfiguracoes(page, "Escola", "Cadastros");
+    await verificarTela(justificativas.getByText("Rascunho sintético")).toBeVisible();
+    expect(gravacoes).toEqual([]);
+  } finally {
+    await page.close();
+  }
+});
 
 it.each([320, 390, 1440])("separa os selos da planilha de frequência a %i px", async (largura) => {
   const page = await novaPagina(largura, 844);

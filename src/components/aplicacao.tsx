@@ -82,7 +82,11 @@ import VistaChamadaParcial from "@/components/chamada-parcial/vista-frequencia-p
 import VistaHorarios from "@/components/horarios/vista-horarios";
 import VistaPainel from "@/components/painel/vista-painel";
 import VistaMovimentacoes from "@/components/movimentacoes/vista-movimentacoes";
-import VistaRelatorios, { type AbaRelatorio } from "@/components/relatorios/vista-relatorios";
+import VistaRelatorios from "@/components/relatorios/vista-relatorios";
+import {
+  OpcoesRelatorios,
+  type DestinoRelatorios,
+} from "@/components/relatorios/navegacao-relatorios";
 import VistaAlunos from "@/components/alunos/vista-alunos";
 import VistaGestao from "@/components/gestao/vista-gestao";
 import {
@@ -166,10 +170,8 @@ function visaoValida(valor: string | undefined): Visao | null {
   return VISOES.find((visao) => visao === valor) ?? null;
 }
 
-function abaRelatoriosDe(valor: string | undefined): AbaRelatorio | undefined {
-  if (valor === "historico") return "historico";
-  if (valor === "grade") return "grade";
-  return undefined;
+function destinoRelatoriosDe(valor: string | undefined): DestinoRelatorios {
+  return valor === "historico" || valor === "grade" ? valor : "resumo";
 }
 
 function larguraDaVisao(visao: Visao): LarguraConteudo {
@@ -213,8 +215,8 @@ const ITENS_FIM: ItemNav[] = [
   { visao: "gestao", rotulo: "Gestão", icone: SettingsRoundedIcon },
 ];
 
-type NivelGaveta = "principal" | "gestao" | "configuracoes";
-type FocoNivel = "voltar" | "gestao" | "configuracoes";
+type NivelGaveta = "principal" | "gestao" | "configuracoes" | "relatorios";
+type FocoNivel = "voltar" | Exclude<NivelGaveta, "principal">;
 type EstadoGaveta = { nivel: NivelGaveta; foco?: FocoNivel; sentido?: "entrar" | "voltar" };
 
 function ListaGaveta({
@@ -278,7 +280,8 @@ function ListaGaveta({
   );
 }
 
-type DestinoFocoMenu = "gatilho" | "titulo" | "dialogo" | { visao: Visao };
+type DestinoNavegacao = { visao: Visao; relatorio?: DestinoRelatorios };
+type DestinoFocoMenu = "gatilho" | "titulo" | "dialogo" | "largura" | DestinoNavegacao;
 type FecharMenu = (destino?: DestinoFocoMenu) => void;
 
 function focarTituloAtivo(conteudo: HTMLElement | null) {
@@ -286,7 +289,13 @@ function focarTituloAtivo(conteudo: HTMLElement | null) {
   const tituloConfiguracoes = painel?.querySelector<HTMLElement>(
     "[data-titulo-configuracoes]:not([hidden] *)",
   );
-  const titulo = tituloConfiguracoes ?? painel?.querySelector<HTMLElement>("h1:not([hidden] *)");
+  const tituloRelatorio = painel?.querySelector<HTMLElement>(
+    'section[aria-label="Relatórios"] :is(h1, h2):not([hidden] *)',
+  );
+  const titulo =
+    tituloConfiguracoes ??
+    tituloRelatorio ??
+    painel?.querySelector<HTMLElement>("h1:not([hidden] *)");
   const alvo = titulo ?? painel ?? conteudo;
   if (!alvo) return;
   alvo.tabIndex = -1;
@@ -323,7 +332,7 @@ interface MenuMovelProps {
   conteudoRef: React.RefObject<HTMLElement | null>;
   pendente: boolean;
   onAbrir: () => void;
-  onFechado: (destino?: Visao) => void;
+  onFechado: (destino: DestinoFocoMenu) => void;
   renderizarConteudo: (fechar: FecharMenu) => React.ReactNode;
 }
 
@@ -360,7 +369,7 @@ function MenuMovel({
     const desktop = window.matchMedia(`(min-width: ${BREAKPOINTS.md}px)`);
     function aoMudarLargura() {
       if (!desktop.matches || !aberto) return;
-      setDestinoFoco("titulo");
+      setDestinoFoco("largura");
       setAberto(false);
     }
     desktop.addEventListener("change", aoMudarLargura);
@@ -387,11 +396,12 @@ function MenuMovel({
   function concluirFechamento() {
     // Chega depois de o Material UI devolver o body; a marca já pode sair.
     raizRef.current?.removeAttribute("data-gaveta-aberta");
-    onFechado(typeof destinoFoco === "object" ? destinoFoco.visao : undefined);
-    if (destinoFoco === "dialogo") return;
+    onFechado(destinoFoco);
     if (destinoFoco === "gatilho" && gatilhoRef.current?.getClientRects().length) {
       gatilhoRef.current.focus({ preventScroll: true });
-    } else if (typeof destinoFoco === "string") focarTituloAtivo(conteudoRef.current);
+    } else if (destinoFoco === "gatilho" || destinoFoco === "titulo") {
+      focarTituloAtivo(conteudoRef.current);
+    }
   }
 
   return (
@@ -592,8 +602,19 @@ export default function Aplicacao({
     planilhaInicial ? null : "escola",
   );
   const [gaveta, setGaveta] = useState<EstadoGaveta>(() => ({
-    nivel: inicial !== "gestao" ? "principal" : emConfiguracoes ? "configuracoes" : "gestao",
+    nivel:
+      inicial === "gestao" && emConfiguracoes
+        ? "configuracoes"
+        : inicial === "gestao" || inicial === "relatorios"
+          ? inicial
+          : "principal",
   }));
+  const [destinoRelatorios, setDestinoRelatorios] = useState(() =>
+    destinoRelatoriosDe(visaoInicial),
+  );
+  // A exploração do submenu móvel não altera a visão nem a gaveta permanente.
+  const [explorandoRelatorios, setExplorandoRelatorios] = useState(false);
+  const relatorioAnterior = useRef(destinoRelatorios);
   const [visitadas, setVisitadas] = useState<Set<Visao>>(() => new Set([inicial]));
   const [series, setSeries] = useState<Serie[]>(seriesIniciais);
   const [turmas, setTurmas] = useState<Turma[]>(turmasIniciais);
@@ -618,39 +639,64 @@ export default function Aplicacao({
   const [pendencias, setPendencias] = useState<Visao[]>([]);
   const [configuracaoPendente, setConfiguracaoPendente] = useState(false);
   const [saidaComPendencia, setSaidaComPendencia] = useState(false);
-  const [visaoComPendencia, setVisaoComPendencia] = useState<Visao | null>(null);
+  const [navegacaoPendente, setNavegacaoPendente] = useState<DestinoNavegacao | null>(null);
   const [senhaAberta, setSenhaAberta] = useState(false);
   const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
   const [sobreAberto, setSobreAberto] = useState(false);
   const gatilhoMenuRef = useRef<HTMLButtonElement | null>(null);
   const origemDialogoRef = useRef<HTMLElement | null>(null);
-  const destinoConfirmadoRef = useRef<Visao | null>(null);
-  const visaoAguardadaRef = useRef<Visao | null>(null);
+  const destinoConfirmadoRef = useRef<DestinoNavegacao | null>(null);
+  const destinoAguardadoRef = useRef<DestinoNavegacao | null>(null);
   const conteudoRef = useRef<HTMLElement | null>(null);
   const raizRef = useRef<HTMLDivElement | null>(null);
   const [offline, setOffline] = useState(false);
-  const [abaRelatoriosInicial] = useState<AbaRelatorio | undefined>(() =>
-    abaRelatoriosDe(visaoInicial),
-  );
   const pagerRef = useRef<HTMLDivElement | null>(null);
+  // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
+  const posicoes = useRef(new Map<Visao, number>());
 
-  // O fechamento do modal e o commit da nova visão podem ocorrer em qualquer ordem.
+  useLayoutEffect(() => {
+    if (relatorioAnterior.current === destinoRelatorios) return;
+    relatorioAnterior.current = destinoRelatorios;
+    posicoes.current.delete("relatorios");
+    pagerRef.current
+      ?.querySelector<HTMLElement>('section[role="group"][aria-label="Relatórios"]')
+      ?.scrollTo({ top: 0 });
+  }, [destinoRelatorios]);
+
+  // O fechamento do modal e o commit da visão e seção podem ocorrer em qualquer ordem.
   const tentarFocarVisaoAtiva = useCallback(() => {
-    const conteudo = conteudoRef.current;
+    const destino = destinoAguardadoRef.current;
     if (
-      !visaoAguardadaRef.current ||
-      conteudo?.dataset.visao !== visaoAguardadaRef.current ||
+      !destino ||
+      visao !== destino.visao ||
+      (destino.relatorio !== undefined && destinoRelatorios !== destino.relatorio) ||
       raizRef.current?.hasAttribute("data-gaveta-aberta")
     )
       return;
-    visaoAguardadaRef.current = null;
-    focarTituloAtivo(conteudo);
-  }, []);
-  useLayoutEffect(tentarFocarVisaoAtiva, [visao, tentarFocarVisaoAtiva]);
+    destinoAguardadoRef.current = null;
+    focarTituloAtivo(conteudoRef.current);
+  }, [visao, destinoRelatorios]);
+  useLayoutEffect(tentarFocarVisaoAtiva, [tentarFocarVisaoAtiva]);
 
-  function focarDepoisDoFechamento(destino?: Visao) {
-    if (destino) visaoAguardadaRef.current = destino;
+  function focarDepoisDoFechamento(destino: DestinoNavegacao) {
+    destinoAguardadoRef.current = destino;
     tentarFocarVisaoAtiva();
+  }
+
+  function aoFecharMenu(destino: DestinoFocoMenu) {
+    setExplorandoRelatorios(false);
+    if (typeof destino === "object") focarDepoisDoFechamento(destino);
+    else if (destino === "largura") {
+      const opcao = explorandoRelatorios
+        ? raizRef.current?.querySelector<HTMLElement>(
+            'aside[aria-label="Navegação do aplicativo"] nav [aria-current="page"]',
+          )
+        : null;
+      if (opcao?.getClientRects().length) opcao.focus({ preventScroll: true });
+      else focarTituloAtivo(conteudoRef.current);
+    } else if (destino === "dialogo") {
+      tentarFocarVisaoAtiva();
+    }
   }
 
   const itemFinal = useMemo(
@@ -671,8 +717,6 @@ export default function Aplicacao({
   }, [configuracoes.saidaAntecipada, ehAdmin, itemFinal, podeOperar]);
   const indiceAtivo = itens.findIndex((item) => item.visao === visao);
   const tituloAtual = itens.find((item) => item.visao === visao)?.rotulo ?? "FrequenciApp";
-  // Posição de rolagem de cada painel, para os painéis distantes não a perderem.
-  const posicoes = useRef(new Map<Visao, number>());
 
   const rotuloTurma = useCallback(
     (id: string) => turmas.find((t) => t.id === id)?.rotulo ?? "",
@@ -769,7 +813,7 @@ export default function Aplicacao({
         setEmConfiguracoes(false);
         setGaveta({ nivel: "gestao" });
       } else {
-        setGaveta({ nivel: "principal" });
+        setGaveta({ nivel: proxima === "relatorios" ? "relatorios" : "principal" });
       }
       setVisitadas((atuais) => (atuais.has(proxima) ? atuais : new Set(atuais).add(proxima)));
     },
@@ -787,7 +831,7 @@ export default function Aplicacao({
     (proxima: Visao) => {
       if (!itens.some((item) => item.visao === proxima) || proxima === visao) return;
       if (visaoComRascunho(visao)) {
-        setVisaoComPendencia(proxima);
+        setNavegacaoPendente({ visao: proxima });
         return;
       }
       ativarVisao(proxima);
@@ -819,6 +863,37 @@ export default function Aplicacao({
     }
     if (visao !== "gestao") ativarVisao("gestao");
     setGaveta({ nivel: "gestao", foco: "voltar", sentido: "entrar" });
+  }
+
+  function abrirNivelRelatorios(fecharMenu?: FecharMenu) {
+    if (fecharMenu && visao !== "relatorios") {
+      setExplorandoRelatorios(true);
+      return;
+    }
+    if (visao !== "relatorios" && visaoComRascunho(visao)) {
+      origemDialogoRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      trocarVisao("relatorios");
+      return;
+    }
+    if (visao !== "relatorios") ativarVisao("relatorios");
+    setGaveta({ nivel: "relatorios", foco: "voltar", sentido: "entrar" });
+  }
+
+  function escolherRelatorio(destino: DestinoRelatorios, fecharMenu?: FecharMenu) {
+    const proxima: DestinoNavegacao = { visao: "relatorios", relatorio: destino };
+    if (visao !== "relatorios" && visaoComRascunho(visao)) {
+      origemDialogoRef.current = gatilhoMenuRef.current;
+      fecharMenu?.("dialogo");
+      setNavegacaoPendente(proxima);
+      return;
+    }
+    fecharMenu?.(proxima);
+    if (visao === "relatorios" && destinoRelatorios === destino) return;
+    startTransition(() => {
+      if (visao !== "relatorios") ativarVisao("relatorios");
+      setDestinoRelatorios(destino);
+    });
   }
 
   function rolarGestaoAoTopo() {
@@ -1075,7 +1150,7 @@ export default function Aplicacao({
             ativo={ativo}
             carregando={carregandoFrequencias}
             erro={erroFrequencias}
-            abaInicial={abaRelatoriosInicial}
+            destino={destinoRelatorios}
             mes={mes}
             mesCorrente={diaCorrente.slice(0, 7)}
             diaCorrente={diaCorrente}
@@ -1156,6 +1231,10 @@ export default function Aplicacao({
   }
 
   function renderizarMenu(movel: boolean, fecharMenu?: FecharMenu) {
+    const estado: EstadoGaveta =
+      movel && explorandoRelatorios
+        ? { nivel: "relatorios", foco: "voltar", sentido: "entrar" }
+        : gaveta;
     return (
       <Box
         sx={{
@@ -1203,8 +1282,17 @@ export default function Aplicacao({
             py: 1.5,
           }}
         >
-          <ListaGaveta estado={ehAdmin ? gaveta : { nivel: "principal" }} movel={movel}>
-            {ehAdmin && gaveta.nivel === "gestao" ? (
+          <ListaGaveta estado={estado} movel={movel}>
+            {estado.nivel === "relatorios" ? (
+              <OpcoesRelatorios
+                atual={visao === "relatorios" ? destinoRelatorios : null}
+                onEscolher={(destino) => escolherRelatorio(destino, fecharMenu)}
+                onVoltar={() => {
+                  setExplorandoRelatorios(false);
+                  setGaveta({ nivel: "principal", foco: "relatorios", sentido: "voltar" });
+                }}
+              />
+            ) : ehAdmin && estado.nivel === "gestao" ? (
               <OpcoesGestao
                 atual={emConfiguracoes ? "configuracoes" : cadastro}
                 pendente={visaoComRascunho("gestao")}
@@ -1219,7 +1307,7 @@ export default function Aplicacao({
                   setGaveta({ nivel: "principal", foco: "gestao", sentido: "voltar" })
                 }
               />
-            ) : ehAdmin && gaveta.nivel === "configuracoes" ? (
+            ) : ehAdmin && estado.nivel === "configuracoes" ? (
               <OpcoesConfiguracoes
                 atual={destinoConfiguracoes}
                 expandida={categoriaExpandida}
@@ -1243,14 +1331,23 @@ export default function Aplicacao({
                       rotulo={item.rotulo}
                       icone={item.icone}
                       atual={visao === item.visao}
-                      foco={item.visao === "gestao" ? "gestao" : undefined}
-                      indicador={item.visao === "gestao" ? ChevronRightRoundedIcon : undefined}
+                      foco={
+                        item.visao === "gestao" || item.visao === "relatorios"
+                          ? item.visao
+                          : undefined
+                      }
+                      indicador={
+                        item.visao === "gestao" || item.visao === "relatorios"
+                          ? ChevronRightRoundedIcon
+                          : undefined
+                      }
                       pendente={
                         pendencias.includes(item.visao) ||
                         (item.visao === "gestao" && visaoComRascunho("gestao"))
                       }
                       onEscolher={() => {
                         if (item.visao === "gestao") abrirNivelGestao(fecharMenu);
+                        else if (item.visao === "relatorios") abrirNivelRelatorios(fecharMenu);
                         else if (fecharMenu) navegarPeloMenu(item.visao, fecharMenu);
                         else trocarVisao(item.visao);
                       }}
@@ -1399,9 +1496,9 @@ export default function Aplicacao({
                   conteudoRef={conteudoRef}
                   pendente={pendencias.length > 0 || configuracaoPendente}
                   onAbrir={() => {
-                    visaoAguardadaRef.current = null;
+                    destinoAguardadoRef.current = null;
                   }}
-                  onFechado={focarDepoisDoFechamento}
+                  onFechado={aoFecharMenu}
                   renderizarConteudo={(fechar) => renderizarMenu(true, fechar)}
                 />
               </Box>
@@ -1536,7 +1633,7 @@ export default function Aplicacao({
         />
 
         <DialogoPendencia
-          aberto={visaoComPendencia !== null}
+          aberto={navegacaoPendente !== null}
           titulo={
             visao === "gestao"
               ? configuracaoPendente
@@ -1546,13 +1643,16 @@ export default function Aplicacao({
           }
           descricao="As alterações continuam pendentes. Ao voltar, será possível salvá-las."
           rotuloConfirmar="Mudar de tela"
-          onCancelar={() => setVisaoComPendencia(null)}
+          onCancelar={() => setNavegacaoPendente(null)}
           onConfirmar={() => {
-            const proxima = visaoComPendencia;
-            setVisaoComPendencia(null);
+            const proxima = navegacaoPendente;
+            setNavegacaoPendente(null);
             if (!proxima) return;
             destinoConfirmadoRef.current = proxima;
-            startTransition(() => ativarVisao(proxima));
+            startTransition(() => {
+              ativarVisao(proxima.visao);
+              if (proxima.relatorio !== undefined) setDestinoRelatorios(proxima.relatorio);
+            });
           }}
           onFechado={() => {
             const destino = destinoConfirmadoRef.current;

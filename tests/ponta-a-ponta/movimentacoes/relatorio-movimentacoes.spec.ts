@@ -6,7 +6,7 @@ import type {
   RelatorioMovimentacoes,
 } from "@/domain/relatorio-movimentacoes";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { aguardarHidratacao, exporRelatorios, selecionarRelatorio } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(async () => {
@@ -90,8 +90,7 @@ function resultado(url: string, turmas: Turma[]): RelatorioMovimentacoes {
 async function abrir(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Saídas e Entradas", exact: true }).click();
+  await selecionarRelatorio(page, "Saídas e Entradas");
   return page.getByRole("region", { name: "Relatório de saídas e entradas", exact: true });
 }
 
@@ -126,7 +125,7 @@ async function escolherDia(page: Page, painel: Locator, rotulo: string, dia: str
   await expect(calendario).toHaveCount(0);
 }
 
-test("agrupa duas turmas, filtra os registros e mantém as cinco abas legíveis no celular", async ({
+test("agrupa duas turmas, filtra os registros e mantém os destinos legíveis no celular", async ({
   page,
 }, info) => {
   const turmas = await turmasDoTeste(page);
@@ -142,13 +141,20 @@ test("agrupa duas turmas, filtra os registros e mantém as cinco abas legíveis 
   await expect(grupoA).toContainText("Atraso do transporte escolar");
   await expect(grupoA).toContainText("E2E Secretaria");
 
-  const aba = page.getByRole("tab", { name: "Saídas e Entradas", exact: true });
+  const opcao = (nav: Locator, name: string) => nav.getByRole("button", { name, exact: true });
+  const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
   for (const largura of [360, 320]) {
     await page.setViewportSize({ width: largura, height: 780 });
-    await expect(aba).toBeVisible();
-    expect(await aba.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth)).toBe(
+    const nav = await exporRelatorios(page);
+    const destino = opcao(nav, "Saídas e Entradas");
+    await expect(destino).toHaveAttribute("aria-current", "page");
+    const rotulo = destino.getByText("Saídas e Entradas", { exact: true });
+    await expect(rotulo).toBeVisible();
+    expect(await rotulo.evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth)).toBe(
       true,
     );
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
     await expect
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
       .toBe(true);
@@ -161,12 +167,28 @@ test("agrupa duas turmas, filtra os registros e mantém as cinco abas legíveis 
       }),
     ).toBe(true);
   }
-  await aba.focus();
-  await aba.press("ArrowLeft");
-  await expect(aba).toHaveAttribute("aria-selected", "false");
-  await page.keyboard.press("ArrowRight");
-  await expect(aba).toHaveAttribute("aria-selected", "true");
-  await expect(aba).toBeFocused();
+  const nav = await exporRelatorios(page);
+  await expect(opcao(nav, "Saídas e Entradas")).toBeFocused();
+  await page.keyboard.press("Shift+Tab");
+  await expect(opcao(nav, "Por aluno")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(menu).toBeHidden();
+  await expect(page.getByRole("heading", { name: "Por aluno", exact: true })).toBeFocused();
+  await exporRelatorios(page);
+  await expect(opcao(nav, "Por aluno")).toHaveAttribute("aria-current", "page");
+  await expect(opcao(nav, "Por aluno")).toBeFocused();
+  await expect(opcao(nav, "Saídas e Entradas")).not.toHaveAttribute("aria-current");
+  await page.keyboard.press("Tab");
+  await expect(opcao(nav, "Saídas e Entradas")).toBeFocused();
+  await page.keyboard.press("Space");
+  await expect(menu).toBeHidden();
+  await expect(
+    painel.getByRole("heading", { name: "Saídas e Entradas", exact: true }),
+  ).toBeFocused();
+  await exporRelatorios(page);
+  await expect(opcao(nav, "Saídas e Entradas")).toHaveAttribute("aria-current", "page");
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
 
   await painel.getByRole("combobox", { name: "Turma do relatório de movimentações" }).click();
   await page.getByRole("option", { name: "E2E Ano B", exact: true }).click();
@@ -353,7 +375,7 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
     const iniciais = consultas;
     expect(iniciais).toBeGreaterThan(0);
     repetir = true;
-    await page.getByRole("tab", { name: "Histórico", exact: true }).click();
+    await selecionarRelatorio(page, "Histórico");
     await expect(painel).toBeHidden();
     await page.evaluate(
       () =>
@@ -362,7 +384,7 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
         ),
     );
     expect(consultas).toBe(iniciais);
-    await page.getByRole("tab", { name: "Saídas e Entradas", exact: true }).click();
+    await selecionarRelatorio(page, "Saídas e Entradas");
     await expect.poll(() => consultas).toBe(iniciais + 1);
     await expect(painel).toHaveAttribute("aria-busy", "true");
     await expect(totais(painel)).toHaveCount(0);

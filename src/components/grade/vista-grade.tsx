@@ -264,6 +264,8 @@ export default function VistaGrade({
           ariaLabel="Turma de origem da grade"
           valor={turmaEfetiva}
           onValor={setTurmaId}
+          truncarRotuloSelecionado
+          quebrarRotulosDasOpcoes
           opcoes={turmasOriginais.map((turma) => ({
             valor: turma.id,
             rotulo: `${turma.rotulo} (${alunos.filter((aluno) => aluno.ativo && aluno.turmaOriginalId === turma.id).length})`,

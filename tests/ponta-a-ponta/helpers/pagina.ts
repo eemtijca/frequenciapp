@@ -1,6 +1,11 @@
 // Utilidades comuns dos testes de ponta a ponta.
 import { expect, type Locator, type Page } from "@playwright/test";
-import { exporNivelGestao, fecharNavegacaoMovel } from "../../helpers/categorias-configuracoes";
+import {
+  exporNivelGestao,
+  fecharNavegacaoMovel,
+  menuMovel,
+  voltarAoMenuPrincipal,
+} from "../../helpers/categorias-configuracoes";
 import { nomeDoMes } from "@/domain/frequencia";
 import { navegarCalendario } from "./calendario-historico";
 import { validarDiaCivil } from "./navegacao-periodo";
@@ -111,8 +116,13 @@ export async function trocarVisao(
   page: Page,
   rotulo: string,
   visao: string,
-  opcoes?: { manterResumo?: boolean },
+  opcoes?: { manterResumo?: boolean; relatorio?: Relatorio },
 ): Promise<void> {
+  if (visao === "relatorios") {
+    await selecionarRelatorio(page, opcoes?.relatorio ?? "Resumo");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", visao);
+    return;
+  }
   // O indicador de rascunho integra o nome acessível depois da recuperação em segundo plano.
   const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const navegacao = await abrirNavegacao(page);
@@ -120,13 +130,13 @@ export async function trocarVisao(
     const principal = navegacao.getByRole("button", {
       name: /^Gestão(?: Alterações não salvas)?$/,
     });
+    if (await navegacao.getByRole("button", { name: "Resumo", exact: true }).isVisible()) {
+      await voltarAoMenuPrincipal(navegacao);
+    }
     if (await principal.isVisible()) await exporNivelGestao(page);
     await fecharNavegacaoMovel(page);
   } else {
-    for (const retorno of ["Voltar para Gestão", "Voltar ao menu principal"]) {
-      const voltar = navegacao.getByRole("button", { name: retorno, exact: true });
-      if (await voltar.isVisible()) await voltar.click();
-    }
+    await voltarAoMenuPrincipal(navegacao);
     await navegacao
       .getByRole("button", { name: new RegExp(`^${nome}(?: Alterações não salvas)?$`) })
       .click();
@@ -134,6 +144,40 @@ export async function trocarVisao(
   await expect(page.getByRole("dialog", { name: "Menu do aplicativo", exact: true })).toBeHidden();
   await expect(page.locator("main").first()).toHaveAttribute("data-visao", visao);
   if (!opcoes?.manterResumo && VISOES_COM_RESUMO.has(visao)) await abrirDiaSeResumo(page);
+}
+
+const regioesRelatorios = {
+  Resumo: "Resumo dos relatórios",
+  Histórico: "Histórico de frequências",
+  Grade: "Grade de frequência",
+  "Por aluno": "Relatório por aluno",
+  "Saídas e Entradas": "Relatório de saídas e entradas",
+} as const;
+
+export type Relatorio = keyof typeof regioesRelatorios;
+
+export async function exporRelatorios(page: Page): Promise<Locator> {
+  const nav = await abrirNavegacao(page);
+  const resumo = nav.getByRole("button", { name: "Resumo", exact: true });
+  const principal = nav.getByRole("button", { name: "Relatórios", exact: true });
+  const voltar = nav.getByRole("button", { name: /^Voltar (para Gestão|ao menu principal)$/ });
+  await expect(resumo.or(principal).or(voltar).first()).toBeVisible();
+  if (!(await resumo.isVisible())) {
+    await voltarAoMenuPrincipal(nav);
+    await principal.click();
+  }
+  await expect(resumo).toBeVisible();
+  return nav;
+}
+
+/** Seleciona o destino pelo painel lateral e aguarda o conteúdo, não a animação da lista. */
+export async function selecionarRelatorio(page: Page, rotulo: Relatorio): Promise<Locator> {
+  const nav = await exporRelatorios(page);
+  await nav.getByRole("button", { name: rotulo, exact: true }).click();
+  await expect(menuMovel(page)).not.toBeAttached();
+  const painel = page.getByRole("region", { name: regioesRelatorios[rotulo], exact: true });
+  await expect(painel).toBeVisible();
+  return painel;
 }
 
 /** Clica em Salvar e confirma o resumo, sem esperar o resultado da gravação. */
