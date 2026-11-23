@@ -268,61 +268,71 @@ export default function VistaMovimentacoes({
       component="section"
       aria-label="Relatório de saídas e entradas"
       aria-busy={carregando}
-      sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
+      sx={{ display: "flex", flexDirection: "column", gap: 1.5, minWidth: 0 }}
     >
       <Typography component="h2" variant="h6">
         Saídas e Entradas
       </Typography>
 
-      <Stack
-        direction="row"
-        spacing={1}
-        useFlexGap
-        role="group"
-        aria-label="Período do relatório"
-        sx={{ flexWrap: "wrap" }}
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "flex-start",
+          rowGap: 1,
+          columnGap: 3,
+        }}
       >
-        {MODOS.map((item) => {
-          const selecionado = modo === item.valor;
-          return (
-            <Botao
-              key={item.valor}
-              variante="contorno"
-              aria-pressed={selecionado}
-              onClick={() => setModo(item.valor)}
-              sx={{ bgcolor: selecionado ? "action.selected" : undefined }}
-            >
-              {item.rotulo}
-            </Botao>
-          );
-        })}
-      </Stack>
-      <Stack
-        direction="row"
-        spacing={1}
-        useFlexGap
-        role="group"
-        aria-label="Agrupamento do relatório"
-        sx={{ flexWrap: "wrap" }}
-      >
-        {AGRUPAMENTOS.map((item) => {
-          const selecionado = agrupamento === item.valor;
-          return (
-            <Botao
-              key={item.valor}
-              variante="contorno"
-              aria-pressed={selecionado}
-              onClick={() => setAgrupamento(item.valor)}
-              sx={{ bgcolor: selecionado ? "action.selected" : undefined }}
-            >
-              {item.rotulo}
-            </Botao>
-          );
-        })}
-      </Stack>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          role="group"
+          aria-label="Período do relatório"
+          sx={{ flexWrap: "wrap" }}
+        >
+          {MODOS.map((item) => {
+            const selecionado = modo === item.valor;
+            return (
+              <Botao
+                key={item.valor}
+                variante="contorno"
+                aria-pressed={selecionado}
+                onClick={() => setModo(item.valor)}
+                sx={{ bgcolor: selecionado ? "action.selected" : undefined }}
+              >
+                {item.rotulo}
+              </Botao>
+            );
+          })}
+        </Stack>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          role="group"
+          aria-label="Agrupamento do relatório"
+          sx={{ flexWrap: "wrap" }}
+        >
+          {AGRUPAMENTOS.map((item) => {
+            const selecionado = agrupamento === item.valor;
+            return (
+              <Botao
+                key={item.valor}
+                variante="contorno"
+                aria-pressed={selecionado}
+                onClick={() => setAgrupamento(item.valor)}
+                sx={{ bgcolor: selecionado ? "action.selected" : undefined }}
+              >
+                {item.rotulo}
+              </Botao>
+            );
+          })}
+        </Stack>
+      </Box>
 
       <Cartao component="div">
-        <Grid container spacing={2} sx={{ width: "100%" }}>
+        <Grid container rowSpacing={1.5} columnSpacing={2} sx={{ width: "100%" }}>
           {modo === "periodo" ? (
             <>
               <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
@@ -487,63 +497,115 @@ export default function VistaMovimentacoes({
         />
       ) : dados ? (
         <>
-          <Box
+          <Cartao
             component="dl"
             aria-label="Totais de movimentações"
-            sx={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-              gap: 2,
-              m: 0,
-            }}
+            sx={{ display: "flex", gap: 2, m: 0 }}
           >
-            <Cartao component="div">
-              <Typography component="dt" variant="body2" sx={{ color: "text.secondary" }}>
-                Saídas
-              </Typography>
-              <Typography
-                component="dd"
-                variant="h4"
-                sx={{ m: 0, mt: 0.5, fontVariantNumeric: "tabular-nums" }}
+            {(
+              [
+                ["Saídas", dados.totais.saidas],
+                ["Entradas", dados.totais.entradas],
+              ] as const
+            ).map(([rotulo, valor]) => (
+              <Box
+                key={rotulo}
+                sx={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  flexWrap: "wrap",
+                  columnGap: 1,
+                  flex: 1,
+                  minWidth: 0,
+                }}
               >
-                {dados.totais.saidas}
-              </Typography>
-            </Cartao>
-            <Cartao component="div">
-              <Typography component="dt" variant="body2" sx={{ color: "text.secondary" }}>
-                Entradas
-              </Typography>
-              <Typography
-                component="dd"
-                variant="h4"
-                sx={{ m: 0, mt: 0.5, fontVariantNumeric: "tabular-nums" }}
-              >
-                {dados.totais.entradas}
-              </Typography>
-            </Cartao>
-          </Box>
-          {dados.turmas.length === 0 ? (
-            <Paper variant="outlined" sx={{ p: 3, textAlign: "center", boxShadow: "none" }}>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Nenhuma saída ou entrada neste período.
-              </Typography>
-            </Paper>
-          ) : agrupamento === "aluno" ? (
-            porAluno.length === 0 ? (
+                <Typography component="dt" variant="body2" sx={{ color: "text.secondary" }}>
+                  {rotulo}
+                </Typography>
+                <Typography
+                  component="dd"
+                  variant="h6"
+                  sx={{ m: 0, fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}
+                >
+                  {valor}
+                </Typography>
+              </Box>
+            ))}
+          </Cartao>
+          <Stack spacing={2} useFlexGap>
+            {dados.turmas.length === 0 ? (
               <Paper variant="outlined" sx={{ p: 3, textAlign: "center", boxShadow: "none" }}>
                 <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  {alunoId === TODOS_OS_ALUNOS
-                    ? "Nenhum aluno encontrado com estes filtros."
-                    : "Este aluno não tem saídas nem entradas neste período."}
+                  Nenhuma saída ou entrada neste período.
                 </Typography>
               </Paper>
+            ) : agrupamento === "aluno" ? (
+              porAluno.length === 0 ? (
+                <Paper variant="outlined" sx={{ p: 3, textAlign: "center", boxShadow: "none" }}>
+                  <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                    {alunoId === TODOS_OS_ALUNOS
+                      ? "Nenhum aluno encontrado com estes filtros."
+                      : "Este aluno não tem saídas nem entradas neste período."}
+                  </Typography>
+                </Paper>
+              ) : (
+                porAluno.map((aluno) => (
+                  <Paper
+                    component="section"
+                    variant="outlined"
+                    key={aluno.alunoId}
+                    aria-label={`Aluno ${aluno.alunoNome}`}
+                    sx={{ minWidth: 0, overflow: "hidden", boxShadow: "none" }}
+                  >
+                    <Stack
+                      direction="row"
+                      spacing={2}
+                      sx={{
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                        borderBottom: 1,
+                        borderColor: "divider",
+                        px: 2,
+                        py: 1.5,
+                      }}
+                    >
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          component="h3"
+                          variant="subtitle2"
+                          sx={{ overflowWrap: "anywhere" }}
+                        >
+                          {aluno.alunoNome}
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                        >
+                          {aluno.turmas.join(" · ")}
+                        </Typography>
+                      </Box>
+                      <CaixasDeInfo itens={contagens(aluno.saidas, aluno.entradas)} />
+                    </Stack>
+                    <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+                      {aluno.movimentacoes.map((item) => (
+                        <LinhaMovimentacao
+                          key={`${item.tipo}:${item.id}`}
+                          item={item}
+                          comAluno={false}
+                        />
+                      ))}
+                    </Box>
+                  </Paper>
+                ))
+              )
             ) : (
-              porAluno.map((aluno) => (
+              dados.turmas.map((grupo) => (
                 <Paper
                   component="section"
                   variant="outlined"
-                  key={aluno.alunoId}
-                  aria-label={`Aluno ${aluno.alunoNome}`}
+                  key={`${grupo.turmaId}:${grupo.turmaRotulo}`}
+                  aria-label={`Turma ${grupo.turmaRotulo}`}
                   sx={{ minWidth: 0, overflow: "hidden", boxShadow: "none" }}
                 >
                   <Stack
@@ -559,75 +621,29 @@ export default function VistaMovimentacoes({
                       py: 1.5,
                     }}
                   >
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography
-                        component="h3"
-                        variant="subtitle2"
-                        sx={{ overflowWrap: "anywhere" }}
-                      >
-                        {aluno.alunoNome}
-                      </Typography>
-                      <Typography
-                        variant="caption"
-                        sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
-                      >
-                        {aluno.turmas.join(" · ")}
-                      </Typography>
-                    </Box>
-                    <CaixasDeInfo itens={contagens(aluno.saidas, aluno.entradas)} />
+                    <Typography
+                      component="h3"
+                      variant="subtitle2"
+                      sx={{ overflowWrap: "anywhere" }}
+                    >
+                      {grupo.turmaRotulo}
+                    </Typography>
+                    <CaixasDeInfo itens={contagens(grupo.saidas, grupo.entradas)} />
                   </Stack>
                   <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
-                    {aluno.movimentacoes.map((item) => (
-                      <LinhaMovimentacao
-                        key={`${item.tipo}:${item.id}`}
-                        item={item}
-                        comAluno={false}
-                      />
+                    {grupo.movimentacoes.map((item) => (
+                      <LinhaMovimentacao key={`${item.tipo}:${item.id}`} item={item} comAluno />
                     ))}
                   </Box>
                 </Paper>
               ))
-            )
-          ) : (
-            dados.turmas.map((grupo) => (
-              <Paper
-                component="section"
-                variant="outlined"
-                key={`${grupo.turmaId}:${grupo.turmaRotulo}`}
-                aria-label={`Turma ${grupo.turmaRotulo}`}
-                sx={{ minWidth: 0, overflow: "hidden", boxShadow: "none" }}
-              >
-                <Stack
-                  direction="row"
-                  spacing={2}
-                  sx={{
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    flexWrap: "wrap",
-                    borderBottom: 1,
-                    borderColor: "divider",
-                    px: 2,
-                    py: 1.5,
-                  }}
-                >
-                  <Typography component="h3" variant="subtitle2" sx={{ overflowWrap: "anywhere" }}>
-                    {grupo.turmaRotulo}
-                  </Typography>
-                  <CaixasDeInfo itens={contagens(grupo.saidas, grupo.entradas)} />
-                </Stack>
-                <Box component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
-                  {grupo.movimentacoes.map((item) => (
-                    <LinhaMovimentacao key={`${item.tipo}:${item.id}`} item={item} comAluno />
-                  ))}
-                </Box>
-              </Paper>
-            ))
-          )}
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            {agrupamento === "aluno"
-              ? "Cada aluno reúne as saídas e as entradas do período, em todas as turmas."
-              : "Entradas e saídas agrupadas pela turma gravada no registro; saídas sem referência ficam como turma histórica desconhecida."}
-          </Typography>
+            )}
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+              {agrupamento === "aluno"
+                ? "Cada aluno reúne as saídas e as entradas do período, em todas as turmas."
+                : "Entradas e saídas agrupadas pela turma gravada no registro; saídas sem referência ficam como turma histórica desconhecida."}
+            </Typography>
+          </Stack>
         </>
       ) : null}
     </Box>

@@ -328,7 +328,7 @@ Regras de composição:
 - No Histórico, o agrupador de séries não tem sombra atrás dos botões. Cada opção mantém seu próprio contorno e estado de seleção.
 - Em Por aluno, mês e busca dividem a linha quando há espaço útil. Os comandos de expansão por série e turma ficam juntos e separados de Emitir relatório, que mantém o aviso de preparação.
 - Os cabeçalhos distinguem série, turma e aluno por peso e superfície. Nomes e rótulos de turma e origem quebram sem perder o trecho distintivo; em linhas estreitas, os contadores do aluno passam para baixo, à direita. O foco das linhas fica dentro do cartão para não ser recortado.
-- Relatório de saídas e entradas independente do mês das outras seções.
+- O relatório de saídas e entradas tem período independente do mês das outras seções. Período e agrupamento são dois grupos com alvos de 48 px; ocupam a mesma faixa quando há espaço e se empilham quando não há. Os totais de saídas e entradas compartilham uma faixa, com rótulos ao lado dos valores.
 - Gráficos em MUI X e tabelas no padrão de 56 e 52 px.
 
 ### Alunos

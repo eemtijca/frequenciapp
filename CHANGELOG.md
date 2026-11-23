@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Em Relatórios, Saídas e Entradas reúne os grupos de período e agrupamento quando há espaço, mantém seus alvos de 48 px e compacta a faixa de filtros e totais para mostrar os registros mais cedo.
+
 - Por aluno organiza mês, busca e comandos de expansão e separa a ação Emitir relatório. Nomes e rótulos longos permanecem legíveis sem encobrir os contadores de frequência.
 
 - O Resumo de Relatórios reúne mês, série e turma, aproxima os indicadores dos filtros e amplia a área de evolução em painéis largos. Os dados diários e os controles do ranking ganham alvos maiores, sem mudar cálculos, critérios ou ordenação.
