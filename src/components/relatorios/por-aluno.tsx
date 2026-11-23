@@ -47,6 +47,13 @@ import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { avisarInfo } from "@/lib/avisos";
+import { TOKENS_LAYOUT } from "@/theme/layout";
+
+const ALVO_MES = {
+  width: TOKENS_LAYOUT.alvoToque,
+  height: TOKENS_LAYOUT.alvoToque,
+  flexShrink: 0,
+};
 
 interface Props {
   alunos: Aluno[];
@@ -182,6 +189,16 @@ function contagemDeAlunos(total: number): string {
   return `${total} ${total === 1 ? "aluno" : "alunos"}`;
 }
 
+const ESTILO_IDENTIDADE = { minWidth: 0, flex: 1, overflowWrap: "anywhere" } as const;
+// O cartão recorta os cantos. O anel precisa ficar dentro do botão de largura total.
+const FOCO_INTERNO = {
+  "&.Mui-focusVisible": { outlineOffset: -5 },
+  "@media (forced-colors: active)": {
+    // Mantém a cor do provedor e deixa 4 px entre o anel e os cantos do cartão.
+    'html[data-foco-teclado="true"] &:focus-visible': { outlineOffset: -7 },
+  },
+} as const;
+
 interface CabecalhoGrupoProps {
   titulo: string;
   total: number;
@@ -209,8 +226,9 @@ function CabecalhoGrupo({ titulo, total, aberto, nivel, linhas, onAlternar }: Ca
           textAlign: "left",
           justifyContent: "flex-start",
           "&:hover": { bgcolor: "action.hover" },
+          ...FOCO_INTERNO,
         },
-        nivel === "serie" ? { bgcolor: "action.hover", fontWeight: 600 } : { fontWeight: 500 },
+        nivel === "serie" ? { bgcolor: "action.hover", fontWeight: 700 } : { fontWeight: 600 },
       ]}
     >
       <ExpandMoreRoundedIcon
@@ -222,8 +240,8 @@ function CabecalhoGrupo({ titulo, total, aberto, nivel, linhas, onAlternar }: Ca
           transition: (tema) => tema.transitions.create("transform", { duration: 150 }),
         }}
       />
-      <Box sx={{ minWidth: 0, flex: 1 }}>
-        <Typography noWrap sx={{ fontWeight: "inherit" }}>
+      <Box component="span" sx={ESTILO_IDENTIDADE}>
+        <Typography component="span" sx={{ display: "block", fontWeight: "inherit" }}>
           {titulo}
         </Typography>
         <Typography
@@ -292,30 +310,38 @@ const ListaAlunos = memo(function ListaAlunos({
                 width: "100%",
                 minHeight: 56,
                 alignItems: "center",
-                gap: 2,
+                flexWrap: "wrap",
+                columnGap: 1,
+                rowGap: 0.5,
                 px: 2,
                 py: 1,
                 textAlign: "left",
                 justifyContent: "flex-start",
                 "&:hover": { bgcolor: "action.hover" },
+                ...FOCO_INTERNO,
               }}
             >
-              <Box sx={{ minWidth: 0, flex: 1 }}>
-                <Typography noWrap sx={{ fontWeight: 500 }}>
+              <Box
+                component="span"
+                sx={{ ...ESTILO_IDENTIDADE, flexBasis: (tema) => tema.spacing(29) }}
+              >
+                <Typography component="span" sx={{ display: "block", fontWeight: 500 }}>
                   {aluno.nome}
                 </Typography>
-                <Typography noWrap variant="caption" sx={{ color: "text.secondary" }}>
+                <Typography variant="caption" sx={{ display: "block", color: "text.secondary" }}>
                   {rotuloTurma(aluno.turmaId)}
                   {aluno.turmaOriginalId !== aluno.turmaId
                     ? ` · origem ${rotuloTurma(aluno.turmaOriginalId)}`
                     : ""}
                 </Typography>
               </Box>
-              <CirculosAcumulado
-                faltas={doAluno.faltas}
-                justificadas={doAluno.justificadas}
-                saidas={doAluno.saidas}
-              />
+              <Box component="span" sx={{ ml: "auto", display: "flex" }}>
+                <CirculosAcumulado
+                  faltas={doAluno.faltas}
+                  justificadas={doAluno.justificadas}
+                  saidas={doAluno.saidas}
+                />
+              </Box>
             </ButtonBase>
             {aberto ? (
               <Box
@@ -489,43 +515,62 @@ export default function PorAluno({
         Por aluno
       </Typography>
 
-      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-        <BotaoIcone
-          rotulo="Mês anterior"
-          variante="contorno"
-          icone={<ChevronLeftRoundedIcon />}
-          onClick={() => onMes(mesSeguinte(mes, -1))}
-          sx={{ width: 48, height: 48 }}
-        />
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <SeletorPeriodo
-            id="mes-por-aluno"
-            modo="mes"
-            valor={mes}
-            max={mesCorrente}
-            rotuloAcessivel="Mês do relatório"
-            rotulo={rotuloMes(mes)}
-            onValor={onMes}
+      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", alignItems: "center" }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            flexGrow: 1,
+            flexBasis: (tema) => tema.spacing(36),
+            minWidth: 0,
+            alignItems: "center",
+          }}
+        >
+          <BotaoIcone
+            rotulo="Mês anterior"
+            variante="contorno"
+            icone={<ChevronLeftRoundedIcon />}
+            onClick={() => onMes(mesSeguinte(mes, -1))}
+            sx={ALVO_MES}
           />
-        </Box>
-        <BotaoIcone
-          rotulo="Mês seguinte"
-          variante="contorno"
-          icone={<ChevronRightRoundedIcon />}
-          disabled={mes >= mesCorrente}
-          onClick={() => onMes(mesSeguinte(mes, 1))}
-          sx={{ width: 48, height: 48 }}
-        />
-      </Stack>
-
-      <Stack spacing={2}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <SeletorPeriodo
+              id="mes-por-aluno"
+              modo="mes"
+              valor={mes}
+              max={mesCorrente}
+              rotuloAcessivel="Mês do relatório"
+              rotulo={rotuloMes(mes)}
+              onValor={onMes}
+            />
+          </Box>
+          <BotaoIcone
+            rotulo="Mês seguinte"
+            variante="contorno"
+            icone={<ChevronRightRoundedIcon />}
+            disabled={mes >= mesCorrente}
+            onClick={() => onMes(mesSeguinte(mes, 1))}
+            sx={ALVO_MES}
+          />
+        </Stack>
         <BarraBusca
           id="busca-por-aluno"
           valor={busca}
           onValor={setBusca}
           placeholder="Buscar aluno"
+          sx={{ flexGrow: 2, flexBasis: (tema) => tema.spacing(36) }}
         />
-        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+      </Stack>
+
+      <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap", alignItems: "center" }}>
+        <Stack
+          role="group"
+          aria-label="Expansão da lista"
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{ flexWrap: "wrap" }}
+        >
           <Botao
             variante="contorno"
             icone={todasSeriesAbertas ? <UnfoldLessRoundedIcon /> : <UnfoldMoreRoundedIcon />}
@@ -533,9 +578,9 @@ export default function PorAluno({
             aria-label={`${todasSeriesAbertas ? "Recolher" : "Expandir"} todas as séries`}
             disabled={buscando || grupos.length === 0}
             onClick={alternarSeries}
-            sx={{ flex: 1, minWidth: 112 }}
+            sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
           >
-            Série
+            Séries
           </Botao>
           <Botao
             variante="contorno"
@@ -544,24 +589,24 @@ export default function PorAluno({
             aria-label={`${todasTurmasAbertas ? "Recolher" : "Expandir"} todas as turmas`}
             disabled={buscando || grupos.length === 0}
             onClick={alternarTurmas}
-            sx={{ flex: 1, minWidth: 112 }}
+            sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
           >
-            Turma
-          </Botao>
-          <Botao
-            icone={<DescriptionRoundedIcon />}
-            onClick={() =>
-              avisarInfo(
-                "Emissão de relatório em preparação",
-                "A geração do relatório em PDF será liberada em breve.",
-                "emitir-relatorio-por-aluno",
-              )
-            }
-            sx={{ flex: 1, minWidth: 176 }}
-          >
-            Emitir relatório
+            Turmas
           </Botao>
         </Stack>
+        <Botao
+          icone={<DescriptionRoundedIcon />}
+          onClick={() =>
+            avisarInfo(
+              "Emissão de relatório em preparação",
+              "A geração do relatório em PDF será liberada em breve.",
+              "emitir-relatorio-por-aluno",
+            )
+          }
+          sx={{ minHeight: TOKENS_LAYOUT.alvoToque, ml: "auto" }}
+        >
+          Emitir relatório
+        </Botao>
       </Stack>
 
       {linhas.length === 0 ? (
