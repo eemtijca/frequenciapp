@@ -57,6 +57,9 @@ interface Props {
   onMes: (mes: string) => void;
 }
 
+// Fixa somente as células de identidade da Grade, que mistura th e td na mesma linha.
+const colunaAlunoFixa = { position: "sticky", left: 0, bgcolor: "background.paper" } as const;
+
 const MODOS: { valor: ModoPeriodo; rotulo: string }[] = [
   { valor: "mes", rotulo: "Mês" },
   { valor: "dia", rotulo: "Um dia" },
@@ -454,7 +457,9 @@ export default function VistaGrade({
               </Box>
             ) : (
               <TabelaPadrao
-                primeiraColunaFixa
+                larguraIntrinseca
+                arrastarHorizontalComMouse
+                rotuloRolagem="Rolagem da Grade de frequência"
                 caption={`Frequência dos alunos da turma original ${rotuloDe(turmaEfetiva)} no período`}
               >
                 <TableHead>
@@ -462,10 +467,11 @@ export default function VistaGrade({
                     <TableCell
                       scope="col"
                       sx={{
+                        ...colunaAlunoFixa,
+                        zIndex: 3,
                         minWidth: 144,
                         borderRight: 1,
                         borderColor: "divider",
-                        bgcolor: "background.paper",
                         textAlign: "left",
                       }}
                     >
@@ -495,6 +501,9 @@ export default function VistaGrade({
                       align="center"
                       title="Faltas totais (F + FJ) de todo o histórico"
                       sx={{
+                        // Reserva só a largura do conteúdo, sem disputar a sobra com Aluno.
+                        width: "1px",
+                        whiteSpace: "nowrap",
                         borderLeft: 1,
                         borderColor: "divider",
                         px: 1,
@@ -513,10 +522,11 @@ export default function VistaGrade({
                         component="th"
                         scope="row"
                         sx={{
+                          ...colunaAlunoFixa,
+                          zIndex: 2,
                           maxWidth: 176,
                           borderRight: 1,
                           borderColor: "divider",
-                          bgcolor: "background.paper",
                           textAlign: "left",
                           fontWeight: 400,
                         }}
@@ -639,6 +649,7 @@ export default function VistaGrade({
                           borderLeft: 1,
                           borderColor: "divider",
                           px: 1,
+                          whiteSpace: "nowrap",
                           color: "falta.texto",
                           fontWeight: 600,
                           fontVariantNumeric: "tabular-nums",

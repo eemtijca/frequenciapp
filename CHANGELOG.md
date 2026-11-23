@@ -123,6 +123,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- A Grade usa a largura do conteúdo sem esticar Aluno ou Total. Em tabelas com rolagem horizontal, o arraste responde ao inverter nos limites e termina ao soltar o botão principal. O filtro de séries do Histórico mantém seus controles sem a faixa de sombra atrás do grupo.
 - O backup drena todo o fluxo após listar o catálogo PostgreSQL, sem travar a cifra nem segurar indefinidamente a trava de operações em dumps grandes.
 - O primeiro backup do instalador passa a conferir o escopo a partir da identidade operacional e do banco efetivo, reutilizando a verificação oficial e preservando as recusas de artefatos, ponteiro, schema ou destino divergentes. A repetição confere novamente os arquivos e o remoto configurado sem gerar outro dump nem declarar a restauração exercitada.
 - A troca de canal e o comando de backup passam a conferir o conjunto pelo verificador oficial, com alvo, banco, schema e destino resolvidos pela operação e ambiente restrito ao allowlist. O planejamento de downgrade usa a conferência somente leitura, sem trava, diretórios ou temporários na instalação, e não gera outro dump. As recusas de artefatos, escopo e remoto indisponível preservam o conjunto e não avançam a instalação; a preferência de canal e tag segue o comportamento anterior de gravação antes do backup no caminho de aplicação.

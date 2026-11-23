@@ -322,6 +322,8 @@ Regras de composição:
 - Rankings de faltas, justificadas e sem justificativa.
 - Gráfico diário com tabela de dados e visualizações lado a lado no desktop.
 - Grade com P, F, FJ e S, primeira coluna fixa, total e exportação CSV. Abaixo de 600 px, o valor fechado do seletor de turma ocupa uma linha, com espaço reservado para o indicador e reticências só quando necessárias. O nome e a contagem completos continuam na descrição acessível e nas opções do menu, que podem ocupar mais de uma linha.
+- A tabela da Grade acompanha a largura do conteúdo: o espaço livre fica fora da tabela, sem alargar Aluno nem Total. Só a coluna Aluno fica fixa na horizontal. Quando a tabela excede a largura disponível, a região de rolagem aceita arraste pelo conteúdo com o botão principal do mouse. O gesto pode inverter no próprio limite e termina ao soltar o botão principal, mesmo fora da tabela. Tab seguido das setas, a barra de rolagem e o toque continuam disponíveis.
+- No Histórico, o agrupador de séries não tem sombra atrás dos botões. Cada opção mantém seu próprio contorno e estado de seleção.
 - Por aluno com agrupamento por série e turma.
 - Relatório de saídas e entradas independente do mês das outras seções.
 - Gráficos em MUI X e tabelas no padrão de 56 e 52 px.

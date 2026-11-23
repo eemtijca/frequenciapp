@@ -148,6 +148,7 @@ export default function VistaHistorico({
           rotulo="Filtrar por série"
           valor={serieFiltro}
           onValor={setSerieFiltro}
+          sx={(tema) => ({ boxShadow: "none", ...tema.applyStyles("dark", { boxShadow: "none" }) })}
           opcoes={[
             { valor: "", rotulo: "Todas" },
             ...series.map((serie) => ({ valor: serie.id, rotulo: serie.nome })),
