@@ -319,8 +319,10 @@ Regras de composição:
 
 - Resumo, Histórico, Grade, Por aluno e Saídas e Entradas são destinos no painel lateral da aplicação, sem barra de abas no conteúdo. O destino ativo usa `aria-current`. Voltar ao menu principal não troca a seção; reescolher a seção ativa preserva filtros e rolagem.
 - Filtros de mês, série, turma e período.
-- Rankings de faltas, justificadas e sem justificativa.
-- Gráfico diário com tabela de dados e visualizações lado a lado no desktop.
+- No Resumo, mês, Série e Turma compartilham o grupo de período e escopo. Os campos ficam lado a lado quando a largura do painel permite, sem reduzir os alvos. Nomes longos podem receber reticências no valor fechado; a descrição acessível e o menu mantêm o nome inteiro.
+- Os quatro indicadores do Resumo compartilham um cartão, com destaque tipográfico para a taxa de infrequência. Comparação vem antes da evolução no painel estreito. No painel largo, ficam lado a lado, com mais largura para o gráfico e a tabela diária.
+- Ver dados diários mantém o controle nativo de expansão, com foco visível. A tabela distingue taxa zero de dia sem registro e, quando necessário, rola localmente com cabeçalho semântico e coluna Dia fixa.
+- O ranking do Resumo mantém os critérios de faltas, faltas sem justificativa e faltas justificadas, com estado pressionado e área de toque de 48 px nas opções e no botão de expansão.
 - Grade com P, F, FJ e S, primeira coluna fixa, total e exportação CSV. Abaixo de 600 px, o valor fechado do seletor de turma ocupa uma linha, com espaço reservado para o indicador e reticências só quando necessárias. O nome e a contagem completos continuam na descrição acessível e nas opções do menu, que podem ocupar mais de uma linha.
 - A tabela da Grade acompanha a largura do conteúdo: o espaço livre fica fora da tabela, sem alargar Aluno nem Total. Só a coluna Aluno fica fixa na horizontal. Quando a tabela excede a largura disponível, a região de rolagem aceita arraste pelo conteúdo com o botão principal do mouse. O gesto pode inverter no próprio limite e termina ao soltar o botão principal, mesmo fora da tabela. Tab seguido das setas, a barra de rolagem e o toque continuam disponíveis.
 - No Histórico, o agrupador de séries não tem sombra atrás dos botões. Cada opção mantém seu próprio contorno e estado de seleção.

@@ -34,12 +34,14 @@ import {
 } from "@/domain/relatorios";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
 import { Cartao } from "@/components/ui/mui/cartao";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 import { GraficoEvolucao } from "@/components/graficos/graficos-sob-demanda";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   mes: string;
@@ -56,6 +58,13 @@ interface Props {
 }
 
 const percentual = new Intl.NumberFormat("pt-BR", { style: "percent", maximumFractionDigits: 1 });
+
+const ESTILO_COLUNA_DIA = {
+  position: "sticky",
+  left: 0,
+  zIndex: 2,
+  bgcolor: "background.paper",
+} as const;
 
 const RANKINGS: Record<
   CriterioRankingFaltas,
@@ -164,82 +173,93 @@ export default function ResumoRelatorios({
       sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
     >
       <Stack
-        direction={{ xs: "column", sm: "row" }}
-        spacing={2}
-        sx={{ alignItems: { xs: "stretch", sm: "center" }, justifyContent: "space-between" }}
+        direction="row"
+        spacing={1.5}
+        useFlexGap
+        role="group"
+        aria-label="Período e escopo do resumo"
+        sx={{ flexWrap: "wrap", alignItems: "flex-end" }}
       >
-        <Typography component="h2" variant="h6">
-          Resumo do mês
-        </Typography>
+        <Stack spacing={0.5} sx={{ flex: "1 1 288px", minWidth: 0 }}>
+          <Typography component="h2" variant="h6">
+            Resumo do mês
+          </Typography>
+          <Stack
+            direction="row"
+            spacing={1}
+            sx={{ alignItems: "center", minHeight: TOKENS_LAYOUT.campo.medio }}
+          >
+            <BotaoIcone
+              rotulo="Mês anterior do resumo"
+              variante="contorno"
+              icone={<ChevronLeftRoundedIcon />}
+              disabled={bloqueado || ocupado}
+              onClick={() => onMes(mesSeguinte(mes, -1))}
+              sx={{ width: 48, height: 48 }}
+            />
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <SeletorPeriodo
+                id="mes-resumo"
+                modo="mes"
+                valor={mes}
+                max={mesCorrente}
+                disabled={bloqueado || ocupado}
+                rotuloAcessivel="Mês do resumo"
+                rotulo={`${rotuloMes(mes).slice(0, 3)}/${mes.slice(0, 4)}`}
+                onValor={onMes}
+              />
+            </Box>
+            <BotaoIcone
+              rotulo="Mês seguinte do resumo"
+              variante="contorno"
+              icone={<ChevronRightRoundedIcon />}
+              disabled={bloqueado || ocupado || mes >= mesCorrente}
+              onClick={() => onMes(mesSeguinte(mes, 1))}
+              sx={{ width: 48, height: 48 }}
+            />
+          </Stack>
+        </Stack>
         <Stack
           direction="row"
           spacing={1}
-          sx={{
-            alignItems: "center",
-            width: { xs: "100%", sm: "auto" },
-            maxWidth: { sm: 420 },
-            flex: { sm: 1 },
-            minWidth: 0,
-          }}
+          useFlexGap
+          sx={{ flex: "2 1 336px", flexWrap: "wrap", minWidth: 0 }}
         >
-          <BotaoIcone
-            rotulo="Mês anterior do resumo"
-            variante="contorno"
-            icone={<ChevronLeftRoundedIcon />}
-            disabled={bloqueado || ocupado}
-            onClick={() => onMes(mesSeguinte(mes, -1))}
-            sx={{ width: 48, height: 48 }}
-          />
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <SeletorPeriodo
-              id="mes-resumo"
-              modo="mes"
-              valor={mes}
-              max={mesCorrente}
-              disabled={bloqueado || ocupado}
-              rotuloAcessivel="Mês do resumo"
-              rotulo={`${rotuloMes(mes).slice(0, 3)}/${mes.slice(0, 4)}`}
-              onValor={onMes}
-            />
+          <Box sx={{ flex: "1 1 164px", minWidth: 0 }}>
+            <Campo id="serie-resumo" rotulo="Série">
+              <Selecionar
+                ariaLabel="Série do resumo"
+                valor={serieId}
+                onValor={(valor) => {
+                  setSerieId(valor);
+                  setTurmaId("todas");
+                }}
+                truncarRotuloSelecionado
+                quebrarRotulosDasOpcoes
+                opcoes={[
+                  { valor: "todas", rotulo: "Todas as séries" },
+                  ...series.map((serie) => ({ valor: serie.id, rotulo: serie.nome })),
+                ]}
+              />
+            </Campo>
           </Box>
-          <BotaoIcone
-            rotulo="Mês seguinte do resumo"
-            variante="contorno"
-            icone={<ChevronRightRoundedIcon />}
-            disabled={bloqueado || ocupado || mes >= mesCorrente}
-            onClick={() => onMes(mesSeguinte(mes, 1))}
-            sx={{ width: 48, height: 48 }}
-          />
+          <Box sx={{ flex: "1 1 164px", minWidth: 0 }}>
+            <Campo id="turma-resumo" rotulo="Turma">
+              <Selecionar
+                ariaLabel="Turma do resumo"
+                valor={turmaId}
+                onValor={setTurmaId}
+                truncarRotuloSelecionado
+                quebrarRotulosDasOpcoes
+                opcoes={[
+                  { valor: "todas", rotulo: "Todas as turmas" },
+                  ...turmasVisiveis.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
+                ]}
+              />
+            </Campo>
+          </Box>
         </Stack>
       </Stack>
-
-      <Grid container spacing={2}>
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Selecionar
-            ariaLabel="Série do resumo"
-            valor={serieId}
-            onValor={(valor) => {
-              setSerieId(valor);
-              setTurmaId("todas");
-            }}
-            opcoes={[
-              { valor: "todas", rotulo: "Todas as séries" },
-              ...series.map((serie) => ({ valor: serie.id, rotulo: serie.nome })),
-            ]}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6 }}>
-          <Selecionar
-            ariaLabel="Turma do resumo"
-            valor={turmaId}
-            onValor={setTurmaId}
-            opcoes={[
-              { valor: "todas", rotulo: "Todas as turmas" },
-              ...turmasVisiveis.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo })),
-            ]}
-          />
-        </Grid>
-      </Grid>
 
       {ocupado ? (
         <Box role="status" sx={{ py: 4, textAlign: "center" }}>
@@ -251,32 +271,32 @@ export default function ResumoRelatorios({
         <AlertaCompacto variante="erro_interno" descricao={erro} tamanho="linha" />
       ) : (
         <>
-          <Grid container component="dl" spacing={2} sx={{ m: 0 }}>
-            {[
-              ["Faltas (F + FJ)", dados.total.faltas + dados.total.justificadas],
-              ["Justificadas", dados.total.justificadas],
-              ["Presenças parciais", dados.total.parciais],
-              ["Infrequência", taxa],
-            ].map(([rotulo, valor]) => (
-              <Grid key={rotulo} size={{ xs: 6, sm: 3 }}>
-                <Cartao component="div" sx={{ height: "100%" }}>
+          <Cartao sx={{ p: { xs: 1.5, sm: 2 } }}>
+            <Grid container component="dl" rowSpacing={1} columnSpacing={2} sx={{ m: 0 }}>
+              {[
+                { rotulo: "Faltas (F + FJ)", valor: dados.total.faltas + dados.total.justificadas },
+                { rotulo: "Justificadas", valor: dados.total.justificadas },
+                { rotulo: "Presenças parciais", valor: dados.total.parciais },
+                { rotulo: "Infrequência", valor: taxa, destaque: true },
+              ].map(({ rotulo, valor, destaque }) => (
+                <Grid key={rotulo} size={{ xs: 6, sm: 3 }}>
                   <Typography component="dt" variant="caption" sx={{ color: "text.secondary" }}>
                     {rotulo}
                   </Typography>
                   <Typography
                     component="dd"
-                    variant="h5"
-                    sx={{ m: 0, mt: 0.5, fontVariantNumeric: "tabular-nums" }}
+                    variant={destaque ? "h4" : "h5"}
+                    sx={{ m: 0, fontVariantNumeric: "tabular-nums", overflowWrap: "anywhere" }}
                   >
                     {valor}
                   </Typography>
-                </Cartao>
-              </Grid>
-            ))}
-          </Grid>
-          <Typography variant="caption" sx={{ color: "text.secondary" }}>
-            Considera chamadas salvas. Dias sem registro ficam fora da taxa.
-          </Typography>
+                </Grid>
+              ))}
+            </Grid>
+            <Typography component="p" variant="caption" sx={{ color: "text.secondary", mt: 1 }}>
+              Considera chamadas salvas. Dias sem registro ficam fora da taxa.
+            </Typography>
+          </Cartao>
           {dados.total.registrados === 0 ? (
             <EstadoVazio
               icone={<InsightsRoundedIcon />}
@@ -284,8 +304,13 @@ export default function ResumoRelatorios({
               descricao="Escolha outro mês, série ou turma para consultar os indicadores."
             />
           ) : (
-            <Grid container spacing={2} sx={{ alignItems: "flex-start" }}>
-              <Grid size={{ xs: 12, xl: 6 }}>
+            <Stack
+              direction="row"
+              spacing={2}
+              useFlexGap
+              sx={{ flexWrap: "wrap", alignItems: "flex-start" }}
+            >
+              <Box sx={{ flex: "5 1 376px", minWidth: 0 }}>
                 <Cartao
                   component="section"
                   aria-label={
@@ -295,8 +320,14 @@ export default function ResumoRelatorios({
                 >
                   <Stack
                     direction="row"
-                    spacing={2}
-                    sx={{ alignItems: "center", justifyContent: "space-between", mb: 2 }}
+                    spacing={1}
+                    useFlexGap
+                    sx={{
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      flexWrap: "wrap",
+                      mb: 1.5,
+                    }}
                   >
                     <Typography component="h3" variant="subtitle1">
                       Comparação
@@ -313,7 +344,7 @@ export default function ResumoRelatorios({
                       />
                     </Box>
                   </Stack>
-                  <Stack component="ul" spacing={2} sx={{ listStyle: "none", m: 0, p: 0 }}>
+                  <Stack component="ul" spacing={1.5} sx={{ listStyle: "none", m: 0, p: 0 }}>
                     {comparacoes.map((turma) => (
                       <Box component="li" key={turma.id}>
                         <Stack
@@ -353,8 +384,8 @@ export default function ResumoRelatorios({
                     ))}
                   </Stack>
                 </Cartao>
-              </Grid>
-              <Grid size={{ xs: 12, xl: 6 }}>
+              </Box>
+              <Box sx={{ flex: "7 1 512px", minWidth: 0 }}>
                 <Cartao
                   component="section"
                   aria-label="Evolução da infrequência"
@@ -364,34 +395,61 @@ export default function ResumoRelatorios({
                     Evolução no mês
                   </Typography>
                   <GraficoEvolucao evolucao={dados.evolucao} />
-                  <Box component="details" sx={{ mt: 1.5 }}>
+                  <Box component="details" sx={{ mt: 0.5, "&[open] > summary": { mb: 1 } }}>
                     <Typography
                       component="summary"
                       variant="body2"
-                      sx={{ cursor: "pointer", py: 1, color: "primary.main", fontWeight: 500 }}
+                      sx={(tema) => ({
+                        cursor: "pointer",
+                        minHeight: TOKENS_LAYOUT.alvoToque,
+                        alignContent: "center",
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1,
+                        color: "primary.main",
+                        fontWeight: 500,
+                        "&:hover": { bgcolor: "action.hover" },
+                        "&:focus-visible": {
+                          outline: `${TOKENS_LAYOUT.campo.foco}px solid ${tema.vars.palette.primary.main}`,
+                          outlineOffset: 2,
+                        },
+                      })}
                     >
                       Ver dados diários
                     </Typography>
-                    <TabelaPadrao caption="Infrequência por dia no mês selecionado">
+                    <TabelaPadrao
+                      caption="Infrequência por dia no mês selecionado"
+                      rotuloRolagem="Dados diários da infrequência"
+                    >
                       <TableHead>
                         <TableRow>
-                          <TableCell scope="col">Dia</TableCell>
-                          <TableCell scope="col">F + FJ</TableCell>
-                          <TableCell scope="col">Registros</TableCell>
-                          <TableCell scope="col">Parciais</TableCell>
-                          <TableCell scope="col">Taxa</TableCell>
+                          <TableCell scope="col" sx={{ ...ESTILO_COLUNA_DIA, zIndex: 3 }}>
+                            Dia
+                          </TableCell>
+                          <TableCell scope="col" align="right">
+                            F + FJ
+                          </TableCell>
+                          <TableCell scope="col" align="right">
+                            Registros
+                          </TableCell>
+                          <TableCell scope="col" align="right">
+                            Parciais
+                          </TableCell>
+                          <TableCell scope="col" align="right">
+                            Taxa
+                          </TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {dados.evolucao.map((dia) => (
                           <TableRow key={dia.dia}>
-                            <TableCell component="th" scope="row">
+                            <TableCell component="th" scope="row" sx={ESTILO_COLUNA_DIA}>
                               {dia.rotulo}
                             </TableCell>
-                            <TableCell>{ausencias(dia)}</TableCell>
-                            <TableCell>{dia.registrados}</TableCell>
-                            <TableCell>{dia.parciais}</TableCell>
-                            <TableCell>
+                            <TableCell align="right">{ausencias(dia)}</TableCell>
+                            <TableCell align="right">{dia.registrados}</TableCell>
+                            <TableCell align="right">{dia.parciais}</TableCell>
+                            <TableCell align="right">
                               {dia.taxa === null ? "Sem registro" : percentual.format(dia.taxa)}
                             </TableCell>
                           </TableRow>
@@ -400,12 +458,13 @@ export default function ResumoRelatorios({
                     </TabelaPadrao>
                   </Box>
                 </Cartao>
-              </Grid>
-              <Grid size={12}>
+              </Box>
+              <Box sx={{ width: "100%", minWidth: 0 }}>
                 <Cartao component="section" aria-label="Alunos com mais faltas">
                   <Stack
                     direction="row"
-                    spacing={2}
+                    spacing={1}
+                    useFlexGap
                     sx={{
                       alignItems: "baseline",
                       justifyContent: "space-between",
@@ -439,6 +498,8 @@ export default function ResumoRelatorios({
                             setMostrarTodos(false);
                           }}
                           sx={{
+                            minHeight: TOKENS_LAYOUT.alvoToque,
+                            fontWeight: selecionado ? 600 : undefined,
                             bgcolor: selecionado ? "action.selected" : undefined,
                             borderColor: selecionado ? "primary.main" : undefined,
                           }}
@@ -507,7 +568,7 @@ export default function ResumoRelatorios({
                       {ranking.length > 10 ? (
                         <Botao
                           variante="texto"
-                          sx={{ mt: 2 }}
+                          sx={{ mt: 2, minHeight: TOKENS_LAYOUT.alvoToque }}
                           aria-expanded={mostrarTodos}
                           onClick={() => setMostrarTodos((atual) => !atual)}
                         >
@@ -517,8 +578,8 @@ export default function ResumoRelatorios({
                     </>
                   )}
                 </Cartao>
-              </Grid>
-            </Grid>
+              </Box>
+            </Stack>
           )}
         </>
       )}

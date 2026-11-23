@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- O Resumo de Relatórios reúne mês, série e turma, aproxima os indicadores dos filtros e amplia a área de evolução em painéis largos. Os dados diários e os controles do ranking ganham alvos maiores, sem mudar cálculos, critérios ou ordenação.
+
 - A interface migra para Material UI 9 com um tema próprio em CSS variables, componentes compartilhados em `src/components/ui/mui` e gráficos MUI X; o FrequenciBI mantém Recharts como exceção documentada. Tailwind, Radix, Lucide, Sonner, next-themes e Motion foram removidos, e a galeria visual passa a registrar as telas em claro e escuro.
 
 - Gestão e Configurações passam a navegar pela gaveta, sem trilhos duplicados, preservando telas visitadas e rascunhos. No celular, escolher um destino final fecha a gaveta e leva o foco ao título; apenas dispensar o menu devolve o foco a Abrir menu. A preferência Animações da interface fica na conta, vale para todo o aplicativo e é lembrada no navegador.
