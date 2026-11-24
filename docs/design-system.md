@@ -219,7 +219,7 @@ Regras:
 
 Regras:
 
-- A gaveta é permanente a partir de 905 px e modal abaixo disso. No desktop, ela reserva seus 256 px uma vez, ao lado do conteúdo.
+- A gaveta é permanente a partir de 905 px e modal abaixo disso. No desktop, ela reserva seus 256 px uma vez, ao lado do conteúdo. O esqueleto de carregamento reserva a mesma coluna a partir desse ponto, para o conteúdo não saltar 256 px quando o shell aparece.
 - A barra superior tem `Toolbar` com a altura da faixa.
 - O item ativo usa `aria-current="page"` e o destaque verde suave. Se a seção ativa estiver recolhida, a categoria visível assume essa indicação até a seção reaparecer.
 - O menu móvel contém o foco. Escape, o botão Fechar menu e toque fora devolvem o foco a Abrir menu. Escolher um destino final ou ampliar para desktop leva o foco ao título ativo. Avisos de pendência e ações da conta transferem o foco ao próprio diálogo.
