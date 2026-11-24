@@ -4,6 +4,7 @@
 - Data: 2026-11-02
 - Substitui as exceções por tema descritas no ADR-054 e no PR #359.
 - Substituído em parte pelo ADR-062 quanto à superfície e ao contorno de controles e campos.
+- Substituído em parte pelo ADR-081 na migração para Material UI. As decisões abaixo permanecem o registro daquela data.
 
 ## Contexto
 

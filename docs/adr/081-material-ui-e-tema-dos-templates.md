@@ -121,10 +121,18 @@ O ADR-081 substitui em parte os dois:
 - os tokens de cor e superfície passam para o tema MUI e para `theme.vars`;
 - os campos passam a ser `outlined`, com 56 ou 40 px, raio de 8 px e contorno completo;
 - o raio global passa a 8 px, com 10 px em diálogos e 999 px em chips;
-- o foco passa a 3 px, com o primário translúcido do template;
+- o foco visível tem 3 px sólidos na cor primária e deslocamento de 2 px; o anel translúcido do template não faz parte do contrato;
 - o CSS global e os CSS Modules deixam de ser a fonte do contrato visual.
 
-Os ADRs 061 e 062 permanecem válidos como registro histórico do período anterior à migração. A marcação de substituição parcial nos próprios arquivos é feita na fase de documentação, sem alterar o histórico das decisões.
+Os ADRs 061 e 062 permanecem como registro histórico. Não se recupera o CSS antigo.
+
+Reaproveitado do ADR-061: tokens centralizados, texto normal a 4,5:1, fronteira e foco a 3:1, e texto desabilitado legível sem depender só de opacidade global.
+
+Não reaproveitado do ADR-061: `superficies.css` como única folha, raio de 16 px em todo controle e cores de gráfico derivadas só de `--primary`, `--falta` e `--foreground`.
+
+Reaproveitado do ADR-062: ação principal e destrutiva sólidas, sem borda, gradiente ou sombra; sombra só em diálogo, popover, menu e aviso; `forced-colors` devolve borda e contorno do sistema.
+
+Não reaproveitado do ADR-062: anel de 2 px, campo só com linha inferior e as misturas de 4%, 6% e 18% em `superficies.css`.
 
 ## Issue de acompanhamento de acessibilidade
 

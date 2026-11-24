@@ -3,6 +3,7 @@
 - Status: aceita
 - Data: 2026-11-03
 - Substitui parcialmente o ADR-054 e o ADR-061.
+- Substituído em parte pelo ADR-081 na migração para Material UI. As decisões abaixo permanecem o registro daquela data.
 
 ## Contexto
 

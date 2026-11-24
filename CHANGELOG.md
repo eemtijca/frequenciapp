@@ -10,7 +10,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
-- A página sem conexão e o erro global mantêm alvo de 48 px e foco de 3 px. O esqueleto de carregamento reserva a gaveta a partir de 905 px, junto com o shell.
+- A página sem conexão e o erro global mantêm alvo de 48 px e foco de 3 px. O esqueleto de carregamento reserva a gaveta a partir de 905 px, junto com o shell. O contrato do tema registra o foco sólido de 3 px e o que foi reaproveitado dos ADRs 061 e 062, sem recuperar o CSS antigo.
 
 - FrequenciBI nomeia os comandos de mostrar e ocultar a chave de acesso, recolhe os filtros da Visão geral no celular e alinha Meta ou limiar aos campos do editor.
 
