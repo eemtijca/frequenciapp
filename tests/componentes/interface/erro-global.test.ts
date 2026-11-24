@@ -2,7 +2,7 @@
 import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser } from "@playwright/test";
+import { chromium, type Browser, type Locator } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -32,11 +32,45 @@ afterAll(async () => {
   await navegador?.close();
   await servidor?.close();
 });
+
+async function medirAcao(acao: Locator) {
+  return acao.evaluate((el) => {
+    const { width, height, left, right, top, bottom } = el.getBoundingClientRect();
+    const estilo = getComputedStyle(el);
+    const espessura = parseFloat(estilo.outlineWidth);
+    const offset = parseFloat(estilo.outlineOffset);
+    const margem = espessura + offset;
+    return {
+      largura: width,
+      altura: height,
+      focoAtivo: el === document.activeElement,
+      focoVisivel: el.matches(":focus-visible"),
+      anel: { estilo: estilo.outlineStyle, espessura, offset },
+      cabeNaTela:
+        left - margem >= 0 &&
+        right + margem <= window.innerWidth &&
+        top - margem >= 0 &&
+        bottom + margem <= window.innerHeight,
+    };
+  });
+}
+
+async function conferirAcaoComFoco(acao: Locator) {
+  const medida = await medirAcao(acao);
+  expect(medida.largura).toBeGreaterThanOrEqual(48);
+  expect(medida.altura).toBeGreaterThanOrEqual(48);
+  expect(medida.focoAtivo).toBe(true);
+  expect(medida.focoVisivel).toBe(true);
+  expect(medida.anel).toEqual({ estilo: "solid", espessura: 3, offset: 2 });
+  expect(medida.cabeNaTela).toBe(true);
+  return medida;
+}
+
 for (const tema of ["light", "dark"] as const) {
   it(`fallback ${tema}: foco e reinício pelo teclado`, async () => {
     const page = await navegador.newPage({
       colorScheme: tema,
-      viewport: { width: 390, height: 844 },
+      viewport: { width: 320, height: 844 },
     });
     try {
       await page.goto(url);
@@ -58,36 +92,26 @@ for (const tema of ["light", "dark"] as const) {
           bordaEstilo: secundaria.borderTopStyle,
         };
       });
-      expect(cores.fundo).toBe(tema === "light" ? "rgb(252, 252, 252)" : "rgb(5, 7, 10)");
+      expect(cores.fundo).toBe(tema === "light" ? "rgb(246, 246, 246)" : "rgb(20, 20, 19)");
       expect(cores.primaria).toBe(tema === "light" ? "rgb(29, 114, 83)" : "rgb(129, 207, 179)");
-      if (tema === "light") {
-        expect(cores.secundaria).toBe("rgba(0, 0, 0, 0)");
-        expect(cores.borda).toBe("rgb(218, 222, 231)");
-        expect(cores.bordaEstilo).toBe("solid");
-      } else {
-        expect(cores.secundaria).toBe("rgba(0, 0, 0, 0)");
-        expect(cores.borda).toBe("rgb(51, 59, 76)");
-        expect(cores.bordaEstilo).toBe("solid");
-      }
-      await page.keyboard.press("Tab");
+      expect(cores.secundaria).toBe("rgba(0, 0, 0, 0)");
+      expect(cores.borda).toBe(tema === "light" ? "rgb(228, 228, 226)" : "rgb(57, 56, 55)");
+      expect(cores.bordaEstilo).toBe("solid");
       const botao = page.getByRole("button", { name: "Tentar novamente" });
-      const focoPrimario = await botao.evaluate((el) => getComputedStyle(el).outlineWidth);
-      expect(focoPrimario).toBe("2px");
-      expect(await botao.evaluate((el) => el === document.activeElement)).toBe(true);
+      const link = page.getByRole("link", { name: "Ir para o início" });
+      expect(await link.getAttribute("href")).toBe("/");
+      await page.keyboard.press("Tab");
+      await conferirAcaoComFoco(botao);
       if (destino) await page.screenshot({ path: path.join(destino, `erro-global-${tema}.png`) });
       await page.keyboard.press("Enter");
       expect(await page.locator("html").getAttribute("data-reset")).toBe("executado");
       await page.keyboard.press("Tab");
+      expect((await conferirAcaoComFoco(link)).altura).toBe(66);
       expect(
-        await page
-          .getByRole("link", { name: "Ir para o início" })
-          .evaluate((el) => el === document.activeElement),
+        await page.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
       ).toBe(true);
-      expect(
-        await page
-          .getByRole("link", { name: "Ir para o início" })
-          .evaluate((el) => getComputedStyle(el).outlineWidth),
-      ).toBe("2px");
     } finally {
       await page.close();
     }

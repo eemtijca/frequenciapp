@@ -71,7 +71,8 @@ export default function ErroGlobal({
             text-decoration: none;
             cursor: pointer;
           }
-          .acao:focus-visible { outline: 2px solid var(--foco); outline-offset: 2px; }
+          button.acao { min-height: 48px; }
+          .acao:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
           .secundaria {
             background: transparent;
             color: var(--tinta);
