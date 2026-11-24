@@ -10,11 +10,11 @@ export default function Carregando() {
   return (
     <Box
       aria-busy="true"
-      sx={{ display: "flex", flexDirection: { xs: "column", lg: "row" }, minHeight: "100dvh" }}
+      sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, minHeight: "100dvh" }}
     >
       <Box
         sx={{
-          display: { xs: "none", lg: "block" },
+          display: { xs: "none", md: "block" },
           width: TOKENS_LAYOUT.gaveta,
           flexShrink: 0,
           borderRight: 1,
