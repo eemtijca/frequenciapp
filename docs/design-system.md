@@ -370,6 +370,10 @@ Regras de composição:
 
 ### FrequenciBI
 
+- A ação de visibilidade identifica a chave de acesso, sem alterar os rótulos dos campos de senha das outras telas.
+- Abaixo de `sm`, a Visão geral recolhe os filtros sem desmontar os campos e mantém o período aplicado no cabeçalho.
+- Meta ou limiar usa o mesmo rótulo acima do campo no Explorador e no diálogo.
+
 - Moldura, filtros e controles em MUI.
 - Editor com filtros, período, série, turma e medidas.
 - Gráficos de rosca, linha, área, barras agrupadas, barras horizontais e dispersão.

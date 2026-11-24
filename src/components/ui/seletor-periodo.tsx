@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
   type MouseEvent,
   type ReactNode,
+  type RefObject,
 } from "react";
 import Box from "@mui/material/Box";
 import ButtonBase from "@mui/material/ButtonBase";
@@ -55,6 +56,8 @@ interface Props {
   calendarioSemanal?: boolean;
   /** Avisa o resumo para pausar enquanto o calendário está aberto. */
   onAbertoChange?: (aberto: boolean) => void;
+  /** Fecha se o gatilho ficar oculto e encaminha o foco do painel a este controle. */
+  focoAoOcultarGatilho?: RefObject<HTMLButtonElement | null>;
   /**
    * Atalho Hoje da tela. No domingo, a Chamada, o Painel e a Chamada Parcial
    * abrem o resumo da semana em vez de escolher o sábado.
@@ -132,6 +135,7 @@ export function SeletorPeriodo({
   semDomingo = false,
   calendarioSemanal = false,
   onAbertoChange,
+  focoAoOcultarGatilho,
   aoHoje,
   hojeAtivo = false,
   onValor,
@@ -206,6 +210,20 @@ export function SeletorPeriodo({
       document.removeEventListener("focusin", aoFocar, true);
     };
   }, [aberto]);
+
+  useEffect(() => {
+    if (!aberto || !ancora || !focoAoOcultarGatilho) return;
+    // Ocultar o grupo não oculta o portal. Observe a âncora, sem duplicar o breakpoint.
+    const observador = new ResizeObserver(() => {
+      if (ancora.getClientRects().length > 0) return;
+      const focoNoCalendario = portal.current?.contains(document.activeElement);
+      focoPendente.current = false;
+      setAberto(false);
+      if (focoNoCalendario) focoAoOcultarGatilho.current?.focus();
+    });
+    observador.observe(ancora);
+    return () => observador.disconnect();
+  }, [aberto, ancora, focoAoOcultarGatilho]);
 
   function registrar(chave: string, elemento: HTMLButtonElement | null) {
     if (!elemento) {

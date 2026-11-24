@@ -6,6 +6,7 @@ import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import FullscreenExitRoundedIcon from "@mui/icons-material/FullscreenExitRounded";
 import FullscreenRoundedIcon from "@mui/icons-material/FullscreenRounded";
@@ -129,6 +130,8 @@ export default function VistaBi({ fuso }: { fuso: string }) {
   const forcar = useRef(false);
   const [extra, setExtra] = useState<RecursoBi | null>(null);
   const [comparacao, setComparacao] = useState<"nenhuma" | "anterior" | "ano">("nenhuma");
+  const [filtrosGeraisAbertos, setFiltrosGeraisAbertos] = useState(false);
+  const expansorFiltros = useRef<HTMLButtonElement>(null);
   const [ancoraCabecalho, setAncoraCabecalho] = useState<HTMLElement | null>(null);
   const [ancoraAcoes, setAncoraAcoes] = useState<HTMLElement | null>(null);
   const [comparativo, setComparativo] = useState<{
@@ -807,8 +810,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                           Abrir análises da escola
                         </Typography>
                         <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
-                          Use a chave criada na Gestão. Não é necessário entrar na conta do
-                          FrequenciApp.
+                          Use a chave criada na Gestão.
                         </Typography>
                       </Box>
                       <Box
@@ -824,6 +826,10 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                               disabled={!prontoLocal}
                               valor={chave}
                               onValor={setChave}
+                              rotulosVisibilidade={{
+                                mostrar: "Mostrar chave de acesso",
+                                ocultar: "Ocultar chave de acesso",
+                              }}
                               autoComplete="off"
                               placeholder="Cole a chave recebida"
                               required
@@ -1026,14 +1032,47 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                         </Botao>
                       </Stack>
                     </Popover>
-                    <SeletorFiltrosBi
-                      fuso={fuso}
-                      key={`${aba}-${painel?.id ?? "global"}-${filtros.inicio}-${filtros.fim}`}
-                      filtros={filtros}
-                      onAlterar={alterarFiltros}
-                      dados={dados}
-                      completo
-                    />
+                    {aba === "geral" && (
+                      <Botao
+                        variante="contorno"
+                        ref={expansorFiltros}
+                        aria-expanded={filtrosGeraisAbertos}
+                        aria-controls="filtros-bi"
+                        onClick={() => setFiltrosGeraisAbertos((abertos) => !abertos)}
+                        sx={{
+                          display: { xs: "inline-flex", sm: "none" },
+                          minHeight: 48,
+                          width: "100%",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        Filtros da análise
+                        <ExpandMoreRoundedIcon
+                          sx={{ transform: filtrosGeraisAbertos ? "rotate(180deg)" : undefined }}
+                        />
+                      </Botao>
+                    )}
+                    <Box
+                      id="filtros-bi"
+                      sx={{
+                        display:
+                          aba === "geral" && !filtrosGeraisAbertos
+                            ? { xs: "none", sm: "block" }
+                            : undefined,
+                      }}
+                    >
+                      <SeletorFiltrosBi
+                        fuso={fuso}
+                        key={`${aba}-${painel?.id ?? "global"}-${filtros.inicio}-${filtros.fim}`}
+                        filtros={filtros}
+                        onAlterar={alterarFiltros}
+                        dados={dados}
+                        completo
+                        focoAoOcultarGatilho={
+                          aba === "geral" && !filtrosGeraisAbertos ? expansorFiltros : undefined
+                        }
+                      />
+                    </Box>
                   </Stack>
                 </Box>
                 <Stack

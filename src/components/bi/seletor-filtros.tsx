@@ -1,7 +1,7 @@
 "use client";
 
 // Filtros globais com aplicação explícita do período e controles acessíveis no celular.
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useState, type RefObject } from "react";
 import Box from "@mui/material/Box";
 import Grid from "@mui/material/Grid";
 import Stack from "@mui/material/Stack";
@@ -41,12 +41,14 @@ export function SeletorFiltrosBi({
   dados,
   fuso,
   completo = false,
+  focoAoOcultarGatilho,
 }: {
   filtros: FiltrosBi;
   onAlterar: (f: FiltrosBi) => void;
   dados: DadosBi;
   fuso: string;
   completo?: boolean;
+  focoAoOcultarGatilho?: RefObject<HTMLButtonElement | null>;
 }) {
   const id = useId();
   const [ano, setAno] = useState(filtros.inicio.slice(0, 4));
@@ -175,6 +177,7 @@ export function SeletorFiltrosBi({
                   max={fim || `${ano}-12-31`}
                   rotulo={dataBr(inicio)}
                   rotuloAcessivel="Início da análise"
+                  focoAoOcultarGatilho={focoAoOcultarGatilho}
                   onValor={setInicio}
                 />
               </Campo>
@@ -189,6 +192,7 @@ export function SeletorFiltrosBi({
                   max={`${ano}-12-31`}
                   rotulo={dataBr(fim)}
                   rotuloAcessivel="Fim da análise"
+                  focoAoOcultarGatilho={focoAoOcultarGatilho}
                   onValor={setFim}
                 />
               </Campo>

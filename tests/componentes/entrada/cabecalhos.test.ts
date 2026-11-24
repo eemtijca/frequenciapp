@@ -239,6 +239,9 @@ it.each(combinacoes)(
           .map((el) => `${el.tagName.toLowerCase()}.${el.className}`);
       });
       expect(excessos).toEqual([]);
+      if (largura === 390) {
+        await page.getByRole("button", { name: "Filtros da análise", exact: true }).click();
+      }
       expect(await fundo(page.getByRole("button", { name: "Aplicar período" }))).not.toBe(
         "rgba(0, 0, 0, 0)",
       );

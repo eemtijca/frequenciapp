@@ -1,9 +1,18 @@
 // Exercita o horário do FrequenciBI no Chromium com dados e acesso sintéticos.
 import path from "node:path";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Page } from "@playwright/test";
+import {
+  chromium,
+  expect as expectUi,
+  type Browser,
+  type BrowserContextOptions,
+  type Page,
+} from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import { observarDobraBi, observarEditorBi, observarPortaoBi } from "../../helpers/bloco-visual-bi";
 import { RECURSOS_BI } from "../../../src/domain/bi";
 
 const requireVitest = createRequire(import.meta.url);
@@ -14,8 +23,11 @@ const { createServer } = await import(pathToFileURL(caminho).href);
 let servidor: Awaited<ReturnType<typeof createServer>>;
 let browser: Browser;
 let url: string;
+let cache: string;
 beforeAll(async () => {
+  cache = await mkdtemp(path.join(tmpdir(), "vite-bi-"));
   servidor = await createServer({
+    cacheDir: cache,
     configFile: false,
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
@@ -31,9 +43,19 @@ beforeAll(async () => {
 afterAll(async () => {
   await browser?.close();
   await servidor?.close();
+  if (cache) await rm(cache, { recursive: true, force: true });
 });
-async function abrir(paginado = false, timezoneId = "UTC"): Promise<Page> {
-  const page = await browser.newPage({ serviceWorkers: "block", timezoneId });
+async function abrir(
+  paginado = false,
+  timezoneId = "UTC",
+  opcoes: Pick<BrowserContextOptions, "viewport" | "reducedMotion"> & {
+    antesDaNavegacao?: (page: Page) => Promise<void>;
+    consulta?: string;
+  } = {},
+): Promise<Page> {
+  const { antesDaNavegacao, consulta = "", ...contexto } = opcoes;
+  const page = await browser.newPage({ ...contexto, serviceWorkers: "block", timezoneId });
+  await antesDaNavegacao?.(page);
   await page.route("**/api/bi?*", async (rota) => {
     const parametros = new URL(rota.request().url()).searchParams;
     const recurso = parametros.get("recurso");
@@ -51,7 +73,7 @@ async function abrir(paginado = false, timezoneId = "UTC"): Promise<Page> {
       },
     });
   });
-  await page.goto(url);
+  await page.goto(url + consulta);
   await page.getByLabel("Guardar chave e consultas para uso offline neste dispositivo").check();
   await page.getByLabel("Chave de acesso", { exact: true }).fill(`fbi_${"z".repeat(43)}`);
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
@@ -632,6 +654,199 @@ it("não mostra uma atualização completa quando uma consulta retorna ao cache 
         { timeout: 10000 },
       )
       .toBe(1);
+  } finally {
+    await page.close();
+  }
+});
+
+it("identifica a ação de revelar a chave sem repetir a instrução de acesso", async () => {
+  const page = await browser.newPage({
+    viewport: { width: 320, height: 844 },
+    serviceWorkers: "block",
+  });
+  try {
+    await page.goto(url);
+    expect(await observarPortaoBi(page)).toEqual({
+      rotulo: "Mostrar chave de acesso",
+      controlaCampo: true,
+      instrucaoGestao: true,
+      repeticaoConta: false,
+    });
+  } finally {
+    await page.close();
+  }
+});
+
+it("mantém o indicador na primeira dobra com os filtros recolhidos", async () => {
+  const page = await browser.newPage({
+    viewport: { width: 390, height: 844 },
+    serviceWorkers: "block",
+  });
+  try {
+    // O processo do navegador pode estar sem rede. Apenas o sinal do documento é simulado.
+    await page.addInitScript(() => {
+      if (!navigator.onLine) {
+        Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
+      }
+    });
+    await page.route("**/api/bi?*", (rota) => {
+      const recurso = new URL(rota.request().url()).searchParams.get("recurso");
+      return rota.fulfill({
+        json: {
+          recurso,
+          linhas:
+            recurso === "chamadas"
+              ? [
+                  {
+                    id: "c",
+                    dia: "2026-10-09",
+                    registrados: 10,
+                    presentes: 8,
+                    ausencias: 2,
+                    faltas: 2,
+                  },
+                ]
+              : [],
+          pagina: 1,
+          proximaPagina: null,
+          consultadoEm: "2026-10-09T12:00:00Z",
+          escopo: {},
+          recursos: RECURSOS_BI,
+        },
+      });
+    });
+    await page.clock.setFixedTime(new Date("2026-10-09T12:00:00Z"));
+    await page.goto(url);
+    await page.getByLabel("Chave de acesso", { exact: true }).fill(`fbi_${"z".repeat(43)}`);
+    await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
+    await page.getByRole("button", { name: "Filtros da análise", exact: true }).waitFor();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect
+      .poll(async () => {
+        const { cabeInteiro, scrollY } = await observarDobraBi(page);
+        return { cabeInteiro, scrollY };
+      })
+      .toEqual({ cabeInteiro: true, scrollY: 0 });
+    expect(
+      await page
+        .getByRole("button", { name: "Filtros da análise", exact: true })
+        .getAttribute("aria-expanded"),
+    ).toBe("false");
+  } finally {
+    await page.close();
+  }
+});
+
+it("alinha a borda de Meta ou limiar à de Visualização no explorador", async () => {
+  const page = await abrir();
+  try {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.getByRole("tab", { name: "Explorador", exact: true }).click();
+    const editor = page.getByRole("region", { name: "Construtor de gráficos", exact: true });
+    const medida = await observarEditorBi(editor);
+    expect(medida.delta).toBeLessThanOrEqual(1);
+    expect(medida.meta.rotuloAcima).toBe(true);
+  } finally {
+    await page.close();
+  }
+});
+
+it.each([
+  { campo: "Início", original: "01", editado: "02", direcao: "ArrowRight" },
+  { campo: "Fim", original: "09", editado: "08", direcao: "ArrowLeft" },
+])("fecha o calendário de $campo a 599 px sem perder o rascunho", async (caso) => {
+  const page = await abrir(false, "UTC", {
+    viewport: { width: 600, height: 900 },
+    reducedMotion: "reduce",
+    antesDaNavegacao: async (pagina) => {
+      await pagina.clock.setFixedTime(new Date("2026-10-09T12:00:00Z"));
+      await pagina.route("**/*", async (rota) => {
+        const pedido = rota.request();
+        if (new URL(pedido.url()).origin === new URL(url).origin && pedido.method() === "GET") {
+          await rota.fallback();
+        } else {
+          await rota.abort();
+        }
+      });
+    },
+    consulta: "?inicio=2026-10-01&fim=2026-10-09",
+  });
+  const nome = `${caso.campo} da análise`;
+  const gatilho = page.getByRole("button", { name: new RegExp(`^${nome}:`) });
+  const expansor = page.getByRole("button", { name: "Filtros da análise", exact: true });
+  const dialogo = page.getByRole("dialog", { name: nome, exact: true });
+  // A saída pode ocultar o diálogo da árvore acessível antes de removê-lo do DOM.
+  const painel = page.locator(`[role="dialog"][aria-label="${nome}"]`);
+  const dia = (numero: string) =>
+    dialogo.getByRole("button", { name: new RegExp(`^${Number(numero)} de outubro de 2026(,|$)`) });
+  const aplicado = page.getByText(/01\/10\/2026.*09\/10\/2026/).first();
+  let leituras = 0;
+
+  try {
+    await expectUi(
+      page.getByText("Atualizado em 09/10/2026 às 12:00", { exact: true }),
+    ).toBeVisible({
+      timeout: 30000,
+    });
+    page.on("request", (pedido) => {
+      if (new URL(pedido.url()).pathname === "/api/bi") leituras++;
+    });
+    await gatilho.press("Enter");
+    await expectUi(dia(caso.original)).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expectUi(painel).toBeHidden();
+    await expectUi(gatilho).toBeFocused();
+
+    await page.keyboard.press("Space");
+    await expectUi(dia(caso.original)).toBeFocused();
+    await page.keyboard.press(caso.direcao);
+    await expectUi(dia(caso.editado)).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expectUi(painel).toBeHidden();
+    await expectUi(gatilho).toBeFocused();
+    await page.keyboard.press("Enter");
+    await expectUi(dia(caso.editado)).toBeFocused();
+
+    await page.setViewportSize({ width: 599, height: 900 });
+    await expectUi(expansor).toBeVisible();
+    await expectUi(expansor).toHaveAttribute("aria-expanded", "false");
+    await expectUi(gatilho).toBeHidden();
+    await expectUi(painel, "o calendário sem gatilho fecha ao cruzar o breakpoint").toBeHidden({
+      timeout: 2000,
+    });
+    await expectUi(expansor).toBeFocused();
+    await expectUi(aplicado).toBeVisible();
+
+    await page.keyboard.press("Enter");
+    await expectUi(expansor).toHaveAttribute("aria-expanded", "true");
+    await expectUi(gatilho).toHaveAccessibleName(new RegExp(`${caso.editado}/10/2026`));
+    await expectUi(painel).toBeHidden();
+
+    // Atravessar o mesmo limite com os filtros abertos não oculta o gatilho.
+    await page.setViewportSize({ width: 600, height: 900 });
+    await gatilho.press("Enter");
+    await expectUi(dia(caso.editado)).toBeFocused();
+    await page.setViewportSize({ width: 599, height: 900 });
+    await expectUi(expansor).toHaveAttribute("aria-expanded", "true");
+    await expectUi(gatilho).toBeVisible();
+    await expectUi(dia(caso.editado)).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expectUi(painel).toBeHidden();
+    await expectUi(gatilho).toBeFocused();
+
+    await page.keyboard.press("Enter");
+    const aplicar = page.getByRole("button", { name: "Aplicar período", exact: true });
+    await aplicar.focus();
+    await expectUi(painel).toBeHidden();
+    await expectUi(aplicar).toBeFocused();
+    await expectUi(aplicado).toBeVisible();
+    expect(leituras).toBe(0);
+
+    await page.keyboard.press("Enter");
+    const resumo =
+      caso.campo === "Início" ? /02\/10\/2026.*09\/10\/2026/ : /01\/10\/2026.*08\/10\/2026/;
+    await expectUi(page.getByText(resumo).first()).toBeVisible();
+    await expect.poll(() => leituras).toBeGreaterThan(0);
   } finally {
     await page.close();
   }

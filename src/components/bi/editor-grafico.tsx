@@ -162,16 +162,18 @@ export function EditorGraficoBi({
               (d) => onAlterar({ ...config, segundaDimensao: d as GraficoBi["dimensao"] }),
             )}
           <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
-            <TextField
-              label="Meta ou limiar"
-              type="number"
-              value={config.meta ?? ""}
-              onChange={(e) =>
-                onAlterar({ ...config, meta: e.target.value ? Number(e.target.value) : null })
-              }
-              fullWidth
-              slotProps={{ htmlInput: { step: "any" } }}
-            />
+            <Campo id={`${id}-meta`} rotulo="Meta ou limiar">
+              <TextField
+                id={`${id}-meta`}
+                type="number"
+                value={config.meta ?? ""}
+                onChange={(e) =>
+                  onAlterar({ ...config, meta: e.target.value ? Number(e.target.value) : null })
+                }
+                fullWidth
+                slotProps={{ htmlInput: { step: "any" } }}
+              />
+            </Campo>
           </Grid>
         </Grid>
         <Acordeao titulo="Aparência e tamanho">

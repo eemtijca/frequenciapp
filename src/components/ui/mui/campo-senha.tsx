@@ -21,6 +21,7 @@ export interface CampoSenhaProps {
   autoComplete?: string;
   required?: boolean;
   maxLength?: number;
+  rotulosVisibilidade?: { mostrar: string; ocultar: string };
 }
 
 export function CampoSenha({
@@ -34,6 +35,7 @@ export function CampoSenha({
   autoComplete,
   required,
   maxLength,
+  rotulosVisibilidade = { mostrar: "Mostrar senha", ocultar: "Ocultar senha" },
 }: CampoSenhaProps) {
   const [visivel, setVisivel] = useState(false);
   const campo = useCampo();
@@ -58,7 +60,7 @@ export function CampoSenha({
         <InputAdornment position="end">
           <IconButton
             type="button"
-            aria-label={visivel ? "Ocultar senha" : "Mostrar senha"}
+            aria-label={visivel ? rotulosVisibilidade.ocultar : rotulosVisibilidade.mostrar}
             aria-pressed={visivel}
             aria-controls={idFinal}
             disabled={desabilitado}
