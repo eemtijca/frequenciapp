@@ -754,6 +754,190 @@ it("R02: nomes abreviados iguais mantêm cada barra e sua dica em 320 px", async
   );
 });
 
+type BordasHorizontais = { left: number; right: number };
+
+function conferirEstabilidadeHorizontal(inicio: BordasHorizontais[], fim: BordasHorizontais[]) {
+  expect(fim, "CARDINALIDADE_DA_LEGENDA").toHaveLength(inicio.length);
+  // A resolução subpixel do layout pode mudar as bordas sem deslocamento relevante.
+  // O limite de 0,5 CSS px não substitui o teste independente de recorte.
+  inicio.forEach((fragmento, indice) => {
+    const atual = fim[indice];
+    if (!atual) throw new Error("FRAGMENTO_AUSENTE");
+    for (const borda of ["left", "right"] as const) {
+      const deslocamento = Math.abs(atual[borda] - fragmento[borda]);
+      expect(deslocamento, "LEGENDA_DESLOCOU").toBeLessThanOrEqual(0.5);
+    }
+  });
+}
+
+function conferirRecorteHorizontal(
+  fragmento: BordasHorizontais,
+  esquerda: number,
+  direita: number,
+) {
+  expect(fragmento.left, "LEGENDA_CORTADA_ESQUERDA").toBeGreaterThanOrEqual(esquerda - 1);
+  expect(fragmento.right, "LEGENDA_CORTADA_DIREITA").toBeLessThanOrEqual(direita + 1);
+}
+
+it("distingue estabilidade subpixel de deslocamento, perda de fragmentos e recorte", () => {
+  const inicio = [{ left: 33, right: 228.046875 }];
+  const fimR02 = [{ left: 32.640625, right: 227.6875 }];
+  expect(fimR02).not.toEqual(inicio);
+  conferirEstabilidadeHorizontal(inicio, fimR02);
+  conferirEstabilidadeHorizontal(inicio, [{ left: 33.5, right: 228.546875 }]);
+  expect(() =>
+    conferirEstabilidadeHorizontal(inicio, [{ left: 33.51, right: 228.556875 }]),
+  ).toThrow("LEGENDA_DESLOCOU");
+  expect(() => conferirEstabilidadeHorizontal(inicio, [{ left: 33, right: 229.046875 }])).toThrow(
+    "LEGENDA_DESLOCOU",
+  );
+  expect(() => conferirEstabilidadeHorizontal(inicio, [])).toThrow("CARDINALIDADE_DA_LEGENDA");
+  expect(() => conferirEstabilidadeHorizontal(inicio, [...fimR02, ...fimR02])).toThrow(
+    "CARDINALIDADE_DA_LEGENDA",
+  );
+
+  // A medida RED arquivada se deslocou e também saiu da área de rolagem.
+  const antes = { left: 33, right: 237.359375 };
+  const depois = { left: -157, right: 47.359375 };
+  expect(() => conferirEstabilidadeHorizontal([antes], [depois])).toThrow("LEGENDA_DESLOCOU");
+  conferirRecorteHorizontal(antes, 17, 303);
+  for (const fragmento of fimR02) conferirRecorteHorizontal(fragmento, 17, 303);
+  // O fragmento permanece cortado mesmo que se mantenha estável nos dois quadros.
+  conferirEstabilidadeHorizontal([depois], [depois]);
+  expect(() => conferirRecorteHorizontal(depois, 17, 303)).toThrow("LEGENDA_CORTADA_ESQUERDA");
+  expect(() => conferirRecorteHorizontal({ left: 33, right: 305 }, 17, 303)).toThrow(
+    "LEGENDA_CORTADA_DIREITA",
+  );
+});
+
+it.each(["celular claro", "celular escuro", "desktop", "desktop claro"] as const)(
+  "mantém toda a legenda da tabela legível: %s",
+  async (caso) => {
+    const movel = caso === "celular claro" || caso === "celular escuro";
+    const opcoes: Opcoes = movel
+      ? {
+          ...celular,
+          viewport: { width: 320, height: 844 },
+          colorScheme: caso === "celular claro" ? ("light" as const) : ("dark" as const),
+        }
+      : { ...desktop, colorScheme: caso === "desktop claro" ? "light" : desktop.colorScheme };
+    await comDiretor(opcoes, async (pagina, pedidos) => {
+      const nome = "Ausência por aluno no período";
+      const botao = painel(pagina).getByRole("button", { name: "Tabela", exact: true });
+      await botao.click();
+      const regiao = painel(pagina).getByRole("region", {
+        name: "Rolagem da tabela de ausência por aluno",
+      });
+      const tabela = regiao.getByRole("table", { name: nome, exact: true });
+      const legenda = painel(pagina).getByText(nome, { exact: true });
+      const nota = painel(pagina).getByText(/^Ausência conta faltas e faltas justificadas/);
+      const aluno = tabela.getByRole("rowheader", { name: "Aluno Estrela", exact: true });
+      await esperar(aluno).toBeVisible();
+      await esperar(legenda).toHaveCount(1);
+      await esperar(tabela).toHaveAccessibleName(nome);
+      await esperar(nota).toBeVisible();
+      expect(pedidos.map(({ metodo, caminho }) => [metodo, caminho])).toEqual([
+        ["GET", rotaEstatisticas],
+      ]);
+
+      // Enquadra a última linha e a legenda sem alterar a posição horizontal.
+      await nota.evaluate((el) => el.scrollIntoView({ block: "end" }));
+      const rolavel = await regiao.elementHandle();
+      const medir = () =>
+        legenda.evaluate((el, regiao) => {
+          const quadro = (no: Element) => {
+            const { left, right, top, bottom } = no.getBoundingClientRect();
+            return { left, right, top, bottom };
+          };
+          const tabela = regiao.querySelector("table");
+          const linha = tabela?.querySelector("tbody tr:last-child");
+          const fixa = linha?.querySelector("th");
+          const ultima = linha?.querySelector("td:last-child");
+          const barra = document.querySelector("header");
+          if (!linha || !fixa || !ultima || !barra) throw new Error("Tabela incompleta");
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const fragmentos = Array.from(range.getClientRects(), ({ left, right, top, bottom }) => ({
+            left,
+            right,
+            top,
+            bottom,
+          }));
+          const { left } = quadro(regiao);
+          const borda = left + regiao.clientLeft;
+          return {
+            caixa: quadro(el),
+            fragmentos,
+            esquerda: borda,
+            direita: borda + regiao.clientWidth,
+            rolagem: regiao.scrollLeft,
+            alcance: regiao.scrollWidth - regiao.clientWidth,
+            excesso: document.documentElement.scrollWidth - innerWidth,
+            altura: innerHeight,
+            topoLivre: quadro(barra).bottom,
+            linha: quadro(linha),
+            fixa: quadro(fixa),
+            ultima: quadro(ultima),
+            percentual: ultima.textContent,
+            contorno:
+              regiao.matches(":focus-visible") && getComputedStyle(regiao).outlineStyle !== "none",
+            y: scrollY,
+          };
+        }, rolavel);
+      const inicio = await medir();
+      expect(inicio.rolagem).toBe(0);
+      if (movel) {
+        expect(inicio.alcance).toBeGreaterThan(0);
+        await pagina.keyboard.press("Tab");
+        await esperar(regiao).toBeFocused();
+        // As setas atuam no elemento focado, sem escrever scrollLeft pelo teste.
+        for (let passo = 0; passo < 16; passo++) await pagina.keyboard.press("ArrowRight");
+        await esperar.poll(async () => (await medir()).rolagem).toBe(inicio.alcance);
+      } else expect(inicio.alcance).toBe(0);
+      await nota.evaluate((el) => el.scrollIntoView({ block: "end" }));
+      const fim = await medir();
+      await emitirMetricas("legenda-tabela", { caso, inicio, fim });
+      if (caso === "celular claro" && process.env.FIXTURE_CAPTURA_RODAPE) {
+        await pagina.screenshot({
+          path: process.env.FIXTURE_CAPTURA_RODAPE,
+          animations: "disabled",
+        });
+      }
+      expect(fim.excesso).toBe(0);
+      expect(fim.percentual).toBe("0%");
+      expect(Math.abs(fim.fixa.left - inicio.fixa.left)).toBeLessThanOrEqual(1);
+      expect(fim.ultima.left).toBeGreaterThanOrEqual(fim.fixa.right - 1);
+      expect(fim.ultima.right).toBeLessThanOrEqual(fim.direita + 1);
+      if (movel) expect(fim.contorno).toBe(true);
+      for (const medida of [inicio, fim]) {
+        expect(medida.fragmentos.length).toBeGreaterThan(0);
+        for (const fragmento of medida.fragmentos) {
+          conferirRecorteHorizontal(fragmento, medida.esquerda, medida.direita);
+          expect(fragmento.top).toBeGreaterThanOrEqual(
+            Math.max(medida.linha.bottom - 1, medida.topoLivre),
+          );
+          expect(fragmento.bottom).toBeLessThanOrEqual(medida.altura);
+        }
+      }
+      conferirEstabilidadeHorizontal(inicio.fragmentos, fim.fragmentos);
+    });
+  },
+);
+
+it("preserva a legenda padrão da tabela sem o ajuste de Minhas turmas", async () => {
+  await comDiretor({ ...desktop, parametros: "?controle-legenda" }, async (pagina, pedidos) => {
+    const tabela = pagina.getByRole("table", { name: "Legenda padrão da fixture", exact: true });
+    await esperar(tabela).toHaveAccessibleName("Legenda padrão da fixture");
+    const legenda = tabela.locator("caption");
+    await esperar(legenda).toBeVisible();
+    await esperar(legenda).toHaveCSS("caption-side", "bottom");
+    await esperar(legenda).toHaveCSS("position", "static");
+    await esperar(legenda).toHaveCSS("padding-inline-start", "16px");
+    expect(await legenda.evaluate((el) => el.childElementCount)).toBe(0);
+    expect(pedidos).toEqual([]);
+  });
+});
+
 it("R02: nome inteiro e última coluna numérica ficam alcançáveis com todas as categorias", async () => {
   await comDiretor(
     {

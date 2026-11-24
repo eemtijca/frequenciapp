@@ -10,7 +10,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
-- Minhas turmas compacta a barra e os indicadores no celular, distingue filtros e limite com contraste, separa barras de alunos com nomes semelhantes e mantém os valores da tabela alcançáveis por teclado. A troca de turma ou mês aguarda o resultado dos novos filtros.
+- Minhas turmas compacta a barra e os indicadores no celular, distingue filtros e limite com contraste, separa barras de alunos com nomes semelhantes e mantém os valores da tabela alcançáveis por teclado. A troca de turma ou mês aguarda o resultado dos novos filtros. A legenda da tabela permanece legível durante a rolagem horizontal.
 
 - Em Relatórios, Saídas e Entradas reúne os grupos de período e agrupamento quando há espaço, mantém seus alvos de 48 px e compacta a faixa de filtros e totais para mostrar os registros mais cedo.
 

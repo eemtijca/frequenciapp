@@ -146,6 +146,7 @@ function TabelaAlunos({ estatisticas }: { estatisticas: EstatisticasTurma }) {
       </Typography>
       <TabelaPadrao
         caption="Ausência por aluno no período"
+        legendaNaLarguraVisivel
         rotuloRolagem="Rolagem da tabela de ausência por aluno"
       >
         <TableHead>

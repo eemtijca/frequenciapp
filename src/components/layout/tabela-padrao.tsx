@@ -10,6 +10,8 @@ import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface TabelaPadraoProps {
   caption?: string;
+  /** Mantém o texto da legenda dentro da largura visível durante a rolagem. */
+  legendaNaLarguraVisivel?: boolean;
   children: ReactNode;
   primeiraColunaFixa?: boolean;
   compacta?: boolean;
@@ -26,6 +28,7 @@ const CONTROLES =
 
 export function TabelaPadrao({
   caption,
+  legendaNaLarguraVisivel = false,
   children,
   primeiraColunaFixa = false,
   compacta = false,
@@ -138,6 +141,7 @@ export function TabelaPadrao({
       sx={(tema) => ({
         width: "100%",
         overflowX: "auto",
+        ...(legendaNaLarguraVisivel && { containerType: "inline-size" }),
         boxShadow: "none",
         ...(arrastarHorizontalComMouse && {
           "&[data-arrastando]": { cursor: "grabbing", userSelect: "none" },
@@ -155,6 +159,8 @@ export function TabelaPadrao({
         size={compacta ? "small" : "medium"}
         sx={(tema) => ({
           ...(larguraIntrinseca && { width: "max-content" }),
+          // O MuiTable aplica padding no caption por seletor descendente.
+          ...(legendaNaLarguraVisivel && { "&.MuiTable-root > caption": { p: 0 } }),
           ...(compacta && {
             tableLayout: "fixed",
             "& .MuiTableCell-root": { px: 0.5, whiteSpace: "normal", overflowWrap: "anywhere" },
@@ -191,7 +197,23 @@ export function TabelaPadrao({
               typography: compacta ? "caption" : "body2",
             }}
           >
-            {caption}
+            {legendaNaLarguraVisivel ? (
+              <Box
+                component="span"
+                sx={{
+                  display: "block",
+                  position: "sticky",
+                  insetInlineStart: 0,
+                  inlineSize: "100cqi",
+                  boxSizing: "border-box",
+                  p: compacta ? 0.5 : 2,
+                }}
+              >
+                {caption}
+              </Box>
+            ) : (
+              caption
+            )}
           </Box>
         ) : null}
         {children}
