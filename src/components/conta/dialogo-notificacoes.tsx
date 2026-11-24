@@ -45,6 +45,9 @@ interface Estado {
   horarioPendencias: string;
 }
 
+// A base ligada avança 20 px; o trilho começa a 12 px da borda.
+const EXTENSAO_TRILHO_LIGADO = 20 - 12;
+
 const VISUALMENTE_OCULTO = {
   position: "absolute",
   width: "1px",
@@ -314,7 +317,13 @@ export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }:
                 </Typography>
                 <List disablePadding aria-label="Tipos de aviso">
                   {estado.tipos.map(({ tipo, disponivel }) => {
-                    const idRotulo = `preferencia-${tipo}`;
+                    const idRotulo = `${tituloId}-${tipo}`;
+                    const contexto = !disponivel
+                      ? "Este aviso está desligado pela Gestão."
+                      : tipo === "novasChamadas"
+                        ? undefined
+                        : `A partir das ${tipo === "resumoDiario" ? estado.horarioResumo : estado.horarioPendencias} (horário da escola).`;
+                    const idContexto = contexto ? `${descricaoId}-${tipo}` : undefined;
                     return (
                       <ListItem
                         key={tipo}
@@ -337,25 +346,14 @@ export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }:
                           >
                             {DESCRICOES_NOTIFICACAO[tipo]}
                           </Typography>
-                          {!disponivel ? (
+                          {contexto ? (
                             <Typography
+                              id={idContexto}
                               component="p"
                               variant="caption"
                               sx={{ color: "text.secondary" }}
                             >
-                              Este aviso está desligado pela Gestão.
-                            </Typography>
-                          ) : tipo !== "novasChamadas" ? (
-                            <Typography
-                              component="p"
-                              variant="caption"
-                              sx={{ color: "text.secondary" }}
-                            >
-                              A partir das{" "}
-                              {tipo === "resumoDiario"
-                                ? estado.horarioResumo
-                                : estado.horarioPendencias}{" "}
-                              (horário da escola).
+                              {contexto}
                             </Typography>
                           ) : null}
                         </Box>
@@ -367,7 +365,19 @@ export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }:
                             preferenciaDesejada.current = { [tipo]: evento.target.checked };
                             executarAcao("salvar");
                           }}
-                          slotProps={{ input: { "aria-labelledby": idRotulo } }}
+                          slotProps={{
+                            input: ({ checked }) => ({
+                              "aria-labelledby": idRotulo,
+                              "aria-describedby": idContexto,
+                              // Cobre o trilho à esquerda sem ampliar a borda direita da base.
+                              style: checked
+                                ? {
+                                    width: `calc(100% + ${EXTENSAO_TRILHO_LIGADO}px)`,
+                                    left: -EXTENSAO_TRILHO_LIGADO,
+                                  }
+                                : { width: "100%", left: 0 },
+                            }),
+                          }}
                         />
                       </ListItem>
                     );

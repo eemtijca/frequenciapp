@@ -133,6 +133,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Notificações mantém texto e ações inteiros no celular ao evitar a rolagem horizontal indevida. O trilho inteiro permite alterar os avisos disponíveis. O interruptor expõe a descrição acessível quando a linha mostra um horário ou motivo de indisponibilidade.
 - A Grade usa a largura do conteúdo sem esticar Aluno ou Total. Em tabelas com rolagem horizontal, o arraste responde ao inverter nos limites e termina ao soltar o botão principal. O filtro de séries do Histórico mantém seus controles sem a faixa de sombra atrás do grupo.
 - O backup drena todo o fluxo após listar o catálogo PostgreSQL, sem travar a cifra nem segurar indefinidamente a trava de operações em dumps grandes.
 - O primeiro backup do instalador passa a conferir o escopo a partir da identidade operacional e do banco efetivo, reutilizando a verificação oficial e preservando as recusas de artefatos, ponteiro, schema ou destino divergentes. A repetição confere novamente os arquivos e o remoto configurado sem gerar outro dump nem declarar a restauração exercitada.
