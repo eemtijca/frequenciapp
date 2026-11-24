@@ -90,6 +90,7 @@ test("ação sem conexão tem alvo de toque, foco visível e tenta a mesma URL p
             fundo: estilo.backgroundColor,
             foco: estilo.outlineColor,
             cartao: getComputedStyle(cartao).backgroundColor,
+            corpo: getComputedStyle(document.body).backgroundColor,
           },
           visivel: link.matches(":focus-visible"),
           estilo: estilo.outlineStyle,
@@ -101,6 +102,8 @@ test("ação sem conexão tem alvo de toque, foco visível e tenta a mesma URL p
       expect(medidas.semCorte).toBe(true);
       expect(contraste(medidas.cores.texto, medidas.cores.fundo)).toBeGreaterThanOrEqual(4.5);
       expect(contraste(medidas.cores.foco, medidas.cores.cartao)).toBeGreaterThanOrEqual(3);
+      expect(medidas.cores.corpo).toBe("rgb(20, 20, 19)");
+      expect(medidas.cores.fundo).toBe("rgb(129, 207, 179)");
       const [resposta] = await Promise.all([
         pagina.waitForNavigation({ url, waitUntil: "load" }),
         pagina.keyboard.press("Enter"),
@@ -109,6 +112,26 @@ test("ação sem conexão tem alvo de toque, foco visível e tenta a mesma URL p
       expect(resposta.status()).toBe(200);
       expect(await resposta.body()).toEqual(bytes);
       expect(pagina.url()).toBe(url);
+      const clara = await navegador.newPage({
+        viewport: { width: 320, height: 844 },
+        deviceScaleFactor: 1,
+        colorScheme: "light",
+        javaScriptEnabled: false,
+        serviceWorkers: "block",
+      });
+      expect((await clara.goto(url))?.status()).toBe(200);
+      const coresClaras = await clara.evaluate(() => {
+        const link = document.querySelector("a.tentar");
+        if (!link) throw new Error("Ação sem conexão ausente no tema claro.");
+        return {
+          corpo: getComputedStyle(document.body).backgroundColor,
+          fundo: getComputedStyle(link).backgroundColor,
+        };
+      });
+      expect(coresClaras).toEqual({
+        corpo: "rgb(246, 246, 246)",
+        fundo: "rgb(29, 114, 83)",
+      });
     } finally {
       await navegador.close();
     }
