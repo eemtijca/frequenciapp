@@ -5,6 +5,7 @@ import { useRef } from "react";
 import { Check, ExternalLink, GitBranch, Scale, ShieldCheck } from "lucide-react";
 import pacote from "../../package.json";
 import { Logotipo } from "@/components/ui/logotipo";
+import { ROTA_PRIVACIDADE } from "@/lib/rotas-publicas";
 import {
   Dialog,
   DialogContent,
@@ -94,14 +95,8 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
             <p className="text-muted-foreground text-xs leading-relaxed">
               Solicitações de dados: gestão da escola.
             </p>
-            <a
-              href={`${REPOSITORIO}/blob/main/docs/lgpd.md`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`${ACAO} text-primary`}
-            >
+            <a href={ROTA_PRIVACIDADE} className={`${ACAO} text-primary`}>
               Como os dados são tratados
-              <ExternalLink size={14} aria-hidden="true" className="shrink-0" />
             </a>
           </section>
 

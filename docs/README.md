@@ -26,7 +26,7 @@
 | [implantacao-nuvem.md](implantacao-nuvem.md)           | AWS, Azure e GCP com Terraform, modo local e produção.                 |
 | [seguranca.md](seguranca.md)                           | Autenticação, sessões, papéis, CSRF e cabeçalhos.                      |
 | [seguranca-preview.md](seguranca-preview.md)           | Roles, PUBLIC e privilégios do schema de preview.                      |
-| [lgpd.md](lgpd.md)                                     | Dados tratados, minimização e direitos do titular.                     |
+| [lgpd.md](lgpd.md)                                     | Inventário técnico. A política pública está em `/privacidade`.         |
 | [beneficios-frequencia.md](beneficios-frequencia.md)   | Regras de frequência mínima dos benefícios e alerta.                   |
 | [operacao.md](operacao.md)                             | Backup, restauração e rotinas do operador.                             |
 | [backup-externo.md](backup-externo.md)                 | Backup portátil de arquivos com transporte externo.                    |

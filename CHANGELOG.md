@@ -137,6 +137,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- A página pública `/privacidade` descreve o tratamento de dados da EEMTI José Cláudio de Araújo, inclusive o escopo `drive.file` da integração Google, e abre sem sessão. `/politica-de-privacidade` redireciona para ela. A entrada e o diálogo Sobre apontam para a página.
+
 - O atualizador agendado da `main` aceita migrações novas apenas com autorização protegida, vinculada à revisão instalada, ao commit candidato, aos SHA-256 dos SQLs e a uma janela de uso único.
 - A aba Horários ganha o horário de provas bimestrais. Em Gestão, Configurações, Horários, a nova aba Provas cadastra a mesma prova para uma série inteira ou para turmas escolhidas, com data, início, fim e disciplina, recusa a turma que já tem prova na mesma janela do dia, remove provas e encerra o período, apagando o horário inteiro. Na consulta, o cartão Provas bimestrais mostra as provas da turma de hoje em diante, por data, e some quando a turma não tem prova. Novas rotas `GET` e `POST /api/provas-bimestrais`, `DELETE /api/provas-bimestrais/{id}` e `POST /api/provas-bimestrais/encerrar`, e a tabela `provas_bimestrais` ([ADR-080](docs/adr/080-horario-de-provas-bimestrais.md)).
 

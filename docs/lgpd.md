@@ -4,7 +4,7 @@ Como o FrequenciApp trata dados pessoais à luz da Lei Geral de Proteção de Da
 
 ## Informações no aplicativo
 
-O diálogo Sobre, disponível na tela de entrada e na área interna, resume as salvaguardas existentes: acesso por conta e permissão, registro de operações administrativas e gestão do compartilhamento nas integrações. O link "Como os dados são tratados" abre este documento; solicitações sobre dados pessoais são encaminhadas à gestão da escola.
+A página pública `/privacidade` é a política apresentada a quem acessa o aplicativo e à tela de consentimento OAuth do Google. O endereço `/politica-de-privacidade` redireciona para ela. O diálogo Sobre, disponível na tela de entrada e na área interna, resume as salvaguardas e aponta para essa página. O rodapé da entrada também liga a política. Solicitações sobre dados pessoais são encaminhadas à gestão da escola. Este documento continua o inventário técnico.
 
 A escola, como controladora, define as bases legais aplicáveis, as finalidades, a retenção e as condições de cada integração. Este documento descreve o que o aplicativo implementa e não constitui certificação jurídica nem auditoria independente de conformidade.
 

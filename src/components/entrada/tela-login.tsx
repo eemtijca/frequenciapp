@@ -14,6 +14,7 @@ import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado"
 import DialogoSobre from "@/components/dialogo-sobre";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
+import { ROTA_PRIVACIDADE } from "@/lib/rotas-publicas";
 
 const CHAVE_EMAIL = "frequenciapp:email";
 const CHAVE_AVISO = "frequenciapp:aviso-entrada";
@@ -272,6 +273,15 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
               Sobre
             </button>
           </nav>
+
+          <footer className="flex justify-center">
+            <a
+              href={ROTA_PRIVACIDADE}
+              className="discreto text-secondary-foreground focus-visible:ring-ring inline-flex min-h-11 items-center justify-center px-1 text-center text-xs underline-offset-4 hover:underline focus-visible:ring-2 focus-visible:outline-none"
+            >
+              Política de privacidade
+            </a>
+          </footer>
 
           {/* Link oculto para agentes de IA: a raiz anônima aponta o índice do projeto. */}
           <a href={urlIndiceAgentes} hidden aria-hidden="true">

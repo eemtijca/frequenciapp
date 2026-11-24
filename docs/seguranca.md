@@ -79,7 +79,7 @@ A cópia completa exige novamente a senha atual da administração por `POST /ap
 ## Integração com Google Planilhas
 
 - Desligada por padrão. Na conexão OAuth de frequência, saídas ou chamadas parciais, o navegador abre o Google Picker com um token de acesso breve. O token de atualização fica cifrado no servidor com uma chave derivada de `AUTH_SECRET`, e as chamadas da Sheets API saem do servidor.
-- OAuth usa estado assinado, PKCE, escopo `drive.file` e seleção explícita da planilha. Só a administração pode conectar a conta e escolher a planilha.
+- OAuth usa estado assinado, PKCE, escopo `drive.file` e seleção explícita da planilha. Só a administração pode conectar a conta e escolher a planilha. A página `/privacidade` descreve esse escopo, o uso limitado aos arquivos escolhidos e a política de dados de usuário do Google, e abre sem sessão.
 - Cada finalidade tem seleção e estrutura próprias. Frequência e saídas têm janela de modo completo; chamadas parciais têm atualização explícita na prévia de linhas criadas pela integração. O arquivo de chamadas parciais é distinto dos outros dois. Somente OAuth e Sheets API atendem as integrações; nenhuma configuração aceita URL arbitrária ou token de script. O simulador HTTP é carregado apenas no servidor de testes, com tokens sintéticos e destino limitado ao loopback.
 - Destravar o modo completo e restaurar cópia exigem a senha do administrador, com limite de tentativas por usuário.
 - O modo completo expira sozinho e só remove linha, coluna ou aba com marcador de Developer Metadata da integração. Nenhuma finalidade cria abas de backup.

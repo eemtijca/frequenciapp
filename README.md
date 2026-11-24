@@ -376,7 +376,7 @@ As saídas seguem o contrato: 0 para sucesso, 1 para falha interna, 2 a 10 para 
 
 ## Privacidade
 
-O aplicativo registra cadastro escolar, frequência e os registros operacionais necessários, incluindo presença parcial e autoria da confirmação manual da Seduc. A integração opcional com Google Planilhas, desligada por padrão, envia os campos de cada finalidade aos arquivos escolhidos pela escola. A confirmação manual não transmite dados ao sistema da Seduc. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. Detalhes e orientações em [docs/lgpd.md](docs/lgpd.md).
+O aplicativo registra cadastro escolar, frequência e os registros operacionais necessários, incluindo presença parcial e autoria da confirmação manual da Seduc. A integração opcional com Google Planilhas, desligada por padrão, envia os campos de cada finalidade aos arquivos escolhidos pela escola. A confirmação manual não transmite dados ao sistema da Seduc. A política pública fica em `/privacidade`, sem sessão, e `/politica-de-privacidade` redireciona para ela. O repositório não contém dados reais de pessoas; a semente de desenvolvimento usa apenas nomes sintéticos. O inventário técnico está em [docs/lgpd.md](docs/lgpd.md).
 
 ## Segurança
 

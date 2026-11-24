@@ -94,7 +94,7 @@ it.each(combinacoes)("entrada: ações auxiliares discretas em %s a %i px", asyn
     expect(await fundo(page.getByRole("button", { name: "Entrar", exact: true }))).not.toBe(
       "rgba(0, 0, 0, 0)",
     );
-    for (const nome of ["FrequenciBI", "GitHub", "API"])
+    for (const nome of ["FrequenciBI", "GitHub", "API", "Política de privacidade"])
       await verificarDiscreto(page.getByRole("link", { name: nome, exact: true }));
     const sobre = page.getByRole("button", { name: "Sobre", exact: true });
     await verificarDiscreto(sobre);

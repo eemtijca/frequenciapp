@@ -10,7 +10,7 @@ const rgb = (bytes: number[]): Rgb => [
   (bytes[2] ?? 0) / 255,
 ];
 
-for (const rota of ["/", "/bi"]) {
+for (const rota of ["/", "/bi", "/privacidade"]) {
   for (const tema of ["light", "dark"] as const) {
     test(`superfícies, texto e cores preservadas em ${rota}, ${tema}`, async ({ page }, info) => {
       await page.setViewportSize({ width: 390, height: 844 });
@@ -134,7 +134,9 @@ for (const rota of ["/", "/bi"]) {
         "texto selecionado",
       ).toBeGreaterThanOrEqual(4.5);
       await page.screenshot({
-        path: info.outputPath(`paleta-${rota === "/" ? "entrada" : "bi"}-${tema}.png`),
+        path: info.outputPath(
+          `paleta-${rota === "/" ? "entrada" : rota.slice(1).replaceAll("/", "-")}-${tema}.png`,
+        ),
         animations: "disabled",
       });
     });
