@@ -9,7 +9,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useTheme } from "@mui/material/styles";
 import { BarChart } from "@mui/x-charts/BarChart";
-import { ChartsReferenceLine } from "@mui/x-charts/ChartsReferenceLine";
+import { ChartsReferenceLine, referenceLineClasses } from "@mui/x-charts/ChartsReferenceLine";
 import { ChartsTooltipContainer, useItemTooltip } from "@mui/x-charts/ChartsTooltip";
 import type { EstatisticaAluno } from "@/domain/estatisticas-diretor";
 import { escalaPercentual } from "@/components/graficos/estilo-graficos";
@@ -46,7 +46,7 @@ function TooltipAluno({ dados }: { dados: AlunoNoGrafico[] }) {
     <ChartsTooltipContainer trigger="item" anchor="node" position="right">
       <Paper role="tooltip" variant="outlined" sx={{ minWidth: 180, maxWidth: 260, p: 1.5 }}>
         <Stack spacing={0.75}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
             {aluno.nome}
           </Typography>
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
@@ -71,14 +71,23 @@ export default function GraficoAlunos({ alunos, limiteRisco }: Props) {
   const paleta = tema.vars.palette;
   const corRisco = paleta.falta.main;
   const corNeutra = paleta.text.secondary;
-  const dados: AlunoNoGrafico[] = useMemo(
-    () =>
-      alunos.map((aluno) => ({
+  const dados = useMemo(() => {
+    const nomes = alunos.map((aluno) => nomeCurto(aluno.nome));
+    const contagens = new Map<string, number>();
+    for (const nome of nomes) contagens.set(nome, (contagens.get(nome) ?? 0) + 1);
+    return alunos.map((aluno, indice): AlunoNoGrafico => {
+      const nome = nomes[indice] ?? aluno.nome;
+      // A posição explicita a ordem de leitura quando mais de um nome é abreviado igual.
+      return {
         aluno,
-        rotulo: nomeCurto(aluno.nome),
+        rotulo: (contagens.get(nome) ?? 0) > 1 ? `${indice + 1}. ${aluno.nome}` : nome,
         valor: aluno.taxa * 100,
-      })),
-    [alunos],
+      };
+    });
+  }, [alunos]);
+  const dadosPorAluno = useMemo(
+    () => new Map(dados.map((item) => [item.aluno.alunoId, item])),
+    [dados],
   );
   const slotTooltip = useMemo(
     () =>
@@ -90,6 +99,9 @@ export default function GraficoAlunos({ alunos, limiteRisco }: Props) {
   const escala = escalaPercentual(
     Math.max(limiteRisco + 5, ...dados.map((item) => item.valor), 10),
   );
+  const posicaoDoLimite = limiteRisco / escala.teto;
+  const ancoraDoLimite =
+    posicaoDoLimite <= 0.2 ? "start" : posicaoDoLimite >= 0.8 ? "end" : "middle";
   const emRisco = alunos.filter((aluno) => aluno.emRisco).length;
   const descricao = `Ausência por aluno. ${emRisco} de ${alunos.length} alcançam o limite de ${limiteRisco}%.`;
   const altura = Math.max(160, dados.length * ALTURA_BARRA + 56);
@@ -138,7 +150,11 @@ export default function GraficoAlunos({ alunos, limiteRisco }: Props) {
           yAxis={[
             {
               scaleType: "band",
-              data: dados.map((item) => item.rotulo),
+              data: dados.map(({ aluno }) => aluno.alunoId),
+              valueFormatter: (id: string, contexto) => {
+                const item = dadosPorAluno.get(id);
+                return (contexto.location === "tick" ? item?.rotulo : item?.aluno.nome) ?? "";
+              },
               width: 112,
               tickLabelStyle: { fontSize: 12, fill: paleta.text.primary },
             },
@@ -150,14 +166,32 @@ export default function GraficoAlunos({ alunos, limiteRisco }: Props) {
             // O rótulo externo da barra é desenhado no limite da área de plotagem.
             // Sem remover o recorte, valores altos perdem a parte final do percentual.
             "& svg > g[clip-path]": { clipPath: "none" },
+            "@media (forced-colors: active)": {
+              [`& .${referenceLineClasses.line}`]: {
+                forcedColorAdjust: "none",
+                stroke: "CanvasText !important",
+              },
+              "& .halo-limiar-diretor": { stroke: "Canvas !important" },
+              [`& .${referenceLineClasses.label}`]: {
+                forcedColorAdjust: "none",
+                fill: "CanvasText !important",
+              },
+            },
           }}
         >
+          {/* O halo mantém o traço legível inclusive no trecho que cruza os dados. */}
+          <ChartsReferenceLine
+            x={limiteRisco}
+            classes={{ line: "halo-limiar-diretor" }}
+            lineStyle={{ stroke: paleta.background.paper, strokeDasharray: "4 3", strokeWidth: 4 }}
+          />
           <ChartsReferenceLine
             x={limiteRisco}
             label={`limite ${limiteRisco}%`}
             labelAlign="start"
-            lineStyle={{ stroke: corRisco, strokeDasharray: "4 3", strokeWidth: 1.5 }}
-            labelStyle={{ fill: paleta.falta.texto, fontSize: 11 }}
+            spacing={{ x: 0, y: -18 }}
+            lineStyle={{ stroke: paleta.text.primary, strokeDasharray: "4 3", strokeWidth: 2 }}
+            labelStyle={{ fill: paleta.text.primary, fontSize: 11, textAnchor: ancoraDoLimite }}
           />
         </BarChart>
       </Box>

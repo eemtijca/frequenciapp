@@ -47,12 +47,35 @@ interface Props {
 type Exibicao = "grafico" | "tabela";
 type TomDestaque = "neutro" | "falta";
 
+interface Consulta {
+  turmaId: string;
+  mes: string;
+}
+
+interface Leitura {
+  consulta: Consulta;
+  dados: EstatisticasDoDiretor | null;
+  carregando: boolean;
+  erro?: { mensagem: string; variante: VarianteEstado };
+}
+
 const percentual = new Intl.NumberFormat("pt-BR", {
   style: "percent",
   maximumFractionDigits: 1,
 });
 
 const ALVO_ACAO = { minHeight: 48 } as const;
+const OPCAO_SELECIONAVEL = {
+  ...ALVO_ACAO,
+  "&&": { borderColor: "text.secondary" },
+  "&&[aria-pressed='true']": {
+    bgcolor: "action.selected",
+    borderColor: "primary.main",
+    borderWidth: 2,
+    fontWeight: 700,
+    "@media (forced-colors: active)": { borderColor: "Highlight" },
+  },
+} as const;
 
 function dataPorExtenso(dia: string): string {
   return dia.split("-").reverse().join("/");
@@ -68,20 +91,33 @@ function Destaque({
   tom?: TomDestaque;
 }) {
   return (
-    <Cartao sx={{ height: "100%" }}>
-      <Stack spacing={0.5} sx={{ alignItems: "center", textAlign: "center" }}>
+    <Cartao sx={{ height: "100%", py: { xs: 1, sm: 2 } }}>
+      <Stack
+        direction={{ xs: "row", sm: "column" }}
+        spacing={{ xs: 1, sm: 0.5 }}
+        useFlexGap
+        sx={{
+          alignItems: "center",
+          justifyContent: { xs: "space-between", sm: "center" },
+          textAlign: { xs: "start", sm: "center" },
+        }}
+      >
         <Typography
           component="p"
           variant="h5"
           sx={(tema) => ({
             ...numeraisTabulares,
             fontWeight: 600,
+            flexShrink: 0,
             ...(tom === "falta" ? { color: tema.vars.palette.falta.texto } : {}),
           })}
         >
           {valor}
         </Typography>
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        <Typography
+          variant="caption"
+          sx={{ color: "text.secondary", textAlign: { xs: "end", sm: "center" } }}
+        >
           {rotulo}
         </Typography>
       </Stack>
@@ -93,11 +129,25 @@ function TabelaAlunos({ estatisticas }: { estatisticas: EstatisticasTurma }) {
   const verJustificadas = estatisticas.categorias.includes("justificativas");
   const verSaidas = estatisticas.categorias.includes("saidas");
   return (
-    <Stack spacing={1.5}>
+    <Stack
+      spacing={1.5}
+      sx={(tema) => ({
+        "& tr > :first-child": {
+          position: "sticky",
+          insetInlineStart: 0,
+          zIndex: 1,
+          bgcolor: tema.vars.palette.background.paper,
+          maxWidth: { xs: 144, sm: 224 },
+        },
+      })}
+    >
       <Typography component="h2" variant="h6">
         Ausência por aluno
       </Typography>
-      <TabelaPadrao caption="Ausência por aluno no período" primeiraColunaFixa>
+      <TabelaPadrao
+        caption="Ausência por aluno no período"
+        rotuloRolagem="Rolagem da tabela de ausência por aluno"
+      >
         <TableHead>
           <TableRow>
             <TableCell component="th" scope="col">
@@ -139,7 +189,9 @@ function TabelaAlunos({ estatisticas }: { estatisticas: EstatisticasTurma }) {
                   useFlexGap
                   sx={{ alignItems: "center", flexWrap: "wrap" }}
                 >
-                  <Box component="span">{aluno.nome}</Box>
+                  <Box component="span" sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                    {aluno.nome}
+                  </Box>
                   {aluno.emRisco ? <Selo tom="atencao" rotulo="em risco" /> : null}
                 </Stack>
               </TableCell>
@@ -165,13 +217,31 @@ function TabelaAlunos({ estatisticas }: { estatisticas: EstatisticasTurma }) {
 
 export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualizado }: Props) {
   const mesCorrente = contexto.diaCorrente.slice(0, 7);
-  const [turmaId, setTurmaId] = useState(contexto.turmas[0]?.turmaId ?? "");
-  const [mes, setMes] = useState(mesCorrente);
+  // Uma nova seleção cria outra consulta, mesmo ao voltar aos mesmos filtros.
+  const [consulta, setConsulta] = useState<Consulta>({
+    turmaId: contexto.turmas[0]?.turmaId ?? "",
+    mes: mesCorrente,
+  });
+  const { turmaId, mes } = consulta;
   const [exibicao, setExibicao] = useState<Exibicao>("grafico");
-  const [dados, setDados] = useState<EstatisticasDoDiretor | null>(null);
-  const [carregando, setCarregando] = useState(false);
-  const [erro, setErro] = useState("");
-  const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
+  const [leitura, setLeitura] = useState<Leitura | null>(null);
+  const atual = leitura?.consulta === consulta ? leitura : null;
+  const dados = atual?.dados ?? null;
+  const erro = atual?.erro;
+  const carregando = atual?.carregando ?? Boolean(turmaId);
+
+  function selecionarTurma(valor: string) {
+    setConsulta((anterior) =>
+      anterior.turmaId === valor ? anterior : { ...anterior, turmaId: valor },
+    );
+  }
+
+  function selecionarMes(alterar: (anterior: string) => string) {
+    setConsulta((anterior) => {
+      const valor = alterar(anterior.mes);
+      return anterior.mes === valor ? anterior : { ...anterior, mes: valor };
+    });
+  }
 
   useEffect(() => {
     if (!turmaId) return;
@@ -180,34 +250,40 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
     const ate = dias[dias.length - 1] ?? de;
     let viva = true;
     async function buscar() {
-      setCarregando(true);
-      setErro("");
+      setLeitura((anterior) => ({
+        consulta,
+        dados: anterior?.consulta === consulta ? anterior.dados : null,
+        carregando: true,
+      }));
       try {
         const resposta = await pedir<EstatisticasDoDiretor>(
           `/api/diretor/estatisticas?turmaId=${turmaId}&de=${de}&ate=${ate}`,
         );
         if (viva) {
-          setDados(resposta);
+          setLeitura({ consulta, dados: resposta, carregando: false });
           onAtualizado();
         }
       } catch (excecao) {
         if (!viva) return;
-        setDados(null);
-        setErro(
-          excecao instanceof ErroApi
-            ? excecao.message
-            : "Não foi possível carregar as estatísticas.",
-        );
-        setErroVariante(estadoDeErro(excecao));
-      } finally {
-        if (viva) setCarregando(false);
+        setLeitura({
+          consulta,
+          dados: null,
+          carregando: false,
+          erro: {
+            mensagem:
+              excecao instanceof ErroApi
+                ? excecao.message
+                : "Não foi possível carregar as estatísticas.",
+            variante: estadoDeErro(excecao),
+          },
+        });
       }
     }
     void buscar();
     return () => {
       viva = false;
     };
-  }, [turmaId, mes, atualizacao, onAtualizado]);
+  }, [consulta, turmaId, mes, atualizacao, onAtualizado]);
 
   if (contexto.turmas.length === 0) {
     return (
@@ -256,12 +332,8 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
                 key={item.turmaId}
                 variante="contorno"
                 aria-pressed={ativo}
-                onClick={() => setTurmaId(item.turmaId)}
-                sx={{
-                  ...ALVO_ACAO,
-                  bgcolor: ativo ? "action.selected" : undefined,
-                  borderColor: ativo ? "primary.main" : undefined,
-                }}
+                onClick={() => selecionarTurma(item.turmaId)}
+                sx={OPCAO_SELECIONAVEL}
               >
                 {item.turma}
               </Botao>
@@ -275,7 +347,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
           rotulo="Mês anterior"
           variante="contorno"
           icone={<ChevronLeftRoundedIcon />}
-          onClick={() => setMes((atual) => mesSeguinte(atual, -1))}
+          onClick={() => selecionarMes((atual) => mesSeguinte(atual, -1))}
           sx={{ width: 48, height: 48, flexShrink: 0 }}
         />
         <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -286,7 +358,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
             max={mesCorrente}
             rotuloAcessivel="Mês das estatísticas"
             rotulo={rotuloMes(mes)}
-            onValor={setMes}
+            onValor={(valor) => selecionarMes(() => valor)}
           />
         </Box>
         <BotaoIcone
@@ -294,12 +366,14 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
           variante="contorno"
           icone={<ChevronRightRoundedIcon />}
           disabled={mes >= mesCorrente}
-          onClick={() => setMes((atual) => mesSeguinte(atual, 1))}
+          onClick={() => selecionarMes((atual) => mesSeguinte(atual, 1))}
           sx={{ width: 48, height: 48, flexShrink: 0 }}
         />
       </Stack>
 
-      {erro ? <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" /> : null}
+      {erro ? (
+        <AlertaCompacto variante={erro.variante} descricao={erro.mensagem} tamanho="linha" />
+      ) : null}
 
       {carregando && !estatisticas ? (
         <Stack
@@ -355,11 +429,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
                     aria-pressed={exibicao === "grafico"}
                     icone={<BarChartRoundedIcon fontSize="small" />}
                     onClick={() => setExibicao("grafico")}
-                    sx={{
-                      ...ALVO_ACAO,
-                      bgcolor: exibicao === "grafico" ? "action.selected" : undefined,
-                      borderColor: exibicao === "grafico" ? "primary.main" : undefined,
-                    }}
+                    sx={OPCAO_SELECIONAVEL}
                   >
                     Gráficos
                   </Botao>
@@ -369,11 +439,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
                     aria-pressed={exibicao === "tabela"}
                     icone={<TableChartRoundedIcon fontSize="small" />}
                     onClick={() => setExibicao("tabela")}
-                    sx={{
-                      ...ALVO_ACAO,
-                      bgcolor: exibicao === "tabela" ? "action.selected" : undefined,
-                      borderColor: exibicao === "tabela" ? "primary.main" : undefined,
-                    }}
+                    sx={OPCAO_SELECIONAVEL}
                   >
                     Tabela
                   </Botao>

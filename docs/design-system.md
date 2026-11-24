@@ -360,12 +360,12 @@ Regras de composição:
 
 ### Minhas turmas
 
-- Shell próprio do diretor, sem a navegação da equipe.
-- Chips das turmas e seletor de mês sem mês futuro.
-- Três indicadores: alunos acompanhados, em risco e ausência da turma.
-- Gráfico de barras horizontais por aluno e gráfico semanal da turma.
-- Tabela alternativa com os mesmos números e o selo em risco.
-- Nenhuma ação de escrita.
+- Shell próprio do diretor com largura de leitura, sem a navegação da equipe. No celular, Atualizar fica junto à identidade e os outros comandos ficam abaixo, na ordem de Tab, com alvos de 48 dp.
+- Seleção de turma e forma de exibição com contornos contrastantes e borda mais espessa na opção ativa, cujo estado também é acessível. O seletor de mês não oferece mês futuro.
+- Três indicadores: alunos acompanhados, em risco e ausência da turma. No celular, cada valor divide a linha com seu rótulo, que pode quebrar sem truncamento.
+- Gráfico de barras horizontais por aluno e gráfico semanal da turma. Cada aluno ocupa uma faixa distinta, mesmo quando o nome se repete; a dica mostra o nome completo. No gráfico por aluno, o limite tem traço com halo para destacar a referência sobre as barras, e o texto fica acima dos dados.
+- Tabela alternativa com os mesmos números e o selo em risco. A região de rolagem tem nome e recebe foco. Só a coluna de aluno fica fixa; os nomes quebram em linhas para deixar espaço para os valores.
+- Uma nova seleção de turma ou mês oculta a leitura anterior até confirmar o novo resultado. Nenhuma ação de escrita.
 - Cada gráfico tem descrição acessível, legenda e dica ao tocar.
 
 ### FrequenciBI

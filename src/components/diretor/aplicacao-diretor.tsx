@@ -88,34 +88,42 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
           sx={{
             alignItems: "center",
             flexWrap: "wrap",
-            gap: 1,
+            columnGap: { xs: 1, sm: 0 },
+            rowGap: 0.5,
             paddingY: { xs: 1, sm: 0 },
           }}
         >
-          <Box sx={{ minWidth: 0, flex: "1 1 200px" }}>
+          <Box sx={{ minWidth: 0, flex: 1, mr: { sm: 1 } }}>
             <Typography variant="subtitle1" component="p" noWrap sx={{ fontWeight: 600 }}>
               FrequenciApp
             </Typography>
-            <Typography variant="caption" component="p" noWrap sx={{ color: "text.secondary" }}>
+            <Typography
+              variant="caption"
+              component="p"
+              sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+            >
               {primeiroNome(usuario.nome)} · {rotuloDePapel(usuario.papel)}
             </Typography>
-            <AtualizadoEm instante={atualizadoEm} fuso={fuso} />
+            <AtualizadoEm instante={atualizadoEm} fuso={fuso} sx={{ whiteSpace: "normal" }} />
           </Box>
+          <BotaoAtualizar
+            variante="texto"
+            onAtualizar={() => setAtualizacao((valor) => valor + 1)}
+            sx={{ mr: { sm: 0.5 } }}
+          />
           <Stack
             direction="row"
             useFlexGap
-            spacing={0.5}
             sx={{
               alignItems: "center",
               flexWrap: "wrap",
-              justifyContent: "flex-end",
+              flex: { xs: "0 0 100%", sm: "0 0 auto" },
+              justifyContent: { xs: "space-evenly", sm: "flex-end" },
+              columnGap: { sm: 0.5 },
+              rowGap: 0.5,
               maxWidth: "100%",
             }}
           >
-            <BotaoAtualizar
-              variante="texto"
-              onAtualizar={() => setAtualizacao((valor) => valor + 1)}
-            />
             <Box
               sx={{
                 display: "inline-flex",
@@ -167,7 +175,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
       </AppBar>
 
       <LayoutPagina>
-        <LayoutConteudo largura="gestao">
+        <LayoutConteudo largura="leitura">
           <Box data-visao="diretor">
             {contexto.trocaObrigatoria ? (
               <EstadoVazio
