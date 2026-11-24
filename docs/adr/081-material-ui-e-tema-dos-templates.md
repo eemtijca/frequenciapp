@@ -40,7 +40,7 @@ O resultado era inconsistência visual entre telas, revisão mais difícil, cust
 - O layout segue o Material Design 2 com o visual do template.
 - Breakpoints: `xs: 0`, `sm: 600`, `md: 905`, `lg: 1240` e `xl: 1440`.
 - Larguras de conteúdo: 840 para leitura e formulários, 1040 para gestão e relatórios e 1280 como exceção documentada para Grade, Relatórios largos e FrequenciBI.
-- A gaveta tem 256 px e fica permanente a partir de 905 px e modal abaixo disso.
+- A gaveta tem 256 px e fica permanente a partir de 905 px e modal abaixo disso. O esqueleto de carregamento reserva a mesma coluna a partir de 905 px.
 - A barra superior tem 56 px no celular e 64 px no desktop.
 - O item de navegação tem 48 px de altura e 16 px de padding.
 - Tabelas usam cabeçalho de 56 px, linhas de 52 px e padding de célula de 16 px.
