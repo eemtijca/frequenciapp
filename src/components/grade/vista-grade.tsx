@@ -39,6 +39,7 @@ import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-es
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { Rotulo } from "@/components/ui/mui/rotulo";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { TabelaPadrao } from "@/components/layout/tabela-padrao";
@@ -359,12 +360,12 @@ export default function VistaGrade({
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={2}
-            sx={{ alignItems: "flex-end" }}
+            sx={{ alignItems: { xs: "stretch", sm: "flex-end" } }}
           >
-            <Stack spacing={1} sx={{ minWidth: 0, flex: 1 }}>
-              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 500 }}>
+            <Stack spacing={1} sx={{ minWidth: 0, flex: { sm: 1 } }}>
+              <Rotulo htmlFor="grade-dia" sx={{ mb: 0, typography: "caption", fontWeight: 500 }}>
                 {modo === "periodo" ? "De" : modo === "semana" ? "Data da semana" : "Data"}
-              </Typography>
+              </Rotulo>
               <SeletorPeriodo
                 id="grade-dia"
                 modo="dia"
@@ -377,10 +378,13 @@ export default function VistaGrade({
               />
             </Stack>
             {modo === "periodo" ? (
-              <Stack spacing={1} sx={{ minWidth: 0, flex: 1 }}>
-                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 500 }}>
+              <Stack spacing={1} sx={{ minWidth: 0, flex: { sm: 1 } }}>
+                <Rotulo
+                  htmlFor="grade-dia-fim"
+                  sx={{ mb: 0, typography: "caption", fontWeight: 500 }}
+                >
                   Até
-                </Typography>
+                </Rotulo>
                 <SeletorPeriodo
                   id="grade-dia-fim"
                   modo="dia"

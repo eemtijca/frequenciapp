@@ -3,7 +3,7 @@
 // Avisos globais em Snackbar e Alert, com fila curta, repetição e leitura acessível.
 import { useEffect, useSyncExternalStore } from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import Alert from "@mui/material/Alert";
+import Alert, { alertClasses } from "@mui/material/Alert";
 import AlertTitle from "@mui/material/AlertTitle";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
@@ -45,18 +45,27 @@ export const LIMITE_AVISOS = 3;
 const DESLOCAMENTO_CELULAR = 84;
 const DESLOCAMENTO_DESKTOP = 96;
 
-const ALVO_TOQUE = {
-  position: "relative",
-  "&::after": {
-    content: '""',
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    width: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    height: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    transform: "translate(-50%, -50%)",
-  },
+/** Equilibra os três espaços do Alert sem alterar alertas incorporados às telas. */
+export const ESTILOS_AVISO_FLUTUANTE = {
+  width: "100%",
+  alignItems: "center",
+  [`& .${alertClasses.icon}`]: { p: 0 },
+  [`& .${alertClasses.message}`]: { flex: 1, minWidth: 0, py: 0, overflowWrap: "anywhere" },
+  [`& .${alertClasses.action}`]: { alignItems: "center", mt: 0, mr: 0, py: 0, pl: 1 },
 } as const;
+
+export function FecharAviso({ onClick }: { onClick: () => void }) {
+  return (
+    <IconButton
+      color="inherit"
+      aria-label="Fechar aviso"
+      onClick={onClick}
+      sx={{ width: TOKENS_LAYOUT.alvoToque, height: TOKENS_LAYOUT.alvoToque }}
+    >
+      <CloseRoundedIcon fontSize="small" />
+    </IconButton>
+  );
+}
 
 const PAPEIS = {
   success: "status",
@@ -146,35 +155,24 @@ export function AvisoAlerta({ aviso, aoFechar }: { aviso: Aviso; aoFechar: () =>
       aria-live={LEITURAS[aviso.severidade]}
       aria-atomic="true"
       variant="standard"
-      sx={{ width: "100%", boxShadow: "var(--template-palette-baseShadow)" }}
-      action={
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          {aviso.tentarDeNovo ? (
-            <Button color="inherit" size="small" onClick={repetir} sx={ALVO_TOQUE}>
-              Tentar novamente
-            </Button>
-          ) : null}
-          <IconButton
-            color="inherit"
-            size="small"
-            aria-label="Fechar aviso"
-            onClick={aoFechar}
-            sx={{
-              width: TOKENS_LAYOUT.botao.pequeno,
-              height: TOKENS_LAYOUT.botao.pequeno,
-              ...ALVO_TOQUE,
-            }}
-          >
-            <CloseRoundedIcon fontSize="small" />
-          </IconButton>
-        </Stack>
-      }
+      sx={{ ...ESTILOS_AVISO_FLUTUANTE, boxShadow: "var(--template-palette-baseShadow)" }}
+      action={<FecharAviso onClick={aoFechar} />}
     >
-      <AlertTitle>{aviso.titulo}</AlertTitle>
+      <AlertTitle sx={{ mt: 0, mb: aviso.descricao ? 0.25 : 0 }}>{aviso.titulo}</AlertTitle>
       {aviso.descricao ? (
         <Typography component="p" variant="body2">
           {aviso.descricao}
         </Typography>
+      ) : null}
+      {aviso.tentarDeNovo ? (
+        <Button
+          color="inherit"
+          size="small"
+          onClick={repetir}
+          sx={{ mt: 0.5, minHeight: TOKENS_LAYOUT.alvoToque }}
+        >
+          Tentar novamente
+        </Button>
       ) : null}
     </Alert>
   );

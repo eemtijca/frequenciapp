@@ -52,6 +52,7 @@ import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import { publicarAviso } from "@/components/ui/mui/avisos";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
+import { chaveRascunho } from "@/lib/rascunho-chamada";
 import { ouvirBeneficiosMudaram } from "@/lib/eventos-beneficios";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import type {
@@ -120,10 +121,6 @@ interface Props {
   onAbrirGestao?: () => void;
 }
 
-function chaveRascunho(usuarioId: string, dia: string, turmaId: string): string {
-  return `frequencia:rascunho:${usuarioId}:${dia}:${turmaId}`;
-}
-
 interface Rascunho {
   versao: 3;
   faltas: FaltaAluno[];
@@ -186,14 +183,12 @@ function estilosMarca(theme: Theme, estado: "P" | "F" | "FJ" | "D") {
     pointerEvents: "none" as const,
   };
 
-  if (estado === "F") {
-    return { ...base, backgroundColor: palette.falta.fraco, color: palette.falta.texto };
-  }
-  if (estado === "FJ") {
+  if (estado === "F" || estado === "FJ") {
+    const cor = estado === "F" ? palette.falta : palette.justificada;
     return {
       ...base,
-      backgroundColor: palette.justificada.fraco,
-      color: palette.justificada.texto,
+      backgroundColor: cor.main,
+      color: cor.contrastText,
     };
   }
   if (estado === "D") {

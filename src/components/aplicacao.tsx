@@ -65,6 +65,7 @@ import { useSaidasMensais } from "@/components/movimentacoes/use-historico-movim
 import { temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
 import { expurgarBiNoLogout } from "@/lib/bi-armazenamento";
+import { temRascunhoChamada } from "@/lib/rascunho-chamada";
 import { MenuConta, type AcaoConta } from "@/components/conta/menu-conta";
 import { ProvedorAtualizacao } from "@/components/atualizacao/contexto-atualizacao";
 import { BotaoAtualizar } from "@/components/ui/mui/botao-atualizar";
@@ -355,7 +356,9 @@ function MenuMovel({
   const [destinoFoco, setDestinoFoco] = useState<DestinoFocoMenu>("gatilho");
   const idMenu = useId();
   const idTitulo = useId();
+  const tema = useTheme();
   const transicao = useConcluirTransicaoSemMovimento();
+  const escolheuDestino = typeof destinoFoco === "object" || destinoFoco === "titulo";
 
   function abrir() {
     onAbrir();
@@ -443,7 +446,12 @@ function MenuMovel({
         onClose={() => fechar("gatilho")}
         variant="temporary"
         anchor="left"
-        transitionDuration={transicao.duracao}
+        transitionDuration={
+          transicao.duracao ??
+          (escolheuDestino
+            ? { enter: tema.transitions.duration.enteringScreen, exit: 120 }
+            : undefined)
+        }
         disableRestoreFocus
         disableEnforceFocus={destinoFoco === "dialogo"}
         slotProps={{
@@ -943,30 +951,6 @@ export default function Aplicacao({
     return () => window.cancelAnimationFrame(quadro);
   }, [itens, visao]);
 
-  // Monta as áreas depois da primeira pintura: nenhuma tela pesada deve
-  // montar junto da primeira visão.
-  useEffect(() => {
-    const aquecer = () => {
-      startTransition(() => {
-        setVisitadas((atuais) => {
-          const proximas = new Set(atuais);
-          for (const item of itens) proximas.add(item.visao);
-          return proximas.size === atuais.size ? atuais : proximas;
-        });
-      });
-    };
-    const janela = window as Window & {
-      requestIdleCallback?: (retorno: () => void, opcoes?: { timeout: number }) => number;
-      cancelIdleCallback?: (id: number) => void;
-    };
-    if (janela.requestIdleCallback && janela.cancelIdleCallback) {
-      const id = janela.requestIdleCallback(aquecer, { timeout: 3000 });
-      return () => janela.cancelIdleCallback?.(id);
-    }
-    const id = window.setTimeout(aquecer, 1500);
-    return () => window.clearTimeout(id);
-  }, [itens]);
-
   // A lista de itens muda quando a área de saídas é ligada ou desligada. A
   // visão ativa volta para um item válido sem perder o estado da chamada.
   useEffect(() => {
@@ -1006,7 +990,7 @@ export default function Aplicacao({
 
   useEffect(() => {
     function avisarSaida(evento: BeforeUnloadEvent) {
-      if (pendencias.length > 0 || configuracaoPendente) {
+      if (pendencias.length > 0 || configuracaoPendente || temRascunhoChamada(usuario.id)) {
         evento.preventDefault();
         evento.returnValue = "";
       }
@@ -1036,7 +1020,7 @@ export default function Aplicacao({
       window.removeEventListener("online", aoFicarOnline);
       window.removeEventListener("sessao-expirada", aoExpirarSessao);
     };
-  }, [pendencias, configuracaoPendente, router]);
+  }, [pendencias, configuracaoPendente, router, usuario.id]);
 
   const { executando: saindo, executar: executarSaida } = useAcaoUnica(async () => {
     try {
@@ -1053,14 +1037,6 @@ export default function Aplicacao({
     avisarSucesso("Sessão encerrada.");
     router.refresh();
   });
-
-  function sair() {
-    if (pendencias.length > 0 || configuracaoPendente) {
-      setSaidaComPendencia(true);
-      return;
-    }
-    void executarSaida();
-  }
 
   function confirmarSaida() {
     setSaidaComPendencia(false);
@@ -1220,8 +1196,11 @@ export default function Aplicacao({
   function abrirAcaoConta(acao: AcaoConta, gatilho: HTMLElement | null, fecharMenu?: FecharMenu) {
     origemDialogoRef.current = fecharMenu ? gatilhoMenuRef.current : gatilho;
     if (acao === "sair") {
-      fecharMenu?.(pendencias.length > 0 || configuracaoPendente ? "dialogo" : "gatilho");
-      void sair();
+      const pedeConfirmacao =
+        pendencias.length > 0 || configuracaoPendente || temRascunhoChamada(usuario.id);
+      fecharMenu?.(pedeConfirmacao ? "dialogo" : "gatilho");
+      if (pedeConfirmacao) setSaidaComPendencia(true);
+      else void executarSaida();
       return;
     }
     fecharMenu?.("dialogo");

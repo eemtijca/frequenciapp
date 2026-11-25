@@ -848,6 +848,128 @@ it("achados finais: fecha a gaveta antes de carregar a Chamada e só então foca
   }
 });
 
+it("protege o rascunho da conta antes de montar a Chamada", async () => {
+  const page = await novaPagina(390);
+  try {
+    await page.addInitScript(() => {
+      sessionStorage.setItem(
+        "frequencia:rascunho:outro:2026-03-10:turma-0",
+        '{"versao":3,"faltas":[]}',
+      );
+    });
+    await abrirRelatoriosDeTeste(page, "painel");
+    await verificarTela(page.getByRole("group", { name: "Painel", exact: true })).toBeVisible();
+    const resultado = await page.evaluate(() => {
+      const bloqueiaSaida = () =>
+        !window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
+      const outraConta = bloqueiaSaida();
+      const chave = "frequencia:rascunho:teste:2026-03-10:turma-0";
+      sessionStorage.setItem(chave, "inválido");
+      const ilegivel = bloqueiaSaida();
+      sessionStorage.setItem(chave, '{"versao":3,"faltas":[]}');
+      const propriaConta = bloqueiaSaida();
+      sessionStorage.removeItem(chave);
+      return { outraConta, ilegivel, propriaConta, aposRemover: bloqueiaSaida() };
+    });
+    expect(resultado).toEqual({
+      outraConta: false,
+      ilegivel: false,
+      propriaConta: true,
+      aposRemover: false,
+    });
+    await verificarTela(
+      page.locator('[data-pager="principal"] > section[aria-label="Chamada"]'),
+    ).not.toBeAttached();
+    await page.evaluate(() => {
+      sessionStorage.setItem(
+        "frequencia:rascunho:teste:2026-03-10:turma-0",
+        '{"versao":3,"faltas":[]}',
+      );
+    });
+    let pedidosDeSaida = 0;
+    await page.route("**/api/auth/sair", (rota) => {
+      pedidosDeSaida++;
+      return rota.fulfill({ json: { ok: true } });
+    });
+    await exporNavegacao(page);
+    await page.getByRole("button", { name: "Conta de Admin teste", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Sair da conta", exact: true }).click();
+    const confirmacao = page.getByRole("alertdialog", { name: "Há alterações não salvas" });
+    await verificarTela(confirmacao).toBeVisible();
+    await confirmacao.getByRole("button", { name: "Continuar aqui" }).click();
+    await verificarTela(confirmacao).not.toBeAttached();
+    expect(pedidosDeSaida).toBe(0);
+  } finally {
+    await page.close();
+  }
+});
+
+it("menu não monta destinos não visitados em segundo plano", async () => {
+  const page = await novaPagina(390);
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    // Executa o trabalho ocioso do primeiro carregamento antes da navegação.
+    await page.addInitScript(() => {
+      const agendar = window.requestIdleCallback;
+      window.requestIdleCallback = (callback) => agendar(callback, { timeout: 1 });
+    });
+    await abrirRelatoriosDeTeste(page, "painel");
+    const paineis = page.locator("[data-pager='principal'] > section");
+    await verificarTela(page.getByRole("group", { name: "Painel", exact: true })).toBeVisible();
+    await page.evaluate(
+      () => new Promise<void>((resolver) => requestIdleCallback(() => resolver())),
+    );
+    const nav = await exporNavegacao(page);
+    await verificarTela(paineis).toHaveCount(1, { timeout: 1500 });
+    await opcaoGaveta(nav, "Chamada").press("Enter");
+    await verificarTela(
+      page.getByRole("heading", { name: "Chamada", exact: true, level: 1 }),
+    ).toBeFocused();
+    await verificarTela(paineis).toHaveCount(2);
+  } finally {
+    await page.close();
+  }
+});
+
+it("selecionar um destino encurta o deslize de saída da gaveta sem perder o foco", async () => {
+  const page = await novaPagina(390);
+  try {
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await abrirRelatoriosDeTeste(page, "painel");
+    const nav = await exporNavegacao(page);
+    const gaveta = menuMovel(page);
+    await verificarTela(opcaoGaveta(nav, "Painel")).toBeFocused();
+    await gaveta.evaluate((el) => {
+      el.addEventListener("transitionrun", (evento) => {
+        if (
+          !(evento instanceof TransitionEvent) ||
+          evento.target !== el ||
+          evento.propertyName !== "transform"
+        )
+          return;
+        const duracao = el
+          .getAnimations()
+          .find(
+            (animacao) =>
+              animacao instanceof CSSTransition && animacao.transitionProperty === "transform",
+          )
+          ?.effect?.getComputedTiming().duration;
+        document.body.dataset.duracaoSaida = String(duracao);
+      });
+    });
+    await opcaoGaveta(nav, "Chamada").press("Enter");
+    await verificarTela(gaveta).not.toBeAttached();
+    const duracao = Number(await page.locator("body").getAttribute("data-duracao-saida"));
+    expect(duracao).toBeGreaterThan(0);
+    expect(duracao).toBeLessThanOrEqual(120);
+    await verificarTela(
+      page.getByRole("heading", { name: "Chamada", exact: true, level: 1 }),
+    ).toBeFocused();
+  } finally {
+    await page.close();
+  }
+});
+
 it("achados finais: confirma a troca com foco no destino, mas cancelamentos devolvem ao menu", async () => {
   const page = await novaPagina(390);
   try {

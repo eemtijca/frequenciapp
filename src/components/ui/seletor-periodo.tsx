@@ -169,11 +169,18 @@ export function SeletorPeriodo({
   const aprumar = (dia: string) => (semDomingo ? ultimoDiaDeChamada(dia) : dia);
   const hojeNoDomingoSemAcao =
     modo === "dia" && semDomingo && diaDaSemanaIso(corrente) === 7 && !aoHoje;
+  const limite = modo === "dia" ? aprumar(max) : max;
+  const piso = min
+    ? modo === "mes"
+      ? min.slice(0, 7)
+      : semDomingo && ehDomingo(min)
+        ? diaSeguinte(min, 1)
+        : min
+    : null;
+  const hoje = modo === "dia" ? aprumar(corrente) : corrente;
   const hojeDesabilitado =
-    hojeNoDomingoSemAcao || (aoHoje ? hojeAtivo : valor === aprumar(corrente));
-  const limite = aprumar(max);
-  const piso = min ? aprumar(min) : null;
-  const referencia = aprumar((valor || corrente) > max ? max : valor || corrente);
+    hojeNoDomingoSemAcao ||
+    (aoHoje ? hojeAtivo : valor === hoje || hoje > limite || Boolean(piso && hoje < piso));
   const selo = mostrarSelo && valor === corrente ? (modo === "dia" ? "Hoje" : "Este mês") : "";
   const diaDaSemana = DIAS.find(
     ([nome]) => detalhe === nome || detalhe === nome.replace("-feira", ""),
@@ -194,8 +201,7 @@ export function SeletorPeriodo({
     if (!aberto) return;
     function foraDoPainel(alvo: EventTarget | null): boolean {
       if (!(alvo instanceof Element)) return true;
-      const dentroDoPainel = alvo.closest("[data-seletor-periodo-painel]") !== null;
-      return !(dentroDoPainel || gatilho.current?.contains(alvo));
+      return !(portal.current?.contains(alvo) || gatilho.current?.contains(alvo));
     }
     function aoApontar(evento: PointerEvent) {
       if (foraDoPainel(evento.target)) setAberto(false);
@@ -243,6 +249,14 @@ export function SeletorPeriodo({
     if (devolverFoco) gatilho.current?.focus();
   }
 
+  function limitarFoco(valor: string) {
+    let proximo = modo === "dia" ? aprumar(valor) : valor;
+    if (proximo > limite) proximo = limite;
+    if (semanal && modo === "dia" && ehDomingo(proximo) && proximo > corrente)
+      proximo = diaSeguinte(proximo, -1);
+    return piso && proximo < piso ? piso : proximo;
+  }
+
   function alternar(evento: MouseEvent<HTMLButtonElement>) {
     if (aberto) {
       setAberto(false);
@@ -255,6 +269,7 @@ export function SeletorPeriodo({
       portal.current = elemento;
     }
     focoPendente.current = true;
+    const referencia = limitarFoco(inicial);
     setAncora(evento.currentTarget);
     setMesVisivel(referencia.slice(0, 7));
     setAnoVisivel(referencia.slice(0, 4));
@@ -263,7 +278,7 @@ export function SeletorPeriodo({
   }
 
   function escolher(proximo: string) {
-    if (piso && proximo < piso) return;
+    if (proximo > limite || (piso && proximo < piso)) return;
     onValor(proximo);
     fechar(true);
   }
@@ -291,12 +306,7 @@ export function SeletorPeriodo({
           : diaSeguinte(foco, 6 - (diaDaSemanaIso(foco) % 7));
     else return;
     evento.preventDefault();
-    proximo = aprumar(proximo);
-    // O foco nunca para num domingo futuro desabilitado: recua para o sábado.
-    if (semanal && ehDomingo(proximo) && proximo > corrente) proximo = diaSeguinte(proximo, -1);
-    if (proximo > limite) proximo = limite;
-    if (semanal && ehDomingo(proximo) && proximo > corrente) proximo = diaSeguinte(proximo, -1);
-    if (piso && proximo < piso) proximo = piso;
+    proximo = limitarFoco(proximo);
     setFoco(proximo);
     setMesVisivel(proximo.slice(0, 7));
   }
@@ -313,9 +323,7 @@ export function SeletorPeriodo({
     else return;
     evento.preventDefault();
     if (proximoIndice < 0 || proximoIndice > 11) return;
-    let proximo = `${anoVisivel}-${String(proximoIndice + 1).padStart(2, "0")}`;
-    if (proximo > max) proximo = max;
-    if (piso && proximo < piso.slice(0, 7)) proximo = piso.slice(0, 7);
+    const proximo = limitarFoco(`${anoVisivel}-${String(proximoIndice + 1).padStart(2, "0")}`);
     setFoco(proximo);
     setAnoVisivel(proximo.slice(0, 4));
   }
@@ -325,21 +333,16 @@ export function SeletorPeriodo({
     setMesVisivel(proximoMes);
     const ultimo = diasDoMes(proximoMes).length;
     const numero = Math.min(Number(foco.slice(8)), ultimo);
-    let proximo = aprumar(`${proximoMes}-${String(numero).padStart(2, "0")}`);
-    if (piso && proximo < piso) proximo = piso;
-    if (proximo > limite) proximo = limite;
-    if (semanal && ehDomingo(proximo) && proximo > corrente) proximo = diaSeguinte(proximo, -1);
+    let proximo = limitarFoco(`${proximoMes}-${String(numero).padStart(2, "0")}`);
+    // Se o primeiro dia é domingo e não aparece, mantenha o foco no mês aberto.
+    if (semDomingo && proximo.slice(0, 7) < proximoMes) proximo = limitarFoco(`${proximoMes}-02`);
     setFoco(proximo);
   }
 
   function mudarAno(deslocamento: number) {
     const proximoAno = String(Number(anoVisivel) + deslocamento);
-    let proximo = `${proximoAno}-${foco.slice(5)}`;
     setAnoVisivel(proximoAno);
-    if (piso && proximo < piso) proximo = piso;
-    if (proximo > limite) proximo = limite;
-    if (semanal && ehDomingo(proximo) && proximo > corrente) proximo = diaSeguinte(proximo, -1);
-    setFoco(proximo);
+    setFoco(limitarFoco(`${proximoAno}-${foco.slice(5)}`));
   }
 
   function estilosCelula(
@@ -459,6 +462,10 @@ export function SeletorPeriodo({
           type="button"
           size="small"
           aria-label={modo === "dia" ? "Mês anterior" : "Ano anterior"}
+          disabled={Boolean(
+            piso &&
+            (modo === "dia" ? mesVisivel <= piso.slice(0, 7) : anoVisivel <= piso.slice(0, 4)),
+          )}
           onClick={() => (modo === "dia" ? mudarMes(-1) : mudarAno(-1))}
           sx={ALVO_TOQUE}
         >
@@ -476,7 +483,9 @@ export function SeletorPeriodo({
           type="button"
           size="small"
           aria-label={modo === "dia" ? "Mês seguinte" : "Ano seguinte"}
-          disabled={modo === "dia" ? mesVisivel >= max.slice(0, 7) : anoVisivel >= max.slice(0, 4)}
+          disabled={
+            modo === "dia" ? mesVisivel >= limite.slice(0, 7) : anoVisivel >= limite.slice(0, 4)
+          }
           onClick={() => (modo === "dia" ? mudarMes(1) : mudarAno(1))}
           sx={ALVO_TOQUE}
         >
@@ -610,7 +619,7 @@ export function SeletorPeriodo({
             const mes = `${anoVisivel}-${String(numero).padStart(2, "0")}`;
             const selecionado = mes === valor;
             const futuro = mes > max;
-            const bloqueado = futuro || Boolean(piso && mes < piso.slice(0, 7));
+            const bloqueado = futuro || Boolean(piso && mes < piso);
             const noMesAtual = mes === corrente;
             return (
               <ButtonBase
@@ -651,7 +660,7 @@ export function SeletorPeriodo({
               fechar(true);
               return;
             }
-            escolher(aprumar(corrente));
+            escolher(hoje);
           }}
           sx={(theme) => ({
             minHeight: ALTURA_GATILHO,
@@ -763,7 +772,7 @@ export function SeletorPeriodo({
         ref={gatilho}
         id={id}
         type="button"
-        disabled={disabled}
+        disabled={disabled || Boolean(piso && piso > limite)}
         aria-haspopup="dialog"
         aria-expanded={aberto}
         aria-label={`${rotuloAcessivel}: ${rotulo}${diaDaSemana ? `, ${diaDaSemana[0]}` : ""}${selo ? `, ${selo}` : ""}`}

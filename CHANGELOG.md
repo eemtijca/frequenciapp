@@ -135,6 +135,11 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Os avisos flutuantes alinham ícone, mensagem e fechamento; a ação de tentar novamente fica abaixo da mensagem.
+- Na Grade, os calendários dos modos diário, semanal e personalizado ocupam a largura disponível no celular. O calendário compartilhado mantém o foco e as opções dentro das datas permitidas.
+- A gaveta móvel fecha mais rápido ao escolher um destino. As telas só montam na primeira visita e mantêm seu estado nas visitas seguintes.
+- A Chamada destaca F e FJ com cores sólidas e contraste nos dois temas. O diálogo Sobre separa o cabeçalho do primeiro cartão e retira o fio abaixo dos links de ação.
+
 - Nos horários da turma, confirmar a exclusão de uma aula leva o foco a Nova aula, e ativar ou desativar devolve o foco ao mesmo comando, sem perdê-lo para a página.
 - No tema claro, o campo desabilitado ganha contorno próprio, mais claro que o do campo ativo.
 - Notificações mantém texto e ações inteiros no celular ao evitar a rolagem horizontal indevida. O trilho inteiro permite alterar os avisos disponíveis. O interruptor expõe a descrição acessível quando a linha mostra um horário ou motivo de indisponibilidade.

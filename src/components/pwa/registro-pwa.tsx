@@ -6,7 +6,9 @@ import { useEffect, useState } from "react";
 import Alert from "@mui/material/Alert";
 import Button from "@mui/material/Button";
 import Snackbar from "@mui/material/Snackbar";
+import { ESTILOS_AVISO_FLUTUANTE, FecharAviso } from "@/components/ui/mui/avisos";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 export default function RegistroPwa() {
   const [atualizacao, setAtualizacao] = useState<ServiceWorker | null>(null);
@@ -82,15 +84,18 @@ export default function RegistroPwa() {
         severity="info"
         variant="standard"
         role="status"
-        onClose={() => setAtualizacao(null)}
-        action={
-          <Button color="inherit" size="small" onClick={aplicarAtualizacao}>
-            Atualizar
-          </Button>
-        }
-        sx={{ width: "100%" }}
+        action={<FecharAviso onClick={() => setAtualizacao(null)} />}
+        sx={ESTILOS_AVISO_FLUTUANTE}
       >
         Versão nova do aplicativo disponível. Toque em Atualizar para recarregar.
+        <Button
+          color="inherit"
+          size="small"
+          onClick={aplicarAtualizacao}
+          sx={{ display: "flex", mt: 0.5, minHeight: TOKENS_LAYOUT.alvoToque }}
+        >
+          Atualizar
+        </Button>
       </Alert>
     </Snackbar>
   );

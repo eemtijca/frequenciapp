@@ -19,6 +19,9 @@ import PorAluno from "@/components/relatorios/por-aluno";
 import ResumoRelatorios from "@/components/relatorios/vista-resumo-relatorios";
 import VistaHistorico from "@/components/relatorios/historico/vista-historico";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
+import DialogoSobre from "@/components/dialogo-sobre";
+import RegistroPwa from "@/components/pwa/registro-pwa";
+import { ProvedorAvisos, publicarAviso } from "@/components/ui/mui/avisos";
 import { CONFIGURACOES_PADRAO } from "@/domain/frequencia";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { tema } from "@/theme/tema";
@@ -78,7 +81,87 @@ function MesFixture({ tela }: { tela: "por-aluno" | "resumo" | "historico" }) {
     />
   );
 }
+
+function AvisosESobre() {
+  const [aberto, setAberto] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setAberto(true)}>
+        Sobre
+      </button>
+      <button
+        type="button"
+        onClick={() => publicarAviso({ titulo: "Entrada confirmada.", severidade: "success" })}
+      >
+        Mostrar aviso
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          publicarAviso({
+            titulo: "Não foi possível carregar os registros.",
+            descricao: "As informações na tela podem estar desatualizadas.",
+            severidade: "error",
+            tentarDeNovo: () => publicarAviso({ titulo: "Carregado.", severidade: "info" }),
+          })
+        }
+      >
+        Mostrar erro
+      </button>
+      <ProvedorAvisos />
+      <DialogoSobre aberto={aberto} onAbrir={setAberto} />
+    </>
+  );
+}
+
 const telas = {
+  "avisos-sobre": <AvisosESobre />,
+  "aviso-pwa": <RegistroPwa />,
+  "chamada-marcas": (
+    <VistaFrequencia
+      {...comum}
+      diaCorrente="2026-11-25"
+      turmas={[turma]}
+      alunos={[
+        {
+          id: "aluno",
+          nome: "Aluno teste",
+          turmaId: turma.id,
+          turmaOriginalId: turma.id,
+          ordem: 1,
+          ativo: true,
+        },
+      ]}
+      usuario={{
+        id: "teste",
+        nome: "Teste",
+        email: "teste@example.org",
+        papel: "ADMIN",
+        ativo: true,
+      }}
+      ativo
+      alvo={null}
+      configuracoes={CONFIGURACOES_PADRAO}
+      catalogoJustificativas={[{ codigo: "At", rotulo: "Atestado", ativo: true }]}
+      versaoFrequencias={0}
+      onFrequenciasMudaram={vazio}
+      onPendencia={() => {}}
+    />
+  ),
+  "calendario-limitado": (
+    <SeletorPeriodo
+      id="limitado"
+      modo="dia"
+      valor="2026-10-30"
+      min="2026-11-01"
+      max="2026-11-25"
+      atual="2026-11-26"
+      semDomingo
+      rotuloAcessivel="Data limitada"
+      rotulo="30/10"
+      onValor={() => {}}
+    />
+  ),
   grade: <GradeFixture />,
   "por-aluno": <MesFixture tela="por-aluno" />,
   resumo: <MesFixture tela="resumo" />,
