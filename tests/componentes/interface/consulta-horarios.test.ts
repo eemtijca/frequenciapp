@@ -118,6 +118,8 @@ async function consultar(
 async function escolher(page: Page, campo: Locator, opcao: string) {
   await campo.click();
   await page.getByRole("option", { name: opcao, exact: true }).click();
+  // O fundo invisível do menu intercepta o hit-test até a saída terminar.
+  await page.getByRole("listbox", { includeHidden: true }).waitFor({ state: "detached" });
 }
 
 it.each(["light", "dark"] as const)(
@@ -298,6 +300,8 @@ it.each(["light", "dark"] as const)(
         const xAula = aula.getBoundingClientRect().left;
         const xSegunda = segunda.getBoundingClientRect().left;
         contenedor.scrollLeft = contenedor.scrollWidth;
+        // A altura das linhas depende da fonte do sistema; só a página rola até a célula.
+        sabado.scrollIntoView({ block: "nearest", inline: "nearest" });
         const retangulo = sabado.getBoundingClientRect();
         const alvo = document.elementFromPoint(retangulo.right - 8, retangulo.top + 8);
         return {

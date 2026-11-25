@@ -919,6 +919,18 @@ it("achados finais: desloca a lista com transição CSS em sentidos opostos", as
   }
 });
 
+// Medir durante o deslize da gaveta devolve frações de pixel; animações infinitas não contam.
+async function aguardarTransicoesFinitas(page: Page) {
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animacao) => Number.isFinite(Number(animacao.effect?.getComputedTiming().endTime)))
+        .map((animacao) => animacao.finished.catch(() => undefined)),
+    ),
+  );
+}
+
 it("achados finais: alinha o link FrequenciBI aos outros itens da gaveta", async () => {
   const page = await novaPagina(320);
   try {
@@ -932,6 +944,7 @@ it("achados finais: alinha o link FrequenciBI aos outros itens da gaveta", async
       await verificarTela(bi).toHaveAttribute("href", "/bi");
       await verificarTela(bi).toHaveAttribute("target", "_blank");
       await verificarTela(bi).toHaveAttribute("rel", "noopener");
+      await aguardarTransicoesFinitas(page);
       const medidas = await bi.evaluate((no) => {
         const icone = no.querySelector("svg")?.getBoundingClientRect();
         return [getComputedStyle(no).paddingInlineStart, icone?.width, icone?.height];
@@ -949,6 +962,7 @@ it("revisão: mantém 16 px de recuo e ícone de 24 px", async () => {
     await abrir(page, "light", false, undefined, null);
     const nav = await exporNavegacao(page);
     const botao = nav.getByRole("button", { name: "Séries", exact: true });
+    await aguardarTransicoesFinitas(page);
     const medidas = await botao.evaluate((no) => ({
       recuo: getComputedStyle(no).paddingInlineStart,
       icone: no.querySelector("svg")?.getBoundingClientRect().width,
