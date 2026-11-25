@@ -112,6 +112,6 @@ test("move, marca desistência e bloqueia a Chamada com gráfico próprio", asyn
   await rolarAteGrafico(page, "Desistentes");
   await expect(page.getByRole("heading", { name: "Desistentes até este dia" })).toBeVisible();
   await expect(page.getByRole("img", { name: "Desistentes por série" })).toBeVisible();
-  const legenda = page.getByRole("listitem").filter({ hasText: "E2E Desistencia" });
-  await expect(legenda.getByRole("img", { name: "1 desistente", exact: true })).toBeVisible();
+  const linha = page.getByRole("row").filter({ hasText: "E2E Desistencia" });
+  await expect(linha.getByRole("cell", { name: "1 desistente", exact: true })).toBeVisible();
 });

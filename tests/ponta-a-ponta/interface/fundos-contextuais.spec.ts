@@ -18,7 +18,7 @@ test.describe("fundos contextuais", () => {
       const navegacao = await abrirNavegacao(page);
       await page.mouse.move(389, 843);
       const ativo = navegacao.locator('[aria-current="page"]');
-      const inativo = navegacao.locator('[role="button"]:not([aria-current="page"])').first();
+      const inativo = navegacao.locator('button:not([aria-current="page"])').first();
       await expect(ativo).toHaveCount(1);
       await expect(ativo).toBeFocused();
       expect(await fundo(ativo)).not.toBe("rgba(0, 0, 0, 0)");

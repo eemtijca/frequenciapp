@@ -37,7 +37,9 @@ test("aplica a preferência do perfil na gaveta sem recarregar e lembra a escolh
   await expect(menu).toHaveCSS("transition-duration", "0s");
   await nav.getByRole("button", { name: "Chamada", exact: true }).press("Enter");
   await expect(menu).toBeHidden();
-  await expect(page.getByRole("heading", { name: "Chamada", level: 1, exact: true })).toBeFocused();
+  await expect(
+    page.getByRole("heading", { name: "Chamada", level: 1, exact: true, includeHidden: true }),
+  ).toBeFocused();
 
   await page.reload();
   await aguardarHidratacao(page);

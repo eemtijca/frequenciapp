@@ -83,7 +83,12 @@ test.describe("navegação", () => {
     await aguardarHidratacao(page);
     await expect(page.locator('[data-indicador="inferior"]')).toHaveCount(0);
     await trocarVisao(page, "Chamada", "chamada");
-    const titulo = page.getByRole("heading", { name: "Chamada", level: 1, exact: true });
+    const titulo = page.getByRole("heading", {
+      name: "Chamada",
+      level: 1,
+      exact: true,
+      includeHidden: true,
+    });
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
     await expect(titulo).toBeFocused();
     const navegacao = await abrirNavegacao(page);

@@ -93,7 +93,7 @@ test.describe("responsividade", () => {
 
     // O símbolo acompanha a coluna dos ícones da navegação, sem deslocamento.
     const marca = await page.locator('aside img[src$="icon.svg"]').first().boundingBox();
-    const primeiroIcone = await page.locator('aside nav [role="button"] svg').first().boundingBox();
+    const primeiroIcone = await page.locator("aside nav button svg").first().boundingBox();
     expect(marca).not.toBeNull();
     expect(primeiroIcone).not.toBeNull();
     const centroMarca = (marca?.x ?? 0) + (marca?.width ?? 0) / 2;

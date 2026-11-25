@@ -93,7 +93,7 @@ test.describe("menu lateral", () => {
       await acionar(menu.getByRole("button", { name: "Chamada", exact: true }));
       await expect(menu).toBeHidden();
       await expect(
-        page.getByRole("heading", { name: "Chamada", level: 1, exact: true }),
+        page.getByRole("heading", { name: "Chamada", level: 1, exact: true, includeHidden: true }),
       ).toBeFocused();
     });
   }

@@ -421,7 +421,11 @@ test.describe("notificações da PWA", () => {
       const ativacao = resposta(page, "POST", "assinatura");
       await page.getByRole("button", { name: "Ativar notificações", exact: true }).click();
       expect((await ativacao).status()).toBe(503);
-      await expect(page.getByRole("alert")).toContainText("Envio temporariamente indisponível");
+      await expect(
+        page.locator('[role="alert"][aria-live="assertive"]', {
+          hasText: "Envio temporariamente indisponível",
+        }),
+      ).toContainText("Envio temporariamente indisponível");
       expect(rede.get).toBeGreaterThan(0);
       expect(rede).toMatchObject({ post: 1, delete: 0, teste: 0, inesperadas: 0 });
       expect(await contagens(page)).toEqual({ pedidos: 1, inscricoes: 1, cancelamentos: 1 });
@@ -445,7 +449,11 @@ test.describe("notificações da PWA", () => {
       const teste = resposta(page, "POST", "teste");
       await page.getByRole("button", { name: "Enviar notificação de teste" }).click();
       expect((await teste).status()).toBe(410);
-      await expect(page.getByRole("alert")).toContainText("As notificações expiraram");
+      await expect(
+        page.locator('[role="alert"][aria-live="assertive"]', {
+          hasText: "As notificações expiraram",
+        }),
+      ).toContainText("As notificações expiraram");
       await expect(
         page.getByRole("button", { name: "Ativar notificações", exact: true }),
       ).toBeEnabled();
