@@ -167,7 +167,7 @@ Regras:
 - Não existe a linha inferior única do tema anterior.
 - O erro usa `error` e `helperText`, com `aria-describedby` ligando o campo à mensagem.
 - O campo obrigatório é identificado no rótulo e no texto de apoio.
-- O campo desabilitado mantém contraste e não usa `opacity` global.
+- O campo desabilitado mantém contraste e não usa `opacity` global. No tema claro, o contorno dele é mais claro que o do campo ativo.
 - O campo de senha tem botão Mostrar e Ocultar com rótulo alternado.
 - O campo de busca tem `InputAdornment` no início e botão de limpar no fim, com rótulo acessível.
 - O formulário usa `FormControl`, `FormLabel`, `TextField` e `FormHelperText`.

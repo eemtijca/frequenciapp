@@ -291,6 +291,10 @@ const inputs: Components<Theme> = {
             borderColor: theme.vars.palette.error.main,
           },
         },
+        // No claro, action.disabled coincide com o fio do controle; o desabilitado recua.
+        [`&.${outlinedInputClasses.disabled} .${outlinedInputClasses.notchedOutline}`]: {
+          borderColor: cinza[300],
+        },
         "&.MuiInputBase-multiline": { height: "auto", padding: 0 },
         [`&.${inputBaseClasses.sizeSmall} .${outlinedInputClasses.input}`]: {
           padding: "9px 12px",
@@ -301,6 +305,10 @@ const inputs: Components<Theme> = {
           },
           [`&.${outlinedInputClasses.error} .${outlinedInputClasses.notchedOutline}`]: {
             borderColor: theme.vars.palette.error.light,
+          },
+          // O escuro preserva o fio desabilitado padrão do MUI, já distinto do controle.
+          [`&.${outlinedInputClasses.disabled} .${outlinedInputClasses.notchedOutline}`]: {
+            borderColor: theme.vars.palette.action.disabled,
           },
         }),
         variants: [
