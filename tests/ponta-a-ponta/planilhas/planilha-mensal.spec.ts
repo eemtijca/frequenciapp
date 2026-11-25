@@ -1,5 +1,9 @@
 // Preparo mensal pela Gestão contra o Google sintético: confirmação, reuso,
 // vínculos fixos e prévia de envio para as abas do mês.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Page } from "@playwright/test";
 import {
@@ -140,11 +144,8 @@ async function abrirPlanilha(page: Page, acao: "Organizar" | "Configurar" = "Org
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Planilhas", exact: true })
-    .click();
+  await abrirConfiguracoesDaGestao(page);
+  await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
   await selecionarAcaoPlanilha(cartao, acao);
@@ -170,7 +171,7 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
 
   const preparar = cartao.getByRole("button", { name: "Preparar mês", exact: true });
   await preparar.click();
-  const dialogo = page.getByRole("alertdialog");
+  const dialogo = page.getByRole("dialog");
   await expect(
     dialogo.getByText(/Retira Turma atual, domingos e sábados sem chamada/),
   ).toBeVisible();
@@ -192,7 +193,7 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
       (elemento as HTMLButtonElement).click();
     });
   await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
-  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true })).toBeEnabled();
+  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true }).last()).toBeEnabled();
   const resultado = dialogo.getByRole("list", { name: "Resultado da preparação por turma" });
   await expect(resultado.getByRole("listitem")).toHaveCount(2);
   for (const aba of abasMensais) {
@@ -218,14 +219,14 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
   expect(google.vinculos(abaB)).toHaveLength(1);
   expect(google.valor("E2E Ano A", 2, 2)).toBe("F");
   await dialogo.screenshot({ path: testInfo.outputPath("planilha-mensal-resultado.png") });
-  await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Fechar", exact: true }).last().click();
 
   // Repetir o preparo conserva marcas já lançadas e não cria abas duplicadas.
   google.definirValor(abaA, 2, 3, "FJ");
   await preparar.click();
   await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
   await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
-  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true })).toBeEnabled();
+  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true }).last()).toBeEnabled();
   for (const aba of abasMensais)
     await expect(resultado.getByRole("listitem").filter({ hasText: aba })).toContainText(
       "Reutilizada",
@@ -233,7 +234,7 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
   expect(preparos).toHaveLength(4);
   expect(google.abas()).toHaveLength(3);
   expect(google.valor(abaA, 2, 3)).toBe("FJ");
-  await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Fechar", exact: true }).last().click();
 
   await selecionarAcaoPlanilha(cartao, "Configurar");
   await cartao.getByRole("button", { name: "Revisar estrutura", exact: true }).click();
@@ -243,7 +244,7 @@ test("prepara duas turmas uma vez, reutiliza o mês e conserva o histórico anti
   await cartao.getByRole("button", { name: "Conferir estrutura", exact: true }).click();
   await expect(cartao.getByRole("button", { name: "Salvar estrutura", exact: true })).toBeEnabled();
   for (const aba of abasMensais) {
-    const vinculo = cartao.getByText(aba, { exact: true }).locator("..");
+    const vinculo = cartao.getByText(aba, { exact: true }).first().locator("..");
     await expect(vinculo).toContainText(rotuloMes(mes));
     await expect(vinculo.getByRole("combobox")).toHaveCount(0);
   }
@@ -297,7 +298,7 @@ test("interrompe a autorização recusada e recupera o mês após reconectar sem
   google.recusarAutorizacao(true);
   const cartao = await abrirPlanilha(page);
   await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
-  const dialogo = page.getByRole("alertdialog");
+  const dialogo = page.getByRole("dialog");
   await dialogo.getByRole("button", { name: /Mês das novas abas/ }).click();
   const calendario = page.getByRole("dialog", { name: "Mês das novas abas", exact: true });
   if (mesAnterior.slice(0, 4) !== mes.slice(0, 4)) {
@@ -352,7 +353,7 @@ test("interrompe a autorização recusada e recupera o mês após reconectar sem
   );
   await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
   await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
-  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true })).toBeEnabled();
+  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true }).last()).toBeEnabled();
   expect(preparos).toHaveLength(3);
   expect(preparos.every((pedido) => pedido.mes === mesAnterior)).toBe(true);
 });
@@ -367,7 +368,7 @@ test("interrompe o lote uma vez em falha temporária do Google e mantém as turm
   });
   const cartao = await abrirPlanilha(page);
   await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
-  const dialogo = page.getByRole("alertdialog");
+  const dialogo = page.getByRole("dialog");
   const escritasAntes = google.chamadas().filter((acao) => acao === "gravar").length;
   google.falharLeituras(503);
   await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
@@ -402,7 +403,7 @@ test("repete somente turmas pendentes e preserva a aba concluída no toque duplo
   });
   const cartao = await abrirPlanilha(page);
   await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
-  const dialogo = page.getByRole("alertdialog");
+  const dialogo = page.getByRole("dialog");
   await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
   await expect(
     dialogo.getByRole("button", { name: "Tentar pendentes", exact: true }),
@@ -420,7 +421,7 @@ test("repete somente turmas pendentes e preserva a aba concluída no toque duplo
       (elemento as HTMLButtonElement).click();
     });
   await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
-  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true })).toBeEnabled();
+  await expect(dialogo.getByRole("button", { name: "Fechar", exact: true }).last()).toBeEnabled();
   await expect(dialogo.getByRole("alert")).toHaveCount(0);
   await expect(dialogo.getByRole("button", { name: "Tentar pendentes", exact: true })).toHaveCount(
     0,
@@ -471,7 +472,7 @@ test("atualiza abas antigas pelo preparo do mês e preserva marcas úteis e vín
   const cartao = await abrirPlanilha(page);
   const preparar = cartao.getByRole("button", { name: "Preparar mês", exact: true });
   await preparar.click();
-  const dialogo = page.getByRole("alertdialog");
+  const dialogo = page.getByRole("dialog");
   await expect(
     dialogo.getByText(/Retira Turma atual, domingos e sábados sem chamada/),
   ).toBeVisible();
@@ -488,7 +489,7 @@ test("atualiza abas antigas pelo preparo do mês e preserva marcas úteis e vín
   ).toEqual(["Aluno", ...diasUteis]);
   expect(google.valor(nova, 2, 2)).toBe("FJ");
   expect(google.vinculos(nova)).toEqual([{ linha: 2, alunoId }]);
-  await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Fechar", exact: true }).last().click();
   await preparar.click();
   await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
   await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
@@ -565,14 +566,14 @@ test("mantém o preparo quando a organização das abas falha e permite concluí
   await expect(page.getByText("Estrutura salva.", { exact: true })).toBeVisible();
   await selecionarAcaoPlanilha(cartao, "Organizar");
   await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
-  const dialogo = page.getByRole("alertdialog");
+  const dialogo = page.getByRole("dialog");
   await dialogo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
   await expect(dialogo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
   await expect(dialogo.getByRole("alert")).toContainText(
     "Não foi possível organizar as abas agora.",
   );
   expect(google.abasVisiveis()).toHaveLength(3);
-  await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Fechar", exact: true }).last().click();
   await page.unroute("**/api/planilha/mensal/visibilidade");
   await cartao.getByRole("button", { name: "Meses da frequência", exact: true }).click();
   const acesso = page.getByRole("dialog", { name: "Meses da frequência", exact: true });
@@ -813,10 +814,10 @@ test("cria e abre o índice das chamadas no Google Docs sem duplicar o documento
 }) => {
   const cartao = await abrirPlanilha(page);
   await cartao.getByRole("button", { name: "Preparar mês", exact: true }).click();
-  const preparo = page.getByRole("alertdialog");
+  const preparo = page.getByRole("dialog");
   await preparo.getByRole("button", { name: "Preparar 2 turmas", exact: true }).click();
   await expect(preparo.getByText(/2 de 2 turmas prontas/)).toBeVisible();
-  await preparo.getByRole("button", { name: "Fechar", exact: true }).click();
+  await preparo.getByRole("button", { name: "Fechar", exact: true }).last().click();
   await cartao.getByRole("button", { name: "Meses da frequência", exact: true }).click();
   const indice = page.getByRole("region", { name: "Índice das chamadas", exact: true });
   await expect(indice.getByRole("button", { name: "Criar índice", exact: true })).toBeEnabled();

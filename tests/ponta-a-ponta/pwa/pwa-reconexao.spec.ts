@@ -27,11 +27,11 @@ for (const tema of ["light", "dark"] as const) {
     await expect(page.getByRole("heading", { name: "Sem conexão" })).toBeVisible();
     await expect(page.locator("body")).toHaveCSS(
       "background-color",
-      tema === "light" ? "rgb(246, 246, 246)" : "rgb(28, 27, 25)",
+      tema === "light" ? "rgb(246, 246, 246)" : "rgb(20, 20, 19)",
     );
     await expect(page.getByRole("link", { name: "Tentar de novo" })).toHaveCSS(
       "background-color",
-      "rgb(23, 120, 77)",
+      tema === "light" ? "rgb(29, 114, 83)" : "rgb(129, 207, 179)",
     );
     await page.keyboard.press("Tab");
     const tentar = page.getByRole("link", { name: "Tentar de novo" });

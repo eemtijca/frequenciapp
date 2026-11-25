@@ -86,7 +86,7 @@ A demonstração pública fica em https://frequenciappjca.vercel.app. Para exper
 - PostgreSQL 17 com Prisma ORM 7, conexão do runtime em `DATABASE_URL` e conexão do CLI em `DIRECT_URL`, com adaptador oficial `pg`.
 - Autenticação própria: scrypt para senhas, sessões opacas em cookies HttpOnly e papéis de administração e coordenação.
 - Transações ACID com isolamento serializável e repetição automática em conflitos.
-- Tailwind CSS 4 com componentes shadcn/ui personalizados, animações com Motion e gráficos com Recharts.
+- Material UI 9 com tema próprio em CSS variables, componentes MUI compartilhados, gráficos MUI X e Recharts restrito ao FrequenciBI.
 - Service worker próprio para a experiência instalável e o aviso offline.
 - Vitest para testes de unidade e contratos de API.
 
@@ -166,16 +166,17 @@ As camadas, o fluxo de requisição e as decisões registradas estão em [docs/a
 
 ## Testes e qualidade
 
-| Comando                    | Efeito                                                   |
-| -------------------------- | -------------------------------------------------------- |
-| `pnpm run format:check`    | Prettier em modo verificação.                            |
-| `pnpm run lint`            | ESLint com regras estritas.                              |
-| `pnpm run tsc`             | Verificação de tipos sem emissão.                        |
-| `pnpm run test:unit`       | Testes de unidade e guarda editorial.                    |
-| `pnpm run test:api`        | Contratos de API com o aplicativo no ar.                 |
-| `pnpm run test:e2e:docker` | Ponta a ponta na imagem oficial, com o aplicativo no ar. |
-| `pnpm run test:pwa:docker` | PWA contra o build de produção.                          |
-| `pnpm run capturas:readme` | Regenera as capturas do README em `docs/imagens/`.       |
+| Comando                     | Efeito                                                   |
+| --------------------------- | -------------------------------------------------------- |
+| `pnpm run format:check`     | Prettier em modo verificação.                            |
+| `pnpm run lint`             | ESLint com regras estritas.                              |
+| `pnpm run tsc`              | Verificação de tipos sem emissão.                        |
+| `pnpm run test:unit`        | Testes de unidade e guarda editorial.                    |
+| `pnpm run test:api`         | Contratos de API com o aplicativo no ar.                 |
+| `pnpm run test:e2e:docker`  | Ponta a ponta na imagem oficial, com o aplicativo no ar. |
+| `pnpm run test:pwa:docker`  | PWA contra o build de produção.                          |
+| `pnpm run capturas:readme`  | Regenera as capturas do README em `docs/imagens/`.       |
+| `pnpm run capturas:galeria` | Regenera a galeria completa e o manifesto de capturas.   |
 
 A convenção das suítes está em [docs/testes.md](docs/testes.md) e [tests/README.md](tests/README.md).
 

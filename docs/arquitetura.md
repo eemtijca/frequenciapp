@@ -21,7 +21,7 @@ flowchart LR
 - `src/domain/`: regras puras, sem dependência de framework ou banco. `frequencia.ts` traz os tipos de série, turma, aula, aluno e frequência, a validação de calendário e de horário, a derivação da marca do aluno no dia e a montagem da grade por turma de origem; `usuarios.ts` traz a política de senha, os papéis e os rótulos de exibição. Tudo aqui é testável de forma isolada e é compartilhado entre servidor e cliente.
 - `src/application/`: casos de uso. `frequencias.ts` carrega, lista e salva a frequência compartilhada com o controle de revisão em transação serializável; `alunos.ts`, `series.ts`, `turmas.ts`, `horarios.ts` e `usuarios.ts` gerenciam as entidades escolares e as contas; `sessao.ts` autentica, resolve a identidade e troca a própria senha. Validação de entrada com zod, decisões de negócio e mapeamento das linhas de banco para os tipos do domínio.
 - `src/infra/`: integrações. `banco.ts` é o singleton do PrismaClient com o adaptador `pg`; `ambiente.ts` valida as variáveis com falha antecipada; `auth/` concentra hash de senha, sessões opacas e limitador de tentativas; `transacoes.ts` executa transações ACID com repetição automática; `erros.ts` traduz qualquer exceção para português claro; `http.ts` reúne os auxiliares comuns das rotas; `auditoria.ts` registra as ações administrativas.
-- `src/app/` e `src/components/`: apresentação. A página única, as rotas de API como adaptadores finos dos casos de uso e os componentes de interface, com o conjunto shadcn/ui personalizado em `components/ui`, as animações com Motion e o registro da PWA.
+- `src/app/` e `src/components/`: apresentação. A página única, as rotas de API como adaptadores finos dos casos de uso e os componentes de interface, com o tema e os componentes compartilhados em Material UI e o registro da PWA.
 
 A dependência aponta para dentro: apresentação chama aplicação, aplicação orquestra domínio e infraestrutura, domínio não importa nada. A infraestrutura conhece o Prisma; a aplicação não conhece HTTP.
 
@@ -125,7 +125,7 @@ src/
     gestao/planilhas/       integrações, seletores e diálogos de planilha
     conta/                  diálogo de troca de senha
     pwa/                    registro do service worker e avisos
-    ui/                     conjunto shadcn/ui personalizado
+    ui/                     componentes MUI compartilhados
   domain/
     frequencia-parcial.ts   tipos e rótulos da presença personalizada
     frequencia-personalizada.ts   contrato da base diária e dos ajustes

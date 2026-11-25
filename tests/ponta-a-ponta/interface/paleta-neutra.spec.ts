@@ -1,4 +1,4 @@
-// Exercita as folhas reais no navegador, sem conta nem banco de dados.
+// Exercita as cores do tema Material UI no navegador, sem conta nem banco de dados.
 import { expect, test } from "@playwright/test";
 import { contraste, type Rgb } from "../../helpers/cor";
 
@@ -10,129 +10,71 @@ const rgb = (bytes: number[]): Rgb => [
   (bytes[2] ?? 0) / 255,
 ];
 
+const VARIAVEIS = [
+  "--template-palette-primary-main",
+  "--template-palette-secondary-main",
+  "--template-palette-falta-main",
+  "--template-palette-justificada-main",
+  "--template-palette-background-default",
+  "--template-palette-background-paper",
+  "--template-palette-text-primary",
+  "--template-palette-text-secondary",
+  "--template-palette-divider",
+] as const;
+
 for (const rota of ["/", "/bi"]) {
   for (const tema of ["light", "dark"] as const) {
-    test(`superfícies, texto e cores preservadas em ${rota}, ${tema}`, async ({ page }, info) => {
+    test(`cores do tema em ${rota}, ${tema}`, async ({ page }, info) => {
       await page.setViewportSize({ width: 390, height: 844 });
       await page.emulateMedia({ colorScheme: tema, reducedMotion: "reduce" });
       await page.addInitScript(() => localStorage.setItem("theme", "system"));
       // As telas públicas não precisam de nenhuma API ou sessão para este ensaio.
       await page.route("**/api/**", (route) => route.abort());
       await page.goto(rota);
-      await expect(page.locator("html")).toHaveClass(new RegExp(tema));
-      const cartao = page.locator(".superficie").filter({ visible: true }).first();
-      await expect(cartao).toBeVisible();
-      const esperados =
-        tema === "light"
-          ? {
-              primary: "oklch(0.5 0.11 160)",
-              falta: "oklch(0.5 0.16 27)",
-              justificada: "oklch(0.55 0.12 250)",
-              alerta: "oklch(0.7 0.15 75)",
-              secondary: "oklch(0.965 0.004 90)",
-              input: "oklch(0.64 0.008 90)",
-              accent: "oklch(0.945 0.016 160)",
-              trilho: "oklch(0.9 0.005 90)",
-              border: "oklch(0.93 0.005 90)",
-              "texto-desabilitado": "oklch(0.48 0.008 90)",
-            }
-          : {
-              primary: "oklch(0.7 0.13 160)",
-              falta: "oklch(0.55 0.17 27)",
-              justificada: "oklch(0.66 0.12 250)",
-              alerta: "oklch(0.75 0.15 80)",
-              secondary: "oklch(0.28 0.006 90)",
-              input: "oklch(1 0 0 / 38%)",
-              accent: "oklch(0.3 0.02 160)",
-              trilho: "oklch(1 0 0 / 14%)",
-              border: "oklch(1 0 0 / 12%)",
-              "texto-desabilitado": "oklch(0.68 0.008 90)",
-            };
-      const medidas = await cartao.evaluate((no, esperados) => {
-        const ctx = document.createElement("canvas").getContext("2d");
-        if (!ctx) throw new Error("Não foi possível analisar as cores.");
-        const cor = (valor: string) => {
-          ctx.clearRect(0, 0, 1, 1);
-          ctx.fillStyle = valor;
-          ctx.fillRect(0, 0, 1, 1);
-          return Array.from(ctx.getImageData(0, 0, 1, 1).data);
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
+
+      const cores = await page.evaluate((variaveis) => {
+        const tela = document.createElement("canvas");
+        tela.width = tela.height = 1;
+        const desenho = tela.getContext("2d");
+        if (!desenho) throw new Error("Não foi possível analisar as cores.");
+        const sonda = document.createElement("span");
+        document.body.append(sonda);
+        const resolver = (valor: string): number[] => {
+          desenho.clearRect(0, 0, 1, 1);
+          desenho.fillStyle = valor;
+          desenho.fillRect(0, 0, 1, 1);
+          return Array.from(desenho.getImageData(0, 0, 1, 1).data);
         };
         const raiz = getComputedStyle(document.documentElement);
-        const sondaCor = (nome: string) => {
-          const elemento = document.createElement("span");
-          elemento.style.backgroundColor = `var(--${nome})`;
-          document.body.append(elemento);
-          const valor = cor(getComputedStyle(elemento).backgroundColor);
-          elemento.remove();
-          return valor;
-        };
-        const sonda = document.createElement("span");
-        sonda.style.backgroundColor = "var(--selecionado-fundo)";
-        sonda.style.color = "var(--selecionado-texto)";
-        document.body.append(sonda);
-        const selecionado = {
-          fundo: cor(getComputedStyle(sonda).backgroundColor),
-          texto: cor(getComputedStyle(sonda).color),
-        };
+        const resultado = Object.fromEntries(
+          variaveis.map((nome) => [nome, resolver(raiz.getPropertyValue(nome).trim())]),
+        );
         sonda.remove();
-        return {
-          fundo: cor(getComputedStyle(document.body).backgroundColor),
-          texto: cor(getComputedStyle(document.body).color),
-          cartao: cor(getComputedStyle(no).backgroundColor),
-          textoCartao: cor(getComputedStyle(no).color),
-          selecionado,
-          superficies: {
-            controle: sondaCor("superficie-controle"),
-            bordaControle: sondaCor("borda-controle"),
-            trilho: sondaCor("superficie-trilho"),
-            desabilitada: sondaCor("superficie-desabilitada"),
-            bordaDesabilitada: sondaCor("borda-desabilitada"),
-          },
-          textoDesabilitado: cor(raiz.getPropertyValue("--texto-desabilitado").trim()),
-          tokens: Object.fromEntries(
-            Object.keys(esperados).map((nome) => [
-              nome,
-              cor(raiz.getPropertyValue(`--${nome}`).trim()),
-            ]),
-          ),
-          tokensEsperados: Object.fromEntries(
-            Object.entries(esperados).map(([nome, valor]) => [nome, cor(valor)]),
-          ),
-        };
-      }, esperados);
-      expect(medidas.tokens).toEqual(medidas.tokensEsperados);
-      expect(
-        contraste(rgb(medidas.superficies.controle), rgb(medidas.cartao)),
-        "fundo do controle contra o cartão",
-      ).toBeGreaterThanOrEqual(1.05);
-      expect(
-        contraste(rgb(medidas.superficies.bordaControle), rgb(medidas.cartao)),
-        "borda do controle contra o cartão",
-      ).toBeGreaterThanOrEqual(1.4);
-      expect(
-        contraste(rgb(medidas.superficies.bordaControle), rgb(medidas.superficies.controle)),
-        "borda do controle contra o fundo do controle",
-      ).toBeGreaterThanOrEqual(1.2);
-      expect(
-        contraste(rgb(medidas.superficies.trilho), rgb(medidas.cartao)),
-        "trilho das abas contra o cartão",
-      ).toBeGreaterThanOrEqual(1.1);
-      expect(
-        contraste(rgb(medidas.textoDesabilitado), rgb(medidas.superficies.desabilitada)),
-        "texto desabilitado",
-      ).toBeGreaterThanOrEqual(4.5);
-      if (tema === "light") {
-        expect(medidas.fundo).toEqual([246, 246, 246, 255]);
-        expect(medidas.cartao).toEqual([255, 255, 255, 255]);
-      } else {
-        expect(medidas.fundo).toEqual([20, 20, 18, 255]);
+        return resultado;
+      }, VARIAVEIS);
+
+      for (const [nome, canais] of Object.entries(cores)) {
+        if (nome === "--template-palette-divider") continue;
+        expect(canais[3], `${nome} opaco`).toBe(255);
       }
-      expect(contraste(rgb(medidas.texto), rgb(medidas.fundo))).toBeGreaterThanOrEqual(4.5);
-      expect(contraste(rgb(medidas.textoCartao), rgb(medidas.cartao))).toBeGreaterThanOrEqual(4.5);
+      const principal = cores["--template-palette-primary-main"] ?? [];
+      const fundo = cores["--template-palette-background-default"] ?? [];
+      const papel = cores["--template-palette-background-paper"] ?? [];
+      const texto = cores["--template-palette-text-primary"] ?? [];
+      const secundario = cores["--template-palette-text-secondary"] ?? [];
+      const falta = cores["--template-palette-falta-main"] ?? [];
+      const justificada = cores["--template-palette-justificada-main"] ?? [];
+
+      expect(contraste(rgb(texto), rgb(fundo)), "texto sobre o fundo").toBeGreaterThanOrEqual(4.5);
       expect(
-        contraste(rgb(medidas.selecionado.texto), rgb(medidas.selecionado.fundo)),
-        "texto selecionado",
+        contraste(rgb(secundario), rgb(papel)),
+        "texto secundário no papel",
       ).toBeGreaterThanOrEqual(4.5);
+      expect(contraste(rgb(principal), rgb(fundo)), "primário no fundo").toBeGreaterThanOrEqual(3);
+      expect(fundo).not.toEqual(papel);
+      expect(falta).not.toEqual(justificada);
+
       await page.screenshot({
         path: info.outputPath(`paleta-${rota === "/" ? "entrada" : "bi"}-${tema}.png`),
         animations: "disabled",

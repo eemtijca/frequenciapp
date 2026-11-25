@@ -1,5 +1,6 @@
 // Catálogo de quem libera a saída: manutenção na Gestão e uso no registro
 // antecipado, com o nome novo aparecendo na lista do dia.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import {
@@ -17,12 +18,8 @@ import {
 
 async function abrirCatalogo(page: Page) {
   await selecionarAcaoConfiguracoes(page, "Escola", "Cadastros");
-  const secao = page.locator('[data-secao="config-liberadores"]');
-  const regiao = secao.getByRole("region", { name: "Quem libera as saídas" });
-  if (!(await regiao.isVisible())) {
-    await secao.getByRole("button", { name: /Quem libera as saídas/ }).click();
-  }
-  await expect(regiao).toBeVisible();
+  const secao = page.getByRole("region", { name: "Quem libera as saídas", exact: true });
+  await expect(secao).toBeVisible();
   return secao;
 }
 
@@ -41,16 +38,16 @@ test.describe("quem libera as saídas", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações" }).click();
+    await abrirConfiguracoesDaGestao(page);
 
     const secao = await abrirCatalogo(page);
-    await secao.getByText("Adicionar responsável", { exact: true }).click();
+    await secao.getByRole("button", { name: "Adicionar responsável", exact: true }).click();
     await page.locator("#liberador-codigo").fill("E2E1");
     await page.locator("#liberador-rotulo").fill("E2E Porteiro");
-    await secao.getByRole("button", { name: "Adicionar" }).click();
+    await secao.getByRole("button", { name: "Adicionar ao rascunho", exact: true }).click();
     await expect(secao.getByText("E2E Porteiro")).toBeVisible();
     // O aviso flutua sobre o rodapé e pausa a própria saída enquanto o ponteiro o cobre.
-    await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
+    await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0, { timeout: 15_000 });
     await salvarConfiguracoes(page);
 
     await trocarVisao(page, "Saídas e Entradas", "saidas");
@@ -69,7 +66,7 @@ test.describe("quem libera as saídas", () => {
     await expect(page.getByText("Liberado por E2E Porteiro").first()).toBeVisible();
 
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações" }).click();
+    await abrirConfiguracoesDaGestao(page);
     const catalogo = await abrirCatalogo(page);
     await catalogo.getByRole("button", { name: "Excluir E2E1" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Excluir" }).click();

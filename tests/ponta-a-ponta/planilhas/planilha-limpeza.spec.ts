@@ -1,4 +1,8 @@
 // Limpeza de backups antigos na Gestão: prévia, cancelamento e toque duplo.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { selecionarAcaoPlanilha } from "../helpers/planilhas";
@@ -30,11 +34,8 @@ async function abrir(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Planilhas", exact: true })
-    .click();
+  await abrirConfiguracoesDaGestao(page);
+  await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
   await selecionarAcaoPlanilha(cartao, "Configurar");

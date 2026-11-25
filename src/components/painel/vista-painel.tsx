@@ -3,16 +3,16 @@
 // Painel do dia: infrequência por série e por turma, cobertura das chamadas
 // e destaque para a infrequência do dia.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ChartPie,
-  CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
-  CircleAlert,
-  LoaderCircle,
-  RotateCcw,
-  TriangleAlert,
-} from "lucide-react";
+import Box from "@mui/material/Box";
+import Skeleton from "@mui/material/Skeleton";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type {
   Aluno,
@@ -35,15 +35,19 @@ import {
 } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { estadoDeErro } from "@/lib/estado-http";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import { Alerta } from "@/components/ui/mui/alerta";
+import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
+import { BarraProgresso } from "@/components/ui/mui/barra-progresso";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { Cartao, CartaoCabecalho, CartaoConteudo, CartaoTitulo } from "@/components/ui/mui/cartao";
+import type { VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { GradeCartoes } from "@/components/layout/grade-cartoes";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
-import { BarraProgresso } from "@/components/ui/barra-progresso";
-import { Button } from "@/components/ui/button";
-import { CartaoIndicador } from "@/components/ui/cartao-indicador";
-import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
+import { categoriasDaSerie } from "@/components/painel/categorias-do-painel";
 import VistaPeriodo from "@/components/painel/vista-periodo";
 import FaixaGraficos from "@/components/painel/faixa-graficos";
 import { IndicadorCobertura } from "@/components/painel/indicador-cobertura";
@@ -52,6 +56,7 @@ import {
   useContextoAtualizacao,
   useAtualizacaoTela,
 } from "@/components/atualizacao/contexto-atualizacao";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   ativo: boolean;
@@ -76,23 +81,61 @@ const percentual = new Intl.NumberFormat("pt-BR", {
 const NIVEIS = {
   baixa: {
     rotulo: "Dentro do esperado",
-    tom: "primary",
-    texto: "text-primary",
-    Icone: CheckCircle2,
+    tom: "sucesso",
+    cor: "primary.main",
+    Icone: CheckCircleRoundedIcon,
   },
   atencao: {
     rotulo: "Atenção",
     tom: "alerta",
-    texto: "text-alerta-texto",
-    Icone: TriangleAlert,
+    cor: "alerta.texto",
+    Icone: WarningAmberRoundedIcon,
   },
   critica: {
     rotulo: "Acima do limite",
     tom: "falta",
-    texto: "text-falta-texto",
-    Icone: CircleAlert,
+    cor: "falta.texto",
+    Icone: ErrorOutlineRoundedIcon,
   },
 } as const;
+
+const TEXTO_OCULTO = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
+
+const TAMANHO_NAVEGACAO = TOKENS_LAYOUT.alvoToque;
+
+function severidadeDoErro(variante: VarianteEstado): "warning" | "error" {
+  return variante === "offline" || variante === "indisponivel" ? "warning" : "error";
+}
+
+function EsqueletoRosca() {
+  return (
+    <Stack
+      role="status"
+      aria-live="polite"
+      direction={{ xs: "column", sm: "row" }}
+      spacing={2.5}
+      sx={{ alignItems: "center", width: "100%" }}
+    >
+      <Typography sx={TEXTO_OCULTO}>Carregando indicadores...</Typography>
+      <Skeleton variant="circular" width={176} height={176} sx={{ flexShrink: 0 }} />
+      <Stack spacing={1} sx={{ width: "100%", minWidth: 0 }}>
+        <Skeleton variant="rounded" height={44} />
+        <Skeleton variant="rounded" height={44} />
+        <Skeleton variant="rounded" height={44} />
+      </Stack>
+    </Stack>
+  );
+}
 
 export default function VistaPainel({
   ativo,
@@ -123,7 +166,7 @@ export default function VistaPainel({
     feriado?: Feriado | null;
     nomeFeriadoNoCadastro: string;
   } | null>(null);
-  const [carregando, setCarregando] = useState(false);
+  const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [recarregar, setRecarregar] = useState(0);
@@ -281,8 +324,19 @@ export default function VistaPainel({
   const coberturaTurmas = serieAtiva
     ? cobertura.turmas.filter((item) => item.turma.serieId === serieAtiva.id)
     : cobertura.turmas;
+  const nivel =
+    resumo.registrados > 0
+      ? NIVEIS[nivelInfrequencia(resumo.infrequencia, limiaresDoPainel(configuracoes))]
+      : null;
+  const IconeNivel = nivel?.Icone;
+  const taxa = percentual.format(resumo.infrequencia);
+
+  const categoriasDaEscola = series.map((serie) => serie.id);
 
   function graficoDoDia(serieSelecionada: Serie | null) {
+    const categorias = serieSelecionada
+      ? categoriasDaSerie(serieSelecionada.id, turmas, alunos)
+      : categoriasDaEscola;
     const distribuicaoDaSerie = serieSelecionada
       ? (distribuicao.find((item) => item.serieId === serieSelecionada.id) ?? null)
       : null;
@@ -295,289 +349,331 @@ export default function VistaPainel({
       )
         ? distribuicaoPorOrigem(serieSelecionada, turmas, ativos, marcas)
         : null;
-    return carregandoPainel ? (
-      <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
-        <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-        Carregando indicadores...
-      </div>
-    ) : (
-      <>
-        <div className="superficie flex flex-col gap-4 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="sr-only">
-              <ChartPie size={18} className="text-muted-foreground shrink-0" aria-hidden="true" />
+    const titulo = serieSelecionada
+      ? `Faltas do dia por turma da ${serieSelecionada.nome}`
+      : "Faltas do dia por série";
+    const vazio = feriado
+      ? feriado.nome
+      : frequenciasDoDia.length === 0
+        ? "Nenhuma chamada salva neste dia"
+        : "Nenhuma falta registrada neste dia";
+
+    if (carregandoPainel) {
+      return (
+        <Cartao aria-label="Carregando indicadores">
+          <CartaoConteudo>
+            <EsqueletoRosca />
+          </CartaoConteudo>
+        </Cartao>
+      );
+    }
+
+    return (
+      <Stack spacing={2}>
+        <Cartao aria-label={serieSelecionada ? serieSelecionada.nome : "Toda a escola"}>
+          <CartaoCabecalho>
+            <CartaoTitulo>
               {serieSelecionada ? serieSelecionada.nome : "Toda a escola"}
-            </h2>
-          </div>
-          <GraficoRosca
-            tomValores="falta"
-            titulo={
-              serieSelecionada
-                ? `Faltas do dia por turma da ${serieSelecionada.nome}`
-                : "Faltas do dia por série"
-            }
-            fatias={
-              feriado
-                ? []
-                : distribuicaoDaSerie
-                  ? distribuicaoDaSerie.turmas.map((turma) => ({
-                      nome: turma.rotulo,
-                      valor: turma.faltas + turma.justificadas,
-                      alunos: turma.esperados,
-                      detalhe: `${turma.registrados} de ${turma.esperados} alunos com chamada`,
-                    }))
-                  : distribuicao.map((item) => ({
-                      nome: item.nome,
-                      valor: item.faltas + item.justificadas,
-                      alunos: item.esperados,
-                      detalhe: `${item.registrados} de ${item.esperados} alunos com chamada`,
-                    }))
-            }
-            vazio={
-              feriado
-                ? feriado.nome
-                : frequenciasDoDia.length === 0
-                  ? "Nenhuma chamada salva neste dia"
-                  : "Nenhuma falta registrada neste dia"
-            }
-          />
-        </div>
+            </CartaoTitulo>
+          </CartaoCabecalho>
+          <CartaoConteudo>
+            <GraficoRosca
+              titulo={titulo}
+              categorias={categorias}
+              fatias={
+                feriado
+                  ? []
+                  : distribuicaoDaSerie
+                    ? distribuicaoDaSerie.turmas.map((turma) => ({
+                        categoriaId: turma.turmaId,
+                        nome: turma.rotulo,
+                        valor: turma.faltas + turma.justificadas,
+                        detalhe: `${turma.registrados} de ${turma.esperados} alunos com chamada`,
+                      }))
+                    : distribuicao.map((item) => ({
+                        categoriaId: item.serieId,
+                        nome: item.nome,
+                        valor: item.faltas + item.justificadas,
+                        detalhe: `${item.registrados} de ${item.esperados} alunos com chamada`,
+                      }))
+              }
+              vazio={vazio}
+            />
+          </CartaoConteudo>
+        </Cartao>
 
         {!feriado && serieSelecionada && porOrigem && (
-          <div className="superficie flex flex-col gap-4 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="sr-only">
-                <ChartPie size={18} className="text-muted-foreground shrink-0" aria-hidden="true" />
-                {serieSelecionada.nome} por turma original
-              </h2>
-              <span className="text-muted-foreground text-xs">
+          <Cartao aria-label={`${serieSelecionada.nome} por turma original`}>
+            <CartaoCabecalho>
+              <CartaoTitulo>{serieSelecionada.nome} por turma original</CartaoTitulo>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Mesmas faltas, agrupadas pela turma de origem
-              </span>
-            </div>
-            <GraficoRosca
-              tomValores="falta"
-              titulo={`Faltas do dia por turma original da ${serieSelecionada.nome}`}
-              fatias={porOrigem.map((turma) => ({
-                nome: turma.rotulo,
-                valor: turma.faltas + turma.justificadas,
-                alunos: turma.esperados,
-                detalhe: `${turma.registrados} de ${turma.esperados} alunos com chamada`,
-              }))}
-              vazio={
-                frequenciasDoDia.length === 0
-                  ? "Nenhuma chamada salva neste dia"
-                  : "Nenhuma falta registrada neste dia"
-              }
-            />
-          </div>
+              </Typography>
+            </CartaoCabecalho>
+            <CartaoConteudo>
+              <GraficoRosca
+                titulo={`Faltas do dia por turma original da ${serieSelecionada.nome}`}
+                categorias={categorias}
+                fatias={porOrigem.map((turma) => ({
+                  categoriaId: turma.turmaId,
+                  nome: turma.rotulo,
+                  valor: turma.faltas + turma.justificadas,
+                  detalhe: `${turma.registrados} de ${turma.esperados} alunos com chamada`,
+                }))}
+                vazio={vazio}
+              />
+            </CartaoConteudo>
+          </Cartao>
         )}
-      </>
+      </Stack>
     );
   }
 
   return (
-    <section aria-label="Painel de frequência" className="flex flex-col gap-4 pb-6">
-      <h1 className="sr-only">Painel</h1>
+    <Box
+      component="section"
+      aria-label="Painel de frequência"
+      aria-busy={carregando}
+      sx={{ pb: 3 }}
+    >
+      <CabecalhoPagina
+        titulo="Painel"
+        acoes={nav.resumo ? undefined : <AtualizadoDaVisao fuso={fuso} />}
+      />
 
-      <div className="navegacao-dia flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Dia anterior"
-          onClick={() => nav.anterior()}
-        >
-          <ChevronLeft size={18} />
-        </Button>
-        <div className="min-w-0 flex-1">
-          <SeletorPeriodo
-            id="dia-painel"
-            modo="dia"
-            valor={nav.resumo ? (nav.domingo ?? "") : dia}
-            max={diaCorrente}
-            calendarioSemanal
-            mostrarSelo={!nav.resumo}
-            rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Dia do painel"}
-            rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
-            detalhe={nav.resumo ? "semana" : diaDaSemana}
-            aoHoje={() => {
+      <Stack spacing={{ xs: 2, sm: 3 }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+          <BotaoIcone
+            rotulo="Dia anterior"
+            icone={<ChevronLeftRoundedIcon />}
+            variante="contorno"
+            onClick={() => nav.anterior()}
+            sx={{
+              width: TAMANHO_NAVEGACAO,
+              height: TAMANHO_NAVEGACAO,
+              flexShrink: 0,
+            }}
+          />
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <SeletorPeriodo
+              id="dia-painel"
+              modo="dia"
+              valor={nav.resumo ? (nav.domingo ?? "") : dia}
+              max={diaCorrente}
+              calendarioSemanal
+              mostrarSelo={!nav.resumo}
+              rotuloAcessivel={nav.resumo ? "Resumo da semana" : "Dia do painel"}
+              rotulo={nav.resumo ? (nav.rotuloResumo ?? "") : rotuloDia}
+              detalhe={nav.resumo ? "semana" : diaDaSemana}
+              aoHoje={() => {
+                setCarregando(false);
+                nav.voltarParaHoje();
+              }}
+              hojeAtivo={nav.hojeAtivo}
+              onAbertoChange={setCalendarioAberto}
+              onValor={(proximo) => nav.escolherDia(proximo)}
+            />
+          </Box>
+          <BotaoIcone
+            rotulo="Dia seguinte"
+            icone={<ChevronRightRoundedIcon />}
+            variante="contorno"
+            disabled={nav.seguinteDesabilitado}
+            onClick={() => nav.seguinte()}
+            sx={{
+              width: TAMANHO_NAVEGACAO,
+              height: TAMANHO_NAVEGACAO,
+              flexShrink: 0,
+            }}
+          />
+        </Stack>
+
+        {nav.mostrarVoltar && (
+          <Botao
+            type="button"
+            variante="contorno"
+            icone={<ReplayRoundedIcon />}
+            onClick={() => {
               setCarregando(false);
               nav.voltarParaHoje();
             }}
-            hojeAtivo={nav.hojeAtivo}
-            onAbertoChange={setCalendarioAberto}
-            onValor={(proximo) => nav.escolherDia(proximo)}
+            sx={{ alignSelf: "flex-start" }}
+          >
+            Voltar para hoje
+          </Botao>
+        )}
+
+        {nav.resumo && nav.semana ? (
+          <VistaResumoSemana
+            turmas={turmas}
+            alunos={alunos}
+            dias={nav.semana}
+            domingo={nav.domingo}
+            feriados={configuracoes.feriados}
+            configuracoes={configuracoes}
+            mostrarSaidas={configuracoes.saidaAntecipada}
+            versao={recarregar}
+            contexto="painel"
+            ativo={ativo}
+            pausado={calendarioAberto}
+            viewId="painel"
+            fuso={fuso}
+            onRecarregarConfiguracoes={onRecarregarConfiguracoes}
+            onAbrirDia={(proximo) => nav.escolherDia(proximo)}
           />
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="size-11 shrink-0"
-          aria-label="Dia seguinte"
-          disabled={nav.seguinteDesabilitado}
-          onClick={() => nav.seguinte()}
-        >
-          <ChevronRight size={18} />
-        </Button>
-      </div>
-      {!nav.resumo && (
-        <div className="flex justify-end">
-          <AtualizadoDaVisao fuso={fuso} />
-        </div>
-      )}
-      {nav.mostrarVoltar && (
-        <Button
-          type="button"
-          onClick={() => {
-            setCarregando(false);
-            nav.voltarParaHoje();
-          }}
-          variant="secondary"
-          className="self-start"
-        >
-          <RotateCcw size={16} aria-hidden="true" />
-          Voltar para hoje
-        </Button>
-      )}
+        ) : (
+          <>
+            {erro ? (
+              <Alerta
+                severity={severidadeDoErro(erroVariante)}
+                role={severidadeDoErro(erroVariante) === "warning" ? "status" : "alert"}
+                titulo={
+                  erroVariante === "offline" ? "Sem conexão" : "Não foi possível carregar o dia"
+                }
+              >
+                {erro}
+              </Alerta>
+            ) : null}
 
-      {nav.resumo && nav.semana ? (
-        <VistaResumoSemana
-          turmas={turmas}
-          alunos={alunos}
-          dias={nav.semana}
-          domingo={nav.domingo}
-          feriados={configuracoes.feriados}
-          configuracoes={configuracoes}
-          mostrarSaidas={configuracoes.saidaAntecipada}
-          versao={recarregar}
-          contexto="painel"
-          ativo={ativo}
-          pausado={calendarioAberto}
-          viewId="painel"
-          fuso={fuso}
-          onRecarregarConfiguracoes={onRecarregarConfiguracoes}
-          onAbrirDia={(proximo) => nav.escolherDia(proximo)}
-        />
-      ) : (
-        <>
-          {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-
-          <div className="grid grid-cols-2 items-stretch gap-3">
-            <CartaoIndicador
-              titulo="Infrequência"
-              rotuloAcessivel="Resumo do dia"
-              ocupado={carregandoPainel}
-            >
-              {!feriado && !carregandoPainel && resumo.parciais > 0 && (
-                <span className="text-muted-foreground text-xs">
-                  {resumo.parciais}{" "}
-                  {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
-                </span>
-              )}
-              <div className="flex flex-col gap-2">
-                {feriado ? (
-                  <IndicadorFeriado nome={feriado.nome} />
-                ) : (
-                  (() => {
-                    const nivel =
-                      resumo.registrados > 0
-                        ? nivelInfrequencia(resumo.infrequencia, limiaresDoPainel(configuracoes))
-                        : null;
-                    const config = nivel ? NIVEIS[nivel] : null;
-                    const Icone = config?.Icone;
-                    const largura = Math.min(100, Math.max(0, resumo.infrequencia * 100));
-                    const texto = config
-                      ? `${percentual.format(resumo.infrequencia)} de infrequência, ${config.rotulo.toLowerCase()}`
-                      : "Sem dados";
-                    return (
-                      <>
-                        <span
-                          className={
-                            config
-                              ? "numerais-tabulares text-3xl font-semibold sm:text-4xl"
-                              : "text-muted-foreground text-sm"
-                          }
+            <Cartao component="section" aria-label="Indicadores do dia">
+              <GradeCartoes dupla>
+                <Stack
+                  role="group"
+                  aria-label="Resumo do dia"
+                  aria-busy={carregandoPainel}
+                  spacing={1}
+                >
+                  <CartaoTitulo>Infrequência</CartaoTitulo>
+                  <Typography variant="caption" color="text.secondary">
+                    Toda a escola
+                  </Typography>
+                  {feriado ? (
+                    <IndicadorFeriado nome={feriado.nome} />
+                  ) : carregandoPainel ? (
+                    <Skeleton variant="rounded" width="100%" height={64} />
+                  ) : (
+                    <>
+                      <Typography
+                        component="p"
+                        variant={nivel ? "h3" : "body2"}
+                        sx={{
+                          fontWeight: nivel ? 600 : 400,
+                          fontVariantNumeric: "tabular-nums",
+                          color: nivel ? "text.primary" : "text.secondary",
+                        }}
+                      >
+                        {nivel ? taxa : "Sem dados"}
+                      </Typography>
+                      <BarraProgresso
+                        valor={resumo.infrequencia * 100}
+                        tom={nivel?.tom ?? "neutro"}
+                        rotulo="Infrequência do dia"
+                        descricao={
+                          nivel
+                            ? `${taxa} de infrequência, ${nivel.rotulo.toLowerCase()}`
+                            : "Sem dados"
+                        }
+                        testId="infrequencia-preenchida"
+                      />
+                      {nivel && IconeNivel && (
+                        <Stack
+                          direction="row"
+                          spacing={0.75}
+                          sx={{ alignItems: "center", color: nivel.cor }}
                         >
-                          {config ? percentual.format(resumo.infrequencia) : "Sem dados"}
-                        </span>
-                        <BarraProgresso
-                          valor={largura}
-                          tom={config?.tom ?? "muted"}
-                          rotulo="Infrequência do dia"
-                          descricao={texto}
-                          testId="infrequencia-preenchida"
-                        />
-                        {config && Icone ? (
-                          <span className={`flex items-center gap-1.5 text-xs ${config.texto}`}>
-                            <Icone aria-hidden="true" className="size-4 shrink-0" />
-                            {config.rotulo}
-                          </span>
-                        ) : null}
-                      </>
-                    );
-                  })()
-                )}
-              </div>
-            </CartaoIndicador>
-            <IndicadorCobertura turmas={coberturaTurmas} feriado={feriado?.nome} />
-          </div>
+                          <IconeNivel aria-hidden="true" sx={{ fontSize: 16, flexShrink: 0 }} />
+                          <Typography variant="caption" color="inherit">
+                            {nivel.rotulo}
+                          </Typography>
+                        </Stack>
+                      )}
+                      {resumo.parciais > 0 && (
+                        <Typography variant="caption" color="text.secondary">
+                          {resumo.parciais}{" "}
+                          {resumo.parciais === 1 ? "presença parcial" : "presenças parciais"}
+                        </Typography>
+                      )}
+                    </>
+                  )}
+                </Stack>
+                <IndicadorCobertura
+                  turmas={coberturaTurmas}
+                  escopo={serieAtiva?.nome ?? "Toda a escola"}
+                  feriado={feriado?.nome}
+                  carregando={carregandoPainel}
+                />
+              </GradeCartoes>
+            </Cartao>
 
-          <FaixaGraficos
-            valor={cartaoAtivo}
-            onValor={setCartaoAtivo}
-            ocupado={atualizando}
-            itens={[
-              {
-                id: "escola",
-                rotulo: "Toda a escola",
-                render: () => graficoDoDia(null),
-              },
-              ...series.map((serie) => ({
-                id: serie.id,
-                rotulo: serie.nome,
-                render: () => graficoDoDia(serie),
-              })),
-              {
-                id: "personalizado",
-                rotulo: "Personalizado",
-                render: () => (
-                  <VistaPeriodo
-                    diaCorrente={diaCorrente}
-                    series={series}
-                    turmas={turmas}
-                    alunos={alunos}
-                  />
-                ),
-              },
-              {
-                id: "desistentes",
-                rotulo: "Desistentes",
-                render: () => (
-                  <div className="superficie flex flex-col gap-4 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <h2 className="sr-only">Desistentes até este dia</h2>
-                      <span className="numerais-tabulares text-muted-foreground shrink-0 text-sm whitespace-nowrap">
-                        {desistencias.total} {desistencias.total === 1 ? "aluno" : "alunos"}
-                      </span>
-                    </div>
-                    <GraficoRosca
-                      titulo="Desistentes por série"
-                      fatias={desistencias.series.map((serie) => ({
-                        nome: serie.nome,
-                        valor: serie.turmas.reduce((soma, turma) => soma + turma.quantidade, 0),
-                      }))}
-                      rotuloTotal="desistentes"
-                      unidadeSingular="desistente"
-                      unidadePlural="desistentes"
-                      vazio="Nenhum aluno desistente até este dia"
+            <FaixaGraficos
+              valor={cartaoAtivo}
+              onValor={setCartaoAtivo}
+              ocupado={atualizando}
+              itens={[
+                {
+                  id: "escola",
+                  rotulo: "Toda a escola",
+                  render: () => graficoDoDia(null),
+                },
+                ...series.map((serie) => ({
+                  id: serie.id,
+                  rotulo: serie.nome,
+                  render: () => graficoDoDia(serie),
+                })),
+                {
+                  id: "personalizado",
+                  rotulo: "Personalizado",
+                  render: () => (
+                    <VistaPeriodo
+                      diaCorrente={diaCorrente}
+                      series={series}
+                      turmas={turmas}
+                      alunos={alunos}
                     />
-                  </div>
-                ),
-              },
-            ]}
-          />
-        </>
-      )}
-    </section>
+                  ),
+                },
+                {
+                  id: "desistentes",
+                  rotulo: "Desistentes",
+                  render: () => (
+                    <Cartao>
+                      <CartaoCabecalho>
+                        <CartaoTitulo>Desistentes até este dia</CartaoTitulo>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: "text.secondary",
+                            fontVariantNumeric: "tabular-nums",
+                            flexShrink: 0,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {desistencias.total} {desistencias.total === 1 ? "aluno" : "alunos"}
+                        </Typography>
+                      </CartaoCabecalho>
+                      <CartaoConteudo>
+                        <GraficoRosca
+                          titulo="Desistentes por série"
+                          categorias={categoriasDaEscola}
+                          fatias={desistencias.series.map((serie) => ({
+                            categoriaId: serie.serieId,
+                            nome: serie.nome,
+                            valor: serie.turmas.reduce((soma, turma) => soma + turma.quantidade, 0),
+                          }))}
+                          rotuloTotal="desistentes"
+                          unidadeSingular="desistente"
+                          unidadePlural="desistentes"
+                          vazio="Nenhum aluno desistente até este dia"
+                        />
+                      </CartaoConteudo>
+                    </Cartao>
+                  ),
+                },
+              ]}
+            />
+          </>
+        )}
+      </Stack>
+    </Box>
   );
 }

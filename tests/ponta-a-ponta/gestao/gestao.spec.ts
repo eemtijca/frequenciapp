@@ -1,9 +1,48 @@
 // Navegação da Gestão e das configurações, com preservação de rascunhos e retorno do Google.
+import {
+  abrirConfiguracoesDaGestao,
+  conferirCategoriaConfiguracoes,
+  exporConfiguracoes,
+  exporNavegacao,
+  menuMovel,
+  selecionarCadastroGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { selecionarAcaoConfiguracoes } from "../helpers/configuracoes";
 
-test.describe("abas da Gestão", () => {
+test.describe("navegação da Gestão", () => {
+  test("Configurações tem contexto próprio e volta ao cadastro anterior com foco no gatilho", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await trocarVisao(page, "Gestão", "gestao");
+    await selecionarCadastroGestao(page, "Turmas");
+    const nav = await exporNavegacao(page);
+    const gatilho = nav.getByRole("button", { name: "Configurações", exact: true });
+    await gatilho.press("Enter");
+    const voltar = nav.getByRole("button", { name: "Voltar para Gestão", exact: true });
+    await expect(voltar).toBeFocused();
+    await expect(page.getByRole("tablist", { name: "Áreas de gestão" })).toHaveCount(0);
+    await selecionarAcaoConfiguracoes(page, "Horários", "Provas");
+    await expect(page.getByRole("form", { name: "Nova prova" })).toBeVisible();
+
+    await voltar.press("Enter");
+    await expect(nav.getByRole("button", { name: "Turmas", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(gatilho).toBeFocused();
+    await expect(page.getByRole("heading", { name: "Turmas", level: 1 })).toBeVisible();
+
+    await page.keyboard.press("Enter");
+    await expect(voltar).toBeFocused();
+    await expect(page.getByRole("form", { name: "Nova prova" })).toBeVisible();
+  });
+
   const retornosGoogle = [
     { finalidade: "FREQUENCIA", secao: "planilha-frequencia" },
     { finalidade: "SAIDAS", secao: "planilha-saidas" },
@@ -18,16 +57,16 @@ test.describe("abas da Gestão", () => {
       const finalidade = retorno.finalidade ? `&googleFinalidade=${retorno.finalidade}` : "";
       await page.goto(`/?visao=gestao&google=conectado${finalidade}`);
       await aguardarHidratacao(page);
-      await expect(page.getByRole("tab", { name: "Configurações" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
+      await expect(page.getByRole("heading", { name: "Configurações", level: 1 })).toBeVisible();
       await expect(page.getByText("Conta Google conectada. Escolha a planilha.")).toBeVisible();
-      await expect(
-        page
-          .getByRole("navigation", { name: "Categorias de configurações" })
-          .getByRole("button", { name: "Planilhas", exact: true }),
-      ).toHaveAttribute("aria-pressed", "true");
+      await conferirCategoriaConfiguracoes(page, "Planilhas");
+      const nav = await exporConfiguracoes(page);
+      await expect(nav.getByRole("button", { name: "Planilhas", exact: true })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      if (await menuMovel(page).isVisible()) await page.keyboard.press("Escape");
+      await expect(menuMovel(page)).toBeHidden();
       for (const secao of ["planilha-frequencia", "planilha-saidas", "planilha-parcial"]) {
         const cartao = page.locator(`[data-secao="${secao}"]`);
         await expect(cartao).toBeVisible();
@@ -38,9 +77,9 @@ test.describe("abas da Gestão", () => {
         if (secao === retorno.secao) {
           await expect(
             cartao
-              .getByRole("navigation", { name: /^Ações da planilha/ })
-              .getByRole("button", { name: "Configurar", exact: true }),
-          ).toHaveAttribute("aria-pressed", "true");
+              .getByRole("tablist", { name: /^Ações da planilha/ })
+              .getByRole("tab", { name: "Configurar", exact: true }),
+          ).toHaveAttribute("aria-selected", "true");
         }
       }
     });
@@ -52,14 +91,10 @@ test.describe("abas da Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações" }).click();
-    const categorias = page.getByRole("navigation", { name: "Categorias de configurações" });
+    await abrirConfiguracoesDaGestao(page);
     const justificativas = page.locator('[data-secao="config-justificativas"]');
     const copia = page.locator('[data-secao="config-copia"]');
-    await expect(categorias.getByRole("button", { name: "Escola", exact: true })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await conferirCategoriaConfiguracoes(page, "Escola");
     await expect(justificativas).toBeHidden();
     await selecionarAcaoConfiguracoes(page, "Escola", "Cadastros");
     await expect(justificativas).toBeVisible();
@@ -67,17 +102,18 @@ test.describe("abas da Gestão", () => {
     await expect(page.locator('[data-secao="planilha-frequencia"]')).toBeHidden();
     await expect(page.locator('[data-secao="config-acesso-diretores"]')).toBeHidden();
 
-    await justificativas.getByRole("button", { name: /^Justificativas/ }).click();
-    await justificativas.getByText("Adicionar justificativa", { exact: true }).click();
+    await justificativas
+      .getByRole("button", { name: "Adicionar justificativa", exact: true })
+      .click();
     await justificativas.getByLabel("Código", { exact: true }).fill("E2E");
     await justificativas.getByLabel("Rótulo", { exact: true }).fill("E2E Rascunho preservado");
-    await categorias.getByRole("button", { name: "Dados", exact: true }).click();
+    await selecionarCategoriaConfiguracoes(page, "Dados");
     await expect(copia).toBeVisible();
     await expect(justificativas).toBeHidden();
     await expect(page.locator('[data-secao="planilha-frequencia"]')).toBeHidden();
     await expect(page.locator('[data-secao="config-acesso-diretores"]')).toBeHidden();
 
-    await categorias.getByRole("button", { name: "Escola", exact: true }).click();
+    await selecionarCategoriaConfiguracoes(page, "Escola", "Cadastros");
     await expect(copia).toBeHidden();
     await expect(justificativas).toBeVisible();
     await expect(justificativas.getByLabel("Código", { exact: true })).toHaveValue("E2E");
@@ -86,53 +122,29 @@ test.describe("abas da Gestão", () => {
     );
   });
 
-  test("sincroniza toque e teclado", async ({ page }) => {
-    await page.goto("/");
-    await aguardarHidratacao(page);
-    await trocarVisao(page, "Gestão", "gestao");
-    await expect(page.getByRole("tab", { name: "Séries" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-
-    await page.getByRole("tab", { name: "Turmas" }).click();
-    await expect(page.getByRole("tab", { name: "Turmas" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-
-    await page.getByRole("tab", { name: "Alunos" }).click();
-    await expect(page.getByRole("tab", { name: "Alunos" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-
-    await page.getByRole("tab", { name: "Alunos" }).press("ArrowRight");
-    await expect(page.getByRole("tab", { name: "Equipe" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-  });
-
-  test("no desktop a troca é instantânea", async ({ page }) => {
+  test("no desktop, Tab percorre destinos sem trocar até a ativação", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
-    await page.goto("/");
+    await page.goto("/?visao=gestao");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Gestão", "gestao");
-
-    await page.getByRole("tab", { name: "Alunos" }).click();
-    await expect(page.getByRole("tab", { name: "Alunos" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
-    await expect(page.getByRole("tabpanel", { name: "Alunos" })).toBeVisible();
+    const nav = await exporNavegacao(page);
+    const series = nav.getByRole("button", { name: "Séries", exact: true });
+    await expect(series).toHaveAttribute("aria-current", "page");
+    await series.focus();
+    await page.keyboard.press("Tab");
+    const turmas = nav.getByRole("button", { name: "Turmas", exact: true });
+    await expect(turmas).toBeFocused();
+    await expect(series).toHaveAttribute("aria-current", "page");
+    await page.keyboard.press("Space");
+    await expect(turmas).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "Turmas", level: 1 })).toBeVisible();
+    await expect(nav).toBeVisible();
   });
 
   test("campo de senha da equipe mostra e oculta", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Equipe" }).click();
+    await selecionarCadastroGestao(page, "Equipe");
     await page.getByRole("button", { name: "Nova conta" }).click();
 
     const campo = page.locator("#senha-usuario");
@@ -148,8 +160,8 @@ test.describe("abas da Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Equipe" }).click();
-    const propria = page.locator(".superficie").filter({ hasText: "Você" });
+    await selecionarCadastroGestao(page, "Equipe");
+    const propria = page.getByRole("row").filter({ hasText: "Você" });
     await propria.getByRole("button", { name: /^Editar conta de / }).click();
 
     const dialogo = page.getByRole("dialog");
@@ -158,39 +170,19 @@ test.describe("abas da Gestão", () => {
     await dialogo.getByRole("button", { name: "Cancelar" }).click();
   });
 
-  test("a seleção vai direto à aba tocada", async ({ page }) => {
+  test("no celular, a seleção final fecha o menu e permanece ao reabrir", async ({ page }) => {
     await page.setViewportSize({ width: 412, height: 915 });
-    await page.goto("/");
+    await page.goto("/?visao=gestao");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Gestão", "gestao");
-
-    await page.getByRole("tab", { name: "Equipe" }).click();
-    await expect(page.getByRole("tab", { name: "Equipe" })).toHaveAttribute(
-      "aria-selected",
-      "true",
+    await selecionarCadastroGestao(page, "Equipe");
+    await expect(page.getByRole("heading", { name: "Equipe", level: 1 })).toBeFocused();
+    const nav = await exporNavegacao(page);
+    await expect(nav.getByRole("button", { name: "Equipe", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
     );
-    const abasGestao = page.getByRole("tablist", { name: "Áreas de gestão" });
-    for (let i = 0; i < 8; i += 1) {
-      const ativa = await abasGestao.getByRole("tab", { selected: true }).textContent();
-      expect(ativa).toBe("Equipe");
-      await page.waitForTimeout(70);
-    }
-  });
-
-  test("a aba de configurações encurta no celular e volta ao nome cheio no desktop", async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width: 412, height: 915 });
-    await page.goto("/");
-    await aguardarHidratacao(page);
-    await trocarVisao(page, "Gestão", "gestao");
-
-    // O nome acessível segue completo, mesmo com o rótulo curto na tela.
-    const aba = page.getByRole("tab", { name: "Configurações" });
-    await expect(aba).toBeVisible();
-    expect(await aba.innerText()).toBe("Config.");
-
-    await page.setViewportSize({ width: 1280, height: 900 });
-    await expect.poll(async () => aba.innerText()).toBe("Configurações");
+    await expect(nav.getByRole("button", { name: "Configurações", exact: true })).toHaveText(
+      "Configurações",
+    );
   });
 });

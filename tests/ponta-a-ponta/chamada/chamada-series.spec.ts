@@ -1,5 +1,6 @@
 // Painel Turmas com séries recolhíveis, progresso e bloqueios de edição.
 // Gestão mantém a seleção de origem recolhível. Dados sintéticos.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaDaSemanaIso, diaSeguinte, rotuloData, rotuloDataCurta } from "@/domain/frequencia";
 import { diaDeChamada } from "../helpers/dia";
@@ -254,7 +255,7 @@ test("Chamada: progresso por série acompanha o salvamento e muda com a data", a
   // Registra os dois temas na largura de cada projeto, sem incluir dados reais.
   for (const tema of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: tema });
-    await expect(page.locator("html")).toHaveClass(tema === "dark" ? /dark/ : /light/);
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
     await testInfo.attach(`Seletores com barras ${tema}`, {
       body: await grupo.screenshot({ animations: "disabled" }),
       contentType: "image/png",
@@ -373,13 +374,13 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await aguardarHidratacao(page);
   await trocarVisao(page, "Chamada", "chamada");
   secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
-  // Aguarda o aviso antes de tocar no cabeçalho; o hover do teste pausa o aviso.
+  // Aguarda o aviso antes de tocar no cabeçalho; o aviso expira sozinho.
   const aviso = page.getByText("Rascunho recuperado. Desbloqueie a chamada, confira e salve.", {
     exact: true,
   });
   await expect(aviso).toBeVisible();
   await page.mouse.move(0, 0);
-  await expect(aviso).toHaveCount(0);
+  await expect(aviso).toHaveCount(0, { timeout: 12_000 });
   grupo = await abrirPrimeiraSerie(secao);
   await expect(turmaA()).toHaveAttribute("data-situacao", "pendente");
   await expect(turmaB()).toHaveAttribute("data-situacao", "concluida");
@@ -395,7 +396,7 @@ test("Chamada: rascunho e conflito deixam somente a turma alterada pendente", as
   await expect(turmaB()).toBeDisabled();
   // O ponteiro sobre o aviso pausa sua duração; aguarda a saída antes do toque.
   await page.mouse.move(0, 0);
-  await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
+  await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0, { timeout: 15_000 });
   await recarregar.evaluate((elemento) => elemento.scrollIntoView({ block: "center" }));
   await recarregar.click();
   await expect(serie()).toHaveAttribute("data-situacao", "concluida");
@@ -491,7 +492,7 @@ test("Gestão: as turmas específicas da origem ficam numa seção recolhível",
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: /Config/ }).click();
+  await abrirConfiguracoesDaGestao(page);
   const secao = page.locator('[data-secao="config-origem-turmas"]');
   const gatilho = secao.getByRole("button", { name: /Turmas específicas/ });
   const caixa = page.getByRole("checkbox", {

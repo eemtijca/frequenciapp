@@ -2,48 +2,48 @@
 
 // Aplicação de BI isolada: chave própria, leituras sob demanda e personalização apenas no navegador.
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ChartNoAxesCombined,
-  ArrowLeft,
-  Download,
-  Upload,
-  Link2,
-  Maximize,
-  Printer,
-  Plus,
-  Copy,
-  Trash2,
-  LoaderCircle,
-  WifiOff,
-  Pencil,
-  MoreHorizontal,
-} from "lucide-react";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CampoSenha } from "@/components/ui/campo-senha";
-import { BotaoAtualizar } from "@/components/ui/botao-atualizar";
-import { AtualizadoEm } from "@/components/ui/atualizado-em";
-import { SeletorTema } from "@/components/ui/seletor-tema";
-import { Selecionar } from "@/components/ui/selecionar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import FullscreenExitRoundedIcon from "@mui/icons-material/FullscreenExitRounded";
+import FullscreenRoundedIcon from "@mui/icons-material/FullscreenRounded";
+import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
+import MoreHorizRoundedIcon from "@mui/icons-material/MoreHorizRounded";
+import PrintRoundedIcon from "@mui/icons-material/PrintRounded";
+import UploadRoundedIcon from "@mui/icons-material/UploadRounded";
+import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
+import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import CircularProgress from "@mui/material/CircularProgress";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Grid from "@mui/material/Grid";
+import Stack from "@mui/material/Stack";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
+import TextField from "@mui/material/TextField";
+import Typography from "@mui/material/Typography";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { AtualizadoEm } from "@/components/ui/mui/atualizado-em";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { BotaoAtualizar } from "@/components/ui/mui/botao-atualizar";
+import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { Campo } from "@/components/ui/mui/campo";
+import { Cartao } from "@/components/ui/mui/cartao";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { Popover } from "@/components/ui/mui/popover";
+import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { SecaoConteudo } from "@/components/layout/secao-conteudo";
+import { GradeCartoes } from "@/components/layout/grade-cartoes";
+import { LayoutConteudo } from "@/components/layout/layout-conteudo";
+import { LayoutPagina } from "@/components/layout/layout-pagina";
+import { Selo } from "@/components/ui/mui/selo";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { SeletorTema } from "@/components/ui/mui/seletor-tema";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
@@ -82,7 +82,6 @@ import { SeletorFiltrosBi } from "./seletor-filtros";
 import { GradePaineisBi } from "./grade-paineis";
 import { TabelaApoioBi } from "./tabela-apoio";
 import { VistaAjudaBi } from "./vista-ajuda";
-import estilos from "./vista-bi.module.css";
 const ABAS = [
   { id: "geral", nome: "Visão geral" },
   { id: "faltas", nome: "Faltas" },
@@ -131,6 +130,10 @@ export default function VistaBi({ fuso }: { fuso: string }) {
   const forcar = useRef(false);
   const [extra, setExtra] = useState<RecursoBi | null>(null);
   const [comparacao, setComparacao] = useState<"nenhuma" | "anterior" | "ano">("nenhuma");
+  const [filtrosGeraisAbertos, setFiltrosGeraisAbertos] = useState(false);
+  const expansorFiltros = useRef<HTMLButtonElement>(null);
+  const [ancoraCabecalho, setAncoraCabecalho] = useState<HTMLElement | null>(null);
+  const [ancoraAcoes, setAncoraAcoes] = useState<HTMLElement | null>(null);
   const [comparativo, setComparativo] = useState<{
     id: string;
     valor: number | null;
@@ -609,871 +612,1147 @@ export default function VistaBi({ fuso }: { fuso: string }) {
         confirmar={confirmarExportacao}
         prepararImpressao={prepararImpressao}
         acoes={
-          <Button
-            size="sm"
-            variant="secondary"
-            className="h-11 print:hidden"
+          <Botao
+            variante="secundario"
+            tamanho="pequeno"
+            sx={{ height: 48, "@media print": { display: "none" } }}
             aria-label={`Personalizar ${g.titulo}`}
+            icone={<EditRoundedIcon />}
             onClick={() => {
               setConfig({ ...g, id: "explorador" });
               trocarAba("explorador");
             }}
           >
-            <Pencil size={15} />
             Personalizar
-          </Button>
+          </Botao>
         }
       />
     );
   };
+  const indicadores: Array<[string, string | number]> = [
+    ["Infrequência", infrequencia === null ? "Sem base de cálculo" : `${numero(infrequencia)}%`],
+    [
+      "Alunos ativos",
+      dados.alunos
+        ? filtrarBi(dados.alunos, {
+            ...filtros,
+            justificativa: "",
+            tipo: "",
+            turno: "",
+          }).filter((l) => l.ativo === true && !l.desistenteEm).length
+        : "Indisponível",
+    ],
+    ["Turmas", dados.turmas ? filtrarBi(dados.turmas, filtrosTurmas).length : "Indisponível"],
+    ["Ausências", numero(metrica("chamadas", "ausencias"))],
+    ["Saídas", numero(metrica("saidas", "registros"))],
+    ["Entradas", numero(metrica("entradas", "registros"))],
+    [
+      "Pendências Seduc",
+      pendencias.every((r) => metrica(r, "pendentes") !== null)
+        ? pendencias.reduce((n, r) => n + (metrica(r, "pendentes") ?? 0), 0)
+        : "Conjuntos indisponíveis",
+    ],
+    ["Dias com chamada", numero(metrica("chamadas", "diasChamada"))],
+    [
+      "Cobertura das turmas",
+      cobertura?.taxa === null || !cobertura ? "Sem base de cálculo" : `${numero(cobertura.taxa)}%`,
+    ],
+  ];
+  const nomeAba = ABAS.find((a) => a.id === aba)?.nome ?? "Visão geral";
   return (
-    <div className={`${estilos.raiz} ${apresentacao ? estilos.apresentacao : ""}`}>
+    <LayoutPagina semGaveta>
       <RegistroPwa />
-      {apresentacao && (
-        <Button className={estilos.sairApresentacao} onClick={() => setApresentacao(false)}>
-          Sair da apresentação
-        </Button>
-      )}
-      <header className={`superficie ${estilos.cabecalho} print:hidden`}>
-        <Link
-          href="/"
-          prefetch={false}
-          aria-label="Voltar ao FrequenciApp"
-          className="discreto focus-visible:ring-ring flex min-h-11 min-w-11 items-center justify-center gap-2 justify-self-start px-3 text-sm focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <ArrowLeft size={18} />
-          <span className="hidden sm:inline">FrequenciApp</span>
-        </Link>
-        <h1 className="flex items-center gap-2 justify-self-center text-lg font-semibold sm:text-xl">
-          <ChartNoAxesCombined size={22} aria-hidden="true" />
-          FrequenciBI
-        </h1>
-        <div className="flex items-center justify-self-end">
-          <div className="hidden items-center gap-1 sm:flex">
-            <SeletorTema variante="ghost" />
-            {acesso && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => {
-                  setChave("");
-                  void esquecer();
-                }}
-              >
-                Esquecer chave
-              </Button>
-            )}
-          </div>
-          <div className="sm:hidden">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="size-11"
-                  aria-label="Mais ações do FrequenciBI"
-                >
-                  <MoreHorizontal size={20} aria-hidden="true" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="end" className="w-60 p-1.5">
-                <div className="flex items-center justify-between gap-2 px-2 py-1.5">
-                  <span className="text-sm font-medium">Tema</span>
-                  <SeletorTema />
-                </div>
-                {acesso && (
-                  <Button
-                    variant="ghost"
-                    className="h-11 w-full justify-start"
-                    onClick={() => {
-                      setChave("");
-                      void esquecer();
-                    }}
-                  >
-                    Esquecer chave
-                  </Button>
-                )}
-              </PopoverContent>
-            </Popover>
-          </div>
-        </div>
-      </header>
-      <main className={estilos.conteudo}>
-        {acesso && (
-          <p className="text-muted-foreground mb-3 text-xs">
-            {ABAS.find((a) => a.id === aba)?.nome} | {dataBr(filtros.inicio)} a{" "}
-            {dataBr(filtros.fim)}
-          </p>
-        )}
-        {!acesso ? (
-          <section className="superficie mx-auto mt-12 w-full max-w-md space-y-5 p-6">
-            <div>
-              <h2 className="text-xl font-semibold">Abrir análises da escola</h2>
-              <p className="text-muted-foreground mt-2 text-sm">
-                Use a chave criada na Gestão. Não é necessário entrar na conta do FrequenciApp.
-              </p>
-            </div>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void entrarAgora();
+      <Box
+        data-apresentacao={apresentacao ? "true" : undefined}
+        sx={{
+          flex: 1,
+          minWidth: 0,
+          ...(apresentacao ? { "& [data-acoes-grafico]": { display: "none !important" } } : {}),
+          "@media print": { minHeight: 0 },
+        }}
+      >
+        <LayoutConteudo largura="larga">
+          {apresentacao && (
+            <Botao
+              variante="secundario"
+              onClick={() => setApresentacao(false)}
+              sx={{
+                position: "fixed",
+                top: "max(8px, env(safe-area-inset-top))",
+                right: "max(8px, env(safe-area-inset-right))",
+                zIndex: 30,
+                "@media print": { display: "none" },
               }}
-              className="space-y-4"
             >
-              <Label htmlFor="chave-bi">Chave de acesso</Label>
-              <CampoSenha
-                id="chave-bi"
-                disabled={!prontoLocal}
-                value={chave}
-                onChange={(e) => setChave(e.target.value)}
-                autoComplete="off"
-                placeholder="Cole a chave recebida"
-                required
+              Sair da apresentação
+            </Botao>
+          )}
+          {!apresentacao && (
+            <Box sx={{ "@media print": { display: "none" } }}>
+              <CabecalhoPagina
+                titulo="FrequenciBI"
+                descricao={
+                  acesso
+                    ? `${nomeAba} | ${dataBr(filtros.inicio)} a ${dataBr(filtros.fim)}`
+                    : "Análises da escola com chave própria, sem entrar na conta do FrequenciApp."
+                }
+                acoes={
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    useFlexGap
+                    sx={{ alignItems: "center", justifyContent: "flex-end", flexWrap: "wrap" }}
+                  >
+                    <Botao
+                      href="/"
+                      variante="texto"
+                      tamanho="pequeno"
+                      sx={{ height: 48 }}
+                      icone={<ArrowBackRoundedIcon />}
+                      aria-label="Voltar ao FrequenciApp"
+                    >
+                      FrequenciApp
+                    </Botao>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ display: { xs: "none", sm: "flex" }, alignItems: "center" }}
+                    >
+                      <Box
+                        sx={{
+                          display: "inline-flex",
+                          "& .MuiIconButton-root": {
+                            backgroundColor: "transparent",
+                            borderColor: "transparent",
+                          },
+                        }}
+                      >
+                        <SeletorTema />
+                      </Box>
+                      {acesso && (
+                        <Botao
+                          variante="texto"
+                          tamanho="pequeno"
+                          sx={{ height: 48 }}
+                          onClick={() => {
+                            setChave("");
+                            void esquecer();
+                          }}
+                        >
+                          Esquecer chave
+                        </Botao>
+                      )}
+                    </Stack>
+                    <Box sx={{ display: { xs: "block", sm: "none" } }}>
+                      <BotaoIcone
+                        rotulo="Mais ações do FrequenciBI"
+                        icone={<MoreHorizRoundedIcon />}
+                        variante="texto"
+                        sx={{ width: 48, height: 48 }}
+                        onClick={(evento) => setAncoraCabecalho(evento.currentTarget)}
+                      />
+                    </Box>
+                  </Stack>
+                }
               />
-              <label className="flex items-start gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={persistirDados}
-                  onChange={(evento) => setPersistirDados(evento.target.checked)}
-                />
-                Guardar chave e consultas para uso offline neste dispositivo
-              </label>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={entrando || fonte.ocupado || !chave.trim()}
+            </Box>
+          )}
+          <Popover
+            aberto={Boolean(ancoraCabecalho)}
+            ancora={ancoraCabecalho}
+            onFechar={() => setAncoraCabecalho(null)}
+            rotuloAcessivel="Mais ações do FrequenciBI"
+            posicao="inferior-fim"
+          >
+            <Stack spacing={2} sx={{ minWidth: 220 }}>
+              <Stack
+                direction="row"
+                sx={{ alignItems: "center", justifyContent: "space-between", gap: 2 }}
               >
-                {entrando || fonte.ocupado ? (
-                  <LoaderCircle className="animate-spin" size={18} />
-                ) : null}
-                Testar e entrar
-              </Button>
-            </form>
-            <p className="text-muted-foreground text-xs">
-              Sem a opção, a consulta fica apenas nesta aba e some ao recarregar. Ao guardar, a
-              chave e os dados pessoais ficam disponíveis neste navegador por até sete dias,
-              inclusive offline. Em dispositivo compartilhado, mantenha desmarcado. Sair do
-              FrequenciApp também remove a chave e as consultas guardadas; bloqueios do navegador
-              podem impedir a remoção.
-            </p>
-            {fonte.erro && (
-              <p role="alert" className="text-falta-texto text-sm">
-                {fonte.erro}
-              </p>
-            )}
-          </section>
-        ) : (
-          <>
-            <div className="mb-4 flex flex-col gap-2 print:hidden">
-              <div className="sm:hidden">
-                <Selecionar
-                  ariaLabel="Seção do FrequenciBI"
-                  value={aba}
-                  onValueChange={(valor) => trocarAba(valor as AbaBi)}
-                  opcoes={ABAS.map((item) => ({ valor: item.id, rotulo: item.nome }))}
-                />
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <nav
-                  aria-label="Seções do FrequenciBI"
-                  className="superficie hidden max-w-full gap-1 overflow-x-auto p-1 sm:flex"
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Tema
+                </Typography>
+                <Box
+                  sx={{
+                    display: "inline-flex",
+                    "& .MuiIconButton-root": {
+                      backgroundColor: "transparent",
+                      borderColor: "transparent",
+                    },
+                  }}
                 >
-                  {ABAS.map((a) => (
-                    <Button
-                      key={a.id}
-                      variant="ghost"
-                      size="sm"
-                      aria-current={aba === a.id ? "page" : undefined}
-                      onClick={() => trocarAba(a.id)}
-                      ref={(el) => {
-                        if (el && aba === a.id) {
-                          const nav = el.parentElement;
-                          if (nav) nav.scrollLeft = el.offsetLeft - nav.offsetLeft - 8;
-                        }
-                      }}
-                      className={`h-11 shrink-0 ${aba === a.id ? "selecionado" : ""}`}
-                    >
-                      {a.nome}
-                    </Button>
-                  ))}
-                </nav>
-                <div className="flex flex-wrap gap-1">
-                  <BotaoAtualizar
-                    onAtualizar={atualizar}
-                    ocupado={carregando || fonte.ocupado}
-                    disponivel
-                    rotulo="Atualizar dados"
-                    variante="outline"
-                    tamanho="sm"
-                    comRotulo
-                  />
-                  <AtualizadoEm instante={ultimaData} fuso={fuso} className="self-center px-1" />
-                  <div className="hidden flex-wrap gap-1 sm:flex">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-11"
-                      onClick={() => void compartilhar()}
-                    >
-                      <Link2 size={15} />
-                      Compartilhar filtros
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-11"
-                      onClick={() => setApresentacao(!apresentacao)}
-                    >
-                      <Maximize size={15} />
-                      {apresentacao ? "Sair da apresentação" : "Apresentar"}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-11"
-                      disabled={carregando || imprimindo}
-                      onClick={() => void imprimir()}
-                    >
-                      <Printer size={15} />
-                      {imprimindo ? "Preparando impressão..." : "Imprimir"}
-                    </Button>
-                  </div>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-11 sm:hidden"
-                        aria-label="Mais ações da análise"
-                      >
-                        <MoreHorizontal size={18} aria-hidden="true" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent align="end" className="w-56 p-1.5">
-                      <Button
-                        variant="ghost"
-                        className="h-11 w-full justify-start"
-                        onClick={() => void compartilhar()}
-                      >
-                        <Link2 size={16} />
-                        Compartilhar filtros
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="h-11 w-full justify-start"
-                        onClick={() => setApresentacao(!apresentacao)}
-                      >
-                        <Maximize size={16} />
-                        {apresentacao ? "Sair da apresentação" : "Apresentar"}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="h-11 w-full justify-start"
-                        disabled={carregando || imprimindo}
-                        onClick={() => void imprimir()}
-                      >
-                        <Printer size={16} />
-                        {imprimindo ? "Preparando impressão..." : "Imprimir"}
-                      </Button>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            </div>
-            <SeletorFiltrosBi
-              fuso={fuso}
-              key={`${aba}-${painel?.id ?? "global"}-${filtros.inicio}-${filtros.fim}`}
-              filtros={filtros}
-              onAlterar={alterarFiltros}
-              dados={dados}
-              completo
-            />
-            <div
-              role="status"
-              className="text-muted-foreground my-3 flex flex-wrap items-center gap-2 text-xs"
-            >
-              {fonte.offline ? (
-                <>
-                  <WifiOff size={15} />
-                  Consulta offline. Uma revogação recente só pode ser conferida com conexão.
-                </>
-              ) : (
-                "Retrato consultado"
+                  <SeletorTema />
+                </Box>
+              </Stack>
+              {acesso && (
+                <Botao
+                  variante="texto"
+                  sx={{ height: 48, justifyContent: "flex-start" }}
+                  onClick={() => {
+                    setChave("");
+                    void esquecer();
+                    setAncoraCabecalho(null);
+                  }}
+                >
+                  Esquecer chave
+                </Botao>
               )}
-              {ultimaData
-                ? new Date(ultimaData).toLocaleString("pt-BR", { timeZone: fuso })
-                : "Ainda sem retrato completo"}
-              {carregando && <span>{fonte.progresso || "Carregando conjuntos..."}</span>}
-            </div>
-            {fonte.erro && (
-              <p
-                role="alert"
-                className="bg-falta-fraca text-falta-texto mb-4 rounded-2xl p-3 text-sm"
-              >
-                {fonte.erro}
-              </p>
-            )}
-            {retratoAtual && retratoAtual.falhas.length > 0 && (
-              <div
-                role="alert"
-                className="bg-falta-fraca text-falta-texto mb-4 rounded-2xl p-3 text-sm"
-              >
-                {retratoAtual.falhas.map((f) => (
-                  <p key={f}>{f}</p>
-                ))}
-              </div>
-            )}
-            {carregando ? (
-              <div role="status" className="flex min-h-40 items-center justify-center gap-3">
-                <LoaderCircle className="animate-spin" />
-                Preparando o recorte
-              </div>
+            </Stack>
+          </Popover>
+          <Stack spacing={2}>
+            {!acesso ? (
+              <Grid container sx={{ justifyContent: "center" }}>
+                <Grid size={{ xs: 12, sm: 8, md: 6, lg: 4 }}>
+                  <Cartao>
+                    <Stack spacing={2}>
+                      <Box>
+                        <Typography component="h2" variant="h5">
+                          Abrir análises da escola
+                        </Typography>
+                        <Typography variant="body2" sx={{ mt: 1, color: "text.secondary" }}>
+                          Use a chave criada na Gestão.
+                        </Typography>
+                      </Box>
+                      <Box
+                        component="form"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          void entrarAgora();
+                        }}
+                      >
+                        <Stack spacing={2}>
+                          <Campo id="chave-bi" rotulo="Chave de acesso">
+                            <CampoSenha
+                              disabled={!prontoLocal}
+                              valor={chave}
+                              onValor={setChave}
+                              rotulosVisibilidade={{
+                                mostrar: "Mostrar chave de acesso",
+                                ocultar: "Ocultar chave de acesso",
+                              }}
+                              autoComplete="off"
+                              placeholder="Cole a chave recebida"
+                              required
+                            />
+                          </Campo>
+                          <FormControlLabel
+                            control={
+                              <Checkbox
+                                checked={persistirDados}
+                                onChange={(evento) => setPersistirDados(evento.target.checked)}
+                              />
+                            }
+                            label="Guardar chave e consultas para uso offline neste dispositivo"
+                            sx={{ alignItems: "flex-start", minHeight: 48, m: 0 }}
+                          />
+                          <Botao
+                            type="submit"
+                            variante="secundario"
+                            sx={{ width: "100%", height: 48 }}
+                            disabled={entrando || fonte.ocupado || !chave.trim()}
+                            carregando={entrando || fonte.ocupado}
+                          >
+                            Testar e entrar
+                          </Botao>
+                        </Stack>
+                      </Box>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        Sem a opção, a consulta fica apenas nesta aba e some ao recarregar. Ao
+                        guardar, a chave e os dados pessoais ficam disponíveis neste navegador por
+                        até sete dias, inclusive offline. Em dispositivo compartilhado, mantenha
+                        desmarcado. Sair do FrequenciApp também remove a chave e as consultas
+                        guardadas; bloqueios do navegador podem impedir a remoção.
+                      </Typography>
+                      {fonte.erro && (
+                        <AlertaCompacto
+                          variante="dados_invalidos"
+                          descricao={fonte.erro}
+                          tamanho="linha"
+                        />
+                      )}
+                    </Stack>
+                  </Cartao>
+                </Grid>
+              </Grid>
             ) : (
               <>
-                {aba === "geral" && (
-                  <>
-                    <section
-                      className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4"
-                      aria-label="Indicadores gerais"
-                    >
-                      {[
-                        [
-                          "Infrequência",
-                          infrequencia === null
-                            ? "Sem base de cálculo"
-                            : `${numero(infrequencia)}%`,
-                        ],
-                        [
-                          "Alunos ativos",
-                          dados.alunos
-                            ? filtrarBi(dados.alunos, {
-                                ...filtros,
-                                justificativa: "",
-                                tipo: "",
-                                turno: "",
-                              }).filter((l) => l.ativo === true && !l.desistenteEm).length
-                            : "Indisponível",
-                        ],
-                        [
-                          "Turmas",
-                          dados.turmas
-                            ? filtrarBi(dados.turmas, filtrosTurmas).length
-                            : "Indisponível",
-                        ],
-                        ["Ausências", numero(metrica("chamadas", "ausencias"))],
-                        ["Saídas", numero(metrica("saidas", "registros"))],
-                        ["Entradas", numero(metrica("entradas", "registros"))],
-                        [
-                          "Pendências Seduc",
-                          pendencias.every((r) => metrica(r, "pendentes") !== null)
-                            ? pendencias.reduce((n, r) => n + (metrica(r, "pendentes") ?? 0), 0)
-                            : "Conjuntos indisponíveis",
-                        ],
-                        ["Dias com chamada", numero(metrica("chamadas", "diasChamada"))],
-                        [
-                          "Cobertura das turmas",
-                          cobertura?.taxa === null || !cobertura
-                            ? "Sem base de cálculo"
-                            : `${numero(cobertura.taxa)}%`,
-                        ],
-                      ].map(([titulo, valor]) => (
-                        <article key={titulo} className="superficie p-4">
-                          <p className="text-muted-foreground text-xs">{titulo}</p>
-                          <strong className="mt-2 block text-xl break-words tabular-nums sm:text-2xl">
-                            {valor}
-                          </strong>
-                        </article>
-                      ))}
-                    </section>
-                    <section className="superficie mb-4 flex flex-wrap items-center gap-3 p-4">
-                      <Label htmlFor="comparacao-bi">Comparar infrequência</Label>
-                      <div className="min-w-48">
-                        <Selecionar
-                          id="comparacao-bi"
-                          value={comparacao}
-                          onValueChange={(v) => setComparacao(v as typeof comparacao)}
-                          opcoes={[
-                            { valor: "nenhuma", rotulo: "Sem comparação" },
-                            { valor: "anterior", rotulo: "Período anterior" },
-                            { valor: "ano", rotulo: "Ano anterior" },
-                          ]}
-                        />
-                      </div>
-                      {comparacao !== "nenhuma" && (
-                        <p className="text-sm">
-                          {comparacaoVisivel
-                            ? (comparacaoVisivel.erro ??
-                              `${comparacaoVisivel.inicio} a ${comparacaoVisivel.fim}: ${comparacaoVisivel.valor === null ? "sem base de cálculo" : `${numero(comparacaoVisivel.valor)}%`}${infrequencia === null || comparacaoVisivel.valor === null ? "" : ` | Variação: ${numero(infrequencia - comparacaoVisivel.valor)} pontos percentuais`}`)
-                            : "Preparando comparação..."}
-                        </p>
-                      )}
-                    </section>
-                  </>
-                )}
-                {["geral", "faltas", "movimentos", "parciais"].includes(aba) && (
-                  <>
-                    <div className="mb-3 flex justify-end print:hidden">
-                      <Button variant="outline" size="sm" onClick={personalizarModelo}>
-                        <Pencil size={15} />
-                        Personalizar este painel
-                      </Button>
-                    </div>
-                    <div className="grid gap-4 lg:grid-cols-2">{curados.map(mostrarGrafico)}</div>
-                  </>
-                )}
-                {aba === "explorador" && (
-                  <div className="space-y-4">
-                    <EditorGraficoBi config={config} onAlterar={setConfig} recursos={recursos} />
-                    <div className="flex flex-wrap gap-2 print:hidden">
-                      <Input
-                        aria-label="Nome da visão salva"
-                        placeholder="Nome da visão"
-                        className="max-w-xs"
-                        value={nomeVisao}
-                        maxLength={100}
-                        onChange={(e) => setNomeVisao(e.target.value)}
+                <Box
+                  sx={{
+                    display: apresentacao ? "none" : undefined,
+                    "@media print": { display: "none" },
+                  }}
+                >
+                  <Stack spacing={2}>
+                    <Box sx={{ display: { xs: "block", sm: "none" } }}>
+                      <Selecionar
+                        ariaLabel="Seção do FrequenciBI"
+                        valor={aba}
+                        onValor={(valor) => trocarAba(valor as AbaBi)}
+                        opcoes={ABAS.map((item) => ({ valor: item.id, rotulo: item.nome }))}
                       />
-                      {visaoAtual && (
-                        <Button onClick={() => guardarVisao(true)}>Atualizar visão</Button>
-                      )}
-                      <Button
-                        variant={visaoAtual ? "outline" : "default"}
-                        onClick={() => guardarVisao()}
+                    </Box>
+                    <Box sx={{ display: { xs: "none", sm: "block" }, minWidth: 0 }}>
+                      <Tabs
+                        value={aba}
+                        onChange={(_evento, valor: unknown) => {
+                          if (typeof valor === "string" && ABAS.some((a) => a.id === valor))
+                            trocarAba(valor as AbaBi);
+                        }}
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        allowScrollButtonsMobile
+                        aria-label="Seções do FrequenciBI"
+                        sx={{
+                          minHeight: 48,
+                          "& .MuiTab-root.Mui-selected": {
+                            backgroundColor: "action.selected",
+                            borderColor: "divider",
+                          },
+                        }}
                       >
-                        {visaoAtual ? "Salvar como nova" : "Salvar visão"}
-                      </Button>
-                      {personalizacao.paineis.length > 0 && (
-                        <div className="w-full min-w-0 sm:w-64">
-                          <Selecionar
-                            ariaLabel="Painel de destino"
-                            value={painel?.id ?? ""}
-                            opcoes={personalizacao.paineis.map((p) => ({
-                              valor: p.id,
-                              rotulo: p.nome,
-                            }))}
-                            onValueChange={(id) =>
-                              setPersonalizacao((p) => ({
-                                ...p,
-                                preferencias: { ...p.preferencias, painelPadrao: id },
-                              }))
-                            }
+                        {ABAS.map((item) => (
+                          <Tab
+                            key={item.id}
+                            value={item.id}
+                            label={item.nome}
+                            aria-current={aba === item.id ? "page" : undefined}
                           />
-                        </div>
-                      )}
-                      <Button
-                        variant="outline"
-                        onClick={painel ? adicionar : () => trocarAba("paineis")}
-                      >
-                        <Plus size={15} />
-                        {painel ? "Adicionar ao painel" : "Criar painel"}
-                      </Button>
-                    </div>
-                    {recursos.includes(config.recurso) ? (
-                      mostrarGrafico(config)
-                    ) : (
-                      <p className="text-muted-foreground text-sm">
-                        Escolha uma base permitida pela chave.
-                      </p>
-                    )}
-                    <section className="superficie p-4">
-                      <h2 className="mb-3 font-semibold">Visões salvas</h2>
-                      {!personalizacao.visoes.length && (
-                        <p className="text-muted-foreground text-sm">Nenhuma visão salva.</p>
-                      )}
-                      <div className="flex flex-wrap gap-2">
-                        {personalizacao.visoes.map((v) => (
-                          <div
-                            key={v.id}
-                            className="controle flex max-w-full min-w-0 items-center gap-1 p-1"
-                          >
-                            <Button
-                              className="h-auto min-h-11 min-w-0 break-words whitespace-normal"
-                              size="sm"
-                              variant={config.id === v.id ? "secondary" : "ghost"}
-                              aria-pressed={config.id === v.id}
-                              onClick={() => {
-                                setConfig(v);
-                                setNomeVisao("");
-                              }}
-                            >
-                              {v.titulo}
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              aria-label={`Excluir visão ${v.titulo}`}
-                              onClick={() =>
-                                confirmarLocal(
-                                  "Excluir visão?",
-                                  "A visão será removida deste navegador. Os gráficos já adicionados aos painéis serão preservados.",
-                                  () =>
-                                    setPersonalizacao((p) => ({
-                                      ...p,
-                                      visoes: p.visoes.filter((g) => g.id !== v.id),
-                                    })),
-                                )
-                              }
-                            >
-                              <Trash2 size={15} />
-                            </Button>
-                          </div>
                         ))}
-                      </div>
-                    </section>
-                  </div>
-                )}
-                {aba === "paineis" && (
-                  <div className="space-y-4">
-                    <section className="superficie flex flex-wrap gap-2 p-4 print:hidden">
-                      <Input
-                        value={nomePainel}
-                        maxLength={100}
-                        aria-label="Nome do novo painel"
-                        placeholder="Nome do painel"
-                        className="max-w-xs"
-                        onChange={(e) => setNomePainel(e.target.value)}
-                      />
-                      <Button
-                        onClick={criarPainel}
-                        disabled={!nomePainel.trim() || personalizacao.paineis.length >= 50}
-                      >
-                        Criar painel
-                      </Button>
-                      {painel && (
-                        <>
-                          <div className="min-w-48">
-                            <Selecionar
-                              ariaLabel="Painel atual"
-                              value={painel.id}
-                              opcoes={personalizacao.paineis.map((p) => ({
-                                valor: p.id,
-                                rotulo: p.nome,
-                              }))}
-                              onValueChange={(id) =>
-                                setPersonalizacao((p) => ({
-                                  ...p,
-                                  preferencias: { ...p.preferencias, painelPadrao: id },
-                                }))
-                              }
-                            />
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => trocarAba("explorador")}
-                          >
-                            <Plus size={15} />
-                            Adicionar gráficos
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            disabled={personalizacao.paineis.length >= 50}
-                            onClick={() => {
-                              const copia = {
-                                ...painel,
-                                id: crypto.randomUUID(),
-                                nome: `${painel.nome.slice(0, 90)} (cópia)`,
-                                graficos: painel.graficos.map((g) => ({
-                                  ...g,
-                                  id: crypto.randomUUID(),
-                                })),
-                              };
-                              setPersonalizacao((p) => ({
-                                ...p,
-                                paineis: [...p.paineis, copia],
-                                preferencias: { ...p.preferencias, painelPadrao: copia.id },
-                              }));
-                            }}
-                          >
-                            <Copy size={15} />
-                            Duplicar painel
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() =>
-                              confirmarLocal(
-                                "Excluir painel?",
-                                "O painel e suas anotações serão removidos deste navegador.",
-                                () =>
-                                  setPersonalizacao((p) => ({
-                                    ...p,
-                                    paineis: p.paineis.filter((v) => v.id !== painel.id),
-                                  })),
-                              )
-                            }
-                          >
-                            <Trash2 size={15} />
-                            Excluir painel
-                          </Button>
-                        </>
-                      )}
-                    </section>
-                    {painel ? (
-                      <>
-                        <div className="flex flex-wrap gap-3">
-                          <Label htmlFor="nome-painel">Nome do painel</Label>
-                          <Input
-                            id="nome-painel"
-                            value={painel.nome}
-                            maxLength={100}
-                            className="max-w-sm"
-                            onChange={(e) => {
-                              if (e.target.value.trim())
-                                alterarPainel({ ...painel, nome: e.target.value });
-                            }}
-                          />
-                        </div>
-                        <GradePaineisBi
-                          painel={painel}
-                          onAlterar={alterarPainel}
-                          recortes={recortes}
-                          prepararImpressao={prepararImpressao}
-                          calcular={calcular}
-                          onFiltrar={filtrarGrafico}
-                          confirmar={confirmarExportacao}
-                          onEditar={(g) => {
-                            setErroEdicao("");
-                            setEditando(g);
-                          }}
+                      </Tabs>
+                    </Box>
+                    <Stack
+                      direction="row"
+                      useFlexGap
+                      spacing={1}
+                      sx={{
+                        alignItems: "center",
+                        justifyContent: "space-between",
+                        flexWrap: "wrap",
+                      }}
+                    >
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+                        <BotaoAtualizar
+                          onAtualizar={atualizar}
+                          ocupado={carregando || fonte.ocupado}
+                          disponivel
+                          rotulo="Atualizar dados"
+                          variante="contorno"
+                          tamanho="pequeno"
                         />
-                        {!painel.graficos.length && (
-                          <p className="text-muted-foreground py-6 text-sm">
-                            Adicione gráficos pelo Explorador.
-                          </p>
-                        )}
-                        <details className="superficie p-4">
-                          <summary className="cursor-pointer text-sm">Anotação do painel</summary>
-                          <textarea
-                            value={painel.anotacao}
-                            maxLength={2000}
-                            aria-label="Anotação do painel"
-                            className="campo mt-3 min-h-20 w-full p-3"
-                            onChange={(e) => alterarPainel({ ...painel, anotacao: e.target.value })}
-                          />
-                        </details>
-                      </>
-                    ) : (
-                      <p className="text-muted-foreground text-sm">
-                        Crie um painel para reunir as análises.
-                      </p>
+                        <AtualizadoEm instante={ultimaData} fuso={fuso} />
+                      </Stack>
+                      <Stack
+                        direction="row"
+                        useFlexGap
+                        spacing={1}
+                        sx={{ display: { xs: "none", sm: "flex" }, flexWrap: "wrap" }}
+                      >
+                        <Botao
+                          variante="texto"
+                          tamanho="pequeno"
+                          sx={{ height: 48 }}
+                          icone={<LinkRoundedIcon />}
+                          onClick={() => void compartilhar()}
+                        >
+                          Compartilhar filtros
+                        </Botao>
+                        <Botao
+                          variante="texto"
+                          tamanho="pequeno"
+                          sx={{ height: 48 }}
+                          icone={
+                            apresentacao ? <FullscreenExitRoundedIcon /> : <FullscreenRoundedIcon />
+                          }
+                          onClick={() => setApresentacao(!apresentacao)}
+                        >
+                          {apresentacao ? "Sair da apresentação" : "Apresentar"}
+                        </Botao>
+                        <Botao
+                          variante="texto"
+                          tamanho="pequeno"
+                          sx={{ height: 48 }}
+                          disabled={carregando || imprimindo}
+                          icone={<PrintRoundedIcon />}
+                          onClick={() => void imprimir()}
+                        >
+                          {imprimindo ? "Preparando impressão..." : "Imprimir"}
+                        </Botao>
+                      </Stack>
+                      <Box sx={{ display: { xs: "block", sm: "none" } }}>
+                        <BotaoIcone
+                          rotulo="Mais ações da análise"
+                          icone={<MoreHorizRoundedIcon />}
+                          variante="texto"
+                          sx={{ width: 48, height: 48 }}
+                          onClick={(evento) => setAncoraAcoes(evento.currentTarget)}
+                        />
+                      </Box>
+                    </Stack>
+                    <Popover
+                      aberto={Boolean(ancoraAcoes)}
+                      ancora={ancoraAcoes}
+                      onFechar={() => setAncoraAcoes(null)}
+                      rotuloAcessivel="Mais ações da análise"
+                      posicao="inferior-fim"
+                    >
+                      <Stack spacing={1} sx={{ minWidth: 220 }}>
+                        <Botao
+                          variante="texto"
+                          sx={{ height: 48, justifyContent: "flex-start" }}
+                          icone={<LinkRoundedIcon />}
+                          onClick={() => {
+                            setAncoraAcoes(null);
+                            void compartilhar();
+                          }}
+                        >
+                          Compartilhar filtros
+                        </Botao>
+                        <Botao
+                          variante="texto"
+                          sx={{ height: 48, justifyContent: "flex-start" }}
+                          icone={<FullscreenRoundedIcon />}
+                          onClick={() => {
+                            setAncoraAcoes(null);
+                            setApresentacao(!apresentacao);
+                          }}
+                        >
+                          Apresentar
+                        </Botao>
+                        <Botao
+                          variante="texto"
+                          sx={{ height: 48, justifyContent: "flex-start" }}
+                          disabled={carregando || imprimindo}
+                          icone={<PrintRoundedIcon />}
+                          onClick={() => {
+                            setAncoraAcoes(null);
+                            void imprimir();
+                          }}
+                        >
+                          {imprimindo ? "Preparando impressão..." : "Imprimir"}
+                        </Botao>
+                      </Stack>
+                    </Popover>
+                    {aba === "geral" && (
+                      <Botao
+                        variante="contorno"
+                        ref={expansorFiltros}
+                        aria-expanded={filtrosGeraisAbertos}
+                        aria-controls="filtros-bi"
+                        onClick={() => setFiltrosGeraisAbertos((abertos) => !abertos)}
+                        sx={{
+                          display: { xs: "inline-flex", sm: "none" },
+                          minHeight: 48,
+                          width: "100%",
+                          justifyContent: "space-between",
+                        }}
+                      >
+                        Filtros da análise
+                        <ExpandMoreRoundedIcon
+                          sx={{ transform: filtrosGeraisAbertos ? "rotate(180deg)" : undefined }}
+                        />
+                      </Botao>
                     )}
-                  </div>
-                )}
-                {aba === "ajuda" && (
-                  <VistaAjudaBi dados={dados} recursos={recursos} onCarregar={setExtra} />
-                )}
-                {extra && dados[extra] && (
-                  <TabelaApoioBi
-                    key={extra}
-                    recurso={extra}
-                    linhas={dados[extra] ?? []}
-                    confirmar={confirmarExportacao}
+                    <Box
+                      id="filtros-bi"
+                      sx={{
+                        display:
+                          aba === "geral" && !filtrosGeraisAbertos
+                            ? { xs: "none", sm: "block" }
+                            : undefined,
+                      }}
+                    >
+                      <SeletorFiltrosBi
+                        fuso={fuso}
+                        key={`${aba}-${painel?.id ?? "global"}-${filtros.inicio}-${filtros.fim}`}
+                        filtros={filtros}
+                        onAlterar={alterarFiltros}
+                        dados={dados}
+                        completo
+                        focoAoOcultarGatilho={
+                          aba === "geral" && !filtrosGeraisAbertos ? expansorFiltros : undefined
+                        }
+                      />
+                    </Box>
+                  </Stack>
+                </Box>
+                <Stack
+                  direction="row"
+                  useFlexGap
+                  spacing={1}
+                  role="status"
+                  sx={{ alignItems: "center", color: "text.secondary", flexWrap: "wrap" }}
+                >
+                  {fonte.offline ? (
+                    <>
+                      <Selo rotulo="Offline" tom="atencao" />
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        <WifiOffRoundedIcon
+                          fontSize="inherit"
+                          aria-hidden="true"
+                          sx={{ verticalAlign: "middle", mr: 0.5 }}
+                        />
+                        Consulta offline. Uma revogação recente só pode ser conferida com conexão.
+                      </Typography>
+                    </>
+                  ) : (
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                      Retrato consultado
+                    </Typography>
+                  )}
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    {ultimaData
+                      ? new Date(ultimaData).toLocaleString("pt-BR", { timeZone: fuso })
+                      : "Ainda sem retrato completo"}
+                  </Typography>
+                  {carregando && (
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                      {fonte.progresso || "Carregando conjuntos..."}
+                    </Typography>
+                  )}
+                </Stack>
+                {fonte.erro && (
+                  <AlertaCompacto
+                    variante="dados_invalidos"
+                    descricao={fonte.erro}
+                    tamanho="linha"
+                    sx={{ mb: 2 }}
                   />
                 )}
-                {destaques.length > 0 && aba !== "ajuda" && (
-                  <details className="superficie mt-4 p-4">
-                    <summary className="cursor-pointer font-semibold">Destaques do recorte</summary>
-                    <ul className="mt-3 space-y-2 text-sm">
-                      {destaques.map((d) => (
-                        <li key={d}>{d}</li>
-                      ))}
-                    </ul>
-                    <p className="text-muted-foreground mt-3 text-xs">
-                      Taxas por turma e destaques de motivos ou horários exigem pelo menos 5
-                      registros. Contagens descrevem somente o recorte consultado.
-                    </p>
-                  </details>
+                {retratoAtual && retratoAtual.falhas.length > 0 && (
+                  <AlertaCompacto
+                    variante="dados_invalidos"
+                    descricao={retratoAtual.falhas.join(" ")}
+                    tamanho="linha"
+                    sx={{ mb: 2 }}
+                  />
+                )}
+                {carregando ? (
+                  <Box
+                    role="status"
+                    sx={{
+                      minHeight: 160,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: 2,
+                    }}
+                  >
+                    <CircularProgress size={24} />
+                    Preparando o recorte
+                  </Box>
+                ) : (
+                  <>
+                    {aba === "geral" && (
+                      <>
+                        <Box component="section" aria-label="Indicadores gerais">
+                          <GradeCartoes>
+                            {indicadores.map(([titulo, valor]) => (
+                              <Cartao key={titulo} component="article" sx={{ height: "100%" }}>
+                                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                                  {titulo}
+                                </Typography>
+                                <Typography
+                                  component="p"
+                                  sx={{
+                                    mt: 1,
+                                    fontWeight: 700,
+                                    fontVariantNumeric: "tabular-nums",
+                                    overflowWrap: "anywhere",
+                                    fontSize: { xs: "1.25rem", sm: "1.5rem" },
+                                  }}
+                                >
+                                  {valor}
+                                </Typography>
+                              </Cartao>
+                            ))}
+                          </GradeCartoes>
+                        </Box>
+                        <SecaoConteudo>
+                          <Stack
+                            direction={{ xs: "column", sm: "row" }}
+                            spacing={2}
+                            sx={{ alignItems: { xs: "stretch", sm: "center" } }}
+                          >
+                            <Box sx={{ minWidth: 0, flex: { sm: "0 0 260px" } }}>
+                              <Campo id="comparacao-bi" rotulo="Comparar infrequência">
+                                <Selecionar
+                                  valor={comparacao}
+                                  onValor={(v) => setComparacao(v as typeof comparacao)}
+                                  opcoes={[
+                                    { valor: "nenhuma", rotulo: "Sem comparação" },
+                                    { valor: "anterior", rotulo: "Período anterior" },
+                                    { valor: "ano", rotulo: "Ano anterior" },
+                                  ]}
+                                />
+                              </Campo>
+                            </Box>
+                            {comparacao !== "nenhuma" && (
+                              <Typography variant="body2">
+                                {comparacaoVisivel
+                                  ? (comparacaoVisivel.erro ??
+                                    `${comparacaoVisivel.inicio} a ${comparacaoVisivel.fim}: ${comparacaoVisivel.valor === null ? "sem base de cálculo" : `${numero(comparacaoVisivel.valor)}%`}${infrequencia === null || comparacaoVisivel.valor === null ? "" : ` | Variação: ${numero(infrequencia - comparacaoVisivel.valor)} pontos percentuais`}`)
+                                  : "Preparando comparação..."}
+                              </Typography>
+                            )}
+                          </Stack>
+                        </SecaoConteudo>
+                      </>
+                    )}
+                    {["geral", "faltas", "movimentos", "parciais"].includes(aba) && (
+                      <>
+                        <Box
+                          sx={{
+                            display: apresentacao ? "none" : "flex",
+                            justifyContent: "flex-end",
+                            "@media print": { display: "none" },
+                          }}
+                        >
+                          <Botao
+                            variante="contorno"
+                            tamanho="pequeno"
+                            sx={{ height: 48 }}
+                            icone={<EditRoundedIcon />}
+                            onClick={personalizarModelo}
+                          >
+                            Personalizar este painel
+                          </Botao>
+                        </Box>
+                        <Grid container spacing={2}>
+                          {curados.map((g) => (
+                            <Grid key={g.id} size={{ xs: 12, lg: 6 }}>
+                              {mostrarGrafico(g)}
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </>
+                    )}
+                    {aba === "explorador" && (
+                      <Stack spacing={2}>
+                        <Box sx={{ display: apresentacao ? "none" : undefined }}>
+                          <EditorGraficoBi
+                            config={config}
+                            onAlterar={setConfig}
+                            recursos={recursos}
+                          />
+                        </Box>
+                        <Stack
+                          direction="row"
+                          useFlexGap
+                          spacing={1}
+                          data-acoes-grafico
+                          sx={{ flexWrap: "wrap", "@media print": { display: "none" } }}
+                        >
+                          <TextField
+                            placeholder="Nome da visão"
+                            value={nomeVisao}
+                            onChange={(e) => setNomeVisao(e.target.value)}
+                            slotProps={{
+                              htmlInput: { "aria-label": "Nome da visão salva", maxLength: 100 },
+                            }}
+                            sx={{ width: { xs: "100%", sm: 280 } }}
+                          />
+                          {visaoAtual && (
+                            <Botao variante="secundario" onClick={() => guardarVisao(true)}>
+                              Atualizar visão
+                            </Botao>
+                          )}
+                          <Botao
+                            variante={visaoAtual ? "contorno" : "secundario"}
+                            onClick={() => guardarVisao()}
+                          >
+                            {visaoAtual ? "Salvar como nova" : "Salvar visão"}
+                          </Botao>
+                          {personalizacao.paineis.length > 0 && (
+                            <Box sx={{ width: { xs: "100%", sm: 256 }, minWidth: 0 }}>
+                              <Selecionar
+                                ariaLabel="Painel de destino"
+                                valor={painel?.id ?? ""}
+                                opcoes={personalizacao.paineis.map((p) => ({
+                                  valor: p.id,
+                                  rotulo: p.nome,
+                                }))}
+                                onValor={(id) =>
+                                  setPersonalizacao((p) => ({
+                                    ...p,
+                                    preferencias: { ...p.preferencias, painelPadrao: id },
+                                  }))
+                                }
+                              />
+                            </Box>
+                          )}
+                          <Botao
+                            variante="contorno"
+                            onClick={painel ? adicionar : () => trocarAba("paineis")}
+                          >
+                            {painel ? "Adicionar ao painel" : "Criar painel"}
+                          </Botao>
+                        </Stack>
+                        {recursos.includes(config.recurso) ? (
+                          mostrarGrafico(config)
+                        ) : (
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                            Escolha uma base permitida pela chave.
+                          </Typography>
+                        )}
+                        <SecaoConteudo titulo="Visões salvas">
+                          {!personalizacao.visoes.length && (
+                            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                              Nenhuma visão salva.
+                            </Typography>
+                          )}
+                          <Stack
+                            direction="row"
+                            useFlexGap
+                            spacing={1}
+                            sx={{ flexWrap: "wrap", minWidth: 0 }}
+                          >
+                            {personalizacao.visoes.map((v) => (
+                              <Stack
+                                key={v.id}
+                                direction="row"
+                                spacing={0.5}
+                                sx={{
+                                  alignItems: "center",
+                                  p: 0.5,
+                                  minWidth: 0,
+                                  maxWidth: "100%",
+                                  border: 1,
+                                  borderColor: "divider",
+                                  borderRadius: 2,
+                                }}
+                              >
+                                <Botao
+                                  variante={config.id === v.id ? "secundario" : "texto"}
+                                  tamanho="pequeno"
+                                  aria-pressed={config.id === v.id}
+                                  onClick={() => {
+                                    setConfig(v);
+                                    setNomeVisao("");
+                                  }}
+                                  sx={{
+                                    height: "auto",
+                                    minHeight: 44,
+                                    minWidth: 0,
+                                    whiteSpace: "normal",
+                                    overflowWrap: "anywhere",
+                                    textAlign: "left",
+                                  }}
+                                >
+                                  {v.titulo}
+                                </Botao>
+                                <BotaoIcone
+                                  rotulo={`Excluir visão ${v.titulo}`}
+                                  icone={<DeleteOutlineRoundedIcon />}
+                                  variante="texto"
+                                  onClick={() =>
+                                    confirmarLocal(
+                                      "Excluir visão?",
+                                      "A visão será removida deste navegador. Os gráficos já adicionados aos painéis serão preservados.",
+                                      () =>
+                                        setPersonalizacao((p) => ({
+                                          ...p,
+                                          visoes: p.visoes.filter((g) => g.id !== v.id),
+                                        })),
+                                    )
+                                  }
+                                />
+                              </Stack>
+                            ))}
+                          </Stack>
+                        </SecaoConteudo>
+                      </Stack>
+                    )}
+                    {aba === "paineis" && (
+                      <Stack spacing={2}>
+                        <Box
+                          sx={{
+                            display: apresentacao ? "none" : undefined,
+                            "@media print": { display: "none" },
+                          }}
+                        >
+                          <SecaoConteudo>
+                            <Stack direction="row" useFlexGap spacing={1} sx={{ flexWrap: "wrap" }}>
+                              <TextField
+                                value={nomePainel}
+                                placeholder="Nome do painel"
+                                onChange={(e) => setNomePainel(e.target.value)}
+                                slotProps={{
+                                  htmlInput: {
+                                    "aria-label": "Nome do novo painel",
+                                    maxLength: 100,
+                                  },
+                                }}
+                                sx={{ width: { xs: "100%", sm: 280 } }}
+                              />
+                              <Botao
+                                variante="secundario"
+                                onClick={criarPainel}
+                                disabled={!nomePainel.trim() || personalizacao.paineis.length >= 50}
+                              >
+                                Criar painel
+                              </Botao>
+                              {painel && (
+                                <>
+                                  <Box sx={{ width: { xs: "100%", sm: 240 }, minWidth: 0 }}>
+                                    <Selecionar
+                                      ariaLabel="Painel atual"
+                                      valor={painel.id}
+                                      opcoes={personalizacao.paineis.map((p) => ({
+                                        valor: p.id,
+                                        rotulo: p.nome,
+                                      }))}
+                                      onValor={(id) =>
+                                        setPersonalizacao((p) => ({
+                                          ...p,
+                                          preferencias: { ...p.preferencias, painelPadrao: id },
+                                        }))
+                                      }
+                                    />
+                                  </Box>
+                                  <Botao
+                                    variante="contorno"
+                                    tamanho="pequeno"
+                                    sx={{ height: 48 }}
+                                    icone={<EditRoundedIcon />}
+                                    onClick={() => trocarAba("explorador")}
+                                  >
+                                    Adicionar gráficos
+                                  </Botao>
+                                  <Botao
+                                    variante="texto"
+                                    tamanho="pequeno"
+                                    sx={{ height: 48 }}
+                                    disabled={personalizacao.paineis.length >= 50}
+                                    icone={<ContentCopyRoundedIcon />}
+                                    onClick={() => {
+                                      const copia = {
+                                        ...painel,
+                                        id: crypto.randomUUID(),
+                                        nome: `${painel.nome.slice(0, 90)} (cópia)`,
+                                        graficos: painel.graficos.map((g) => ({
+                                          ...g,
+                                          id: crypto.randomUUID(),
+                                        })),
+                                      };
+                                      setPersonalizacao((p) => ({
+                                        ...p,
+                                        paineis: [...p.paineis, copia],
+                                        preferencias: {
+                                          ...p.preferencias,
+                                          painelPadrao: copia.id,
+                                        },
+                                      }));
+                                    }}
+                                  >
+                                    Duplicar painel
+                                  </Botao>
+                                  <Botao
+                                    variante="destrutivo"
+                                    tamanho="pequeno"
+                                    sx={{ height: 48 }}
+                                    icone={<DeleteOutlineRoundedIcon />}
+                                    onClick={() =>
+                                      confirmarLocal(
+                                        "Excluir painel?",
+                                        "O painel e suas anotações serão removidos deste navegador.",
+                                        () =>
+                                          setPersonalizacao((p) => ({
+                                            ...p,
+                                            paineis: p.paineis.filter((v) => v.id !== painel.id),
+                                          })),
+                                      )
+                                    }
+                                  >
+                                    Excluir painel
+                                  </Botao>
+                                </>
+                              )}
+                            </Stack>
+                          </SecaoConteudo>
+                        </Box>
+                        {painel ? (
+                          <>
+                            <TextField
+                              label="Nome do painel"
+                              value={painel.nome}
+                              onChange={(e) => {
+                                if (e.target.value.trim())
+                                  alterarPainel({ ...painel, nome: e.target.value });
+                              }}
+                              slotProps={{ htmlInput: { maxLength: 100 } }}
+                              sx={{ width: { xs: "100%", sm: 400 } }}
+                            />
+                            <GradePaineisBi
+                              painel={painel}
+                              onAlterar={alterarPainel}
+                              recortes={recortes}
+                              prepararImpressao={prepararImpressao}
+                              calcular={calcular}
+                              onFiltrar={filtrarGrafico}
+                              confirmar={confirmarExportacao}
+                              onEditar={(g) => {
+                                setErroEdicao("");
+                                setEditando(g);
+                              }}
+                            />
+                            {!painel.graficos.length && (
+                              <Typography variant="body2" sx={{ py: 3, color: "text.secondary" }}>
+                                Adicione gráficos pelo Explorador.
+                              </Typography>
+                            )}
+                            <Acordeao titulo="Anotação do painel">
+                              <TextField
+                                value={painel.anotacao}
+                                multiline
+                                minRows={3}
+                                fullWidth
+                                slotProps={{
+                                  htmlInput: {
+                                    "aria-label": "Anotação do painel",
+                                    maxLength: 2000,
+                                  },
+                                }}
+                                onChange={(e) =>
+                                  alterarPainel({ ...painel, anotacao: e.target.value })
+                                }
+                              />
+                            </Acordeao>
+                          </>
+                        ) : (
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                            Crie um painel para reunir as análises.
+                          </Typography>
+                        )}
+                      </Stack>
+                    )}
+                    {aba === "ajuda" && (
+                      <VistaAjudaBi dados={dados} recursos={recursos} onCarregar={setExtra} />
+                    )}
+                    {extra && dados[extra] && (
+                      <TabelaApoioBi
+                        key={extra}
+                        recurso={extra}
+                        linhas={dados[extra] ?? []}
+                        confirmar={confirmarExportacao}
+                      />
+                    )}
+                    {destaques.length > 0 && aba !== "ajuda" && (
+                      <Acordeao titulo="Destaques do recorte">
+                        <Box component="ul" sx={{ m: 0, pl: 3 }}>
+                          {destaques.map((d) => (
+                            <Typography key={d} component="li" variant="body2" sx={{ mb: 1 }}>
+                              {d}
+                            </Typography>
+                          ))}
+                        </Box>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          Taxas por turma e destaques de motivos ou horários exigem pelo menos 5
+                          registros. Contagens descrevem somente o recorte consultado.
+                        </Typography>
+                      </Acordeao>
+                    )}
+                  </>
+                )}
+                <Box
+                  sx={{
+                    display: apresentacao ? "none" : undefined,
+                    "@media print": { display: "none" },
+                  }}
+                >
+                  <Acordeao titulo="Configurações deste navegador">
+                    <Stack direction="row" useFlexGap spacing={1} sx={{ flexWrap: "wrap" }}>
+                      <Botao
+                        variante="contorno"
+                        tamanho="pequeno"
+                        sx={{ height: 48 }}
+                        icone={<DownloadRoundedIcon />}
+                        onClick={() =>
+                          confirmarExportacao(() =>
+                            baixarBi(
+                              new Blob(
+                                [
+                                  exportarPersonalizacaoBi({
+                                    ...personalizacao,
+                                    preferencias: {
+                                      ...personalizacao.preferencias,
+                                      explorador: ultimaAnaliseValida.current,
+                                    },
+                                  }),
+                                ],
+                                { type: "application/json" },
+                              ),
+                              "frequencibi-configuracoes.json",
+                            ),
+                          )
+                        }
+                      >
+                        Exportar configurações
+                      </Botao>
+                      <Botao
+                        variante="contorno"
+                        tamanho="pequeno"
+                        sx={{ height: 48 }}
+                        icone={<UploadRoundedIcon />}
+                        onClick={() => arquivo.current?.click()}
+                      >
+                        Importar configurações
+                      </Botao>
+                      <input
+                        ref={arquivo}
+                        type="file"
+                        accept="application/json,.json"
+                        hidden
+                        aria-label="Arquivo de configurações"
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) void importar(f);
+                          e.target.value = "";
+                        }}
+                      />
+                      <Botao
+                        variante="texto"
+                        tamanho="pequeno"
+                        sx={{ height: 48 }}
+                        disabled={ocupacaoLocal}
+                        onClick={() =>
+                          confirmarLocal(
+                            "Limpar dados baixados?",
+                            "Os retratos offline serão removidos. A chave e as visões continuam neste navegador.",
+                            async () => {
+                              setOcupacaoLocal(true);
+                              try {
+                                await fonte.limparCache();
+                                setRetrato(null);
+                                setAtualizacao((v) => v + 1);
+                              } finally {
+                                setOcupacaoLocal(false);
+                              }
+                            },
+                          )
+                        }
+                      >
+                        Limpar cache
+                      </Botao>
+                      <Botao
+                        variante="texto"
+                        tamanho="pequeno"
+                        sx={{ height: 48 }}
+                        disabled={ocupacaoLocal}
+                        onClick={() =>
+                          confirmarLocal(
+                            "Limpar tudo neste navegador?",
+                            "Remove a chave, os dados, as visões, as metas e as anotações locais. As informações da escola no servidor são preservadas.",
+                            async () => {
+                              await esquecer();
+                              await limparTudoBi();
+                              setPersonalizacao(personalizacaoVaziaBi());
+                              setConfig(
+                                graficoBi(
+                                  "chamadas",
+                                  "turma",
+                                  "infrequencia",
+                                  "barras",
+                                  "Minha análise",
+                                ),
+                              );
+                              setArmazenar(true);
+                              setRetrato(null);
+                              setChave("");
+                            },
+                          )
+                        }
+                      >
+                        Limpar tudo
+                      </Botao>
+                      <Botao
+                        variante="texto"
+                        tamanho="pequeno"
+                        sx={{ height: 48 }}
+                        disabled={fonte.ocupado}
+                        onClick={() => void entrar(acesso.chave, acesso.persistir)}
+                      >
+                        Conferir chave novamente
+                      </Botao>
+                    </Stack>
+                  </Acordeao>
+                </Box>
+                {(erro || fonte.aviso) && (
+                  <AlertaCompacto
+                    variante="dados_invalidos"
+                    titulo="Não foi possível concluir"
+                    descricao={
+                      <>
+                        {erro && <Typography component="span">{erro}</Typography>}
+                        {fonte.aviso && (
+                          <Typography
+                            component="span"
+                            sx={{ display: "block", mt: erro ? 0.5 : 0 }}
+                          >
+                            {fonte.aviso}
+                          </Typography>
+                        )}
+                      </>
+                    }
+                    tamanho="linha"
+                    acao={{ rotulo: "Dispensar", onClick: () => setErro("") }}
+                    sx={{ mt: 2 }}
+                  />
                 )}
               </>
             )}
-            <details className="superficie mt-4 p-4 print:hidden">
-              <summary className="cursor-pointer text-sm font-medium">
-                Configurações deste navegador
-              </summary>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() =>
-                    confirmarExportacao(() =>
-                      baixarBi(
-                        new Blob(
-                          [
-                            exportarPersonalizacaoBi({
-                              ...personalizacao,
-                              preferencias: {
-                                ...personalizacao.preferencias,
-                                explorador: ultimaAnaliseValida.current,
-                              },
-                            }),
-                          ],
-                          {
-                            type: "application/json",
-                          },
-                        ),
-                        "frequencibi-configuracoes.json",
-                      ),
-                    )
-                  }
-                >
-                  <Download size={15} />
-                  Exportar configurações
-                </Button>
-                <Button size="sm" variant="outline" onClick={() => arquivo.current?.click()}>
-                  <Upload size={15} />
-                  Importar configurações
-                </Button>
-                <input
-                  ref={arquivo}
-                  type="file"
-                  accept="application/json,.json"
-                  className="hidden"
-                  aria-label="Arquivo de configurações"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) void importar(f);
-                    e.target.value = "";
-                  }}
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={ocupacaoLocal}
-                  onClick={() =>
-                    confirmarLocal(
-                      "Limpar dados baixados?",
-                      "Os retratos offline serão removidos. A chave e as visões continuam neste navegador.",
-                      async () => {
-                        setOcupacaoLocal(true);
-                        try {
-                          await fonte.limparCache();
-                          setRetrato(null);
-                          setAtualizacao((v) => v + 1);
-                        } finally {
-                          setOcupacaoLocal(false);
-                        }
-                      },
-                    )
-                  }
-                >
-                  Limpar cache
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={ocupacaoLocal}
-                  onClick={() =>
-                    confirmarLocal(
-                      "Limpar tudo neste navegador?",
-                      "Remove a chave, os dados, as visões, as metas e as anotações locais. As informações da escola no servidor são preservadas.",
-                      async () => {
-                        await esquecer();
-                        await limparTudoBi();
-                        setPersonalizacao(personalizacaoVaziaBi());
-                        setConfig(
-                          graficoBi("chamadas", "turma", "infrequencia", "barras", "Minha análise"),
-                        );
-                        setArmazenar(true);
-                        setRetrato(null);
-                        setChave("");
-                      },
-                    )
-                  }
-                >
-                  Limpar tudo
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={fonte.ocupado}
-                  onClick={() => void entrar(acesso.chave, acesso.persistir)}
-                >
-                  Conferir chave novamente
-                </Button>
-              </div>
-            </details>
+          </Stack>
+        </LayoutConteudo>
+      </Box>
+      <DialogoConfirmacao
+        aberto={Boolean(confirmacao)}
+        titulo={confirmacao?.titulo ?? "Confirmar ação"}
+        descricao={confirmacao?.descricao}
+        onConfirmar={() => void confirmarAgora()}
+        onCancelar={() => {
+          if (!confirmando) setConfirmacao(null);
+        }}
+        rotuloConfirmar={confirmando ? "Preparando..." : "Confirmar"}
+        operacaoEmAndamento={confirmando}
+      />
+      <Dialogo
+        aberto={Boolean(editando)}
+        onFechar={() => setEditando(null)}
+        titulo="Editar análise do painel"
+        descricao="Alterações ficam neste navegador."
+        acoes={
+          <Botao
+            variante="secundario"
+            onClick={() => {
+              const valido = esquemaGraficoBi.safeParse(editando);
+              if (valido.success && painel) {
+                alterarPainel({
+                  ...painel,
+                  graficos: painel.graficos.map((g) => (g.id === editando?.id ? valido.data : g)),
+                });
+                setEditando(null);
+              } else setErroEdicao("Confira o título e os valores da análise antes de salvar.");
+            }}
+          >
+            Salvar análise
+          </Botao>
+        }
+      >
+        {editando && (
+          <>
+            <EditorGraficoBi
+              config={editando}
+              onAlterar={(g) => {
+                setEditando(g);
+                setErroEdicao("");
+              }}
+              recursos={recursos}
+            />
+            {erroEdicao && (
+              <AlertaCompacto variante="dados_invalidos" descricao={erroEdicao} tamanho="linha" />
+            )}
           </>
         )}
-        {(erro || fonte.aviso) && (
-          <div
-            role="alert"
-            className="bg-falta-fraca text-falta-texto mt-4 rounded-2xl p-3 text-sm"
-          >
-            {erro && <p>{erro}</p>}
-            {fonte.aviso && <p>{fonte.aviso}</p>}
-            <Button size="sm" variant="ghost" onClick={() => setErro("")}>
-              Dispensar
-            </Button>
-          </div>
-        )}
-      </main>
-      <AlertDialog
-        open={Boolean(confirmacao)}
-        onOpenChange={(aberto) => {
-          if (!aberto && !confirmando) setConfirmacao(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{confirmacao?.titulo}</AlertDialogTitle>
-            <AlertDialogDescription>{confirmacao?.descricao}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={confirmando}>Cancelar</AlertDialogCancel>
-            <Button disabled={confirmando} onClick={() => void confirmarAgora()}>
-              {confirmando ? "Preparando..." : "Confirmar"}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <Dialog
-        open={Boolean(editando)}
-        onOpenChange={(aberto) => {
-          if (!aberto) setEditando(null);
-        }}
-      >
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Editar análise do painel</DialogTitle>
-            <DialogDescription>Alterações ficam neste navegador.</DialogDescription>
-          </DialogHeader>
-          {editando && (
-            <>
-              <EditorGraficoBi
-                config={editando}
-                onAlterar={(g) => {
-                  setEditando(g);
-                  setErroEdicao("");
-                }}
-                recursos={recursos}
-              />
-              {erroEdicao && (
-                <p role="alert" className="text-falta-texto text-sm">
-                  {erroEdicao}
-                </p>
-              )}
-              <Button
-                onClick={() => {
-                  const valido = esquemaGraficoBi.safeParse(editando);
-                  if (valido.success && painel) {
-                    alterarPainel({
-                      ...painel,
-                      graficos: painel.graficos.map((g) =>
-                        g.id === editando.id ? valido.data : g,
-                      ),
-                    });
-                    setEditando(null);
-                  } else setErroEdicao("Confira o título e os valores da análise antes de salvar.");
-                }}
-              >
-                Salvar análise
-              </Button>
-            </>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
+      </Dialogo>
+    </LayoutPagina>
   );
 }

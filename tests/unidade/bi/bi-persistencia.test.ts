@@ -78,7 +78,7 @@ function reconferirPeloBotao(contexto: Record<string, unknown>): () => void {
   function visitar(no: ts.Node) {
     if (
       ts.isJsxElement(no) &&
-      no.openingElement.tagName.getText(fonte) === "Button" &&
+      no.openingElement.tagName.getText(fonte) === "Botao" &&
       no.children.some(
         (filho) => ts.isJsxText(filho) && filho.text.trim() === "Conferir chave novamente",
       )

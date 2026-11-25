@@ -79,7 +79,7 @@ test("o cabeçalho do resumo cabe no celular sem cortar o selo", async ({ page }
   await escolherDomingo(page, "#dia-painel", domingo);
 
   const resumo = page.getByRole("region", { name: "Resumo da semana", exact: true });
-  await expect(resumo).toHaveClass(/superficie/);
+  await expect(resumo).toBeVisible();
   const cabecalho = resumo.locator("header");
   const selo = cabecalho.getByText("Somente leitura", { exact: true });
   await expect(selo).toBeVisible();

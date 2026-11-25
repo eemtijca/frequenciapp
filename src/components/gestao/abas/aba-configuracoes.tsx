@@ -2,39 +2,28 @@
 
 // Configurações da escola em um único rascunho: recursos, catálogos, avisos,
 // acesso, almoço, calendário e chaves do BI são revisados e gravados em lote.
-import { useEffect, useRef, useState } from "react";
-import {
-  Archive,
-  Bell,
-  CalendarClock,
-  CalendarDays,
-  ChartNoAxesCombined,
-  ClipboardList,
-  HelpCircle,
-  Utensils,
-  Check,
-  Clock,
-  Download,
-  FileSpreadsheet,
-  LoaderCircle,
-  Pencil,
-  Plus,
-  RotateCcw,
-  Save,
-  ScrollText,
-  Settings2,
-  ShieldCheck,
-  Trash2,
-  Upload,
-  UserCheck,
-  Users,
-  X,
-} from "lucide-react";
-import { toast } from "sonner";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
+import FileUploadRoundedIcon from "@mui/icons-material/FileUploadRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
+import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import CircularProgress from "@mui/material/CircularProgress";
+import Divider from "@mui/material/Divider";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Switch from "@mui/material/Switch";
+import Typography from "@mui/material/Typography";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { avisarBeneficiosMudaram } from "@/lib/eventos-beneficios";
 import { avisarOrdemAlmocoMudou } from "@/lib/eventos-ordem-almoco";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import {
   ordenarPorRotulo,
   type Configuracoes,
@@ -50,15 +39,20 @@ import type {
 } from "@/domain/configuracoes";
 import { DIAS_ORDEM_ALMOCO } from "@/domain/ordem-almoco";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { PainelAcoes } from "@/components/ui/painel-acoes";
-import { Button } from "@/components/ui/button";
-import { CampoSenha } from "@/components/ui/campo-senha";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Selo } from "@/components/ui/selo";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
+import { PaineisVisitados } from "@/components/gestao/paineis-visitados";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { Interruptor } from "@/components/ui/mui/interruptor";
+import { Selo } from "@/components/ui/mui/selo";
 import DialogoDownload from "@/components/conta/dialogo-download";
+import { categoriaDe, type DestinoConfiguracoes } from "@/components/gestao/destinos-gestao";
+import SecaoCatalogo from "@/components/gestao/configuracoes/secao-catalogo";
+import SecaoConfiguracao from "../configuracoes/secao-configuracao";
 import SecaoChavesBi from "@/components/gestao/configuracoes/secao-chaves-bi";
 import SecaoAcessoDiretores from "@/components/gestao/configuracoes/secao-acesso-diretores";
 import SecaoNotificacoes from "@/components/gestao/configuracoes/secao-notificacoes";
@@ -72,31 +66,14 @@ import SecaoInfrequencia from "@/components/gestao/configuracoes/secao-infrequen
 import VistaHorarios from "@/components/horarios/vista-horarios";
 import SecaoProvasBimestrais from "@/components/horarios/secao-provas-bimestrais";
 import SecaoOrdemAlmoco from "@/components/gestao/configuracoes/secao-ordem-almoco";
+import { ESPACO_COMPOSICAO, TOKENS_LAYOUT } from "@/theme/layout";
 import {
   ProvedorRascunhoConfiguracoes,
   useRascunhoConfiguracoes,
 } from "@/components/gestao/configuracoes/rascunho-configuracoes";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface Props {
+  destino: DestinoConfiguracoes;
   planilhaInicial?: "FREQUENCIA" | "SAIDAS" | "PARCIAL";
   configuracoes: Configuracoes;
   justificativas: JustificativaConfigurada[];
@@ -124,14 +101,6 @@ interface ResultadoImportacao {
 }
 
 const LIMITE_ARQUIVO = 25 * 1024 * 1024;
-const CATEGORIAS = [
-  { valor: "escola", rotulo: "Escola", icone: Settings2 },
-  { valor: "horarios", rotulo: "Horários", icone: Clock },
-  { valor: "planilhas", rotulo: "Planilhas", icone: FileSpreadsheet },
-  { valor: "acesso", rotulo: "Acesso e avisos", icone: ShieldCheck },
-  { valor: "dados", rotulo: "Dados", icone: Archive },
-] as const;
-type Categoria = (typeof CATEGORIAS)[number]["valor"];
 
 const CODIGO_JUSTIFICATIVA = /^[A-Za-z][A-Za-z0-9]*$/;
 
@@ -156,6 +125,8 @@ function contagem(n: number, singular: string, plural: string): string {
   return `${n} ${n === 1 ? singular : plural}`;
 }
 
+const ESTILO_CAMPO_CODIGO = { minWidth: 0, width: { xs: "100%", sm: 128 } } as const;
+
 export default function AbaConfiguracoes(props: Props) {
   return (
     <ProvedorRascunhoConfiguracoes>
@@ -165,6 +136,7 @@ export default function AbaConfiguracoes(props: Props) {
 }
 
 function ConteudoConfiguracoes({
+  destino,
   planilhaInicial,
   series,
   turmas,
@@ -206,19 +178,12 @@ function ConteudoConfiguracoes({
     mutarChaves,
   } = useRascunhoConfiguracoes();
 
-  const [acaoEscola, setAcaoEscola] = useState("geral");
-  const [acaoHorarios, setAcaoHorarios] = useState("aulas");
-  const [acaoAcesso, setAcaoAcesso] = useState("diretores");
-  const [categoria, setCategoria] = useState<Categoria>(planilhaInicial ? "planilhas" : "escola");
-  // O editor de horários só monta na primeira visita e depois mantém o rascunho ao trocar de categoria.
-  const [horariosAbertos, setHorariosAbertos] = useState(false);
+  const categoria = categoriaDe(destino);
   const [abertoRecursos, setAbertoRecursos] = useState(true);
-  const [abertoJustificativas, setAbertoJustificativas] = useState(false);
-  const [abertoLiberadores, setAbertoLiberadores] = useState(false);
-  const [abertoCopia, setAbertoCopia] = useState(false);
   const [abertoTurmasOrigem, setAbertoTurmasOrigem] = useState(false);
   const [confirmarSalvar, setConfirmarSalvar] = useState(false);
   const [confirmarDescartar, setConfirmarDescartar] = useState(false);
+  const [confirmarImportacao, setConfirmarImportacao] = useState(false);
   const [senhaBi, setSenhaBi] = useState("");
   const [segredosBi, setSegredosBi] = useState<ResultadoLote["segredosBi"]>([]);
   const [downloadAberto, setDownloadAberto] = useState(false);
@@ -226,6 +191,58 @@ function ConteudoConfiguracoes({
   const [erroCopia, setErroCopia] = useState("");
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const arquivoRef = useRef<HTMLInputElement | null>(null);
+  const rodapeRef = useRef<HTMLDivElement>(null);
+  const paineisRef = useRef<HTMLDivElement>(null);
+
+  function desobstruirFoco(controle: HTMLElement, barra: HTMLElement) {
+    if (controle.closest('[role="dialog"], [role="alertdialog"]')) return;
+    const rodape = barra.getBoundingClientRect();
+    const alvo = controle.getBoundingClientRect();
+    if (
+      rodape.height > 0 &&
+      alvo.bottom + 5 > rodape.top &&
+      alvo.top - 5 < rodape.bottom &&
+      alvo.right > rodape.left &&
+      alvo.left < rodape.right
+    ) {
+      controle.scrollIntoView({ block: "center", inline: "nearest" });
+    }
+  }
+
+  useLayoutEffect(() => {
+    if (!alterado || !rodapeRef.current) return;
+    const barra = rodapeRef.current;
+    const alturaRodape = "--altura-rodape-configuracoes";
+    function atualizarRodape() {
+      // Os avisos ficam no body. Um painel oculto não deve reservar espaço.
+      const altura = barra.getBoundingClientRect().height;
+      if (altura > 0) {
+        document.body.style.setProperty(alturaRodape, `${Math.ceil(altura)}px`);
+      } else {
+        document.body.style.removeProperty(alturaRodape);
+      }
+      const foco = document.activeElement;
+      if (foco instanceof HTMLElement && paineisRef.current?.contains(foco)) {
+        desobstruirFoco(foco, barra);
+      }
+    }
+    // O primeiro rascunho pode criar a barra sem que o controle perca o foco.
+    atualizarRodape();
+    const observador = new ResizeObserver(atualizarRodape);
+    observador.observe(barra, { box: "border-box" });
+    return () => {
+      observador.disconnect();
+      document.body.style.removeProperty(alturaRodape);
+    };
+  }, [alterado]);
+
+  function focarCategoriaSemRascunho() {
+    if (!rodapeRef.current && document.activeElement === document.body) {
+      paineisRef.current
+        ?.querySelector<HTMLElement>(`#config-grupo-${categoria.valor}-titulo`)
+        ?.focus();
+    }
+  }
 
   const [novaCodigo, setNovaCodigo] = useState("");
   const [novaRotulo, setNovaRotulo] = useState("");
@@ -262,21 +279,39 @@ function ConteudoConfiguracoes({
 
   if (!rascunhoCarregado || !baseCarregada) {
     return (
-      <div className="superficie flex min-h-40 flex-col items-center justify-center gap-3 p-6 text-center">
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 2,
+          minHeight: 160,
+          padding: 3,
+          textAlign: "center",
+          border: 1,
+          borderColor: "divider",
+          borderRadius: 2,
+        }}
+      >
         {carregando ? (
           <>
-            <LoaderCircle size={20} className="animate-spin" aria-hidden="true" />
-            <p className="text-muted-foreground text-sm">Carregando configurações...</p>
+            <CircularProgress size={24} aria-label="Carregando configurações" />
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Carregando configurações...
+            </Typography>
           </>
         ) : (
           <>
-            <p className="text-sm">{erro || "Não foi possível carregar as configurações."}</p>
-            <Button type="button" variant="outline" onClick={() => void recarregar()}>
+            <Typography variant="body2">
+              {erro || "Não foi possível carregar as configurações."}
+            </Typography>
+            <Botao type="button" variante="contorno" onClick={() => void recarregar()}>
               Tentar novamente
-            </Button>
+            </Botao>
           </>
         )}
-      </div>
+      </Box>
     );
   }
 
@@ -421,7 +456,9 @@ function ConteudoConfiguracoes({
 
   async function concluirSalvamento() {
     if (precisaSenhaBi && senhaBi.trim() === "") {
-      toast.error("Informe a senha do administrador para alterar as chaves do BI.");
+      avisarErro(new Error("Informe a senha do administrador para alterar as chaves do BI."), {
+        contexto: "Informe a senha do administrador para alterar as chaves do BI.",
+      });
       return;
     }
     try {
@@ -460,7 +497,6 @@ function ConteudoConfiguracoes({
     setImportando(true);
     setErroCopia("");
     setResultado(null);
-    toast.loading("Importando a cópia de segurança...", { id: aviso });
     try {
       if (arquivo.size > LIMITE_ARQUIVO) {
         throw new Error("A cópia é muito grande. Use um arquivo de até 25 MB.");
@@ -477,10 +513,10 @@ function ConteudoConfiguracoes({
     } catch (excecao) {
       const mensagem = excecao instanceof ErroApi ? excecao.message : (excecao as Error).message;
       setErroCopia(mensagem);
-      toast.error(mensagem, {
+      avisarErro(excecao, {
+        contexto: mensagem,
+        descricao: "Confira o arquivo e tente de novo.",
         id: aviso,
-        description: "Confira o arquivo e tente de novo.",
-        duration: 8000,
       });
     } finally {
       setImportando(false);
@@ -624,160 +660,213 @@ function ConteudoConfiguracoes({
   }
 
   const recursos = (
-    <>
-      <SecaoRecolhivel
-        dataSecao="config-recursos"
+    <Stack data-secao="config-recursos" spacing={2}>
+      <Acordeao
         titulo="Recursos da escola"
-        icone={Settings2}
+        resumo={<Selo>Chamada, saídas e origem</Selo>}
         aberto={abertoRecursos}
-        onAbertoChange={setAbertoRecursos}
+        onChange={setAbertoRecursos}
       >
-        <div className="superficie flex items-center justify-between gap-4 p-3">
-          <div className="min-w-0">
-            <Label htmlFor="config-frequencia-aula">Chamada por aula</Label>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              {atual.configuracoes.frequenciaPorAula ? "Por aula" : "Diária"}
-            </p>
-          </div>
-          <Switch
-            id="config-frequencia-aula"
-            checked={atual.configuracoes.frequenciaPorAula}
-            disabled={salvando}
-            onCheckedChange={(valor) => alternar("frequenciaPorAula", valor)}
-          />
-        </div>
-
-        <div className="superficie flex items-center justify-between gap-4 p-3">
-          <div className="min-w-0">
-            <Label htmlFor="config-saida-antecipada">Saídas e Entradas</Label>
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              {atual.configuracoes.saidaAntecipada ? "Área disponível" : "Área oculta"}
-            </p>
-          </div>
-          <Switch
-            id="config-saida-antecipada"
-            checked={atual.configuracoes.saidaAntecipada}
-            disabled={salvando}
-            onCheckedChange={(valor) => alternar("saidaAntecipada", valor)}
-          />
-        </div>
-
-        <div
-          className="superficie flex flex-col gap-3 p-3"
-          role="group"
-          aria-label="Turma de origem na Chamada"
+        <Box
+          role="region"
+          aria-label="Recursos da escola"
+          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
         >
-          <div className="superficie flex items-center justify-between gap-4 p-3">
-            <div className="min-w-0">
-              <Label htmlFor="config-origem-chamada">Turma de origem na Chamada</Label>
-            </div>
-            <Switch
+          <Box
+            sx={{
+              padding: 2,
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+            }}
+          >
+            <Interruptor
+              id="config-frequencia-aula"
+              rotulo="Chamada por aula"
+              descricao={atual.configuracoes.frequenciaPorAula ? "Por aula" : "Diária"}
+              checked={atual.configuracoes.frequenciaPorAula}
+              disabled={salvando}
+              onChange={(valor) => alternar("frequenciaPorAula", valor)}
+            />
+          </Box>
+
+          <Box
+            sx={{
+              padding: 2,
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+            }}
+          >
+            <Interruptor
+              id="config-saida-antecipada"
+              rotulo="Saídas e Entradas"
+              descricao={atual.configuracoes.saidaAntecipada ? "Área disponível" : "Área oculta"}
+              checked={atual.configuracoes.saidaAntecipada}
+              disabled={salvando}
+              onChange={(valor) => alternar("saidaAntecipada", valor)}
+            />
+          </Box>
+
+          <Box
+            role="group"
+            aria-label="Turma de origem na Chamada"
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              padding: 2,
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+            }}
+          >
+            <Interruptor
               id="config-origem-chamada"
+              rotulo="Turma de origem na Chamada"
               checked={atual.configuracoes.origemNaChamada}
               disabled={salvando}
-              onCheckedChange={(valor) => salvarOrigem({ origemNaChamada: valor })}
+              onChange={(valor) => salvarOrigem({ origemNaChamada: valor })}
             />
-          </div>
-          {atual.configuracoes.origemNaChamada && (
-            <>
-              <fieldset disabled={salvando} className="flex flex-col gap-2">
-                <legend className="mb-1 text-sm font-medium">Séries completas</legend>
-                <p className="text-muted-foreground text-xs">Inclui as turmas atuais e futuras.</p>
-                {series.map((serie) => (
-                  <label
-                    key={serie.id}
-                    className="faixa-toque bg-secondary/40 flex items-center gap-3 rounded-lg px-3 py-2 text-sm"
-                  >
-                    <input
-                      type="checkbox"
-                      className="accent-primary size-4 shrink-0"
-                      aria-label={`Mostrar origem na série ${serie.nome}`}
-                      checked={atual.configuracoes.origemNaChamadaSerieIds.includes(serie.id)}
-                      onChange={(evento) =>
-                        void salvarOrigem({
-                          origemNaChamadaSerieIds: selecaoAlterada(
-                            atual.configuracoes.origemNaChamadaSerieIds,
-                            serie.id,
-                            evento.target.checked,
-                          ),
-                        })
-                      }
-                    />
-                    {serie.nome}
-                  </label>
-                ))}
-              </fieldset>
-              <SecaoRecolhivel
-                dataSecao="config-origem-turmas"
-                nivel="interna"
-                titulo="Turmas específicas"
-                icone={Users}
-                aberto={abertoTurmasOrigem}
-                onAbertoChange={setAbertoTurmasOrigem}
-                resumo={
-                  <Selo
-                    variante={
-                      atual.configuracoes.origemNaChamadaTurmaIds.length > 0 ? "sucesso" : "neutro"
-                    }
-                  >
-                    {atual.configuracoes.origemNaChamadaTurmaIds.length === 0
-                      ? "Nenhuma"
-                      : `${atual.configuracoes.origemNaChamadaTurmaIds.length} selecionada${
-                          atual.configuracoes.origemNaChamadaTurmaIds.length === 1 ? "" : "s"
-                        }`}
-                  </Selo>
-                }
-              >
-                <fieldset disabled={salvando} className="flex flex-col gap-2">
-                  <legend className="sr-only">Turmas específicas</legend>
-                  {turmas.map((item) => (
-                    <label
-                      key={item.id}
-                      className="faixa-toque bg-secondary/40 flex items-center gap-3 rounded-lg px-3 py-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        className="accent-primary size-4 shrink-0"
-                        aria-label={`Mostrar origem na turma ${item.rotulo}`}
-                        checked={atual.configuracoes.origemNaChamadaTurmaIds.includes(item.id)}
-                        onChange={(evento) =>
-                          void salvarOrigem({
-                            origemNaChamadaTurmaIds: selecaoAlterada(
-                              atual.configuracoes.origemNaChamadaTurmaIds,
-                              item.id,
-                              evento.target.checked,
-                            ),
-                          })
+            {atual.configuracoes.origemNaChamada ? (
+              <>
+                <Box component="fieldset" sx={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+                  <Typography component="legend" variant="subtitle2" sx={{ marginBottom: 0.5 }}>
+                    Séries completas
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Inclui as turmas atuais e futuras.
+                  </Typography>
+                  <Box sx={{ display: "flex", flexDirection: "column", marginTop: 1 }}>
+                    {series.map((serie) => (
+                      <FormControlLabel
+                        key={serie.id}
+                        control={
+                          <Checkbox
+                            checked={atual.configuracoes.origemNaChamadaSerieIds.includes(serie.id)}
+                            disabled={salvando}
+                            onChange={(evento) =>
+                              void salvarOrigem({
+                                origemNaChamadaSerieIds: selecaoAlterada(
+                                  atual.configuracoes.origemNaChamadaSerieIds,
+                                  serie.id,
+                                  evento.target.checked,
+                                ),
+                              })
+                            }
+                            slotProps={{
+                              input: {
+                                "aria-label": `Mostrar origem na série ${serie.nome}`,
+                              },
+                            }}
+                          />
                         }
+                        label={serie.nome}
+                        sx={(tema) => ({
+                          minHeight: 48,
+                          margin: 0,
+                          paddingX: 1,
+                          borderRadius: 2,
+                          backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 4%, transparent)`,
+                        })}
                       />
-                      {item.rotulo}
-                    </label>
-                  ))}
-                </fieldset>
-              </SecaoRecolhivel>
-              {atual.configuracoes.origemNaChamadaSerieIds.length === 0 &&
-                atual.configuracoes.origemNaChamadaTurmaIds.length === 0 && (
-                  <p className="text-muted-foreground text-xs">
+                    ))}
+                  </Box>
+                </Box>
+                <Box data-secao="config-origem-turmas">
+                  <Acordeao
+                    titulo="Turmas específicas"
+                    nivelTitulo="h4"
+                    resumo={
+                      <Selo
+                        tom={
+                          atual.configuracoes.origemNaChamadaTurmaIds.length > 0
+                            ? "sucesso"
+                            : "neutro"
+                        }
+                      >
+                        {atual.configuracoes.origemNaChamadaTurmaIds.length === 0
+                          ? "Nenhuma"
+                          : `${atual.configuracoes.origemNaChamadaTurmaIds.length} selecionada${
+                              atual.configuracoes.origemNaChamadaTurmaIds.length === 1 ? "" : "s"
+                            }`}
+                      </Selo>
+                    }
+                    aberto={abertoTurmasOrigem}
+                    onChange={setAbertoTurmasOrigem}
+                  >
+                    {abertoTurmasOrigem ? (
+                      <Box
+                        component="fieldset"
+                        sx={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}
+                      >
+                        <Typography component="legend" sx={ESTILO_SOMENTE_LEITOR}>
+                          Turmas específicas
+                        </Typography>
+                        <Box sx={{ display: "flex", flexDirection: "column" }}>
+                          {turmas.map((item) => (
+                            <FormControlLabel
+                              key={item.id}
+                              control={
+                                <Checkbox
+                                  checked={atual.configuracoes.origemNaChamadaTurmaIds.includes(
+                                    item.id,
+                                  )}
+                                  disabled={salvando}
+                                  onChange={(evento) =>
+                                    void salvarOrigem({
+                                      origemNaChamadaTurmaIds: selecaoAlterada(
+                                        atual.configuracoes.origemNaChamadaTurmaIds,
+                                        item.id,
+                                        evento.target.checked,
+                                      ),
+                                    })
+                                  }
+                                  slotProps={{
+                                    input: {
+                                      "aria-label": `Mostrar origem na turma ${item.rotulo}`,
+                                    },
+                                  }}
+                                />
+                              }
+                              label={item.rotulo}
+                              sx={(tema) => ({
+                                minHeight: 48,
+                                margin: 0,
+                                paddingX: 1,
+                                borderRadius: 2,
+                                backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 4%, transparent)`,
+                              })}
+                            />
+                          ))}
+                        </Box>
+                      </Box>
+                    ) : null}
+                  </Acordeao>
+                </Box>
+                {atual.configuracoes.origemNaChamadaSerieIds.length === 0 &&
+                atual.configuracoes.origemNaChamadaTurmaIds.length === 0 ? (
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
                     Nenhuma série ou turma selecionada.
-                  </p>
-                )}
-            </>
-          )}
-        </div>
-      </SecaoRecolhivel>
-    </>
+                  </Typography>
+                ) : null}
+              </>
+            ) : null}
+          </Box>
+        </Box>
+      </Acordeao>
+    </Stack>
   );
 
   const frequencia = (
-    <>
+    <Stack spacing={2}>
       <SecaoInfrequencia configuracoes={atual.configuracoes} onMudar={mutarConfiguracoes} />
-
       <SecaoBeneficiosFrequencia beneficios={atual.beneficios} onMudar={mutarBeneficios} />
-    </>
+    </Stack>
   );
 
   const calendario = (
-    <>
+    <Stack spacing={2}>
       <SecaoCalendarioLetivo
         feriados={atual.feriados}
         diaCorrente={diaCorrente}
@@ -788,456 +877,504 @@ function ConteudoConfiguracoes({
           aplicarFeriadosExternos(dados);
         }}
       />
-    </>
+    </Stack>
   );
 
   const cadastros = (
-    <>
-      <SecaoRecolhivel
-        dataSecao="config-justificativas"
+    <Stack spacing={3}>
+      <Typography variant="body2" color="text.secondary">
+        As mudanças dos cadastros entram no rascunho e só valem depois de salvar as configurações.
+      </Typography>
+      <SecaoCatalogo
+        id="config-justificativas"
         titulo="Justificativas"
-        icone={ScrollText}
-        aberto={abertoJustificativas}
-        onAbertoChange={setAbertoJustificativas}
-        resumo={
-          <>
-            <Selo>{atual.justificativas.filter((item) => item.ativo).length} ativas</Selo>
-          </>
-        }
-      >
-        <details className="bg-secondary/30 rounded-xl p-3">
-          <summary className="text-primary flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
-            <Plus size={18} aria-hidden="true" />
-            Adicionar justificativa
-          </summary>
-          <div className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
-            <div className="flex flex-col gap-1.5 sm:w-32">
-              <Label htmlFor="justificativa-codigo">Código</Label>
-              <Input
-                id="justificativa-codigo"
-                value={novaCodigo}
-                maxLength={10}
-                autoComplete="off"
-                onChange={(evento) => setNovaCodigo(evento.target.value)}
-                placeholder="Ex.: At"
-                className="h-11"
-              />
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <Label htmlFor="justificativa-rotulo">Rótulo</Label>
-              <Input
-                id="justificativa-rotulo"
-                value={novaRotulo}
-                maxLength={60}
-                autoComplete="off"
-                onChange={(evento) => setNovaRotulo(evento.target.value)}
-                placeholder="Ex.: Atestado"
-                className="h-11"
-              />
-            </div>
-            <Button
+        resumo={contagem(
+          atual.justificativas.filter((item) => item.ativo).length,
+          "ativa",
+          "ativas",
+        )}
+        acao="Adicionar justificativa"
+        editor={
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              alignItems: { sm: "flex-end" },
+              gap: 2,
+            }}
+          >
+            <Box sx={ESTILO_CAMPO_CODIGO}>
+              <Campo id="justificativa-codigo" rotulo="Código">
+                <CampoTexto
+                  id="justificativa-codigo"
+                  valor={novaCodigo}
+                  onValor={setNovaCodigo}
+                  maxLength={10}
+                  autoComplete="off"
+                  placeholder="Ex.: At"
+                />
+              </Campo>
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Campo id="justificativa-rotulo" rotulo="Rótulo">
+                <CampoTexto
+                  id="justificativa-rotulo"
+                  valor={novaRotulo}
+                  onValor={setNovaRotulo}
+                  maxLength={60}
+                  autoComplete="off"
+                  placeholder="Ex.: Atestado"
+                />
+              </Campo>
+            </Box>
+            <Botao
               type="button"
-              className="h-11 sm:w-auto"
+              variante="neutro"
+              icone={<AddRoundedIcon />}
               onClick={criarJustificativa}
               disabled={novaCodigo.trim() === "" || novaRotulo.trim() === ""}
             >
-              <Plus size={16} />
-              Adicionar
-            </Button>
-          </div>
-        </details>
+              Adicionar ao rascunho
+            </Botao>
+          </Box>
+        }
+      >
+        {erroJustificativa ? (
+          <AlertaCompacto
+            variante="dados_invalidos"
+            descricao={erroJustificativa}
+            tamanho="linha"
+          />
+        ) : null}
 
-        {erroJustificativa && (
-          <AvisoCompacto variante="dados_invalidos" descricao={erroJustificativa} tamanho="linha" />
-        )}
-
-        <ul className="superficie divide-y overflow-hidden">
+        <Box
+          component="ul"
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            margin: 0,
+            padding: 0,
+            listStyle: "none",
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 2,
+          }}
+        >
           {atual.justificativas.map((item) => (
-            <li
+            <Box
+              component="li"
               key={item.codigo}
-              className={`grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${
-                item.ativo ? "" : "opacity-60"
-              }`}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) auto",
+                alignItems: "center",
+                gap: 1,
+                minHeight: 56,
+                paddingX: 2,
+                paddingY: 1,
+                borderBottom: 1,
+                borderColor: "divider",
+                opacity: item.ativo ? 1 : 0.6,
+                "&:last-of-type": { borderBottom: 0 },
+              }}
             >
               {editando === item.codigo ? (
-                <div className="col-span-full flex min-w-0 items-center gap-2">
-                  <Input
-                    value={rotuloEdicao}
-                    maxLength={60}
-                    autoComplete="off"
-                    aria-label={`Rótulo de ${item.codigo}`}
-                    onChange={(evento) => setRotuloEdicao(evento.target.value)}
-                    className="h-11 min-w-0 flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="size-11 shrink-0"
-                    aria-label={`Salvar rótulo de ${item.codigo}`}
+                <Box
+                  sx={{
+                    gridColumn: "1 / -1",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <CampoTexto
+                      id={`justificativa-rotulo-${item.codigo}`}
+                      valor={rotuloEdicao}
+                      onValor={setRotuloEdicao}
+                      maxLength={60}
+                      autoComplete="off"
+                      ariaLabel={`Rótulo de ${item.codigo}`}
+                    />
+                  </Box>
+                  <BotaoIcone
+                    rotulo={`Aplicar rótulo de ${item.codigo} ao rascunho`}
+                    variante="secundario"
+                    icone={<CheckRoundedIcon />}
                     onClick={() => salvarRotulo(item.codigo)}
                     disabled={rotuloEdicao.trim().length < 2}
-                  >
-                    <Check size={16} />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="size-11 shrink-0"
-                    aria-label={`Cancelar edição de ${item.codigo}`}
+                  />
+                  <BotaoIcone
+                    rotulo={`Cancelar edição de ${item.codigo}`}
+                    variante="secundario"
+                    icone={<CloseRoundedIcon />}
                     onClick={() => {
                       setEditando(null);
                       setRotuloEdicao("");
                     }}
-                  >
-                    <X size={16} />
-                  </Button>
-                </div>
+                  />
+                </Box>
               ) : (
                 <>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium wrap-anywhere">{item.rotulo}</p>
-                    <p className="text-muted-foreground text-xs wrap-anywhere">
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
+                      {item.rotulo}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                    >
                       {item.codigo}
                       {item.ativo ? "" : " · desativada"}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
                     <Switch
                       checked={item.ativo}
-                      aria-label={`${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`}
-                      onCheckedChange={() => alternarAtivo(item)}
+                      slotProps={{
+                        input: {
+                          "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
+                        },
+                      }}
+                      onChange={() => alternarAtivo(item)}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-11 shrink-0"
-                      aria-label={`Editar rótulo de ${item.codigo}`}
+                    <BotaoIcone
+                      rotulo={`Editar rótulo de ${item.codigo}`}
+                      variante="texto"
+                      icone={<TuneRoundedIcon />}
                       onClick={() => {
                         setEditando(item.codigo);
                         setRotuloEdicao(item.rotulo);
                       }}
-                    >
-                      <Pencil size={16} />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-falta-texto size-11 shrink-0"
-                      aria-label={`Excluir ${item.codigo}`}
+                    />
+                    <BotaoIcone
+                      rotulo={`Excluir ${item.codigo}`}
+                      variante="texto"
+                      icone={<DeleteOutlineRoundedIcon />}
                       onClick={() => setExcluirAlvo(item)}
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
+                      sx={(tema) => ({ color: tema.vars.palette.falta.main })}
+                    />
+                  </Stack>
                 </>
               )}
-            </li>
+            </Box>
           ))}
-        </ul>
+        </Box>
 
-        <AlertDialog
-          open={excluirAlvo !== null}
-          onOpenChange={(aberto) => {
-            if (!aberto) setExcluirAlvo(null);
+        <DialogoConfirmacao
+          aberto={excluirAlvo !== null}
+          titulo={`Excluir a justificativa ${excluirAlvo?.codigo ?? ""}?`}
+          descricao="A exclusão é aplicada ao salvar as configurações. Se houver faltas ou saídas usando o código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
+          rotuloConfirmar="Excluir"
+          destrutivo
+          onConfirmar={() => {
+            if (excluirAlvo) removerJustificativa(excluirAlvo);
           }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Excluir a justificativa {excluirAlvo?.codigo}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                A exclusão é aplicada ao salvar as configurações. Se houver faltas ou saídas usando
-                o código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é
-                desativar.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                onClick={() => excluirAlvo && removerJustificativa(excluirAlvo)}
-              >
-                Excluir
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </SecaoRecolhivel>
+          onCancelar={() => setExcluirAlvo(null)}
+        />
+      </SecaoCatalogo>
 
-      <SecaoRecolhivel
-        dataSecao="config-liberadores"
+      <Divider />
+      <SecaoCatalogo
+        id="config-liberadores"
         titulo="Quem libera as saídas"
-        icone={UserCheck}
-        aberto={abertoLiberadores}
-        onAbertoChange={setAbertoLiberadores}
-        resumo={
-          <>
-            <Selo>{atual.liberadores.filter((item) => item.ativo).length} ativos</Selo>
-          </>
-        }
-      >
-        <details className="bg-secondary/30 rounded-xl p-3">
-          <summary className="text-primary flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
-            <Plus size={18} aria-hidden="true" />
-            Adicionar responsável
-          </summary>
-          <div className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-end">
-            <div className="flex flex-col gap-1.5 sm:w-32">
-              <Label htmlFor="liberador-codigo">Código</Label>
-              <Input
-                id="liberador-codigo"
-                value={novaCodigoLiberador}
-                maxLength={20}
-                autoComplete="off"
-                onChange={(evento) => setNovaCodigoLiberador(evento.target.value)}
-                placeholder="Ex.: maria"
-                className="h-11"
-              />
-            </div>
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <Label htmlFor="liberador-rotulo">Rótulo</Label>
-              <Input
-                id="liberador-rotulo"
-                value={novaRotuloLiberador}
-                maxLength={60}
-                autoComplete="off"
-                onChange={(evento) => setNovaRotuloLiberador(evento.target.value)}
-                placeholder="Ex.: Coordenadora Maria"
-                className="h-11"
-              />
-            </div>
-            <Button
+        resumo={contagem(atual.liberadores.filter((item) => item.ativo).length, "ativo", "ativos")}
+        acao="Adicionar responsável"
+        editor={
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              alignItems: { sm: "flex-end" },
+              gap: 2,
+            }}
+          >
+            <Box sx={ESTILO_CAMPO_CODIGO}>
+              <Campo id="liberador-codigo" rotulo="Código">
+                <CampoTexto
+                  id="liberador-codigo"
+                  valor={novaCodigoLiberador}
+                  onValor={setNovaCodigoLiberador}
+                  maxLength={20}
+                  autoComplete="off"
+                  placeholder="Ex.: maria"
+                />
+              </Campo>
+            </Box>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Campo id="liberador-rotulo" rotulo="Rótulo">
+                <CampoTexto
+                  id="liberador-rotulo"
+                  valor={novaRotuloLiberador}
+                  onValor={setNovaRotuloLiberador}
+                  maxLength={60}
+                  autoComplete="off"
+                  placeholder="Ex.: Coordenadora Maria"
+                />
+              </Campo>
+            </Box>
+            <Botao
               type="button"
-              className="h-11 sm:w-auto"
+              variante="neutro"
+              icone={<AddRoundedIcon />}
               onClick={criarLiberador}
               disabled={novaCodigoLiberador.trim() === "" || novaRotuloLiberador.trim() === ""}
             >
-              <Plus size={16} />
-              Adicionar
-            </Button>
-          </div>
-        </details>
+              Adicionar ao rascunho
+            </Botao>
+          </Box>
+        }
+      >
+        {erroLiberador ? (
+          <AlertaCompacto variante="dados_invalidos" descricao={erroLiberador} tamanho="linha" />
+        ) : null}
 
-        {erroLiberador && (
-          <AvisoCompacto variante="dados_invalidos" descricao={erroLiberador} tamanho="linha" />
-        )}
+        {atual.liberadores.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Nenhum nome cadastrado.
+          </Typography>
+        ) : null}
 
-        {atual.liberadores.length === 0 && (
-          <p className="text-muted-foreground text-sm">Nenhum nome cadastrado.</p>
-        )}
-
-        <ul className="superficie divide-y overflow-hidden">
+        <Box
+          component="ul"
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            margin: 0,
+            padding: 0,
+            listStyle: "none",
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 2,
+          }}
+        >
           {atual.liberadores.map((item) => (
-            <li
+            <Box
+              component="li"
               key={item.codigo}
-              className={`grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 last:overflow-hidden last:rounded-b-[calc(var(--radius)-1px)] ${
-                item.ativo ? "" : "opacity-60"
-              }`}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "minmax(0, 1fr) auto",
+                alignItems: "center",
+                gap: 1,
+                minHeight: 56,
+                paddingX: 2,
+                paddingY: 1,
+                borderBottom: 1,
+                borderColor: "divider",
+                opacity: item.ativo ? 1 : 0.6,
+                "&:last-of-type": { borderBottom: 0 },
+              }}
             >
               {editandoLiberador === item.codigo ? (
-                <div className="col-span-full flex min-w-0 items-center gap-2">
-                  <Input
-                    value={rotuloEdicaoLiberador}
-                    maxLength={60}
-                    autoComplete="off"
-                    aria-label={`Rótulo de ${item.codigo}`}
-                    onChange={(evento) => setRotuloEdicaoLiberador(evento.target.value)}
-                    className="h-11 min-w-0 flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="size-11 shrink-0"
-                    aria-label={`Salvar rótulo de ${item.codigo}`}
+                <Box
+                  sx={{
+                    gridColumn: "1 / -1",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 1,
+                    minWidth: 0,
+                  }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <CampoTexto
+                      id={`liberador-rotulo-${item.codigo}`}
+                      valor={rotuloEdicaoLiberador}
+                      onValor={setRotuloEdicaoLiberador}
+                      maxLength={60}
+                      autoComplete="off"
+                      ariaLabel={`Rótulo de ${item.codigo}`}
+                    />
+                  </Box>
+                  <BotaoIcone
+                    rotulo={`Aplicar rótulo de ${item.codigo} ao rascunho`}
+                    variante="secundario"
+                    icone={<CheckRoundedIcon />}
                     onClick={() => salvarRotuloLiberador(item.codigo)}
                     disabled={rotuloEdicaoLiberador.trim().length < 2}
-                  >
-                    <Check size={16} />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="icon"
-                    className="size-11 shrink-0"
-                    aria-label={`Cancelar edição de ${item.codigo}`}
+                  />
+                  <BotaoIcone
+                    rotulo={`Cancelar edição de ${item.codigo}`}
+                    variante="secundario"
+                    icone={<CloseRoundedIcon />}
                     onClick={() => {
                       setEditandoLiberador(null);
                       setRotuloEdicaoLiberador("");
                     }}
-                  >
-                    <X size={16} />
-                  </Button>
-                </div>
+                  />
+                </Box>
               ) : (
                 <>
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium wrap-anywhere">{item.rotulo}</p>
-                    <p className="text-muted-foreground text-xs wrap-anywhere">
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: "anywhere" }}>
+                      {item.rotulo}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                    >
                       {item.codigo}
                       {item.ativo ? "" : " · desativado"}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
                     <Switch
                       checked={item.ativo}
-                      aria-label={`${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`}
-                      onCheckedChange={() => alternarAtivoLiberador(item)}
+                      slotProps={{
+                        input: {
+                          "aria-label": `${item.ativo ? "Desativar" : "Reativar"} ${item.codigo}`,
+                        },
+                      }}
+                      onChange={() => alternarAtivoLiberador(item)}
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-11 shrink-0"
-                      aria-label={`Editar rótulo de ${item.codigo}`}
+                    <BotaoIcone
+                      rotulo={`Editar rótulo de ${item.codigo}`}
+                      variante="texto"
+                      icone={<TuneRoundedIcon />}
                       onClick={() => {
                         setEditandoLiberador(item.codigo);
                         setRotuloEdicaoLiberador(item.rotulo);
                       }}
-                    >
-                      <Pencil size={16} />
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="text-falta-texto size-11 shrink-0"
-                      aria-label={`Excluir ${item.codigo}`}
+                    />
+                    <BotaoIcone
+                      rotulo={`Excluir ${item.codigo}`}
+                      variante="texto"
+                      icone={<DeleteOutlineRoundedIcon />}
                       onClick={() => setExcluirAlvoLiberador(item)}
-                    >
-                      <Trash2 size={16} />
-                    </Button>
-                  </div>
+                      sx={(tema) => ({ color: tema.vars.palette.falta.main })}
+                    />
+                  </Stack>
                 </>
               )}
-            </li>
+            </Box>
           ))}
-        </ul>
+        </Box>
 
-        <AlertDialog
-          open={excluirAlvoLiberador !== null}
-          onOpenChange={(aberto) => {
-            if (!aberto) setExcluirAlvoLiberador(null);
+        <DialogoConfirmacao
+          aberto={excluirAlvoLiberador !== null}
+          titulo={`Excluir ${excluirAlvoLiberador?.rotulo ?? ""}?`}
+          descricao="A exclusão é aplicada ao salvar as configurações. Se houver saídas com este código, o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar."
+          rotuloConfirmar="Excluir"
+          destrutivo
+          onConfirmar={() => {
+            if (excluirAlvoLiberador) removerLiberador(excluirAlvoLiberador);
           }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Excluir {excluirAlvoLiberador?.rotulo}?</AlertDialogTitle>
-              <AlertDialogDescription>
-                A exclusão é aplicada ao salvar as configurações. Se houver saídas com este código,
-                o servidor recusa o lote e nada é gravado. Com histórico, o caminho é desativar.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                onClick={() => excluirAlvoLiberador && removerLiberador(excluirAlvoLiberador)}
-              >
-                Excluir
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </SecaoRecolhivel>
-    </>
+          onCancelar={() => setExcluirAlvoLiberador(null)}
+        />
+      </SecaoCatalogo>
+    </Stack>
   );
 
   const dados = (
-    <>
-      <SecaoRecolhivel
-        dataSecao="config-copia"
-        titulo="Cópia de segurança"
-        icone={Archive}
-        aberto={abertoCopia}
-        onAbertoChange={setAbertoCopia}
-        resumo={<Selo>Arquivo JSON</Selo>}
-      >
-        <div className="grid grid-cols-2 gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-auto min-h-24 min-w-0 flex-col gap-2 rounded-xl px-2 py-3 whitespace-normal"
-            onClick={() => setDownloadAberto(true)}
-            disabled={importando}
+    <SecaoConfiguracao
+      id="config-copia"
+      titulo="Cópia de segurança"
+      descricao="A exportação e a importação são independentes do rascunho de configurações."
+    >
+      <Stack divider={<Divider />} spacing={2}>
+        {[
+          {
+            rotulo: "Baixar cópia",
+            titulo: "Exportação dos dados",
+            descricao:
+              "Por padrão, o ZIP é protegido por senha. Também é possível escolher o JSON original sem senha.",
+            icone: <FileDownloadRoundedIcon />,
+            executar: () => setDownloadAberto(true),
+          },
+          {
+            rotulo: "Importar cópia",
+            titulo: "Mesclagem de dados",
+            descricao:
+              "Adicione registros ausentes a partir de um JSON, sem substituir os que já existem.",
+            icone: <FileUploadRoundedIcon />,
+            executar: () => setConfirmarImportacao(true),
+          },
+        ].map(({ rotulo, titulo, descricao, icone, executar }) => (
+          <Stack
+            key={rotulo}
+            direction={{ xs: "column", sm: "row" }}
+            spacing={{ xs: ESPACO_COMPOSICAO.textoAcaoEmpilhada, sm: 2 }}
+            useFlexGap
+            sx={{ alignItems: { xs: "flex-start", sm: "center" }, justifyContent: "space-between" }}
           >
-            <Download size={16} />
-            Baixar cópia
-          </Button>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                className="h-auto min-h-24 min-w-0 flex-col gap-2 rounded-xl px-2 py-3 whitespace-normal"
-                disabled={importando}
-              >
-                {importando ? (
-                  <LoaderCircle size={16} className="animate-spin" />
-                ) : (
-                  <Upload size={16} />
-                )}
-                Importar cópia
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Importar cópia?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  O arquivo é mesclado ao banco: registros que já existem são mantidos e apenas os
-                  que faltam são adicionados. Confira o resultado depois da importação.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={() => arquivoRef.current?.click()}>
-                  Escolher arquivo
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-          <input
-            ref={arquivoRef}
-            type="file"
-            accept=".json,application/json"
-            hidden
-            onChange={(evento) => {
-              const arquivo = evento.target.files?.[0];
-              if (arquivo) void importar(arquivo);
-            }}
-          />
-        </div>
-        <details className="text-muted-foreground text-xs">
-          <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
-            <HelpCircle size={16} aria-hidden="true" />
-            Ajuda
-          </summary>
-          <p>
-            A importação adiciona dados ausentes e preserva os existentes. Chaves do FrequenciBI
-            precisam ser geradas novamente.
-          </p>
-        </details>
-        {erroCopia && (
-          <AvisoCompacto variante="dados_invalidos" descricao={erroCopia} tamanho="linha" />
-        )}
-        {resultado && (
-          <p role="status" className="bg-secondary/60 rounded-lg px-4 py-3 text-sm">
+            <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
+              <Typography component="h4" variant="subtitle2">
+                {titulo}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {descricao}
+              </Typography>
+            </Stack>
+            <Botao
+              type="button"
+              variante="contorno"
+              icone={icone}
+              onClick={executar}
+              disabled={importando}
+              sx={{ flexShrink: 0, minHeight: TOKENS_LAYOUT.alvoToque }}
+            >
+              {rotulo}
+            </Botao>
+          </Stack>
+        ))}
+      </Stack>
+      <input
+        ref={arquivoRef}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={(evento) => {
+          const arquivo = evento.target.files?.[0];
+          if (arquivo) void importar(arquivo);
+        }}
+      />
+      <Acordeao
+        titulo="Ajuda"
+        nivelTitulo="h4"
+        resumo={
+          <Typography
+            component="span"
+            variant="body2"
+            sx={{ display: "flex", alignItems: "center", gap: 1 }}
+          >
+            <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />O que a importação
+            altera
+          </Typography>
+        }
+      >
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          A importação adiciona dados ausentes e preserva os existentes. Chaves do FrequenciBI
+          precisam ser geradas novamente.
+        </Typography>
+      </Acordeao>
+      {erroCopia ? (
+        <AlertaCompacto variante="dados_invalidos" descricao={erroCopia} tamanho="linha" />
+      ) : null}
+      {resultado ? (
+        <Box
+          role="status"
+          sx={(tema) => ({
+            paddingX: 2,
+            paddingY: 1.5,
+            borderRadius: 2,
+            backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 6%, transparent)`,
+          })}
+        >
+          <Typography variant="body2">
             {resultado.adicionadas}{" "}
             {resultado.adicionadas === 1 ? "registro adicionado" : "registros adicionados"},{" "}
             {resultado.identicas} {resultado.identicas === 1 ? "já era igual" : "já eram iguais"} e{" "}
             {resultado.conflitos}{" "}
             {resultado.conflitos === 1 ? "conflito mantido" : "conflitos mantidos"}.
-            <span className="mt-2 block">
-              Chaves do FrequenciBI não são restauradas. Gere novas chaves na Gestão quando
-              necessário.
-            </span>
-          </p>
-        )}
-      </SecaoRecolhivel>
-    </>
+          </Typography>
+          <Typography variant="caption" sx={{ display: "block", marginTop: 1 }}>
+            Chaves do FrequenciBI não são restauradas. Gere novas chaves na Gestão quando
+            necessário.
+          </Typography>
+        </Box>
+      ) : null}
+    </SecaoConfiguracao>
   );
 
   const tituloErro =
@@ -1253,146 +1390,79 @@ function ConteudoConfiguracoes({
               ? "Não foi possível concluir"
               : undefined;
 
-  return (
-    <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[13rem_minmax(0,1fr)] lg:gap-6">
-      {erro && !confirmarSalvar && (
-        <div className="col-span-full">
-          <AvisoCompacto
-            variante={varianteDoErro(erroStatus)}
-            titulo={tituloErro}
-            descricao={erro}
-            tamanho="linha"
-            acao={
-              erroStatus === 409
-                ? {
-                    rotulo: "Recarregar tudo e descartar",
-                    onClick: () => void recarregar(),
-                  }
-                : undefined
-            }
-          />
-        </div>
-      )}
-      <nav
-        aria-label="Categorias de configurações"
-        className="superficie grid grid-cols-2 gap-1.5 p-1.5 lg:grid-cols-1"
-      >
-        {CATEGORIAS.map(({ valor, rotulo, icone: Icone }) => (
-          <Button
-            key={valor}
-            id={`categoria-config-${valor}`}
-            type="button"
-            variant="ghost"
-            aria-pressed={categoria === valor}
-            aria-controls={`config-grupo-${valor}`}
-            onClick={() => {
-              setCategoria(valor);
-              if (valor === "horarios") setHorariosAbertos(true);
-            }}
-            className={`h-auto min-h-14 min-w-0 justify-start rounded-xl px-3 py-2 text-xs whitespace-normal sm:text-sm ${
-              categoria === valor ? "selecionado" : "text-muted-foreground"
-            }`}
-          >
-            <Icone size={16} aria-hidden="true" />
-            {rotulo}
-          </Button>
-        ))}
-      </nav>
-      <div className="min-w-0 pb-24">
-        <section
-          id="config-grupo-escola"
-          aria-labelledby="categoria-config-escola"
-          hidden={categoria !== "escola"}
-          inert={categoria !== "escola"}
-          className="flex min-w-0 flex-col gap-4"
-        >
-          <PainelAcoes
-            rotulo="Ações da escola"
-            valor={acaoEscola}
-            onValor={setAcaoEscola}
-            itens={[
-              { valor: "geral", rotulo: "Geral", icone: Settings2, conteudo: recursos },
-              {
-                valor: "frequencia",
-                rotulo: "Frequência",
-                icone: ChartNoAxesCombined,
-                conteudo: frequencia,
-              },
-              {
-                valor: "calendario",
-                rotulo: "Calendário",
-                icone: CalendarDays,
-                conteudo: calendario,
-              },
-              {
-                valor: "cadastros",
-                rotulo: "Cadastros",
-                icone: ClipboardList,
-                conteudo: cadastros,
-              },
-            ]}
-          />
-        </section>
-        <section
-          id="config-grupo-horarios"
-          aria-labelledby="categoria-config-horarios"
-          hidden={categoria !== "horarios"}
-          inert={categoria !== "horarios"}
-          className="flex min-w-0 flex-col gap-4"
-        >
-          {horariosAbertos && (
-            <PainelAcoes
-              rotulo="Ações dos horários"
-              valor={acaoHorarios}
-              onValor={setAcaoHorarios}
-              itens={[
-                {
-                  valor: "aulas",
-                  rotulo: "Aulas",
-                  icone: Clock,
-                  conteudo: (
-                    <VistaHorarios
-                      turmas={turmas}
-                      diaCorrente={diaCorrente}
-                      fuso={fuso}
-                      editavel
-                      onMudanca={onHorariosMudaram}
-                      onPendencia={onPendenciaHorarios}
-                    />
-                  ),
-                },
-                {
-                  valor: "almoco",
-                  rotulo: "Almoço",
-                  icone: Utensils,
-                  conteudo: (
-                    <SecaoOrdemAlmoco
-                      turmas={turmas}
-                      dias={atual.ordemAlmoco}
-                      onMudar={mutarOrdem}
-                      onCopiarParaTodos={(dia, itens) => {
-                        for (const valor of DIAS_ORDEM_ALMOCO) mutarOrdem(valor, itens);
-                      }}
-                    />
-                  ),
-                },
-                {
-                  valor: "provas",
-                  rotulo: "Provas",
-                  icone: CalendarClock,
-                  conteudo: <SecaoProvasBimestrais turmas={turmas} diaCorrente={diaCorrente} />,
-                },
-              ]}
-            />
-          )}
-        </section>
-        <section
-          id="config-grupo-planilhas"
-          aria-labelledby="categoria-config-planilhas"
-          hidden={categoria !== "planilhas"}
-          inert={categoria !== "planilhas"}
-          className="flex min-w-0 flex-col gap-4"
-        >
+  const paineis = [
+    { valor: "geral", conteudo: recursos },
+    {
+      valor: "frequencia",
+      conteudo: frequencia,
+    },
+    {
+      valor: "calendario",
+      conteudo: calendario,
+    },
+    {
+      valor: "cadastros",
+      conteudo: cadastros,
+    },
+    {
+      valor: "diretores",
+      conteudo: <SecaoAcessoDiretores parametros={atual.acesso} onMudar={mutarAcesso} />,
+    },
+    {
+      valor: "notificacoes",
+      conteudo: <SecaoNotificacoes configuracao={atual.notificacoes} onMudar={mutarNotificacoes} />,
+    },
+    {
+      valor: "bi",
+      conteudo: (
+        <SecaoChavesBi
+          series={series}
+          turmas={turmas}
+          chaves={atual.chavesBi}
+          onMudar={(lista: ChaveBiDesejada[]) => mutarChaves(lista)}
+        />
+      ),
+    },
+    {
+      valor: "aulas",
+      conteudo: (
+        <VistaHorarios
+          turmas={turmas}
+          diaCorrente={diaCorrente}
+          fuso={fuso}
+          editavel
+          onMudanca={onHorariosMudaram}
+          onPendencia={onPendenciaHorarios}
+        />
+      ),
+    },
+    {
+      valor: "almoco",
+      conteudo: (
+        <SecaoOrdemAlmoco
+          turmas={turmas}
+          dias={atual.ordemAlmoco}
+          onMudar={mutarOrdem}
+          onCopiarParaTodos={(_dia, itens) => {
+            for (const valor of DIAS_ORDEM_ALMOCO) mutarOrdem(valor, itens);
+          }}
+        />
+      ),
+    },
+    {
+      valor: "provas",
+      conteudo: (
+        <SecaoProvasBimestrais
+          turmas={turmas}
+          diaCorrente={diaCorrente}
+          rascunhoPendente={alterado}
+        />
+      ),
+    },
+    {
+      valor: "planilhas",
+      conteudo: (
+        <Stack spacing={2}>
           <IntegracaoPlanilha
             turmas={turmas}
             diaCorrente={diaCorrente}
@@ -1407,255 +1477,256 @@ function ConteudoConfiguracoes({
             abertoInicial={planilhaInicial === "PARCIAL"}
           />
           <SecaoFilaPlanilha />
-        </section>
-        <section
-          id="config-grupo-acesso"
-          aria-labelledby="categoria-config-acesso"
-          hidden={categoria !== "acesso"}
-          inert={categoria !== "acesso"}
-          className="flex min-w-0 flex-col gap-4"
-        >
-          <PainelAcoes
-            rotulo="Ações de acesso e avisos"
-            valor={acaoAcesso}
-            onValor={setAcaoAcesso}
-            itens={[
-              {
-                valor: "diretores",
-                rotulo: "Diretores",
-                icone: ShieldCheck,
-                conteudo: <SecaoAcessoDiretores parametros={atual.acesso} onMudar={mutarAcesso} />,
-              },
-              {
-                valor: "notificacoes",
-                rotulo: "Notificações",
-                icone: Bell,
-                conteudo: (
-                  <SecaoNotificacoes
-                    configuracao={atual.notificacoes}
-                    onMudar={mutarNotificacoes}
-                  />
-                ),
-              },
-              {
-                valor: "bi",
-                rotulo: "FrequenciBI",
-                icone: ChartNoAxesCombined,
-                conteudo: (
-                  <SecaoChavesBi
-                    series={series}
-                    turmas={turmas}
-                    chaves={atual.chavesBi}
-                    onMudar={(lista: ChaveBiDesejada[]) => mutarChaves(lista)}
-                  />
-                ),
-              },
-            ]}
+        </Stack>
+      ),
+    },
+    { valor: "dados", conteudo: dados },
+  ] satisfies { valor: DestinoConfiguracoes; conteudo: React.ReactNode }[];
+
+  return (
+    <Stack spacing={2} sx={{ minWidth: 0 }}>
+      {erro && !confirmarSalvar ? (
+        <Box>
+          <AlertaCompacto
+            variante={varianteDoErro(erroStatus)}
+            titulo={tituloErro}
+            descricao={erro}
+            tamanho="linha"
+            acao={
+              erroStatus === 409
+                ? {
+                    rotulo: "Recarregar tudo e descartar",
+                    onClick: () => void recarregar(),
+                  }
+                : undefined
+            }
           />
-        </section>
-        <section
-          id="config-grupo-dados"
-          aria-labelledby="categoria-config-dados"
-          hidden={categoria !== "dados"}
-          inert={categoria !== "dados"}
-          className="flex min-w-0 flex-col gap-4"
-        >
-          {dados}
-        </section>
-      </div>
-      {alterado && (
-        <div
-          role="region"
-          aria-label="Salvar configurações"
-          data-rodape-configuracoes=""
-          className="superficie sticky z-20 col-span-full mx-auto flex w-fit max-w-full items-center gap-2 rounded-2xl p-2 lg:mr-0 lg:ml-auto"
-          style={{ bottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
-        >
-          <p
-            className="text-muted-foreground max-w-32 min-w-0 truncate px-2 text-xs font-medium sm:max-w-48"
-            aria-live="polite"
-            title={`Alterações não salvas em ${secoesAlteradas.length} ${
-              secoesAlteradas.length === 1 ? "seção" : "seções"
-            }`}
-          >
-            <span className="sm:hidden">Não salvo</span>
-            <span className="hidden sm:inline">
-              Alterações não salvas em {secoesAlteradas.length}{" "}
-              {secoesAlteradas.length === 1 ? "seção" : "seções"}
-            </span>
-          </p>
-          <Button
-            type="button"
-            variant="ghost"
-            className="shrink-0"
-            aria-label="Descartar"
-            onClick={() => setConfirmarDescartar(true)}
-            disabled={salvando}
-          >
-            <RotateCcw size={16} aria-hidden="true" />
-            <span className="hidden sm:inline">Descartar</span>
-          </Button>
-          <Button
-            type="button"
-            className="shrink-0 px-4"
-            aria-label="Salvar configurações"
-            onClick={() => {
-              setSenhaBi("");
-              setConfirmarSalvar(true);
-            }}
-            disabled={salvando}
-          >
-            {salvando ? (
-              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <Save size={16} aria-hidden="true" />
-            )}
-            <span className="hidden sm:inline">Salvar configurações</span>
-            <span className="sm:hidden">Salvar</span>
-          </Button>
-        </div>
-      )}
-      <AlertDialog
-        open={confirmarSalvar}
-        onOpenChange={(aberto) => {
-          if (!aberto && !salvando) setConfirmarSalvar(false);
+        </Box>
+      ) : null}
+
+      <Box
+        sx={{ minWidth: 0 }}
+        onFocusCapture={(evento) => {
+          if (rodapeRef.current) desobstruirFoco(evento.target, rodapeRef.current);
         }}
+        ref={paineisRef}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Salvar configurações?</AlertDialogTitle>
-            <AlertDialogDescription>
+        <Stack
+          component="section"
+          id={`config-grupo-${categoria.valor}`}
+          aria-labelledby={`config-grupo-${categoria.valor}-titulo`}
+          spacing={2}
+          sx={{ minWidth: 0 }}
+        >
+          <Typography
+            component="h2"
+            variant="h5"
+            id={`config-grupo-${categoria.valor}-titulo`}
+            tabIndex={-1}
+            data-titulo-configuracoes=""
+          >
+            {categoria.rotulo}
+          </Typography>
+          <PaineisVisitados ativo={destino} itens={paineis} />
+        </Stack>
+      </Box>
+
+      {alterado ? (
+        <Paper
+          ref={rodapeRef}
+          role="region"
+          aria-label="Rascunho de configurações"
+          data-rodape-configuracoes=""
+          variant="outlined"
+          sx={{
+            position: "sticky",
+            bottom: "max(8px, env(safe-area-inset-bottom))",
+            zIndex: 20,
+            minWidth: 0,
+            px: { xs: 1, sm: 2 },
+            py: 1,
+          }}
+        >
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={1}
+            sx={{ justifyContent: "space-between", alignItems: { sm: "center" } }}
+          >
+            <Typography variant="body2" aria-live="polite" sx={{ fontWeight: 600 }}>
+              {`Alterações em ${contagem(secoesAlteradas.length, "seção", "seções")}`}
+            </Typography>
+            <Stack
+              direction="row"
+              useFlexGap
+              spacing={1}
+              sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}
+            >
+              <Botao
+                type="button"
+                variante="texto"
+                onClick={() => setConfirmarDescartar(true)}
+                disabled={salvando}
+                sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+              >
+                Descartar
+              </Botao>
+              <Botao
+                type="button"
+                variante="principal"
+                onClick={() => {
+                  setSenhaBi("");
+                  setConfirmarSalvar(true);
+                }}
+                disabled={salvando}
+                sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+              >
+                Revisar alterações
+              </Botao>
+            </Stack>
+          </Stack>
+        </Paper>
+      ) : null}
+
+      <DialogoConfirmacao
+        aberto={confirmarSalvar}
+        titulo="Salvar configurações?"
+        descricao={
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Typography variant="body2">
               As alterações valem para toda a escola e são gravadas de uma vez. Se outra pessoa
               tiver mudado alguma seção, nada é gravado.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <ul className="flex flex-col gap-2 text-sm">
-            {secoesAlteradas.map((secao) => (
-              <li key={secao.chave} className="flex flex-col gap-0.5">
-                <span className="font-medium">{secao.rotulo}</span>
-                <span className="text-muted-foreground text-xs">{resumoDaSecao(secao.chave)}</span>
-              </li>
-            ))}
-          </ul>
-          {precisaSenhaBi && (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="config-senha-bi">Senha do administrador</Label>
-              <CampoSenha
+            </Typography>
+            <Box
+              component="ul"
+              sx={{ display: "flex", flexDirection: "column", gap: 1, margin: 0 }}
+            >
+              {secoesAlteradas.map((secao) => (
+                <Box component="li" key={secao.chave}>
+                  <Typography variant="subtitle2">{secao.rotulo}</Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    {resumoDaSecao(secao.chave)}
+                  </Typography>
+                </Box>
+              ))}
+            </Box>
+            {precisaSenhaBi ? (
+              <Campo
                 id="config-senha-bi"
-                autoComplete="current-password"
-                value={senhaBi}
-                onChange={(evento) => setSenhaBi(evento.target.value)}
-              />
-              <p className="text-muted-foreground text-xs">
-                A senha confirma a criação, a substituição ou a revogação das chaves do BI.
-              </p>
-            </div>
-          )}
-          {erro && (
-            <AvisoCompacto
-              variante={varianteDoErro(erroStatus)}
-              titulo={tituloErro}
-              descricao={erro}
-              tamanho="linha"
-              acao={
-                erroStatus === 409
-                  ? {
-                      rotulo: "Recarregar tudo e descartar",
-                      onClick: () => {
-                        setConfirmarSalvar(false);
-                        void recarregar();
-                      },
-                    }
-                  : undefined
-              }
-            />
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={salvando}>Continuar revisando</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={salvando || (precisaSenhaBi && senhaBi.trim() === "")}
-              onClick={(evento) => {
-                evento.preventDefault();
-                void concluirSalvamento();
-              }}
-            >
-              {salvando ? <LoaderCircle size={16} className="animate-spin" /> : null}
-              Salvar configurações
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog open={confirmarDescartar} onOpenChange={setConfirmarDescartar}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Descartar alterações?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Todas as seções voltam ao estado salvo, inclusive catálogos, calendário e chaves.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Continuar editando</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              onClick={() => {
-                descartar();
-                setConfirmarDescartar(false);
-              }}
-            >
-              Descartar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <Dialog
-        open={segredosBi.length > 0}
-        onOpenChange={(aberto) => {
-          if (!aberto) setSegredosBi([]);
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Guarde as chaves do BI</DialogTitle>
-            <DialogDescription>
-              Elas aparecem apenas agora e dão acesso a dados pessoais. Não as inclua em links.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            {segredosBi.map((item) => (
-              <div key={item.id} className="flex flex-col gap-1.5">
-                <Label>{item.rotulo}</Label>
-                <Input
-                  aria-label={`Chave gerada para ${item.rotulo}`}
-                  readOnly
-                  value={item.segredo}
-                  autoComplete="off"
-                  className="font-mono text-xs"
+                rotulo="Senha do administrador"
+                descricao="A senha confirma a criação, a substituição ou a revogação das chaves do BI."
+              >
+                <CampoSenha
+                  id="config-senha-bi"
+                  autoComplete="current-password"
+                  valor={senhaBi}
+                  onValor={setSenhaBi}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="self-start"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(item.segredo);
-                      avisarSucesso("Chave copiada.");
-                    } catch (excecao) {
-                      avisarErro(excecao, {
-                        contexto: "Não foi possível copiar. Selecione a chave e copie manualmente.",
-                      });
-                    }
-                  }}
-                >
-                  Copiar chave
-                </Button>
-              </div>
-            ))}
-          </div>
-          <DialogFooter>
-            <Button onClick={() => setSegredosBi([])}>Já guardei</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              </Campo>
+            ) : null}
+            {erro ? (
+              <AlertaCompacto
+                variante={varianteDoErro(erroStatus)}
+                titulo={tituloErro}
+                descricao={erro}
+                tamanho="linha"
+                acao={
+                  erroStatus === 409
+                    ? {
+                        rotulo: "Recarregar tudo e descartar",
+                        onClick: () => {
+                          setConfirmarSalvar(false);
+                          void recarregar();
+                        },
+                      }
+                    : undefined
+                }
+              />
+            ) : null}
+          </Box>
+        }
+        rotuloCancelar="Continuar revisando"
+        rotuloConfirmar="Salvar configurações"
+        operacaoEmAndamento={salvando}
+        aposFechar={focarCategoriaSemRascunho}
+        onConfirmar={() => void concluirSalvamento()}
+        onCancelar={() => setConfirmarSalvar(false)}
+      />
+
+      <DialogoConfirmacao
+        aberto={confirmarDescartar}
+        titulo="Descartar alterações?"
+        descricao="Todas as seções voltam ao estado salvo, inclusive catálogos, calendário e chaves."
+        rotuloCancelar="Continuar editando"
+        rotuloConfirmar="Descartar"
+        aposFechar={focarCategoriaSemRascunho}
+        destrutivo
+        onConfirmar={() => {
+          descartar();
+          setConfirmarDescartar(false);
+        }}
+        onCancelar={() => setConfirmarDescartar(false)}
+      />
+
+      <DialogoConfirmacao
+        aberto={confirmarImportacao}
+        titulo="Importar cópia?"
+        descricao="O arquivo é mesclado ao banco: registros que já existem são mantidos e apenas os que faltam são adicionados. Confira o resultado depois da importação."
+        rotuloConfirmar="Escolher arquivo"
+        onConfirmar={() => {
+          setConfirmarImportacao(false);
+          arquivoRef.current?.click();
+        }}
+        onCancelar={() => setConfirmarImportacao(false)}
+      />
+
+      <Dialogo
+        aberto={segredosBi.length > 0}
+        onFechar={() => setSegredosBi([])}
+        titulo="Guarde as chaves do BI"
+        descricao="Elas aparecem apenas agora e dão acesso a dados pessoais. Não as inclua em links."
+      >
+        <Stack spacing={2}>
+          {segredosBi.map((item) => (
+            <Box key={item.id}>
+              <CampoTexto
+                id={`segredo-bi-${item.id}`}
+                valor={item.segredo}
+                onValor={() => {}}
+                readOnly
+                autoComplete="off"
+                ariaLabel={`Chave gerada para ${item.rotulo}`}
+              />
+              <Typography variant="caption" sx={{ display: "block", marginTop: 0.5 }}>
+                {item.rotulo}
+              </Typography>
+              <Botao
+                type="button"
+                variante="contorno"
+                tamanho="pequeno"
+                sx={{ justifySelf: "flex-start", marginTop: 1 }}
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(item.segredo);
+                    avisarSucesso("Chave copiada.");
+                  } catch (excecao) {
+                    avisarErro(excecao, {
+                      contexto: "Não foi possível copiar. Selecione a chave e copie manualmente.",
+                    });
+                  }
+                }}
+              >
+                Copiar chave
+              </Botao>
+            </Box>
+          ))}
+          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <Botao variante="secundario" onClick={() => setSegredosBi([])}>
+              Já guardei
+            </Botao>
+          </Box>
+        </Stack>
+      </Dialogo>
+
       <DialogoDownload
         confirmarAdmin
         aberto={downloadAberto}
@@ -1668,6 +1739,18 @@ function ConteudoConfiguracoes({
           )
         }
       />
-    </div>
+    </Stack>
   );
 }
+
+const ESTILO_SOMENTE_LEITOR = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;

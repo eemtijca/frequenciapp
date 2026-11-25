@@ -1,10 +1,19 @@
 // Integração com o Google Planilhas na interface, contra a Sheets API sintética:
 // conta Google, estrutura, mapa, prévia na Grade e desconexão.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { criarGoogleFalso, type GoogleFalso } from "../../helpers/google-falso";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, escolherTurmaNaGrade, trocarVisao } from "../helpers/pagina";
+import {
+  selecionarRelatorio,
+  aguardarHidratacao,
+  escolherTurmaNaGrade,
+  trocarVisao,
+} from "../helpers/pagina";
 import { selecionarAcaoPlanilha } from "../helpers/planilhas";
 
 // A resposta simulada por page.route exige que o service worker não intercepte a requisição.
@@ -64,11 +73,8 @@ test.describe("Google Planilhas", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações" }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Planilhas", exact: true })
-      .click();
+    await abrirConfiguracoesDaGestao(page);
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
     const cartao = page.locator('[data-secao="planilha-frequencia"]');
     await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
     await selecionarAcaoPlanilha(cartao, "Configurar");
@@ -79,19 +85,15 @@ test.describe("Google Planilhas", () => {
     await page.reload();
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações" }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Planilhas", exact: true })
-      .click();
+    await abrirConfiguracoesDaGestao(page);
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
     await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
     await selecionarAcaoPlanilha(cartao, "Configurar");
     await expect(cartao.getByText("Conta Google conectada", { exact: true })).toBeVisible();
 
     // Estrutura e mapa sugeridos.
     await cartao.getByRole("button", { name: "Conferir estrutura" }).click();
-    const painelConfig = page.locator("#painel-configuracoes");
-    await expect(painelConfig.getByText("E2E Ano A", { exact: true }).first()).toBeVisible();
+    await expect(cartao.getByText("E2E Ano A", { exact: true }).first()).toBeVisible();
     await cartao.getByRole("button", { name: "Salvar estrutura" }).click();
     await expect(page.getByText("Estrutura salva.", { exact: true })).toBeVisible();
 
@@ -101,7 +103,7 @@ test.describe("Google Planilhas", () => {
     await page.getByRole("option", { name: "E2E Ano A", exact: true }).click();
     const organizar = cartao.getByRole("button", { name: "Organizar apresentação de E2E Ano A" });
     await organizar.click();
-    const apresentacao = page.getByRole("alertdialog");
+    const apresentacao = page.getByRole("dialog");
     await expect(
       apresentacao.getByRole("heading", { name: "Organizar apresentação da aba E2E Ano A?" }),
     ).toBeVisible();
@@ -135,7 +137,7 @@ test.describe("Google Planilhas", () => {
       apresentacao.getByRole("heading", { name: "Resultado da organização" }),
     ).toBeVisible();
     await expect(apresentacao.getByText(/Concluídas: 2 de 2. Pendências: 0/)).toBeVisible();
-    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).click();
+    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).last().click();
     const corrigir = cartao.getByRole("button", {
       name: "Corrigir cabeçalho e datas de todas as turmas",
       exact: true,
@@ -184,7 +186,7 @@ test.describe("Google Planilhas", () => {
         false,
       );
     await apresentacao.screenshot({ path: "test-results/planilha-todas-resultado.png" });
-    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).click();
+    await apresentacao.getByRole("button", { name: "Fechar", exact: true }).last().click();
 
     // O envio ao salvar permanece desligado e o mapa continua disponível.
     await selecionarAcaoPlanilha(cartao, "Enviar");
@@ -228,8 +230,7 @@ test.describe("Google Planilhas", () => {
     await previaGeral.getByRole("button", { name: "Fechar" }).last().click();
 
     // Prévia na Grade, sem enviar.
-    await trocarVisao(page, "Relatórios", "relatorios");
-    await page.getByRole("tab", { name: "Grade" }).click();
+    await selecionarRelatorio(page, "Grade");
     await escolherTurmaNaGrade(page, /E2E Ano A/);
     await page.getByRole("button", { name: "Enviar para a planilha" }).click();
     const dialogo = page.getByRole("dialog");
@@ -238,18 +239,15 @@ test.describe("Google Planilhas", () => {
 
     // Sem conexão, o envio fica bloqueado.
     await page.context().setOffline(true);
-    await expect(dialogo.getByText(/Sem conexão/)).toBeVisible();
+    await expect(dialogo.getByText("Sem conexão", { exact: true })).toBeVisible();
     await expect(dialogo.getByRole("button", { name: "Enviar" })).toBeDisabled();
     await page.context().setOffline(false);
     await dialogo.getByRole("button", { name: "Cancelar" }).click();
 
     // Desconexão, na zona de risco.
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações" }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Planilhas", exact: true })
-      .click();
+    await abrirConfiguracoesDaGestao(page);
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
     await selecionarAcaoPlanilha(cartao, "Configurar");
     await cartao.getByRole("button", { name: "Zona de risco" }).click();
     await cartao.getByRole("button", { name: "Desconectar" }).click();
@@ -262,8 +260,7 @@ test.describe("Google Planilhas", () => {
   test("baixa o CSV da turma de origem", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
-    await trocarVisao(page, "Relatórios", "relatorios");
-    await page.getByRole("tab", { name: "Grade" }).click();
+    await selecionarRelatorio(page, "Grade");
     const grade = page.locator('section[aria-label="Grade de frequência"]');
     const pilula = grade.getByRole("button", { name: /E2E Ano A/ });
     if (await pilula.isVisible().catch(() => false)) await pilula.click();

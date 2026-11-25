@@ -3,17 +3,23 @@
 // Gráfico personalizado de infrequência, com consulta explícita de período
 // e filtros por série e turma, usando apenas chamadas salvas.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import Box from "@mui/material/Box";
+import Grid from "@mui/material/Grid";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type { Aluno, Frequencia, Serie, Turma } from "@/domain/frequencia";
 import { LIMITE_DIAS_PERIODO, rotuloData } from "@/domain/frequencia";
 import { ausencias, distribuicaoDoPeriodo, infrequencia } from "@/domain/relatorios";
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Selecionar } from "@/components/ui/selecionar";
+import { Alerta } from "@/components/ui/mui/alerta";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { Cartao, CartaoCabecalho, CartaoConteudo, CartaoTitulo } from "@/components/ui/mui/cartao";
+import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
+import { categoriasDaSerie } from "@/components/painel/categorias-do-painel";
 
 interface Props {
   diaCorrente: string;
@@ -102,153 +108,203 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
   });
 
   return (
-    <section aria-label="Infrequência personalizada" className="superficie space-y-5 p-4">
-      <header>
-        <h2 className="font-medium">Infrequência por período</h2>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Escolha as datas e o recorte para comparar as faltas das chamadas salvas.
-        </p>
-      </header>
-      <form
-        className="space-y-4"
-        onSubmit={(evento) => {
-          evento.preventDefault();
-          void gerar();
-        }}
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-2">
-            <Label htmlFor="periodo-painel-de">Data inicial</Label>
-            <SeletorPeriodo
-              id="periodo-painel-de"
-              modo="dia"
-              valor={de}
-              max={diaCorrente}
-              disabled={executando}
-              rotuloAcessivel="Data inicial do gráfico"
-              rotulo={rotuloData(de)}
-              onValor={(valor) => {
-                setDe(valor);
-                invalidar();
-              }}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="periodo-painel-ate">Data final</Label>
-            <SeletorPeriodo
-              id="periodo-painel-ate"
-              modo="dia"
-              valor={ate}
-              max={diaCorrente}
-              disabled={executando}
-              rotuloAcessivel="Data final do gráfico"
-              rotulo={rotuloData(ate)}
-              onValor={(valor) => {
-                setAte(valor);
-                invalidar();
-              }}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="periodo-painel-serie">Série</Label>
-            <Selecionar
-              id="periodo-painel-serie"
-              value={serieId}
-              disabled={executando}
-              onValueChange={(valor) => {
-                setSerieId(valor);
-                setTurmaId("todas");
-                invalidar();
-              }}
-              opcoes={[
-                { valor: "todas", rotulo: "Todas as séries" },
-                ...series.map((item) => ({ valor: item.id, rotulo: item.nome })),
-              ]}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="periodo-painel-turma">Turma</Label>
-            <Selecionar
-              id="periodo-painel-turma"
-              value={turmaId}
-              disabled={executando || serieId === "todas"}
-              onValueChange={(valor) => {
-                setTurmaId(valor);
-                invalidar();
-              }}
-              opcoes={[
-                { valor: "todas", rotulo: "Todas as turmas" },
-                ...turmasDisponiveis.map((item) => ({ valor: item.id, rotulo: item.rotulo })),
-              ]}
-            />
-          </div>
-        </div>
-        <Button type="submit" disabled={executando}>
-          {executando && <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />}
-          {executando ? "Gerando gráfico..." : "Gerar gráfico"}
-        </Button>
-      </form>
-      {erro && (
-        <p role="alert" className="text-falta-texto text-sm">
-          {erro}
-        </p>
-      )}
-      {executando && (
-        <p role="status" className="text-muted-foreground text-sm">
-          Carregando chamadas do período...
-        </p>
-      )}
-      {resultado !== null && (
-        <div aria-live="polite" className="space-y-4 border-t pt-4">
-          <p className="numerais-tabulares text-sm font-medium">
-            De {rotuloData(de)} a {rotuloData(ate)}
-          </p>
-          <div
-            role="group"
-            aria-label="Resumo do período"
-            className="grid grid-cols-2 gap-3 sm:grid-cols-4"
+    <Cartao component="section" aria-label="Infrequência personalizada">
+      <CartaoCabecalho>
+        <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+          <CartaoTitulo>Infrequência por período</CartaoTitulo>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Compare as faltas das chamadas salvas no período e no recorte escolhidos.
+          </Typography>
+        </Stack>
+      </CartaoCabecalho>
+      <CartaoConteudo>
+        <Box
+          component="form"
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            void gerar();
+          }}
+        >
+          <Grid container spacing={2}>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Campo id="periodo-painel-de" rotulo="Data inicial">
+                <SeletorPeriodo
+                  id="periodo-painel-de"
+                  modo="dia"
+                  valor={de}
+                  max={diaCorrente}
+                  disabled={executando}
+                  rotuloAcessivel="Data inicial do gráfico"
+                  rotulo={rotuloData(de)}
+                  onValor={(valor) => {
+                    setDe(valor);
+                    invalidar();
+                  }}
+                />
+              </Campo>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Campo id="periodo-painel-ate" rotulo="Data final">
+                <SeletorPeriodo
+                  id="periodo-painel-ate"
+                  modo="dia"
+                  valor={ate}
+                  max={diaCorrente}
+                  disabled={executando}
+                  rotuloAcessivel="Data final do gráfico"
+                  rotulo={rotuloData(ate)}
+                  onValor={(valor) => {
+                    setAte(valor);
+                    invalidar();
+                  }}
+                />
+              </Campo>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Campo id="periodo-painel-serie" rotulo="Série">
+                <Selecionar
+                  id="periodo-painel-serie"
+                  valor={serieId}
+                  disabled={executando}
+                  onValor={(valor) => {
+                    setSerieId(valor);
+                    setTurmaId("todas");
+                    invalidar();
+                  }}
+                  opcoes={[
+                    { valor: "todas", rotulo: "Todas as séries" },
+                    ...series.map((item) => ({ valor: item.id, rotulo: item.nome })),
+                  ]}
+                />
+              </Campo>
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6 }}>
+              <Campo id="periodo-painel-turma" rotulo="Turma">
+                <Selecionar
+                  id="periodo-painel-turma"
+                  valor={turmaId}
+                  disabled={executando || serieId === "todas"}
+                  onValor={(valor) => {
+                    setTurmaId(valor);
+                    invalidar();
+                  }}
+                  opcoes={[
+                    { valor: "todas", rotulo: "Todas as turmas" },
+                    ...turmasDisponiveis.map((item) => ({ valor: item.id, rotulo: item.rotulo })),
+                  ]}
+                />
+              </Campo>
+            </Grid>
+          </Grid>
+          <Box sx={{ mt: 2 }}>
+            <Botao type="submit" variante="secundario" carregando={executando}>
+              Gerar gráfico
+            </Botao>
+          </Box>
+        </Box>
+        {erro ? (
+          <Alerta severity="error" role="alert">
+            {erro}
+          </Alerta>
+        ) : null}
+        {executando ? (
+          <Alerta severity="info" role="status">
+            Carregando chamadas do período...
+          </Alerta>
+        ) : null}
+        {resultado !== null ? (
+          <Box
+            aria-live="polite"
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 2,
+              borderTop: 1,
+              borderColor: "divider",
+              pt: 2,
+            }}
           >
-            {[
-              ["Faltas (F + FJ)", String(ausencias(resumo))],
-              ["Registros de aluno por dia", String(resumo.registrados)],
-              ["Presenças parciais", String(resumo.parciais)],
-              [
-                "Infrequência",
-                resumo.registrados > 0 ? percentual.format(infrequencia(resumo)) : "Sem dados",
-              ],
-            ].map(([rotulo, valor]) => (
-              <div
-                key={rotulo}
-                className="superficie flex flex-col items-center gap-1 p-3 text-center"
-              >
-                <strong className="numerais-tabulares text-xl font-semibold">{valor}</strong>
-                <span className="text-muted-foreground text-xs">{rotulo}</span>
-              </div>
-            ))}
-          </div>
-          <GraficoRosca
-            tomValores="falta"
-            titulo={
-              serie ? `Faltas do período por turma da ${serie.nome}` : "Faltas do período por série"
-            }
-            fatias={selecionados.map((item) => ({
-              nome: "rotulo" in item ? item.rotulo : item.nome,
-              valor: ausencias(item),
-              detalhe: `${percentual.format(infrequencia(item))} de infrequência`,
-            }))}
-            vazio={
-              resumo.registrados === 0
-                ? "Nenhuma chamada salva neste período e recorte"
-                : "Nenhuma falta registrada neste período e recorte"
-            }
-          />
-          <p className="text-muted-foreground text-sm">
-            A taxa considera F + FJ sobre os registros de aluno por dia com chamada salva. Dias sem
-            chamada ficam fora do cálculo. A rosca mostra a distribuição das faltas por{" "}
-            {serie ? "turma atual" : "série atual"}.
-          </p>
-        </div>
-      )}
-    </section>
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
+            >
+              De {rotuloData(de)} a {rotuloData(ate)}
+            </Typography>
+            <Box role="group" aria-label="Resumo do período">
+              <Grid container spacing={2}>
+                {[
+                  ["Faltas (F + FJ)", String(ausencias(resumo))],
+                  ["Registros de aluno por dia", String(resumo.registrados)],
+                  ["Presenças parciais", String(resumo.parciais)],
+                  [
+                    "Infrequência",
+                    resumo.registrados > 0 ? percentual.format(infrequencia(resumo)) : "Sem dados",
+                  ],
+                ].map(([rotulo, valor]) => (
+                  <Grid key={rotulo} size={{ xs: 6, sm: 3 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 0.5,
+                        p: 1.5,
+                        textAlign: "center",
+                        border: 1,
+                        borderColor: "divider",
+                        borderRadius: 1,
+                        backgroundColor: "action.hover",
+                      }}
+                    >
+                      <Typography
+                        component="strong"
+                        variant="h6"
+                        sx={{ fontVariantNumeric: "tabular-nums", fontWeight: 600 }}
+                      >
+                        {valor}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {rotulo}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+            <GraficoRosca
+              titulo={
+                serie
+                  ? `Faltas do período por turma da ${serie.nome}`
+                  : "Faltas do período por série"
+              }
+              categorias={
+                serie
+                  ? categoriasDaSerie(serie.serieId, turmas, alunos)
+                  : series.map((item) => item.id)
+              }
+              fatias={selecionados.map((item) => ({
+                categoriaId: "turmaId" in item ? item.turmaId : item.serieId,
+                nome: "rotulo" in item ? item.rotulo : item.nome,
+                valor: ausencias(item),
+                detalhe:
+                  item.registrados > 0
+                    ? `${percentual.format(infrequencia(item))} de infrequência`
+                    : "Sem dados de infrequência",
+              }))}
+              vazio={
+                resumo.registrados === 0
+                  ? "Nenhuma chamada salva neste período e recorte"
+                  : "Nenhuma falta registrada neste período e recorte"
+              }
+            />
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              A taxa considera F + FJ sobre os registros de aluno por dia com chamada salva. Dias
+              sem chamada ficam fora do cálculo. A rosca mostra a distribuição das faltas por{" "}
+              {serie ? "turma atual" : "série atual"}.
+            </Typography>
+          </Box>
+        ) : null}
+      </CartaoConteudo>
+    </Cartao>
   );
 }

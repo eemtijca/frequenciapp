@@ -1,9 +1,10 @@
 "use client";
 
-// Gestão: área do administrador. Séries, turmas, alunos, equipe, diretores
-// de turma e configurações em abas curtas.
-import { GraduationCap, ListChecks, School, Settings2, UserRoundCheck, Users } from "lucide-react";
+// Mantém os painéis de Gestão montados sob a seleção da gaveta.
 import { useEffect, useState } from "react";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type {
   Aluno,
   Configuracoes,
@@ -12,8 +13,13 @@ import type {
   Serie,
   Turma,
 } from "@/domain/frequencia";
-import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
-import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
+import { PaineisVisitados } from "@/components/gestao/paineis-visitados";
+import {
+  CADASTROS_GESTAO,
+  type DestinoGestao,
+  type DestinoConfiguracoes,
+} from "@/components/gestao/destinos-gestao";
+import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
 import AbaSeries from "@/components/gestao/abas/aba-series";
 import AbaTurmas from "@/components/gestao/abas/aba-turmas";
 import AbaAlunos from "@/components/gestao/abas/aba-alunos";
@@ -23,10 +29,9 @@ import AbaConfiguracoes from "@/components/gestao/abas/aba-configuracoes";
 import { avisarInfo } from "@/lib/avisos";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
-export type Aba = "series" | "turmas" | "alunos" | "equipe" | "diretores" | "configuracoes";
-
 interface Props {
-  abaInicial?: Aba;
+  destino: DestinoGestao;
+  destinoConfiguracoes: DestinoConfiguracoes;
   planilhaInicial?: "FREQUENCIA" | "SAIDAS" | "PARCIAL";
   usuarioId: string;
   series: Serie[];
@@ -50,17 +55,9 @@ interface Props {
   onAbrirParcial?: () => void;
 }
 
-const ABAS: AbaItem<Aba>[] = [
-  { valor: "series", rotulo: "Séries", icone: GraduationCap },
-  { valor: "turmas", rotulo: "Turmas", icone: School },
-  { valor: "alunos", rotulo: "Alunos", icone: ListChecks },
-  { valor: "equipe", rotulo: "Equipe", icone: Users },
-  { valor: "diretores", rotulo: "Diretores", rotuloCurto: "Diretores", icone: UserRoundCheck },
-  { valor: "configuracoes", rotulo: "Configurações", rotuloCurto: "Config.", icone: Settings2 },
-];
-
 export default function VistaGestao({
-  abaInicial = "series",
+  destino,
+  destinoConfiguracoes,
   planilhaInicial,
   usuarioId,
   series,
@@ -86,7 +83,6 @@ export default function VistaGestao({
   const [atualizacao, setAtualizacao] = useState(0);
   const [horariosPendentes, setHorariosPendentes] = useState(false);
   const [configPendente, setConfigPendente] = useState(false);
-
   useEffect(() => {
     onPendenciaHorarios?.(horariosPendentes);
   }, [horariosPendentes, onPendenciaHorarios]);
@@ -109,67 +105,79 @@ export default function VistaGestao({
     setAtualizacao((valor) => valor + 1);
   });
 
-  return (
-    <section aria-label="Gestão da escola" className="flex flex-col gap-4 pb-6">
-      <h1 className="sr-only">Gestão</h1>
-      <div className="flex justify-end">
-        <AtualizadoDaVisao fuso={fuso} />
-      </div>
+  const itens = [
+    {
+      valor: "series" as const,
+      conteudo: <AbaSeries series={series} onMudanca={onSeriesMudaram} />,
+    },
+    {
+      valor: "turmas" as const,
+      conteudo: (
+        <AbaTurmas
+          series={series}
+          turmas={turmas}
+          onMudanca={onTurmasMudaram}
+          onOrdenacao={onAlunosMudaram}
+        />
+      ),
+    },
+    {
+      valor: "alunos" as const,
+      conteudo: <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />,
+    },
+    {
+      valor: "equipe" as const,
+      conteudo: (
+        <AbaEquipe usuarioId={usuarioId} onMudanca={onTurmasMudaram} atualizacao={atualizacao} />
+      ),
+    },
+    {
+      valor: "diretores" as const,
+      conteudo: (
+        <AbaDiretores turmas={turmas} diaCorrente={diaCorrente} atualizacao={atualizacao} />
+      ),
+    },
+    {
+      valor: "configuracoes" as const,
+      conteudo: (
+        <AbaConfiguracoes
+          destino={destinoConfiguracoes}
+          planilhaInicial={planilhaInicial}
+          configuracoes={configuracoes}
+          series={series}
+          justificativas={justificativas}
+          liberadores={liberadores}
+          turmas={turmas}
+          diaCorrente={diaCorrente}
+          fuso={fuso}
+          atualizacao={atualizacao}
+          onMudanca={onConfiguracoesMudaram}
+          onJustificativasMudaram={onJustificativasMudaram}
+          onLiberadoresMudaram={onLiberadoresMudaram}
+          onHorariosMudaram={onHorariosMudaram}
+          onPendenciaHorarios={setHorariosPendentes}
+          onPendenciaConfiguracoes={setConfigPendente}
+          onAbrirSaidas={onAbrirSaidas}
+          onAbrirParcial={onAbrirParcial}
+        />
+      ),
+    },
+  ];
 
-      <AbasDeslizantes
-        rotuloAcessivel="Áreas de gestão"
-        abaInicial={abaInicial}
-        abas={ABAS}
-        dataPager="gestao"
+  return (
+    <Box component="section" aria-label="Gestão da escola" sx={{ pb: 3 }}>
+      <Stack
+        component="header"
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1}
+        sx={{ justifyContent: "space-between", mb: 2 }}
       >
-        {(aba) => (
-          <>
-            {aba === "series" && <AbaSeries series={series} onMudanca={onSeriesMudaram} />}
-            {aba === "turmas" && (
-              <AbaTurmas
-                series={series}
-                turmas={turmas}
-                onMudanca={onTurmasMudaram}
-                onOrdenacao={onAlunosMudaram}
-              />
-            )}
-            {aba === "alunos" && (
-              <AbaAlunos turmas={turmas} alunos={alunos} onMudanca={onAlunosMudaram} />
-            )}
-            {aba === "equipe" && (
-              <AbaEquipe
-                usuarioId={usuarioId}
-                onMudanca={onTurmasMudaram}
-                atualizacao={atualizacao}
-              />
-            )}
-            {aba === "diretores" && (
-              <AbaDiretores turmas={turmas} diaCorrente={diaCorrente} atualizacao={atualizacao} />
-            )}
-            {aba === "configuracoes" && (
-              <AbaConfiguracoes
-                planilhaInicial={planilhaInicial}
-                configuracoes={configuracoes}
-                series={series}
-                justificativas={justificativas}
-                liberadores={liberadores}
-                turmas={turmas}
-                diaCorrente={diaCorrente}
-                fuso={fuso}
-                atualizacao={atualizacao}
-                onMudanca={onConfiguracoesMudaram}
-                onJustificativasMudaram={onJustificativasMudaram}
-                onLiberadoresMudaram={onLiberadoresMudaram}
-                onHorariosMudaram={onHorariosMudaram}
-                onPendenciaHorarios={setHorariosPendentes}
-                onPendenciaConfiguracoes={setConfigPendente}
-                onAbrirSaidas={onAbrirSaidas}
-                onAbrirParcial={onAbrirParcial}
-              />
-            )}
-          </>
-        )}
-      </AbasDeslizantes>
-    </section>
+        <Typography component="h1" variant="h4" tabIndex={-1} data-titulo-gestao="">
+          {destino === "configuracoes" ? "Configurações" : CADASTROS_GESTAO[destino]}
+        </Typography>
+        <AtualizadoDaVisao fuso={fuso} />
+      </Stack>
+      <PaineisVisitados ativo={destino} itens={itens} />
+    </Box>
   );
 }

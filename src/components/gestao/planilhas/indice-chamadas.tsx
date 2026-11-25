@@ -2,12 +2,20 @@
 
 // Criação e acesso ao índice das chamadas em um documento do Google Docs.
 import { useEffect, useState } from "react";
-import { ExternalLink, FileText, LoaderCircle, RefreshCw } from "lucide-react";
+import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import Box from "@mui/material/Box";
+import Link from "@mui/material/Link";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { corpoJson, pedir } from "@/lib/api-cliente";
 import { mensagemAmigavel } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface EstadoIndice {
   url: string | null;
@@ -62,96 +70,124 @@ export function IndiceChamadas({ disabled }: { disabled?: boolean }) {
   });
   const ocupado = disabled || executando;
   return (
-    <section className="superficie flex flex-col gap-2 p-3" aria-label="Índice das chamadas">
-      <div className="flex items-center gap-2 text-sm font-medium">
-        <FileText size={16} /> Índice das chamadas
-      </div>
-      <p className="text-muted-foreground text-xs">Google Docs com links por mês e turma.</p>
-      <div className="flex flex-wrap gap-2">
-        {estado?.url && (
-          <a
-            className="controle flex min-h-11 items-center gap-2 px-3 text-sm"
+    <Box
+      component="section"
+      aria-label="Índice das chamadas"
+      sx={(tema) => ({
+        display: "flex",
+        flexDirection: "column",
+        gap: 1,
+        padding: 2,
+        border: `1px solid ${tema.vars.palette.divider}`,
+        borderRadius: 2,
+        minWidth: 0,
+      })}
+    >
+      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+        <DescriptionRoundedIcon fontSize="small" aria-hidden="true" />
+        <Typography variant="subtitle2">Índice das chamadas</Typography>
+      </Stack>
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        Google Docs com links por mês e turma.
+      </Typography>
+      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", alignItems: "center" }}>
+        {estado?.url ? (
+          <Link
             href={estado.url}
             target="_blank"
             rel="noopener noreferrer"
+            underline="hover"
+            sx={{ display: "inline-flex", alignItems: "center", gap: 1, minHeight: 48 }}
           >
-            <ExternalLink size={16} /> Abrir índice
-          </a>
-        )}
-        {!estado?.pendente && (
-          <Button
+            <LaunchRoundedIcon fontSize="small" aria-hidden="true" />
+            Abrir índice
+          </Link>
+        ) : null}
+        {!estado?.pendente ? (
+          <Botao
             type="button"
-            variant="outline"
+            variante="contorno"
             disabled={ocupado || (!estado && !mensagem)}
             onClick={() => void executar()}
             aria-label={estado?.url ? "Atualizar índice" : undefined}
+            carregando={executando}
+            icone={<RefreshRoundedIcon />}
           >
-            {executando ? (
-              <LoaderCircle size={16} className="animate-spin" />
-            ) : (
-              <RefreshCw size={16} />
-            )}
             {estado?.url
               ? "Atualizar índice"
               : !estado && mensagem
                 ? "Tentar de novo"
                 : "Criar índice"}
-          </Button>
-        )}
-      </div>
-      {estado?.pendente && (
-        <div className="flex flex-col gap-2 text-sm">
+          </Botao>
+        ) : null}
+      </Stack>
+      {estado?.pendente ? (
+        <Stack spacing={1}>
           {confirmarCriacao ? (
             <>
-              <p>Uma nova tentativa pode criar outro documento no Drive.</p>
-              <Button type="button" disabled={ocupado} onClick={() => void executar()}>
-                Criar outro índice
-              </Button>
-              <Button
+              <Typography variant="body2">
+                Uma nova tentativa pode criar outro documento no Drive.
+              </Typography>
+              <Botao
                 type="button"
-                variant="outline"
+                variante="secundario"
+                disabled={ocupado}
+                onClick={() => void executar()}
+                sx={{ alignSelf: "flex-start" }}
+              >
+                Criar outro índice
+              </Botao>
+              <Botao
+                type="button"
+                variante="contorno"
                 disabled={ocupado}
                 onClick={() => setConfirmarCriacao(false)}
+                sx={{ alignSelf: "flex-start" }}
               >
                 Cancelar
-              </Button>
+              </Botao>
             </>
           ) : (
             <>
-              <p>Localize o índice no Google Drive para recuperar a criação anterior.</p>
-              <label htmlFor="indice-documento-url">Link do documento</label>
-              <Input
-                id="indice-documento-url"
-                type="url"
-                value={documentoUrl}
-                disabled={ocupado}
-                onChange={(evento) => setDocumentoUrl(evento.target.value)}
-              />
-              <Button
+              <Typography variant="body2">
+                Localize o índice no Google Drive para recuperar a criação anterior.
+              </Typography>
+              <Campo id="indice-documento-url" rotulo="Link do documento">
+                <CampoTexto
+                  id="indice-documento-url"
+                  tipo="url"
+                  valor={documentoUrl}
+                  onValor={setDocumentoUrl}
+                  disabled={ocupado}
+                />
+              </Campo>
+              <Botao
                 type="button"
-                variant="outline"
+                variante="contorno"
                 disabled={ocupado || !documentoUrl}
                 onClick={() => void executar()}
+                sx={{ alignSelf: "flex-start" }}
               >
                 Recuperar índice
-              </Button>
-              <Button
+              </Botao>
+              <Botao
                 type="button"
-                variant="ghost"
+                variante="texto"
                 disabled={ocupado}
                 onClick={() => setConfirmarCriacao(true)}
+                sx={{ alignSelf: "flex-start", minHeight: TOKENS_LAYOUT.alvoToque }}
               >
                 Não encontrei o documento
-              </Button>
+              </Botao>
             </>
           )}
-        </div>
-      )}
-      {mensagem && (
-        <p role="status" className="text-sm">
+        </Stack>
+      ) : null}
+      {mensagem ? (
+        <Typography role="status" variant="body2">
           {mensagem}
-        </p>
-      )}
-    </section>
+        </Typography>
+      ) : null}
+    </Box>
   );
 }

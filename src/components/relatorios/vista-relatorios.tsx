@@ -1,8 +1,8 @@
 "use client";
 
-// Relatórios em sub-abas: frequência, acompanhamento individual e movimentações por turma.
-import { ArrowRightLeft, ChartNoAxesCombined, History, Table2, UserRound } from "lucide-react";
+// Mantém os painéis de Relatórios montados sob a seleção da gaveta.
 import { useState } from "react";
+import Box from "@mui/material/Box";
 import type {
   Aluno,
   Frequencia,
@@ -11,8 +11,10 @@ import type {
   Serie,
   Turma,
 } from "@/domain/frequencia";
-import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
-import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
+import { PaineisVisitados } from "@/components/gestao/paineis-visitados";
+import type { DestinoRelatorios } from "@/components/relatorios/navegacao-relatorios";
+import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
+import { ProvedorVisibilidadeGraficos } from "@/components/graficos/visibilidade-graficos";
 import VistaHistorico from "@/components/relatorios/historico/vista-historico";
 import VistaGrade from "@/components/grade/vista-grade";
 import PorAluno from "@/components/relatorios/por-aluno";
@@ -20,10 +22,8 @@ import ResumoRelatorios from "@/components/relatorios/vista-resumo-relatorios";
 import VistaMovimentacoes from "@/components/relatorios/vista-movimentacoes";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
-export type AbaRelatorio = "resumo" | "historico" | "grade" | "aluno" | "movimentacoes";
-
 interface Props {
-  abaInicial?: AbaRelatorio;
+  destino: DestinoRelatorios;
   ativo?: boolean;
   mes: string;
   mesCorrente: string;
@@ -45,21 +45,8 @@ interface Props {
   onRecarregar: (mes: string) => Promise<void>;
 }
 
-const ABAS: AbaItem<AbaRelatorio>[] = [
-  { valor: "resumo", rotulo: "Resumo", icone: ChartNoAxesCombined },
-  { valor: "historico", rotulo: "Histórico", icone: History },
-  { valor: "grade", rotulo: "Grade", icone: Table2 },
-  { valor: "aluno", rotulo: "Por aluno", icone: UserRound },
-  {
-    valor: "movimentacoes",
-    rotulo: "Saídas e Entradas",
-    rotuloCurto: "Mov.",
-    icone: ArrowRightLeft,
-  },
-];
-
 export default function VistaRelatorios({
-  abaInicial,
+  destino,
   ativo = true,
   mes,
   mesCorrente,
@@ -80,99 +67,116 @@ export default function VistaRelatorios({
   onAbrir,
   onRecarregar,
 }: Props) {
-  const inicial = ABAS.some((item) => item.valor === abaInicial)
-    ? (abaInicial as AbaRelatorio)
-    : "resumo";
   const [atualizacao, setAtualizacao] = useState(0);
   useAtualizacaoTela("relatorios", async () => {
     await onRecarregar(mes);
     setAtualizacao((valor) => valor + 1);
   });
 
-  return (
-    <section aria-label="Relatórios" className="flex flex-col gap-4 pb-6">
-      <h1 className="sr-only">Relatórios</h1>
-      <div className="flex justify-end">
-        <AtualizadoDaVisao fuso={fuso} />
-      </div>
+  const itens = [
+    {
+      valor: "resumo" as const,
+      conteudo: (
+        <ProvedorVisibilidadeGraficos visivel={destino === "resumo"}>
+          <ResumoRelatorios
+            mes={mes}
+            mesCorrente={mesCorrente}
+            diaCorrente={diaCorrente}
+            series={series}
+            turmas={turmas}
+            alunos={alunos}
+            frequencias={frequencias}
+            bloqueado={bloqueado}
+            carregando={carregando}
+            erro={erro}
+            onMes={onMes}
+          />
+        </ProvedorVisibilidadeGraficos>
+      ),
+    },
+    {
+      valor: "historico" as const,
+      conteudo: (
+        <ProvedorVisibilidadeGraficos visivel={destino === "historico"}>
+          <VistaHistorico
+            frequencias={frequencias}
+            turmas={turmas}
+            series={series}
+            mes={mes}
+            mesCorrente={mesCorrente}
+            fuso={fuso}
+            onMes={onMes}
+            onAbrir={onAbrir}
+            bloqueado={bloqueado}
+            rotuloTurma={rotuloTurma}
+          />
+        </ProvedorVisibilidadeGraficos>
+      ),
+    },
+    {
+      valor: "grade" as const,
+      conteudo: (
+        <ProvedorVisibilidadeGraficos visivel={destino === "grade"}>
+          <VistaGrade
+            alunos={alunos}
+            frequencias={frequencias}
+            resumo={resumo}
+            mes={mes}
+            mesCorrente={mesCorrente}
+            hoje={diaCorrente}
+            aberto={ativo && destino === "grade"}
+            versao={versao}
+            atualizacao={atualizacao}
+            origens={turmas}
+            onMes={onMes}
+          />
+        </ProvedorVisibilidadeGraficos>
+      ),
+    },
+    {
+      valor: "aluno" as const,
+      conteudo: (
+        <ProvedorVisibilidadeGraficos visivel={destino === "aluno"}>
+          <PorAluno
+            alunos={alunos}
+            series={series}
+            turmas={turmas}
+            frequencias={frequencias}
+            saidas={saidas}
+            resumo={resumo}
+            mes={mes}
+            mesCorrente={mesCorrente}
+            onMes={onMes}
+          />
+        </ProvedorVisibilidadeGraficos>
+      ),
+    },
+    {
+      valor: "movimentacoes" as const,
+      conteudo: (
+        <ProvedorVisibilidadeGraficos visivel={destino === "movimentacoes"}>
+          <VistaMovimentacoes
+            hoje={diaCorrente}
+            turmas={turmas}
+            alunos={alunos}
+            ativa={ativo && destino === "movimentacoes"}
+            atualizacao={atualizacao}
+          />
+        </ProvedorVisibilidadeGraficos>
+      ),
+    },
+  ];
 
-      <AbasDeslizantes
-        rotuloAcessivel="Relatórios"
-        abaInicial={inicial}
-        abas={ABAS}
-        dataPager="relatorios"
-      >
-        {(aba, ativa) => (
-          <>
-            {aba === "resumo" && (
-              <ResumoRelatorios
-                mes={mes}
-                mesCorrente={mesCorrente}
-                diaCorrente={diaCorrente}
-                series={series}
-                turmas={turmas}
-                alunos={alunos}
-                frequencias={frequencias}
-                bloqueado={bloqueado}
-                carregando={carregando}
-                erro={erro}
-                onMes={onMes}
-              />
-            )}
-            {aba === "historico" && (
-              <VistaHistorico
-                frequencias={frequencias}
-                turmas={turmas}
-                series={series}
-                mes={mes}
-                mesCorrente={mesCorrente}
-                fuso={fuso}
-                onMes={onMes}
-                onAbrir={onAbrir}
-                bloqueado={bloqueado}
-                rotuloTurma={rotuloTurma}
-              />
-            )}
-            {aba === "grade" && (
-              <VistaGrade
-                alunos={alunos}
-                frequencias={frequencias}
-                resumo={resumo}
-                mes={mes}
-                mesCorrente={mesCorrente}
-                hoje={diaCorrente}
-                aberto={ativo && ativa}
-                versao={versao}
-                atualizacao={atualizacao}
-                origens={turmas}
-                onMes={onMes}
-              />
-            )}
-            {aba === "aluno" && (
-              <PorAluno
-                alunos={alunos}
-                series={series}
-                turmas={turmas}
-                frequencias={frequencias}
-                saidas={saidas}
-                resumo={resumo}
-                mes={mes}
-                mesCorrente={mesCorrente}
-                onMes={onMes}
-              />
-            )}
-            {aba === "movimentacoes" && (
-              <VistaMovimentacoes
-                hoje={diaCorrente}
-                turmas={turmas}
-                alunos={alunos}
-                ativa={ativo && ativa}
-                atualizacao={atualizacao}
-              />
-            )}
-          </>
-        )}
-      </AbasDeslizantes>
-    </section>
+  return (
+    <Box
+      component="section"
+      aria-label="Relatórios"
+      sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 3, minWidth: 0 }}
+    >
+      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+        <AtualizadoDaVisao fuso={fuso} />
+      </Box>
+      <PaineisVisitados itens={itens} ativo={destino} />
+    </Box>
   );
 }

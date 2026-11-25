@@ -3,7 +3,14 @@
 // Parâmetros de acesso no rascunho: validade da palavra-chave, sessão do
 // diretor, limites de tentativa, o que o diretor vê e o limite de risco.
 import { useState } from "react";
-import { Clock, Eye, LockKeyhole, ShieldCheck } from "lucide-react";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import RemoveRedEyeRoundedIcon from "@mui/icons-material/RemoveRedEyeRounded";
+import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Typography from "@mui/material/Typography";
+import type { SvgIconComponent } from "@mui/icons-material";
 import {
   CATEGORIAS_DIRETOR,
   FAIXAS_PARAMETROS,
@@ -12,24 +19,48 @@ import {
   type ParametroNumerico,
   type ParametrosAcesso,
 } from "@/domain/diretores";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
-import { Selo } from "@/components/ui/selo";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Selo } from "@/components/ui/mui/selo";
+import SecaoConfiguracao from "./secao-configuracao";
 
 const GRUPOS = [
   {
     titulo: "Sessão e validade",
-    icone: Clock,
+    icone: AccessTimeRoundedIcon,
     campos: ["validadePalavraDias", "sessaoDiretorHoras"],
   },
   {
     titulo: "Segurança da entrada",
-    icone: LockKeyhole,
+    icone: LockRoundedIcon,
     campos: ["tentativasPorOrigem", "tentativasPorLogin", "janelaMinutos"],
   },
-] as const;
+] as const satisfies readonly {
+  titulo: string;
+  icone: SvgIconComponent;
+  campos: readonly ParametroNumerico[];
+}[];
+
+const GRUPO = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  padding: 2,
+  border: 1,
+  borderColor: "divider",
+  borderRadius: 2,
+  margin: 0,
+  minWidth: 0,
+} as const;
+
+const LEGENDA = {
+  display: "flex",
+  alignItems: "center",
+  gap: 1,
+  paddingX: 1,
+  fontWeight: 600,
+} as const;
 
 export default function SecaoAcessoDiretores({
   parametros,
@@ -38,7 +69,6 @@ export default function SecaoAcessoDiretores({
   parametros: ParametrosAcesso;
   onMudar: (parametros: ParametrosAcesso) => void;
 }) {
-  const [aberto, setAberto] = useState(false);
   const [textos, setTextos] = useState<Partial<Record<ParametroNumerico, string>>>({});
   const [erro, setErro] = useState("");
   const [parametrosAnteriores, setParametrosAnteriores] = useState(parametros);
@@ -80,12 +110,10 @@ export default function SecaoAcessoDiretores({
   }
 
   return (
-    <SecaoRecolhivel
-      dataSecao="config-acesso-diretores"
+    <SecaoConfiguracao
+      id="config-acesso-diretores"
       titulo="Acesso dos diretores de turma"
-      icone={ShieldCheck}
-      aberto={aberto}
-      onAbertoChange={setAberto}
+      descricao="Ajuste a validade, a segurança da entrada e o que os diretores de turma podem ver. As mudanças entram no rascunho."
       resumo={
         <>
           <Selo>Palavra por {parametros.validadePalavraDias} dias</Selo>
@@ -98,92 +126,92 @@ export default function SecaoAcessoDiretores({
         </>
       }
     >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(evento) => evento.preventDefault()}
+      <Box
+        component="form"
         noValidate
+        onSubmit={(evento) => evento.preventDefault()}
+        sx={{ display: "flex", flexDirection: "column", gap: 2 }}
       >
         {GRUPOS.map(({ titulo, icone: Icone, campos }) => (
-          <fieldset key={titulo} className="rounded-xl border p-3">
-            <legend className="flex items-center gap-2 px-1 text-sm font-medium">
-              <Icone size={16} aria-hidden="true" /> {titulo}
-            </legend>
-            {titulo === "Segurança da entrada" && (
-              <p className="text-muted-foreground mb-3 text-xs">Limites para todos os perfis.</p>
-            )}
-            <div className="grid gap-3 sm:grid-cols-2">
+          <Box key={titulo} component="fieldset" sx={GRUPO}>
+            <Typography component="legend" variant="subtitle2" sx={LEGENDA}>
+              <Icone fontSize="small" aria-hidden="true" /> {titulo}
+            </Typography>
+            {titulo === "Segurança da entrada" ? (
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Limites para todos os perfis.
+              </Typography>
+            ) : null}
+            <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { sm: "1fr 1fr" } }}>
               {campos.map((campo) => {
                 const faixa = FAIXAS_PARAMETROS[campo];
                 return (
-                  <div key={campo} className="flex min-w-0 flex-col gap-1.5">
-                    <Label htmlFor={`parametro-${campo}`}>{faixa.rotulo}</Label>
-                    <Input
+                  <Campo
+                    key={campo}
+                    id={`parametro-${campo}`}
+                    rotulo={faixa.rotulo}
+                    descricao={`${faixa.unidade} · ${faixa.minimo} a ${faixa.maximo}`}
+                  >
+                    <CampoTexto
                       id={`parametro-${campo}`}
-                      type="number"
+                      valor={textos[campo] ?? String(parametros[campo])}
+                      onValor={(valor) => alterarNumero(campo, valor)}
                       inputMode="numeric"
-                      min={faixa.minimo}
-                      max={faixa.maximo}
-                      value={textos[campo] ?? String(parametros[campo])}
-                      onChange={(evento) => alterarNumero(campo, evento.target.value)}
-                      aria-describedby={`parametro-${campo}-limites`}
-                      className="h-11"
                     />
-                    <p id={`parametro-${campo}-limites`} className="text-muted-foreground text-xs">
-                      {faixa.unidade} · {faixa.minimo} a {faixa.maximo}
-                    </p>
-                  </div>
+                  </Campo>
                 );
               })}
-            </div>
-          </fieldset>
+            </Box>
+          </Box>
         ))}
-        <fieldset className="flex flex-col gap-3 rounded-xl border p-3">
-          <legend className="flex items-center gap-2 px-1 text-sm font-medium">
-            <Eye size={16} aria-hidden="true" /> O que o diretor vê
-          </legend>
-          <div className="grid gap-2 sm:grid-cols-2">
+        <Box component="fieldset" sx={GRUPO}>
+          <Typography component="legend" variant="subtitle2" sx={LEGENDA}>
+            <RemoveRedEyeRoundedIcon fontSize="small" aria-hidden="true" /> O que o diretor vê
+          </Typography>
+          <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: { sm: "1fr 1fr" } }}>
             {CATEGORIAS_DIRETOR.map((categoria) => (
-              <label
+              <FormControlLabel
                 key={categoria}
-                className="bg-muted/40 flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm"
-              >
-                <input
-                  type="checkbox"
-                  checked={parametros.categoriasDiretor.includes(categoria)}
-                  disabled={categoria === "faltas"}
-                  onChange={(evento) => alternarCategoria(categoria, evento.target.checked)}
-                  className="size-4 accent-[var(--primary)]"
-                />
-                {ROTULOS_CATEGORIA_DIRETOR[categoria]}
-              </label>
+                control={
+                  <Checkbox
+                    checked={parametros.categoriasDiretor.includes(categoria)}
+                    disabled={categoria === "faltas"}
+                    onChange={(evento) => alternarCategoria(categoria, evento.target.checked)}
+                  />
+                }
+                label={ROTULOS_CATEGORIA_DIRETOR[categoria]}
+                sx={(tema) => ({
+                  minHeight: 48,
+                  margin: 0,
+                  paddingX: 1,
+                  borderRadius: 2,
+                  backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 5%, transparent)`,
+                })}
+              />
             ))}
-          </div>
-          <p className="text-muted-foreground text-xs">
+          </Box>
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             Faltas sempre visíveis. Libere dados sensíveis apenas quando necessário.
-          </p>
-          <div className="flex flex-col gap-1.5 border-t pt-3">
-            <Label htmlFor="parametro-limiteRiscoPercentual">
-              {FAIXAS_PARAMETROS.limiteRiscoPercentual.rotulo}
-            </Label>
-            <Input
+          </Typography>
+          <Box sx={{ borderTop: 1, borderColor: "divider", paddingTop: 2 }}>
+            <Campo
               id="parametro-limiteRiscoPercentual"
-              type="number"
-              inputMode="numeric"
-              min={FAIXAS_PARAMETROS.limiteRiscoPercentual.minimo}
-              max={FAIXAS_PARAMETROS.limiteRiscoPercentual.maximo}
-              value={textos.limiteRiscoPercentual ?? String(parametros.limiteRiscoPercentual)}
-              onChange={(evento) => alterarNumero("limiteRiscoPercentual", evento.target.value)}
-              aria-describedby="parametro-risco-limites"
-              className="h-11 sm:max-w-48"
-            />
-            <p id="parametro-risco-limites" className="text-muted-foreground text-xs">
-              De {FAIXAS_PARAMETROS.limiteRiscoPercentual.minimo} a{" "}
-              {FAIXAS_PARAMETROS.limiteRiscoPercentual.maximo}% dos dias com chamada.
-            </p>
-          </div>
-        </fieldset>
-        {erro && <AvisoCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />}
-      </form>
-    </SecaoRecolhivel>
+              rotulo={FAIXAS_PARAMETROS.limiteRiscoPercentual.rotulo}
+              descricao={`De ${FAIXAS_PARAMETROS.limiteRiscoPercentual.minimo} a ${FAIXAS_PARAMETROS.limiteRiscoPercentual.maximo}% dos dias com chamada.`}
+            >
+              <CampoTexto
+                id="parametro-limiteRiscoPercentual"
+                valor={textos.limiteRiscoPercentual ?? String(parametros.limiteRiscoPercentual)}
+                onValor={(valor) => alterarNumero("limiteRiscoPercentual", valor)}
+                inputMode="numeric"
+              />
+            </Campo>
+          </Box>
+        </Box>
+        {erro ? (
+          <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
+        ) : null}
+      </Box>
+    </SecaoConfiguracao>
   );
 }

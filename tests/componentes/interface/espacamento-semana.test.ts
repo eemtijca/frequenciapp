@@ -5,7 +5,6 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
 import { chromium, type Browser } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -23,7 +22,6 @@ beforeAll(async () => {
     configFile: false,
     cacheDir: cache,
     define: { "process.env": "{}" },
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { port: 0, hmr: false, watch: { ignored: ["**/*"] } },
@@ -46,10 +44,6 @@ it("mantém gráficos e cartões sem colisão em cada largura e tema", async () 
     for (const tema of ["light", "dark"]) {
       const page = await browser.newPage({ viewport: { width, height: 900 } });
       try {
-        await page.addInitScript(
-          (temaAtual) => document.documentElement.classList.toggle("dark", temaAtual === "dark"),
-          tema,
-        );
         await page.route("**/api/frequencias?**", (route) =>
           route.fulfill({
             json: {
@@ -70,12 +64,13 @@ it("mantém gráficos e cartões sem colisão em cada largura e tema", async () 
             },
           }),
         );
-        await page.goto(url);
+        await page.goto(`${url}?tema=${tema}`);
         await page.getByRole("region", { name: "Resumo da semana" }).waitFor();
-        await page.evaluate(
-          (temaAtual) => document.documentElement.classList.toggle("dark", temaAtual === "dark"),
-          tema,
-        );
+        await expect
+          .poll(() => page.locator("html").getAttribute("data-mui-color-scheme"), {
+            timeout: 15000,
+          })
+          .toBe(tema);
         const resumo = page.getByRole("region", { name: "Resumo da semana" });
         const rosca = resumo.getByRole("img", {
           name: /Faltas, justificadas e presentes de 1º ano A/,
@@ -133,12 +128,14 @@ it("mantém gráficos e cartões sem colisão em cada largura e tema", async () 
                 b = dias[j];
               if (a && b && colidem(box(a), box(b))) erros.push("dias sobrepostos");
             }
-          if (document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)
-            erros.push("overflow horizontal da página");
+          // O shell do aplicativo esconde a rolagem lateral; aqui o recorte real é o resumo.
+          if (root.scrollWidth > root.clientWidth + 1) erros.push("overflow horizontal do resumo");
           return erros;
         });
         if (
-          (await page.locator("html").evaluate((el) => el.classList.contains("dark"))) !==
+          (await page
+            .locator("html")
+            .evaluate((el) => el.getAttribute("data-mui-color-scheme") === "dark")) !==
           (tema === "dark")
         )
           erros.push("tema não aplicado");

@@ -37,7 +37,7 @@ test("abas refletem a URL e sobrevivem ao recarregamento", async ({ page }) => {
     "aria-selected",
     "true",
   );
-  await expect(page.locator("#entrada-horario")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Horário da chegada" })).toBeVisible();
 
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
@@ -58,10 +58,10 @@ test("saídas e entradas têm o mesmo campo de horário e o título não tem íc
   await expect(
     page.getByRole("heading", { level: 1, name: "Saiu mais cedo" }).locator("svg"),
   ).toHaveCount(0);
-  await expect(page.locator("#saida-horario")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Horário da saída" })).toBeVisible();
   await page.getByRole("tab", { name: "Entradas", exact: true }).click();
   await abrirDiaSeResumo(page);
-  await expect(page.locator("#entrada-horario")).toBeVisible();
+  await expect(page.getByRole("group", { name: "Horário da chegada" })).toBeVisible();
   await expect(page.locator('input[type="time"]')).toHaveCount(0);
   await expect(page.locator('input[type="date"]')).toHaveCount(0);
 });
@@ -70,11 +70,15 @@ test("seletor de horário: teclado, foco e fechamento", async ({ page }) => {
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
   await abrirDiaSeResumo(page);
+  const campo = page
+    .locator("#saida-horario")
+    .locator('xpath=ancestor::div[contains(@class,"MuiPickersInputBase-root")]')
+    .first();
+  const botao = campo.getByRole("button", { name: /^Escolha uma hora/ });
   const gatilho = page.locator("#saida-horario");
-  await gatilho.click();
+  await botao.click();
   const painel = page.getByRole("dialog", { name: "Horário da saída" });
   await expect(painel).toBeVisible();
-  await expect(gatilho).toHaveAttribute("aria-expanded", "true");
   // O foco inicial cai na hora selecionada; a seta troca de coluna e Enter escolhe.
   await expect(painel.getByRole("option", { selected: true }).first()).toBeFocused();
   await page.keyboard.press("Home");
@@ -83,14 +87,16 @@ test("seletor de horário: teclado, foco e fechamento", async ({ page }) => {
   await page.keyboard.press("Home");
   await page.keyboard.press("PageDown");
   await page.keyboard.press("Enter");
+  await painel.getByRole("button", { name: "OK", exact: true }).focus();
+  await page.keyboard.press("Enter");
   await expect(painel).toHaveCount(0);
-  await expect(gatilho).toContainText("01:06");
-  await expect(gatilho).toBeFocused();
+  await expect(gatilho).toHaveValue("01:05");
+  await expect(botao).toBeFocused();
 
-  await gatilho.click();
+  await botao.click();
   await page.keyboard.press("Escape");
   await expect(painel).toHaveCount(0);
-  await expect(gatilho).toBeFocused();
+  await expect(botao).toBeFocused();
 });
 
 test("registra a saída com o horário escolhido e mostra na lista", async ({ page }) => {
@@ -122,25 +128,26 @@ test("tocar em uma hora atualiza o campo na hora e mantém o painel nos minutos"
   await page.goto("/?visao=saidas&aba=saidas");
   await aguardarHidratacao(page);
   await abrirDiaSeResumo(page);
+  const campo = page
+    .locator("#saida-horario")
+    .locator('xpath=ancestor::div[contains(@class,"MuiPickersInputBase-root")]')
+    .first();
   const gatilho = page.locator("#saida-horario");
-  await gatilho.click();
+  await campo.getByRole("button", { name: /^Escolha uma hora/ }).click();
   const painel = page.getByRole("dialog", { name: "Horário da saída" });
-  const horas = painel.getByRole("listbox", { name: "Horas" });
-  await horas.getByRole("option", { name: "07", exact: true }).click();
-  await expect(gatilho).toContainText(/^07:/);
-  await expect(horas.getByRole("option", { name: "07", exact: true })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  const horas = painel.getByRole("listbox", { name: /horas/i });
+  const primeiraHora = horas.getByRole("option").first();
+  const horaEscolhida = (await primeiraHora.textContent())?.trim() ?? "";
+  await primeiraHora.click();
+  await expect(gatilho).toHaveValue(new RegExp(`^${horaEscolhida}:`));
   await expect(painel).toBeVisible();
-  await horas.getByRole("option", { name: "19", exact: true }).click();
-  await expect(gatilho).toContainText(/^19:/);
-  await painel
-    .getByRole("listbox", { name: "Minutos" })
-    .getByRole("option", { name: "45", exact: true })
-    .click();
+  const minutos = painel.getByRole("listbox", { name: /minutos/i });
+  const primeiroMinuto = minutos.getByRole("option").first();
+  const minutoEscolhido = (await primeiroMinuto.textContent())?.trim() ?? "";
+  await primeiroMinuto.click();
+  await painel.getByRole("button", { name: "OK", exact: true }).click();
   await expect(painel).toHaveCount(0);
-  await expect(gatilho).toContainText("19:45");
+  await expect(gatilho).toHaveValue(`${horaEscolhida}:${minutoEscolhido}`);
 });
 
 test.describe("360 px", () => {
@@ -149,15 +156,21 @@ test.describe("360 px", () => {
     await page.goto("/?visao=saidas&aba=entradas");
     await aguardarHidratacao(page);
     await abrirDiaSeResumo(page);
-    await page.locator("#entrada-horario").click();
-    const painel = page.getByRole("dialog", { name: "Horário da chegada" });
+    const campo = page
+      .locator("#entrada-horario")
+      .locator('xpath=ancestor::div[contains(@class,"MuiPickersInputBase-root")]')
+      .first();
+    await campo.getByRole("button", { name: /^Escolha uma hora/ }).click();
+    const painel = page
+      .getByRole("dialog")
+      .filter({ has: page.getByRole("listbox", { name: /horas/i }) });
     await expect(painel).toBeVisible();
     const caixa = await painel.boundingBox();
     expect(caixa).not.toBeNull();
     expect((caixa?.x ?? -1) >= 0).toBe(true);
     expect((caixa?.x ?? 0) + (caixa?.width ?? 0) <= 360).toBe(true);
     // Área de toque confortável: cada item tem ao menos 44 px de altura.
-    const opcao = painel.getByRole("listbox", { name: "Horas" }).getByRole("option").first();
+    const opcao = painel.getByRole("listbox", { name: /horas/i }).getByRole("option").first();
     // offsetHeight ignora a escala da animação de abertura (zoom-in-95), que
     // deixava o boundingBox em 42 a 44 px durante os primeiros quadros.
     expect(

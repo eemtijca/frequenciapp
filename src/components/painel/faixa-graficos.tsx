@@ -2,10 +2,15 @@
 
 // Gráficos do painel: carrossel controlado, um cartão por vez e estado preservado.
 import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { CarrosselCartoes, type ItemCarrossel } from "@/components/ui/carrossel-cartoes";
-import { Selecionar } from "@/components/ui/selecionar";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import { BotaoIcone } from "@/components/ui/mui/botao";
+import { CarrosselCartoes, type ItemCarrossel } from "@/components/ui/mui/carrossel-cartoes";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { CartaoTitulo } from "@/components/ui/mui/cartao";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   itens: ItemCarrossel[];
@@ -13,6 +18,8 @@ interface Props {
   onValor: (id: string) => void;
   ocupado?: boolean;
 }
+
+const TAMANHO_CONTROLE = TOKENS_LAYOUT.alvoToque;
 
 export default function FaixaGraficos({ itens, valor, onValor, ocupado }: Props) {
   const indice = Math.max(
@@ -34,54 +41,67 @@ export default function FaixaGraficos({ itens, valor, onValor, ocupado }: Props)
   }
 
   return (
-    <section aria-label="Gráficos do painel" className="min-w-0 space-y-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <h2 className="text-sm font-medium">Gráficos</h2>
-        <div
-          className="flex min-w-0 items-center gap-2"
-          role="group"
-          aria-label="Navegação dos gráficos"
+    <Box component="section" aria-label="Gráficos do painel" sx={{ minWidth: 0 }}>
+      <Stack spacing={2}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={{ xs: 1, sm: 2 }}
+          sx={{
+            alignItems: { xs: "stretch", sm: "center" },
+            justifyContent: "space-between",
+          }}
         >
-          <Selecionar
-            ariaLabel="Gráfico em exibição"
-            value={atual.id}
-            onValueChange={selecionar}
-            opcoes={itens.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
-            className="min-w-0 flex-1 sm:w-56 sm:flex-none"
-          />
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Gráfico anterior"
-            disabled={indice <= 0}
-            onClick={() => irPara(indice - 1)}
-            className="size-11 shrink-0"
+          <CartaoTitulo>Gráficos</CartaoTitulo>
+          <Stack
+            direction="row"
+            spacing={1}
+            role="group"
+            aria-label="Navegação dos gráficos"
+            sx={{ minWidth: 0, alignItems: "center" }}
           >
-            <ChevronLeft aria-hidden="true" />
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            aria-label="Próximo gráfico"
-            disabled={indice >= itens.length - 1}
-            onClick={() => irPara(indice + 1)}
-            className="size-11 shrink-0"
-          >
-            <ChevronRight aria-hidden="true" />
-          </Button>
-        </div>
-      </div>
+            <Box
+              sx={{
+                minWidth: 0,
+                flex: { xs: 1, sm: "none" },
+                width: { xs: "100%", sm: 224 },
+                "& .MuiInputBase-root": { minHeight: TAMANHO_CONTROLE },
+              }}
+            >
+              <Selecionar
+                ariaLabel="Gráfico em exibição"
+                valor={atual.id}
+                onValor={selecionar}
+                opcoes={itens.map((item) => ({ valor: item.id, rotulo: item.rotulo }))}
+              />
+            </Box>
+            <BotaoIcone
+              rotulo="Gráfico anterior"
+              icone={<ChevronLeftRoundedIcon />}
+              variante="contorno"
+              disabled={indice <= 0}
+              onClick={() => irPara(indice - 1)}
+              sx={{ width: TAMANHO_CONTROLE, height: TAMANHO_CONTROLE, flexShrink: 0 }}
+            />
+            <BotaoIcone
+              rotulo="Próximo gráfico"
+              icone={<ChevronRightRoundedIcon />}
+              variante="contorno"
+              disabled={indice >= itens.length - 1}
+              onClick={() => irPara(indice + 1)}
+              sx={{ width: TAMANHO_CONTROLE, height: TAMANHO_CONTROLE, flexShrink: 0 }}
+            />
+          </Stack>
+        </Stack>
 
-      <CarrosselCartoes
-        itens={itens}
-        valor={atual.id}
-        visitados={visitados}
-        onValor={selecionar}
-        rotuloAcessivel="Cartões de gráficos"
-        ocupado={ocupado}
-      />
-    </section>
+        <CarrosselCartoes
+          itens={itens}
+          valor={atual.id}
+          visitados={visitados}
+          onValor={selecionar}
+          rotuloAcessivel="Cartões de gráficos"
+          ocupado={ocupado}
+        />
+      </Stack>
+    </Box>
   );
 }

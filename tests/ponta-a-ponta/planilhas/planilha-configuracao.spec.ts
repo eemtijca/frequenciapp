@@ -1,5 +1,9 @@
 // Configuração assistida com banco e Google sintéticos: leitura sem escrita,
 // diagnóstico mensal, recuperação de acesso e conferência antes de salvar o mapa.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import {
   diaLocal,
@@ -75,11 +79,8 @@ async function abrirPlanilha(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Planilhas", exact: true })
-    .click();
+  await abrirConfiguracoesDaGestao(page);
+  await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
   await selecionarAcaoPlanilha(cartao, "Configurar");
@@ -226,10 +227,21 @@ test("salva o mapa somente após conferir a estrutura e invalida a leitura quand
   page,
 }) => {
   const mapas: { conferenciaHash: string }[] = [];
+  let lotes = 0;
   page.on("request", (pedido) => {
-    if (new URL(pedido.url()).pathname === "/api/planilha/mapa") mapas.push(pedido.postDataJSON());
+    if (pedido.method() !== "POST") return;
+    const caminho = new URL(pedido.url()).pathname;
+    if (caminho === "/api/planilha/mapa") mapas.push(pedido.postDataJSON());
+    if (caminho === "/api/configuracoes/lote") lotes++;
   });
   let cartao = await abrirPlanilha(page);
+  const preferencias = cartao.getByRole("group", { name: "Preferências no rascunho" });
+  const ativa = preferencias.getByRole("switch", { name: "Integração ativa", exact: true });
+  await expect(ativa).toBeChecked();
+  await ativa.click();
+  await expect(ativa).not.toBeChecked();
+  const rodape = page.getByRole("region", { name: "Rascunho de configurações" });
+  await expect(rodape).toBeVisible();
   await expect(cartao.getByRole("button", { name: "Salvar estrutura", exact: true })).toHaveCount(
     0,
   );
@@ -242,9 +254,15 @@ test("salva o mapa somente após conferir a estrutura e invalida a leitura quand
   ).toBeVisible();
   expect(mapas).toHaveLength(1);
   expect(mapas[0]?.conferenciaHash).toMatch(/^[a-f0-9]{64}$/);
+  await expect(rodape).toBeVisible();
+  await expect(ativa).not.toBeChecked();
+  expect(lotes).toBe(0);
+  await descartarConfiguracoes(page);
+  expect(lotes).toBe(0);
 
-  // A configuração persistida aparece, mas não vale como uma nova conferência.
+  // O mapa persiste sem depender do rascunho, mas não vale como uma nova conferência.
   cartao = await abrirPlanilha(page);
+  await expect(ativa).toBeChecked();
   await cartao.getByRole("button", { name: "Revisar estrutura", exact: true }).click();
   const salvar = cartao.getByRole("button", { name: "Salvar estrutura", exact: true });
   await expect(salvar).toBeDisabled();
@@ -279,19 +297,36 @@ test("salva o mapa somente após conferir a estrutura e invalida a leitura quand
 });
 
 test("desativa a planilha no rascunho e só aplica depois de salvar", async ({ page }) => {
+  let lotes = 0;
+  page.on("request", (pedido) => {
+    if (
+      new URL(pedido.url()).pathname === "/api/configuracoes/lote" &&
+      pedido.method() === "POST"
+    ) {
+      lotes++;
+    }
+  });
   const cartao = await abrirPlanilha(page);
   const ativa = cartao.getByRole("switch", { name: "Integração ativa", exact: true });
   await expect(ativa).toBeChecked();
 
   await ativa.click();
   await expect(ativa).not.toBeChecked();
-  await expect(page.getByRole("region", { name: "Salvar configurações" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Rascunho de configurações" })).toBeVisible();
 
   await descartarConfiguracoes(page);
   await expect(ativa).toBeChecked();
+  expect(lotes).toBe(0);
 
   await ativa.click();
+  const revisar = page.getByRole("button", { name: "Revisar alterações", exact: true });
+  await revisar.click();
+  const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?" });
+  await expect(revisao).toContainText("Planilhas");
+  expect(lotes).toBe(0);
+  await revisao.getByRole("button", { name: "Continuar revisando", exact: true }).click();
   await salvarConfiguracoes(page);
+  expect(lotes).toBe(1);
   await expect(ativa).not.toBeChecked();
 
   await page.reload();

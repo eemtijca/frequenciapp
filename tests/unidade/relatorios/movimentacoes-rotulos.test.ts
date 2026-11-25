@@ -1,7 +1,10 @@
 // Renderiza os consumidores reais com carga sintética e seções abertas, sem rede ou navegador.
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createElement } from "react";
+import { createElement, type ReactElement } from "react";
+import { textoVisivel } from "../../helpers/html";
 import { renderToStaticMarkup } from "react-dom/server";
+import { ThemeProvider } from "@mui/material/styles";
+import { tema } from "@/theme/tema";
 import type { Aluno, SaidaAntecipada, Turma } from "@/domain/frequencia";
 import type { EntradaAtrasada } from "@/domain/entradas";
 import type { RelatorioMovimentacoes } from "@/domain/relatorio-movimentacoes";
@@ -90,28 +93,25 @@ function saida(
   };
 }
 function texto(html: string): string {
-  return html
-    .replace(/<[^>]*>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return textoVisivel(html);
 }
-function blocos(html: string, tag: string): string[] {
-  const conteudo = tag === "span" ? "([^<>]*)" : "([\\s\\S]*?)";
-  return [...html.matchAll(new RegExp(`<${tag}\\b[^>]*>${conteudo}</${tag}>`, "g"))].map((item) =>
-    texto(item[1] ?? ""),
-  );
+function comTema(elemento: ReactElement): ReactElement {
+  return createElement(ThemeProvider, { theme: tema }, elemento);
 }
+
 function renderizarResumo(tipo: "saida" | "entrada" = "saida"): string {
   return renderToStaticMarkup(
-    createElement(VistaResumoMovimentacoes, {
-      tipo,
-      turmas,
-      alunos,
-      dias,
-      ativo: true,
-      fuso: "America/Fortaleza",
-      onAbrirDia: () => {},
-    }),
+    comTema(
+      createElement(VistaResumoMovimentacoes, {
+        tipo,
+        turmas,
+        alunos,
+        dias,
+        ativo: true,
+        fuso: "America/Fortaleza",
+        onAbrirDia: () => {},
+      }),
+    ),
   );
 }
 
@@ -135,15 +135,17 @@ describe("rótulos renderizados das movimentações", () => {
       variante: "indisponivel",
     };
     const html = renderToStaticMarkup(
-      createElement(VistaMovimentacoes, {
-        hoje: "2026-10-19",
-        turmas,
-        alunos,
-        ativa: true,
-      }),
+      comTema(
+        createElement(VistaMovimentacoes, {
+          hoje: "2026-10-19",
+          turmas,
+          alunos,
+          ativa: true,
+        }),
+      ),
     );
     expect(dubl.cargaInjetada).toBe(true);
-    expect(blocos(html, "p")).toContain(
+    expect(texto(html)).toContain(
       "Entradas e saídas agrupadas pela turma gravada no registro; saídas sem referência ficam como turma histórica desconhecida.",
     );
     expect(texto(html)).not.toContain("saídas pela turma atual do aluno");
@@ -157,22 +159,20 @@ describe("rótulos renderizados das movimentações", () => {
       saida("s4", "2026-10-22"),
     ];
     const html = renderizarResumo();
-    expect(blocos(html, "span")).toContain("Somente leitura");
-    expect
-      .soft(blocos(html, "li"))
-      .toEqual(
-        expect.arrayContaining([
-          "1º ano A 1",
-          "1º ano B 1",
-          "1º ano A renomeada 1",
-          "Turma histórica desconhecida 1",
-        ]),
-      );
-    expect(blocos(html, "tr")).toContain(
-      "Ana 1º ano A · 1º ano B · 1º ano A renomeada · Turma histórica desconhecida 4",
+    expect(texto(html)).toContain("Somente leitura");
+    for (const rotulo of [
+      "1º ano A 1",
+      "1º ano B 1",
+      "1º ano A renomeada 1",
+      "Turma histórica desconhecida 1",
+    ]) {
+      expect.soft(texto(html)).toMatch(new RegExp(rotulo.split(/\s+/).join("\\s+")));
+    }
+    expect(texto(html)).toMatch(
+      /Ana 1º ano A · 1º ano B · 1º ano A renomeada · Turma histórica desconhecida 4/,
     );
-    expect(blocos(html, "dl")).toContain("Saídas 4 Alunos 1 Turmas conhecidas 2");
-    expect(blocos(html, "span").filter((item) => item === "2 turmas conhecidas")).toHaveLength(2);
+    expect(texto(html)).toMatch(/Saídas 4 Alunos 1 Turmas conhecidas 2/);
+    expect((texto(html).match(/2 turmas conhecidas/g) ?? []).length).toBe(2);
     expect(texto(html)).toContain("Total por referência histórica; turma desconhecida separada.");
     expect(texto(html)).not.toContain("Cadastro atual");
   });
@@ -180,10 +180,10 @@ describe("rótulos renderizados das movimentações", () => {
   it("não conta o balde desconhecido como turma conhecida nos totais e selos", () => {
     dubl.dados.saidas = [saida("s1", "2026-10-19")];
     const html = renderizarResumo();
-    expect(blocos(html, "li")).toContain("Turma histórica desconhecida 1");
-    expect(blocos(html, "tr")).toContain("Ana Turma histórica desconhecida 1");
-    expect(blocos(html, "dl")).toContain("Saídas 1 Alunos 1 Turmas conhecidas 0");
-    expect(blocos(html, "span").filter((item) => item === "0 turmas conhecidas")).toHaveLength(2);
+    expect(texto(html)).toMatch(/Turma histórica desconhecida\s+1/);
+    expect(texto(html)).toMatch(/Ana Turma histórica desconhecida\s+1/);
+    expect(texto(html)).toMatch(/Saídas 1 Alunos 1 Turmas conhecidas 0/);
+    expect((texto(html).match(/0 turmas conhecidas/g) ?? []).length).toBe(2);
     expect(texto(html)).not.toContain("1 turmas");
   });
 
@@ -203,9 +203,9 @@ describe("rótulos renderizados das movimentações", () => {
       },
     ];
     const html = renderizarResumo("entrada");
-    expect(blocos(html, "li")).toContain("1º ano B 1");
-    expect(blocos(html, "tr")).toContain("Ana 1º ano B 1");
-    expect(blocos(html, "dl")).toContain("Entradas 1 Alunos 1 Turmas 1");
+    expect(texto(html)).toMatch(/1º ano B\s+1/);
+    expect(texto(html)).toMatch(/Ana 1º ano B\s+1/);
+    expect(texto(html)).toMatch(/Entradas 1 Alunos 1 Turmas 1/);
     expect(texto(html)).toContain("Total por turma na semana.");
     expect(texto(html)).not.toContain("turmas conhecidas");
   });

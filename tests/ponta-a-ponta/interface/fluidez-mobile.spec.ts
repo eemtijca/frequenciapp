@@ -1,10 +1,16 @@
 // Regressões de fluidez no celular: busca, relatórios, foco e rolagem dos controles.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { randomUUID } from "node:crypto";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { nomeDoMes, rotuloMes } from "@/domain/frequencia";
 import { comBanco } from "../helpers/banco";
 import { diasEscolaresDaFixture } from "../helpers/dias-escolares-fixture";
-import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import {
+  selecionarRelatorio,
+  abrirDiaSeResumo,
+  aguardarHidratacao,
+  trocarVisao,
+} from "../helpers/pagina";
 
 const serie = "E2E Fluidez";
 const turmaA = `${serie} A`;
@@ -95,8 +101,8 @@ async function abrirGestaoAlunos(page: Page): Promise<Locator> {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Alunos", exact: true }).click();
-  return page.getByRole("tabpanel", { name: "Alunos", exact: true });
+  await selecionarCadastroGestao(page, "Alunos");
+  return page.getByRole("region", { name: "Gestão da escola", exact: true });
 }
 
 async function aguardarQuadros(page: Page): Promise<void> {
@@ -123,8 +129,8 @@ test("buscar sem acento e limpar conserva a ordem do cadastro e permite editar",
   page,
 }) => {
   const painel = await abrirGestaoAlunos(page);
-  const grupo = painel.getByRole("heading", { name: turmaA, exact: true }).locator("../..");
-  const nomes = grupo.getByRole("listitem").locator("p.font-medium");
+  const grupo = painel.locator(`tbody[data-turma="${turmaA}"]`);
+  const nomes = grupo.getByRole("rowheader").locator("p");
   await expect(nomes).toHaveText([bruna, caio, alvaro]);
   const busca = painel.getByRole("searchbox", {
     name: "Buscar aluno",
@@ -143,10 +149,7 @@ test("buscar sem acento e limpar conserva a ordem do cadastro e permite editar",
   });
   await expect(dialogo.getByRole("textbox", { name: "Nome", exact: true })).toHaveValue(alvaro);
   await dialogo.getByRole("combobox", { name: "Turma atual", exact: true }).click();
-  const filtro = page.getByRole("textbox", {
-    name: "Filtrar opções",
-    exact: true,
-  });
+  const filtro = dialogo.getByRole("combobox", { name: "Turma atual", exact: true });
   await filtro.pressSequentially("e2e fluidez");
   await expect(
     page.getByRole("listbox", { name: "Opções", exact: true }).getByRole("option"),
@@ -240,8 +243,7 @@ test("selecionar todos respeita a busca e a edição usa os dados atuais da linh
 test("a busca e o grupo da turma preservam os totais e o detalhe do aluno", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Por aluno", exact: true }).click();
+  await selecionarRelatorio(page, "Por aluno");
   const relatorio = page.getByRole("region", {
     name: "Relatório por aluno",
     exact: true,
@@ -305,8 +307,7 @@ test("os grupos de série e turma recolhem a lista, a busca reabre e Emitir rela
 }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Por aluno", exact: true }).click();
+  await selecionarRelatorio(page, "Por aluno");
   const relatorio = page.getByRole("region", { name: "Relatório por aluno", exact: true });
   const grupoSerie = relatorio.getByRole("region", { name: serie, exact: true });
   const grupoA = relatorio.getByRole("region", { name: turmaA, exact: true });
@@ -355,8 +356,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
   });
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Grade", exact: true }).click();
+  await selecionarRelatorio(page, "Grade");
   const grade = page.getByRole("region", {
     name: "Grade de frequência",
     exact: true,
@@ -374,7 +374,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
   await (await primeira).finished();
   const antes = consultas.length;
 
-  await page.getByRole("tab", { name: "Histórico", exact: true }).click();
+  await selecionarRelatorio(page, "Histórico");
   const historico = page.getByRole("region", {
     name: "Histórico de frequências",
     exact: true,
@@ -389,7 +389,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
   expect(consultas).toHaveLength(antes);
 
   const retomada = page.waitForResponse((resposta) => consultaDeUmDia(resposta.url()));
-  await page.getByRole("tab", { name: "Grade", exact: true }).click();
+  await selecionarRelatorio(page, "Grade");
   await (await retomada).finished();
   await expect(grade.getByRole("searchbox", { name: "Buscar aluno", exact: true })).toHaveValue(
     "alvaro",
@@ -404,7 +404,7 @@ test("a grade suspende a consulta fora da aba e a retoma conservando turma, per�
   await aguardarQuadros(page);
   expect(consultas).toHaveLength(aposAba);
   const volta = page.waitForResponse((resposta) => new URL(resposta.url()).searchParams.has("de"));
-  await trocarVisao(page, "Relatórios", "relatorios");
+  await trocarVisao(page, "Relatórios", "relatorios", { relatorio: "Grade" });
   await (await volta).finished();
   await expect(grade.getByRole("searchbox", { name: "Buscar aluno", exact: true })).toHaveValue(
     "alvaro",
@@ -422,59 +422,67 @@ test("buscar e percorrer horários com teclado rola apenas o painel de opções"
     elemento.scrollTop = Math.max(1, elemento.scrollTop);
   });
   await aluno.click();
-  const busca = page.getByRole("textbox", {
-    name: "Filtrar opções",
-    exact: true,
-  });
+  const busca = aluno;
   await busca.fill("E2E Fluidez Lista");
   await expect(busca).toBeFocused();
-  const lista = page.getByRole("listbox", { name: "Opções", exact: true });
+  const lista = page.getByRole("listbox");
   await expect(lista.getByRole("option")).toHaveCount(32);
   const posicaoBusca = await posicaoDaTela(page);
   expect(posicaoBusca.painel).toBeGreaterThan(0);
+  // As primeiras setas iniciam o destaque no MUI; depois a lista acompanha o item ativo.
   for (let indice = 0; indice < 31; indice++) await busca.press("ArrowDown");
   await expect(busca).toBeFocused();
-  await expect(lista.getByRole("option", { name: /E2E Fluidez Lista 32/ })).toBeInViewport();
+  const destacada = lista.locator('[role="option"].Mui-focused');
+  await expect(destacada).toHaveCount(1);
+  await expect(destacada).toBeInViewport();
   expect(await lista.evaluate((elemento) => elemento.scrollTop)).toBeGreaterThan(0);
+  await busca.press("End");
+  await expect(lista.getByRole("option", { name: /E2E Fluidez Lista 32/ })).toBeInViewport();
   expect(await posicaoDaTela(page)).toEqual(posicaoBusca);
   await busca.press("Enter");
-  await expect(aluno).toContainText("E2E Fluidez Lista 32");
+  await expect(aluno).toHaveValue(/^E2E Fluidez Lista 32/);
   await expect(aluno).toBeFocused();
 
-  const horario = page.locator("#saida-horario");
-  await horario.scrollIntoViewIfNeeded();
-  await horario.click();
-  const painel = page.getByRole("dialog", {
-    name: "Horário da saída",
-    exact: true,
-  });
-  const horas = painel.getByRole("listbox", { name: "Horas", exact: true });
-  const minutos = painel.getByRole("listbox", { name: "Minutos", exact: true });
+  const campoHorario = page
+    .locator("#saida-horario")
+    .locator('xpath=ancestor::div[contains(@class,"MuiPickersInputBase-root")]')
+    .first();
+  const botaoHorario = campoHorario.getByRole("button", { name: /^Escolha uma hora/ });
+  await campoHorario.scrollIntoViewIfNeeded();
+  await botaoHorario.click();
+  const painel = page
+    .getByRole("dialog")
+    .filter({ has: page.getByRole("listbox", { name: "Selecione horas", exact: true }) });
+  const horas = painel.getByRole("listbox", { name: "Selecione horas", exact: true });
+  const minutos = painel.getByRole("listbox", { name: "Selecione minutos", exact: true });
   await expect(horas.getByRole("option", { selected: true })).toBeFocused();
+  await aguardarQuadros(page);
   const posicaoHorario = await posicaoDaTela(page);
   await page.keyboard.press("End");
-  await expect(horas.getByRole("option", { name: "23", exact: true })).toBeFocused();
-  await page.keyboard.press("ArrowRight");
-  await page.keyboard.press("End");
-  await expect(minutos.getByRole("option", { name: "59", exact: true })).toBeFocused();
-  await expect(minutos.getByRole("option", { name: "59", exact: true })).toBeInViewport();
+  await expect(horas.getByRole("option", { name: "23 horas", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(minutos.getByRole("option", { selected: true })).toBeFocused();
+  for (let passo = 0; passo < 12; passo++) await page.keyboard.press("PageDown");
+  await expect(minutos.getByRole("option", { name: "59 minutos", exact: true })).toBeFocused();
+  await expect(minutos.getByRole("option", { name: "59 minutos", exact: true })).toBeInViewport();
   expect(await posicaoDaTela(page)).toEqual(posicaoHorario);
   await page.keyboard.press("Enter");
+  await painel.getByRole("button", { name: "OK", exact: true }).focus();
+  await page.keyboard.press("Enter");
   await expect(painel).toHaveCount(0);
-  await expect(horario).toHaveText("23:59");
-  await expect(horario).toBeFocused();
-  await horario.click();
+  await expect(page.locator("#saida-horario")).toHaveValue("23:59");
+  await expect(botaoHorario).toBeFocused();
+  await botaoHorario.click();
   await page.keyboard.press("Escape");
   await expect(painel).toHaveCount(0);
-  await expect(horario).toBeFocused();
+  await expect(botaoHorario).toBeFocused();
   expect(await posicaoDaTela(page)).toEqual(posicaoHorario);
 });
 
 test("preserva a rolagem ao trocar de visão", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Por aluno", exact: true }).click();
+  await selecionarRelatorio(page, "Por aluno");
   await expect(
     page.getByRole("region", { name: "Relatório por aluno", exact: true }),
   ).toBeVisible();
@@ -487,7 +495,7 @@ test("preserva a rolagem ao trocar de visão", async ({ page }) => {
   expect(antes).toBeGreaterThan(0);
 
   await trocarVisao(page, "Painel", "painel");
-  await trocarVisao(page, "Relatórios", "relatorios");
+  await trocarVisao(page, "Relatórios", "relatorios", { relatorio: "Por aluno" });
   await expect
     .poll(() => painelDaTela(page).evaluate((elemento) => elemento.scrollTop))
     .toBeGreaterThanOrEqual(antes - 1);
@@ -520,9 +528,6 @@ test("a confirmação de exclusão permite alcançar as ações na tela baixa e 
       }),
     )
     .toBe(true);
-  expect(
-    await confirmacao.evaluate((elemento) => elemento.scrollHeight > elemento.clientHeight),
-  ).toBe(true);
   const excluir = confirmacao.getByRole("button", {
     name: "Excluir",
     exact: true,

@@ -27,7 +27,7 @@ async function abrirChamada(page: Page) {
   await expect(aluno).toHaveAttribute("aria-pressed", "false");
   // A marca fica fora do botão do nome; o toque nela depende da camada que cobre a linha.
   const marca = aluno
-    .locator("xpath=ancestor::div[contains(@class,'faixa-toque')]")
+    .locator("xpath=ancestor::*[@data-faixa-toque]")
     .locator("span", { hasText: /^(P|F)$/ })
     .last();
   await marca.scrollIntoViewIfNeeded();
@@ -44,7 +44,14 @@ test.describe("toque", () => {
     const { aluno, x, y } = await abrirChamada(page);
     await page.touchscreen.tap(x, y);
     await expect(aluno).toHaveAttribute("aria-pressed", "true");
-    await page.touchscreen.tap(x, y);
+    // A linha cresce com o campo de justificativa; o segundo toque usa o centro atual.
+    const caixa = await aluno
+      .locator("xpath=ancestor::*[@data-faixa-toque]")
+      .locator("span", { hasText: /^(P|F)$/ })
+      .last()
+      .boundingBox();
+    if (!caixa) throw new Error("Marca da linha sem posição após a primeira falta.");
+    await page.touchscreen.tap(caixa.x + caixa.width / 2, caixa.y + caixa.height / 2);
     await expect(aluno).toHaveAttribute("aria-pressed", "false");
   });
 });

@@ -25,6 +25,16 @@ const cabecalhosSeguranca = [
 const nextConfig: NextConfig = {
   agentRules: false,
   devIndicators: false,
+  distDir: process.env.NEXT_DIST_DIR || ".next",
+  experimental: {
+    // Importa apenas os módulos usados pelos pacotes MUI e evita puxar o barrel inteiro.
+    optimizePackageImports: [
+      "@mui/material",
+      "@mui/icons-material",
+      "@mui/x-charts",
+      "@mui/x-date-pickers",
+    ],
+  },
   output: process.env.VERCEL ? undefined : "standalone",
   poweredByHeader: false,
   reactStrictMode: true,

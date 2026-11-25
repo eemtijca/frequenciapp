@@ -101,12 +101,27 @@ test("a ação preserva o tema escuro e funciona com teclado", async ({ page }, 
   });
   await expect(botao).toBeEnabled();
   await page.mouse.move(389, 843);
-  const fundo = (elemento: Element) => getComputedStyle(elemento).backgroundColor;
+  await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", "dark");
+  const fundoComposto = (elemento: Element) => {
+    const camadas: string[] = [];
+    for (let atual: Element | null = elemento; atual; atual = atual.parentElement)
+      camadas.unshift(getComputedStyle(atual).backgroundColor);
+    const tela = document.createElement("canvas");
+    tela.width = tela.height = 1;
+    const desenho = tela.getContext("2d");
+    if (!desenho) throw new Error("Não foi possível analisar as cores.");
+    for (const camada of camadas) {
+      desenho.fillStyle = camada;
+      desenho.fillRect(0, 0, 1, 1);
+    }
+    return Array.from(desenho.getImageData(0, 0, 1, 1).data);
+  };
   const anterior = page.getByRole("button", {
     name: "Dia anterior da chamada parcial",
     exact: true,
   });
-  expect(await botao.evaluate(fundo)).toBe(await anterior.evaluate(fundo));
+  // A seta tem fundo transparente sobre o painel; compare a cor efetivamente visível.
+  expect(await botao.evaluate(fundoComposto)).toEqual(await anterior.evaluate(fundoComposto));
   const estilo = await botao.evaluate((no) => {
     const css = getComputedStyle(no);
     return {

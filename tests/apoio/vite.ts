@@ -4,7 +4,6 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import tailwind from "@tailwindcss/postcss";
 
 const requireVitest = createRequire(import.meta.url);
 const caminhoVite = requireVitest.resolve("vite", {
@@ -26,7 +25,6 @@ export async function criarServidorFixture(
   const servidor = await createServer({
     configFile: false,
     cacheDir: cache,
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     define: { "process.env": "{}" },
     plugins,

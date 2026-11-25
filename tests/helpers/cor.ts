@@ -43,6 +43,31 @@ export function lerOklch(texto: string): [number, number, number] {
   return [Number(partes[1]), Number(partes[2]), Number(partes[3])];
 }
 
+/** Lê "hsl(H, S%, L%)"; o alfa e a unidade deg são ignorados. */
+export function lerHsl(texto: string): [number, number, number] {
+  const partes = /hsl\(\s*([\d.]+)(?:deg)?[,\s]+([\d.]+)%[,\s]+([\d.]+)%/.exec(texto);
+  if (!partes) throw new Error(`Cor fora do formato hsl: ${texto}`);
+  return [Number(partes[1]), Number(partes[2]), Number(partes[3])];
+}
+
+/** HSL para sRGB (0 a 1), com a matiz em graus e saturação e luz em 0 a 100. */
+export function hslParaRgb(matiz: number, saturacao: number, luz: number): Rgb {
+  const s = saturacao / 100;
+  const l = luz / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const h = ((matiz % 360) + 360) % 360;
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const m = l - c / 2;
+  let canais: Rgb;
+  if (h < 60) canais = [c, x, 0];
+  else if (h < 120) canais = [x, c, 0];
+  else if (h < 180) canais = [0, c, x];
+  else if (h < 240) canais = [0, x, c];
+  else if (h < 300) canais = [x, 0, c];
+  else canais = [c, 0, x];
+  return canais.map((canal) => limitar(canal + m)) as Rgb;
+}
+
 /** OKLCH para sRGB (0 a 1), cortando o que sai da gama. */
 export function oklchParaRgb(l: number, c: number, h: number): Rgb {
   const a = c * Math.cos((h * Math.PI) / 180);

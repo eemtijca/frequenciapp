@@ -1,8 +1,13 @@
-// Monta a aba real, com rede interceptada pelo teste e dados exclusivamente fictícios.
+// Monta o shell e a Gestão reais, com rede interceptada e dados fictícios.
+import { Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import AbaConfiguracoes from "../../../src/components/gestao/abas/aba-configuracoes";
+
+import Aplicacao from "../../../src/components/aplicacao";
+import { ProvedorAvisos } from "../../../src/components/ui/mui/avisos";
 import { CONFIGURACOES_PADRAO, type Turma } from "../../../src/domain/frequencia";
-import "../../../src/app/globals.css";
+import { ProvedorTema } from "../../../src/theme/provedor-tema";
+
+document.documentElement.setAttribute("data-mui-color-scheme", "light");
 
 const turmas: Turma[] = ["A", "B", "C"].map((nome, i) => ({
   id: `turma-${i}`,
@@ -14,20 +19,33 @@ const turmas: Turma[] = ["A", "B", "C"].map((nome, i) => ({
 }));
 const root = document.getElementById("root");
 if (!root) throw new Error("Elemento raiz ausente");
+const parametros = new URLSearchParams(location.search);
 createRoot(root).render(
-  <main className="p-4">
-    <AbaConfiguracoes
-      configuracoes={CONFIGURACOES_PADRAO}
-      justificativas={[]}
-      liberadores={[]}
-      series={[{ id: "serie-1", nome: "1º ano", ordem: 1 }]}
-      turmas={turmas}
-      diaCorrente="2026-03-10"
-      fuso="America/Sao_Paulo"
-      onMudanca={() => {}}
-      onJustificativasMudaram={async () => {}}
-      onLiberadoresMudaram={async () => {}}
-      onHorariosMudaram={() => {}}
-    />
-  </main>,
+  <ProvedorTema>
+    <Suspense fallback={<p>Carregando tela de teste</p>}>
+      <Aplicacao
+        usuario={{
+          id: "teste",
+          nome: "Admin teste",
+          email: "teste@example.test",
+          papel: parametros.has("coordenacao") ? "COORDENACAO" : "ADMIN",
+          ativo: true,
+        }}
+        carregadoEm="2026-03-10T12:00:00.000Z"
+        diaCorrente="2026-03-10"
+        fuso="America/Sao_Paulo"
+        visaoInicial={parametros.get("visao") ?? "gestao"}
+        configuracoesIniciais={{ ...CONFIGURACOES_PADRAO, saidaAntecipada: true }}
+        justificativasIniciais={[]}
+        liberadoresIniciais={[]}
+        seriesIniciais={[{ id: "serie-1", nome: "1º ano", ordem: 1 }]}
+        turmasIniciais={turmas}
+        alunosIniciais={[]}
+        frequenciasIniciais={[]}
+        saidasIniciais={[]}
+        resumoInicial={null}
+      />
+    </Suspense>
+    <ProvedorAvisos />
+  </ProvedorTema>,
 );

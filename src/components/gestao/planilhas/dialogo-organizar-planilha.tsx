@@ -1,28 +1,41 @@
 "use client";
 
 // Prévia do padrão visual de uma aba, com confirmação e ação única.
-import { useState } from "react";
+import { useId, useState } from "react";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableContainer from "@mui/material/TableContainer";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type { ApresentacaoAba } from "@/domain/planilha-apresentacao";
 import { CORES_PLANILHA } from "@/domain/planilha-apresentacao";
 import { pedir, corpoJson } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso, avisarInfo, mensagemAmigavel } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Dialogo } from "@/components/ui/mui/dialogo";
 
 type PreviaAba = ApresentacaoAba & { planoHash: string };
 type ConferenciaAba = { aba: string; previa?: PreviaAba; erro?: string };
 type ResultadoAba = { aba: string; concluida: boolean; erro?: string };
+
+const ESTILO_SOMENTE_LEITOR = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
 
 function TabelaPrevia({
   previa,
@@ -32,66 +45,90 @@ function TabelaPrevia({
   rotulo?: string;
 }) {
   return (
-    <div
-      className="max-h-48 min-w-0 overflow-auto rounded-lg border text-sm"
+    <TableContainer
       role="region"
       tabIndex={0}
       aria-label={rotulo}
+      sx={(tema) => ({
+        maxHeight: 192,
+        overflow: "auto",
+        border: `1px solid ${tema.vars.palette.divider}`,
+        borderRadius: 2,
+      })}
     >
-      <table
-        style={{
+      <Table
+        size="small"
+        sx={{
           width: previa.colunas.reduce((total, coluna) => total + coluna.largura, 0),
           tableLayout: "fixed",
           color: "#1f2937",
         }}
       >
-        <caption className="sr-only">Colunas reconhecidas e exemplo da organização visual</caption>
+        <caption style={ESTILO_SOMENTE_LEITOR}>
+          Colunas reconhecidas e exemplo da organização visual
+        </caption>
         <colgroup>
           {previa.colunas.map((coluna) => (
             <col key={coluna.indice} style={{ width: coluna.largura }} />
           ))}
         </colgroup>
-        <thead
-          style={{
+        <TableHead
+          sx={{
             backgroundColor: CORES_PLANILHA.cabecalho,
             color: CORES_PLANILHA.textoCabecalho,
           }}
         >
-          <tr>
+          <TableRow>
             {previa.colunas.map((coluna) => (
-              <th
+              <TableCell
                 key={coluna.indice}
-                className="h-11 px-3 py-2 break-words"
-                style={{ textAlign: coluna.alinhamento === "CENTER" ? "center" : "left" }}
+                component="th"
+                scope="col"
+                sx={{
+                  height: 44,
+                  paddingX: 1.5,
+                  paddingY: 1,
+                  color: "inherit",
+                  fontWeight: 600,
+                  textAlign: coluna.alinhamento === "CENTER" ? "center" : "left",
+                  overflowWrap: "anywhere",
+                  border: 0,
+                }}
               >
                 {coluna.rotulo}
-              </th>
+              </TableCell>
             ))}
-          </tr>
-        </thead>
-        <tbody>
+          </TableRow>
+        </TableHead>
+        <TableBody>
           {["Exemplo A", "Exemplo B"].map((nome, indice) => (
-            <tr
+            <TableRow
               key={nome}
-              style={{
+              sx={{
                 backgroundColor:
                   indice === 0 ? CORES_PLANILHA.primeiraLinha : CORES_PLANILHA.segundaLinha,
               }}
             >
               {previa.colunas.map((coluna) => (
-                <td
+                <TableCell
                   key={coluna.indice}
-                  className="px-3 py-2 break-words"
-                  style={{ textAlign: coluna.alinhamento === "CENTER" ? "center" : "left" }}
+                  sx={{
+                    paddingX: 1.5,
+                    paddingY: 1,
+                    color: "inherit",
+                    textAlign: coluna.alinhamento === "CENTER" ? "center" : "left",
+                    overflowWrap: "anywhere",
+                    border: 0,
+                  }}
                 >
                   {coluna.largura === 260 ? nome : "-"}
-                </td>
+                </TableCell>
               ))}
-            </tr>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-    </div>
+        </TableBody>
+      </Table>
+    </TableContainer>
   );
 }
 
@@ -114,6 +151,7 @@ export function OrganizarPlanilha({
   abas?: string[];
   acoes?: ReturnType<typeof useAcoesPorChave>;
 }) {
+  const idAno = useId();
   const [anoReferencia, setAnoReferencia] = useState(new Date().getFullYear());
   const [conferencias, setConferencias] = useState<ConferenciaAba[] | null>(null);
   const [resultados, setResultados] = useState<ResultadoAba[] | null>(null);
@@ -231,185 +269,219 @@ export function OrganizarPlanilha({
   }
   return (
     <>
-      {ajustarCabecalho && (
-        <label className="flex items-center gap-2 text-sm">
-          Ano das datas sem ano
-          <Input
-            type="number"
-            min={2000}
-            max={2100}
-            className="w-24"
-            value={anoReferencia}
-            disabled={executando || conferencias !== null}
-            onChange={(evento) => setAnoReferencia(Number(evento.target.value))}
-          />
-        </label>
-      )}
-      <Button
+      {ajustarCabecalho ? (
+        <Box sx={{ width: { xs: "100%", sm: 120 } }}>
+          <Campo id={idAno} rotulo="Ano das datas sem ano">
+            <CampoTexto
+              id={idAno}
+              valor={String(anoReferencia)}
+              onValor={(valor) => setAnoReferencia(Number(valor))}
+              inputMode="numeric"
+              maxLength={4}
+              disabled={executando || conferencias !== null}
+              tamanho="pequeno"
+            />
+          </Campo>
+        </Box>
+      ) : null}
+      <Botao
         type="button"
-        variant="outline"
-        className="h-10"
+        variante="contorno"
         aria-label={`${ajustarCabecalho ? "Corrigir cabeçalho e datas de" : "Organizar apresentação de"} ${alvo}`}
         disabled={disabled || executando || (todasTurmas ? abas.length === 0 : !aba)}
+        carregando={executando}
         onClick={() => void conferir()}
+        sx={{ minWidth: 0, whiteSpace: "normal" }}
       >
         {executando
           ? "Conferindo..."
           : ajustarCabecalho
             ? "Corrigir cabeçalho e datas"
             : "Organizar apresentação"}
-      </Button>
-      {andamento && !conferencias && (
-        <p role="status" className="text-muted-foreground w-full text-sm">
+      </Botao>
+      {andamento && !conferencias ? (
+        <Typography role="status" variant="body2" sx={{ color: "text.secondary", width: "100%" }}>
           {andamento.fase} {andamento.atual} de {andamento.total}: {andamento.aba}
-        </p>
-      )}
-      <AlertDialog
-        open={conferencias !== null}
-        onOpenChange={(aberto) => {
-          if (!aberto && !executando) fechar();
+        </Typography>
+      ) : null}
+      <Dialogo
+        aberto={conferencias !== null}
+        onFechar={() => {
+          if (!executando) fechar();
         }}
-      >
-        <AlertDialogContent className={todasTurmas ? "max-h-[90dvh] overflow-y-auto" : undefined}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {resultados ? (
-                "Resultado da organização"
-              ) : todasTurmas ? (
-                ajustarCabecalho ? (
-                  "Corrigir cabeçalhos e datas de todas as turmas?"
-                ) : (
-                  "Organizar apresentação de todas as turmas?"
-                )
-              ) : (
-                <>
-                  {ajustarCabecalho
-                    ? "Corrigir cabeçalho e datas da aba"
-                    : "Organizar apresentação da aba"}{" "}
-                  {previa?.aba}?
-                </>
-              )}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {resultados ? (
-                <>
-                  Concluídas: {quantidadeConcluidas} de {resultados.length}. Pendências:{" "}
-                  {resultados.length - quantidadeConcluidas}. As abas com pendências precisam de
-                  conferência antes de outra tentativa.
-                </>
-              ) : todasTurmas ? (
-                <>
-                  Abas prontas: {quantidadeProntas} de {conferencias?.length ?? 0}. A confirmação
-                  processará cada aba em sequência.
-                  {ajustarCabecalho
-                    ? " Não haverá cópia automática; as chamadas e fórmulas da tabela serão preservadas."
-                    : " A aparência será substituída; valores, fórmulas e rótulos serão preservados."}{" "}
-                  As abas que não puderem ser conferidas ficarão fora da aplicação.
-                </>
-              ) : ajustarCabecalho ? (
-                <>
-                  {(previa?.ajusteCabecalho?.linhasRemover ?? 0) === 1
-                    ? "Será retirada 1 linha"
-                    : `Serão retiradas ${previa?.ajusteCabecalho?.linhasRemover ?? 0} linhas`}{" "}
-                  de título, legenda ou espaço acima da tabela.
-                  {(previa?.ajusteCabecalho?.datas.length ?? 0) === 1
-                    ? "Será corrigida 1 data"
-                    : `Serão corrigidas ${previa?.ajusteCabecalho?.datas.length ?? 0} datas`}{" "}
-                  para dia/mês/ano. O cabeçalho Aluno e os dias permanecerão na primeira linha. Não
-                  haverá cópia automática. As chamadas e as fórmulas da tabela serão preservadas.
-                </>
-              ) : (
-                <>
-                  Cabeçalho verde com texto branco e negrito, linhas alternadas, colunas ajustadas e
-                  quebra de texto. O cabeçalho da linha {previa?.cabecalhoLinha} ficará fixo durante
-                  a rolagem. A aparência anterior dessas colunas será substituída; valores, fórmulas
-                  e rótulos serão preservados.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {andamento && (
-            <p role="status" className="text-sm">
-              {andamento.fase} {andamento.atual} de {andamento.total}: {andamento.aba}
-            </p>
-          )}
-          {resultados ? (
-            <ul className="space-y-3 text-sm" aria-label="Resultado por aba">
-              {resultados.map((item) => (
-                <li key={item.aba} className="rounded-lg border p-3">
-                  <strong className="block">{item.aba}</strong>
-                  {item.concluida ? (
-                    "Concluída"
-                  ) : (
-                    <>
-                      <span>Confira a aba</span>
-                      <p className="text-muted-foreground">{item.erro}</p>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
+        titulo={
+          resultados
+            ? "Resultado da organização"
+            : todasTurmas
+              ? ajustarCabecalho
+                ? "Corrigir cabeçalhos e datas de todas as turmas?"
+                : "Organizar apresentação de todas as turmas?"
+              : `${ajustarCabecalho ? "Corrigir cabeçalho e datas da aba" : "Organizar apresentação da aba"} ${previa?.aba ?? ""}?`
+        }
+        descricao={
+          resultados ? (
+            <>
+              Concluídas: {quantidadeConcluidas} de {resultados.length}. Pendências:{" "}
+              {resultados.length - quantidadeConcluidas}. As abas com pendências precisam de
+              conferência antes de outra tentativa.
+            </>
+          ) : todasTurmas ? (
+            <>
+              Abas prontas: {quantidadeProntas} de {conferencias?.length ?? 0}. A confirmação
+              processará cada aba em sequência.
+              {ajustarCabecalho
+                ? " Não haverá cópia automática; as chamadas e fórmulas da tabela serão preservadas."
+                : " A aparência será substituída; valores, fórmulas e rótulos serão preservados."}{" "}
+              As abas que não puderem ser conferidas ficarão fora da aplicação.
+            </>
+          ) : ajustarCabecalho ? (
+            <>
+              {(previa?.ajusteCabecalho?.linhasRemover ?? 0) === 1
+                ? "Será retirada 1 linha"
+                : `Serão retiradas ${previa?.ajusteCabecalho?.linhasRemover ?? 0} linhas`}{" "}
+              de título, legenda ou espaço acima da tabela.
+              {(previa?.ajusteCabecalho?.datas.length ?? 0) === 1
+                ? "Será corrigida 1 data"
+                : `Serão corrigidas ${previa?.ajusteCabecalho?.datas.length ?? 0} datas`}{" "}
+              para dia/mês/ano. O cabeçalho Aluno e os dias permanecerão na primeira linha. Não
+              haverá cópia automática. As chamadas e as fórmulas da tabela serão preservadas.
+            </>
           ) : (
             <>
-              <p className="text-muted-foreground text-xs">
+              Cabeçalho verde com texto branco e negrito, linhas alternadas, colunas ajustadas e
+              quebra de texto. O cabeçalho da linha {previa?.cabecalhoLinha} ficará fixo durante a
+              rolagem. A aparência anterior dessas colunas será substituída; valores, fórmulas e
+              rótulos serão preservados.
+            </>
+          )
+        }
+        tamanho="grande"
+      >
+        <Stack spacing={2}>
+          {andamento ? (
+            <Typography role="status" variant="body2">
+              {andamento.fase} {andamento.atual} de {andamento.total}: {andamento.aba}
+            </Typography>
+          ) : null}
+          {resultados ? (
+            <Box
+              component="ul"
+              aria-label="Resultado por aba"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 1,
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+              }}
+            >
+              {resultados.map((item) => (
+                <Box
+                  component="li"
+                  key={item.aba}
+                  sx={{ border: 1, borderColor: "divider", borderRadius: 2, padding: 2 }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600, display: "block" }}>
+                    {item.aba}
+                  </Typography>
+                  {item.concluida ? (
+                    <Typography variant="caption">Concluída</Typography>
+                  ) : (
+                    <>
+                      <Typography variant="caption">Confira a aba</Typography>
+                      <Typography
+                        variant="caption"
+                        sx={{ display: "block", color: "text.secondary" }}
+                      >
+                        {item.erro}
+                      </Typography>
+                    </>
+                  )}
+                </Box>
+              ))}
+            </Box>
+          ) : (
+            <>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 Prévia com dados fictícios. Role para conferir as colunas.
-              </p>
+              </Typography>
               {todasTurmas ? (
-                <div className="min-w-0 space-y-3">
+                <Box sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                   {conferencias?.map((item, indice) => (
-                    <details
+                    <Box
                       key={item.aba}
-                      open={indice === 0}
-                      className="bg-secondary/30 min-w-0 rounded-lg p-3"
+                      sx={(tema) => ({
+                        minWidth: 0,
+                        padding: 2,
+                        borderRadius: 2,
+                        backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 5%, transparent)`,
+                      })}
                     >
-                      <summary className="cursor-pointer text-sm font-medium">
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
                         {item.aba}: {item.previa ? "Pronta" : "Não será alterada"}
-                      </summary>
-                      {item.previa ? (
-                        <div className="mt-3 min-w-0 space-y-2">
-                          <p className="text-muted-foreground text-xs">
-                            {ajustarCabecalho
-                              ? `Linhas a retirar: ${item.previa.ajusteCabecalho?.linhasRemover ?? 0}. Datas a corrigir: ${item.previa.ajusteCabecalho?.datas.length ?? 0}.`
-                              : `Cabeçalho na linha ${item.previa.cabecalhoLinha}.`}
-                          </p>
-                          <TabelaPrevia
-                            previa={item.previa}
-                            rotulo={`Prévia da apresentação de ${item.aba}`}
-                          />
-                        </div>
-                      ) : (
-                        <p className="text-muted-foreground mt-2 text-sm">{item.erro}</p>
-                      )}
-                    </details>
+                      </Typography>
+                      {indice === 0 || item.previa ? (
+                        item.previa ? (
+                          <Box
+                            sx={{ marginTop: 1, display: "flex", flexDirection: "column", gap: 1 }}
+                          >
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                              {ajustarCabecalho
+                                ? `Linhas a retirar: ${item.previa.ajusteCabecalho?.linhasRemover ?? 0}. Datas a corrigir: ${item.previa.ajusteCabecalho?.datas.length ?? 0}.`
+                                : `Cabeçalho na linha ${item.previa.cabecalhoLinha}.`}
+                            </Typography>
+                            <TabelaPrevia
+                              previa={item.previa}
+                              rotulo={`Prévia da apresentação de ${item.aba}`}
+                            />
+                          </Box>
+                        ) : (
+                          <Typography
+                            variant="body2"
+                            sx={{ marginTop: 1, color: "text.secondary" }}
+                          >
+                            {item.erro}
+                          </Typography>
+                        )
+                      ) : null}
+                    </Box>
                   ))}
-                </div>
-              ) : (
-                previa && <TabelaPrevia previa={previa} />
-              )}
+                </Box>
+              ) : previa ? (
+                <TabelaPrevia previa={previa} />
+              ) : null}
             </>
           )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={executando}>
+          <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <Botao
+              type="button"
+              variante="contorno"
+              disabled={executando}
+              onClick={() => {
+                if (!executando) fechar();
+              }}
+            >
               {resultados ? "Fechar" : "Cancelar"}
-            </AlertDialogCancel>
-            {!resultados && (
-              <AlertDialogAction
+            </Botao>
+            {!resultados ? (
+              <Botao
+                type="button"
+                variante="secundario"
                 disabled={executando || quantidadeProntas === 0}
-                onClick={(evento) => {
-                  evento.preventDefault();
-                  void aplicar();
-                }}
+                carregando={executando}
+                onClick={() => void aplicar()}
               >
                 {executando
                   ? "Aplicando..."
                   : ajustarCabecalho
                     ? "Aplicar correção"
                     : "Aplicar apresentação"}
-              </AlertDialogAction>
-            )}
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              </Botao>
+            ) : null}
+          </Stack>
+        </Stack>
+      </Dialogo>
     </>
   );
 }

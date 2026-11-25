@@ -1,14 +1,8 @@
 "use client";
 
-// Fallback quando o layout raiz falha. Usa estilos inline para não depender do CSS.
+// Fallback quando o layout raiz falha. Usa estilos próprios para não depender do CSS.
 import { useEffect } from "react";
 import Link from "next/link";
-
-const COR_PRIMARIA = "#17784d";
-const FUNDO_CLARO = "#f6f6f6";
-const TINTA_CLARA = "#3d3a34";
-const FUNDO_ESCURO = "#1c1b19";
-const TINTA_ESCURA = "#eceae6";
 
 export default function ErroGlobal({
   error,
@@ -26,14 +20,63 @@ export default function ErroGlobal({
       <head>
         <title>Algo saiu do esperado · FrequenciApp</title>
         <style>{`
-          body { background: ${FUNDO_CLARO}; color: ${TINTA_CLARA}; }
-          .texto { color: #6f6a60; }
-          .acao:focus-visible { outline: 2px solid ${COR_PRIMARIA}; outline-offset: 2px; }
-          .secundaria { background: transparent; color: ${TINTA_CLARA}; border: 1px solid #d9ddda; }
+          :root {
+            color-scheme: light dark;
+            --fundo: #f6f6f6;
+            --tinta: #262626;
+            --tinta-fraca: #595959;
+            --borda: #e4e4e2;
+            --verde: #1d7253;
+            --verde-texto: #effaf6;
+            --emblema-fundo: rgba(29, 114, 83, 0.1);
+            --foco: #1d7253;
+          }
           @media (prefers-color-scheme: dark) {
-            body { background: ${FUNDO_ESCURO}; color: ${TINTA_ESCURA}; }
-            .texto { color: #b6b2a9; }
-            .secundaria { background: #2b2925; color: ${TINTA_ESCURA}; border-color: transparent; }
+            :root {
+              --fundo: #141413;
+              --tinta: #ffffff;
+              --tinta-fraca: #a6a6a6;
+              --borda: #393837;
+              --verde: #81cfb3;
+              --verde-texto: #082b1e;
+              --emblema-fundo: rgba(129, 207, 179, 0.15);
+              --foco: #81cfb3;
+            }
+          }
+          body { background: var(--fundo); color: var(--tinta); }
+          .texto { color: var(--tinta-fraca); }
+          .emblema {
+            display: flex;
+            width: 56px;
+            height: 56px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: var(--emblema-fundo);
+            color: var(--verde);
+          }
+          .acao {
+            margin-top: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 18px;
+            min-height: 44px;
+            border-radius: 8px;
+            border: none;
+            background: var(--verde);
+            color: var(--verde-texto);
+            font-size: 15px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+          }
+          button.acao { min-height: 48px; }
+          .acao:focus-visible { outline: 3px solid var(--foco); outline-offset: 2px; }
+          .secundaria {
+            background: transparent;
+            color: var(--tinta);
+            border: 1px solid var(--borda);
           }
         `}</style>
       </head>
@@ -51,19 +94,7 @@ export default function ErroGlobal({
           textAlign: "center",
         }}
       >
-        <span
-          aria-hidden="true"
-          style={{
-            display: "flex",
-            width: 56,
-            height: 56,
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 16,
-            background: `${COR_PRIMARIA}1a`,
-            color: COR_PRIMARIA,
-          }}
-        >
+        <span aria-hidden="true" className="emblema">
           <svg
             width="26"
             height="26"
@@ -89,40 +120,10 @@ export default function ErroGlobal({
           Não foi possível carregar a aplicação. Tente novamente em instantes.
         </p>
         <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8 }}>
-          <button
-            type="button"
-            className="acao"
-            onClick={reset}
-            style={{
-              marginTop: 8,
-              padding: "10px 18px",
-              minHeight: 44,
-              borderRadius: 16,
-              border: "none",
-              background: COR_PRIMARIA,
-              color: "#faf9f6",
-              fontSize: 15,
-              fontWeight: 600,
-              cursor: "pointer",
-            }}
-          >
+          <button type="button" className="acao" onClick={reset}>
             Tentar novamente
           </button>
-          <Link
-            href="/"
-            className="acao secundaria"
-            style={{
-              marginTop: 8,
-              display: "inline-flex",
-              alignItems: "center",
-              padding: "10px 18px",
-              minHeight: 44,
-              borderRadius: 16,
-              fontSize: 15,
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
-          >
+          <Link href="/" className="acao secundaria">
             Ir para o início
           </Link>
         </div>

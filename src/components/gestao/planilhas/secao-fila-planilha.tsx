@@ -3,7 +3,13 @@
 // Fila FIFO dos envios automáticos às planilhas: contagens por estado, os envios ainda
 // pendentes e as ações da administração (processar agora, reenfileirar e descartar).
 import { useCallback, useEffect, useState } from "react";
-import { ListOrdered, LoaderCircle, Play, RefreshCw, RotateCcw, X } from "lucide-react";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { rotuloData } from "@/domain/frequencia";
 import type {
   EstadoDaFila,
@@ -15,10 +21,11 @@ import type {
 import { corpoJson, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import { CaixasDeInfo } from "@/components/ui/caixas-de-info";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
-import { Selo, type VarianteSelo } from "@/components/ui/selo";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
+import { Selo, type TomSelo } from "@/components/ui/mui/selo";
 
 const ATUALIZAR_A_CADA_MS = 15_000;
 
@@ -36,7 +43,7 @@ const ROTULO_ESTADO: Record<EstadoItemFila, string> = {
   DESCARTADO: "Descartado",
 };
 
-const VARIANTE_ESTADO: Record<EstadoItemFila, VarianteSelo> = {
+const TOM_ESTADO: Record<EstadoItemFila, TomSelo> = {
   AGUARDANDO: "neutro",
   EM_ANDAMENTO: "neutro",
   CONCLUIDO: "sucesso",
@@ -153,152 +160,182 @@ export default function SecaoFilaPlanilha() {
   }
 
   return (
-    <SecaoRecolhivel
-      dataSecao="planilha-fila"
-      titulo="Fila de envios automáticos"
-      icone={ListOrdered}
-      aberto={aberto}
-      onAbertoChange={setAberto}
-      resumo={
-        <>
-          <Selo
-            variante={
-              erro
-                ? "perigo"
+    <Box data-secao="planilha-fila">
+      <Acordeao
+        titulo="Fila de envios automáticos"
+        resumo={
+          <>
+            <Selo
+              tom={
+                erro
+                  ? "perigo"
+                  : !estado
+                    ? "neutro"
+                    : abertos + conferencias > 0
+                      ? "atencao"
+                      : "sucesso"
+              }
+            >
+              {erro
+                ? "Falha ao consultar"
                 : !estado
-                  ? "neutro"
-                  : abertos + conferencias > 0
-                    ? "atencao"
-                    : "sucesso"
+                  ? "Conferindo..."
+                  : abertos > 0
+                    ? `${abertos} na fila`
+                    : conferencias > 0
+                      ? `${conferencias} para conferir`
+                      : "Fila vazia"}
+            </Selo>
+            {conferencias > 0 ? <Selo tom="atencao">{conferencias} para conferir</Selo> : null}
+            {falhos > 0 ? <Selo tom="perigo">{falhos} com falha</Selo> : null}
+          </>
+        }
+        aberto={aberto}
+        onChange={setAberto}
+      >
+        <Stack spacing={2}>
+          {erro ? (
+            <AlertaCompacto variante="indisponivel" descricao={erro} tamanho="linha" />
+          ) : null}
+          <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+            <Botao
+              type="button"
+              variante="contorno"
+              disabled={chaveAtiva === "processar"}
+              carregando={chaveAtiva === "processar"}
+              icone={<PlayArrowRoundedIcon />}
+              onClick={processarAgora}
+            >
+              Processar agora
+            </Botao>
+            <Botao type="button" variante="texto" icone={<RefreshRoundedIcon />} onClick={carregar}>
+              Atualizar fila
+            </Botao>
+          </Stack>
+          <Acordeao
+            titulo="Detalhes da fila"
+            nivelTitulo="h4"
+            resumo={
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                Contagens por estado
+              </Typography>
             }
           >
-            {erro
-              ? "Falha ao consultar"
-              : !estado
-                ? "Conferindo..."
-                : abertos > 0
-                  ? `${abertos} na fila`
-                  : conferencias > 0
-                    ? `${conferencias} para conferir`
-                    : "Fila vazia"}
-          </Selo>
-          {conferencias > 0 && <Selo variante="atencao">{conferencias} para conferir</Selo>}
-          {falhos > 0 && <Selo variante="perigo">{falhos} com falha</Selo>}
-        </>
-      }
-    >
-      <div className="flex flex-col gap-4">
-        {erro && (
-          <p role="alert" className="text-falta-texto text-sm">
-            {erro}
-          </p>
-        )}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11"
-            disabled={chaveAtiva === "processar"}
-            onClick={processarAgora}
-          >
-            {chaveAtiva === "processar" ? (
-              <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-            ) : (
-              <Play size={16} aria-hidden="true" />
-            )}
-            Processar agora
-          </Button>
-          <Button type="button" variant="ghost" className="h-11" onClick={carregar}>
-            <RefreshCw size={16} aria-hidden="true" />
-            Atualizar fila
-          </Button>
-        </div>
-        <details className="text-muted-foreground text-xs">
-          <summary className="min-h-11 cursor-pointer content-center font-medium">
-            Detalhes da fila
-          </summary>
-          <p className="mb-3">
-            Envios processados por ordem de chegada, com até cinco tentativas automáticas. A lista
-            mostra os pendentes, as falhas de preparo, as origens não processadas e as conferências
-            de escrita incerta. Os resolvidos entram nas contagens.
-          </p>
-          {estado && (
-            <CaixasDeInfo
-              rotulo="Itens por estado"
-              partes={(Object.keys(ROTULO_ESTADO) as EstadoItemFila[]).map(
-                (chave) => `${ROTULO_ESTADO[chave]}: ${estado.contagens[chave]}`,
-              )}
-            />
-          )}
-        </details>
-        {estado && estado.itens.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nenhum envio pendente na fila.</p>
-        ) : (
-          <ul aria-label="Itens da fila" className="divide-y rounded-lg border">
-            {estado?.itens.map((item) => (
-              <li key={item.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center">
-                <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                  <div>
-                    <Selo variante={VARIANTE_ESTADO[item.estado]}>
+            <Stack spacing={2}>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Envios processados por ordem de chegada, com até cinco tentativas automáticas. A
+                lista mostra os pendentes, as falhas de preparo, as origens não processadas e as
+                conferências de escrita incerta. Os resolvidos entram nas contagens.
+              </Typography>
+              {estado ? (
+                <CaixasDeInfo
+                  rotulo="Itens por estado"
+                  itens={(Object.keys(ROTULO_ESTADO) as EstadoItemFila[]).map(
+                    (chave) => `${ROTULO_ESTADO[chave]}: ${estado.contagens[chave]}`,
+                  )}
+                />
+              ) : null}
+            </Stack>
+          </Acordeao>
+          {estado && estado.itens.length === 0 ? (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Nenhum envio pendente na fila.
+            </Typography>
+          ) : (
+            <Box
+              component="ul"
+              aria-label="Itens da fila"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 2,
+              }}
+            >
+              {estado?.itens.map((item) => (
+                <Stack
+                  component="li"
+                  key={item.id}
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1}
+                  sx={{
+                    alignItems: { sm: "center" },
+                    padding: 2,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    "&:last-of-type": { borderBottom: 0 },
+                  }}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Selo tom={TOM_ESTADO[item.estado]}>
                       {item.requerConferencia
                         ? item.podeResolver
                           ? "Conferência necessária"
                           : "Ação necessária"
                         : ROTULO_ESTADO[item.estado]}
                     </Selo>
-                  </div>
-                  <p className="text-muted-foreground text-xs wrap-anywhere">
-                    {partesDoItem(item).join(" · ")}
-                    {item.escopos.map((alvo, indice) => (
-                      <span key={indice} className="block">
-                        Origem {alvo.origemRotulo ?? alvo.origemId ?? "movimentação"} ·{" "}
-                        {alvo.destino ?? "Destino desconhecido"}
-                      </span>
-                    ))}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  {item.podeResolver && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11"
-                      disabled={chaveAtiva === `resolver:${item.id}`}
-                      onClick={() => agir(item, "resolver")}
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        display: "block",
+                        marginTop: 0.5,
+                        color: "text.secondary",
+                        overflowWrap: "anywhere",
+                      }}
                     >
-                      Registrar conferência
-                    </Button>
-                  )}
-                  {item.podeReprocessar && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11"
-                      disabled={chaveAtiva === `reenfileirar:${item.id}`}
-                      onClick={() => agir(item, "reenfileirar")}
-                    >
-                      <RotateCcw size={16} aria-hidden="true" />
-                      Tentar novamente
-                    </Button>
-                  )}
-                  {item.estado === "AGUARDANDO" && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-11"
-                      disabled={chaveAtiva === `descartar:${item.id}`}
-                      onClick={() => agir(item, "descartar")}
-                    >
-                      <X size={16} aria-hidden="true" />
-                      Descartar
-                    </Button>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </SecaoRecolhivel>
+                      {partesDoItem(item).join(" · ")}
+                      {item.escopos.map((alvo, indice) => (
+                        <Box component="span" key={indice} sx={{ display: "block" }}>
+                          Origem {alvo.origemRotulo ?? alvo.origemId ?? "movimentação"} ·{" "}
+                          {alvo.destino ?? "Destino desconhecido"}
+                        </Box>
+                      ))}
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+                    {item.podeResolver ? (
+                      <Botao
+                        type="button"
+                        variante="contorno"
+                        disabled={chaveAtiva === `resolver:${item.id}`}
+                        onClick={() => agir(item, "resolver")}
+                      >
+                        Registrar conferência
+                      </Botao>
+                    ) : null}
+                    {item.podeReprocessar ? (
+                      <Botao
+                        type="button"
+                        variante="contorno"
+                        disabled={chaveAtiva === `reenfileirar:${item.id}`}
+                        icone={<ReplayRoundedIcon />}
+                        onClick={() => agir(item, "reenfileirar")}
+                      >
+                        Tentar novamente
+                      </Botao>
+                    ) : null}
+                    {item.estado === "AGUARDANDO" ? (
+                      <Botao
+                        type="button"
+                        variante="texto"
+                        disabled={chaveAtiva === `descartar:${item.id}`}
+                        icone={<CloseRoundedIcon />}
+                        onClick={() => agir(item, "descartar")}
+                      >
+                        Descartar
+                      </Botao>
+                    ) : null}
+                  </Stack>
+                </Stack>
+              ))}
+            </Box>
+          )}
+        </Stack>
+      </Acordeao>
+    </Box>
   );
 }

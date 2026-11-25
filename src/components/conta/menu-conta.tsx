@@ -1,12 +1,26 @@
 "use client";
 
 // Menu flutuante da conta: perfil, notificações, senha, Sobre e saída.
-import { useRef, useState } from "react";
-import { Bell, ChevronUp, Info, KeyRound, LogOut } from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import useMediaQuery from "@mui/material/useMediaQuery";
+import ArrowDropUpRoundedIcon from "@mui/icons-material/ArrowDropUpRounded";
+import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
+import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
+import Avatar from "@mui/material/Avatar";
+import Box from "@mui/material/Box";
+import Divider from "@mui/material/Divider";
+import ListItemButton from "@mui/material/ListItemButton";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import Menu from "@mui/material/Menu";
+import MenuItem from "@mui/material/MenuItem";
+import Typography from "@mui/material/Typography";
+import type { Theme } from "@mui/material/styles";
 import type { Identidade } from "@/domain/usuarios";
 import { rotuloDePapel } from "@/domain/usuarios";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { SeletorTema } from "@/components/ui/seletor-tema";
+import { TOKENS_LAYOUT } from "@/theme/layout";
+import { OpcoesAnimacoes } from "./seletor-animacoes";
 
 export type AcaoConta = "notificacoes" | "senha" | "sobre" | "sair";
 
@@ -14,118 +28,168 @@ interface Props {
   usuario: Identidade;
   movel: boolean;
   saindo: boolean;
-  onAcao: (acao: AcaoConta, gatilho: HTMLButtonElement | null) => void;
+  onAcao: (acao: AcaoConta, gatilho: HTMLElement | null) => void;
 }
 
-function Item({
-  icone: Icone,
-  rotulo,
-  onClick,
-  disabled,
-}: {
-  icone: typeof Bell;
+interface ItemProps {
+  icone: ReactNode;
   rotulo: string;
   onClick: () => void;
   disabled?: boolean;
-}) {
+}
+
+const ALTURA_CURTA = "(max-height: 400px)";
+
+const sxItemFocado = (tema: Theme) => ({
+  // O teclado marca :focus-visible mesmo quando o MUI não aplica Mui-focusVisible.
+  "&.Mui-focusVisible, &:focus-visible": {
+    backgroundColor: tema.vars.palette.action.hover,
+    boxShadow: `inset 0 0 0 2px ${tema.vars.palette.primary.main}`,
+  },
+});
+
+const sxItemCompacto = {
+  minHeight: TOKENS_LAYOUT.alvoToque,
+  [`@media ${ALTURA_CURTA}`]: { minHeight: 44, py: 0 },
+};
+
+function Item({ icone, rotulo, onClick, disabled }: ItemProps) {
   return (
-    <button
-      type="button"
-      role="menuitem"
-      disabled={disabled}
+    <MenuItem
       onClick={onClick}
-      className="discreto pressionavel focus-visible:ring-ring/50 flex min-h-11 w-full items-center gap-2.5 px-2.5 text-left text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:outline-none disabled:cursor-not-allowed"
+      disabled={disabled}
+      sx={[{ gap: 1.5, px: 1.5 }, sxItemCompacto, sxItemFocado]}
     >
-      <Icone size={17} className="text-muted-foreground shrink-0" aria-hidden="true" />
-      <span className="min-w-0 truncate">{rotulo}</span>
-    </button>
+      <ListItemIcon sx={{ minWidth: 0, color: "text.secondary" }}>{icone}</ListItemIcon>
+      <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
+        {rotulo}
+      </Box>
+    </MenuItem>
   );
 }
 
 export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
-  const [aberto, setAberto] = useState(false);
-  const conteudoRef = useRef<HTMLDivElement>(null);
+  const [ancora, setAncora] = useState<HTMLButtonElement | null>(null);
   const gatilhoRef = useRef<HTMLButtonElement | null>(null);
+  const idMenu = useId();
+  const aberto = ancora !== null;
+  const alturaCurta = useMediaQuery(ALTURA_CURTA);
 
   function acionar(acao: AcaoConta) {
-    setAberto(false);
+    setAncora(null);
     onAcao(acao, gatilhoRef.current);
   }
 
   return (
-    <Popover open={aberto} onOpenChange={setAberto}>
-      <PopoverTrigger asChild>
-        <button
-          ref={gatilhoRef}
-          type="button"
-          aria-haspopup="menu"
-          aria-label={`Conta de ${usuario.nome}`}
-          className="discreto pressionavel focus-visible:ring-ring/50 flex min-h-12 w-full items-center gap-2.5 px-2 py-1.5 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
-        >
-          <span className="selecionado flex size-10 shrink-0 items-center justify-center rounded-full">
-            <span className="text-sm font-semibold" aria-hidden="true">
-              {usuario.nome.slice(0, 1).toUpperCase()}
-            </span>
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">{usuario.nome}</span>
-            <span className="text-muted-foreground block truncate text-xs">
-              {rotuloDePapel(usuario.papel)}
-            </span>
-          </span>
-          <ChevronUp size={16} className="text-muted-foreground shrink-0" aria-hidden="true" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="top"
-        align="start"
-        collisionPadding={8}
-        className="w-[min(17rem,calc(100vw-1.5rem))] p-1.5"
-        onOpenAutoFocus={(evento) => {
-          evento.preventDefault();
-          conteudoRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    <>
+      <ListItemButton
+        ref={gatilhoRef}
+        component="button"
+        type="button"
+        aria-haspopup="menu"
+        aria-label={`Conta de ${usuario.nome}`}
+        aria-expanded={aberto}
+        aria-controls={aberto ? idMenu : undefined}
+        onClick={(evento) => setAncora(evento.currentTarget)}
+        sx={{
+          width: "100%",
+          minHeight: TOKENS_LAYOUT.alvoToque,
+          px: 1,
+          py: 0.75,
+          gap: 1.25,
+          borderRadius: 2,
+          textAlign: "left",
         }}
       >
-        <div
-          ref={conteudoRef}
-          role="menu"
-          aria-label="Conta"
-          className="flex flex-col gap-1.5"
-          onKeyDown={(evento) => {
-            if (evento.key !== "ArrowDown" && evento.key !== "ArrowUp") return;
-            const itens = [
-              ...(conteudoRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []),
-            ];
-            if (itens.length === 0) return;
-            evento.preventDefault();
-            const atual = itens.indexOf(document.activeElement as HTMLElement);
-            const delta = evento.key === "ArrowDown" ? 1 : -1;
-            const proximo = (atual + delta + itens.length) % itens.length;
-            itens[proximo]?.focus();
+        <Avatar
+          aria-hidden="true"
+          sx={{
+            width: 40,
+            height: 40,
+            flexShrink: 0,
+            bgcolor: "secondary.main",
+            color: "secondary.contrastText",
+            fontSize: 14,
+            fontWeight: 600,
           }}
         >
-          <div className="text-muted-foreground truncate border-b px-2.5 py-2 text-xs">
+          {usuario.nome.slice(0, 1).toUpperCase()}
+        </Avatar>
+        <Box sx={{ display: "flex", flexDirection: "column", minWidth: 0, flex: 1 }}>
+          <Typography variant="body2" noWrap sx={{ fontWeight: 600 }}>
+            {usuario.nome}
+          </Typography>
+          <Typography variant="caption" noWrap sx={{ color: "text.secondary" }}>
+            {rotuloDePapel(usuario.papel)}
+          </Typography>
+        </Box>
+        <ArrowDropUpRoundedIcon
+          fontSize="small"
+          aria-hidden="true"
+          sx={{ flexShrink: 0, color: "text.secondary" }}
+        />
+      </ListItemButton>
+      <Menu
+        variant="menu"
+        anchorEl={ancora}
+        open={aberto}
+        onClose={() => setAncora(null)}
+        anchorOrigin={{ vertical: "top", horizontal: "left" }}
+        transformOrigin={{ vertical: "bottom", horizontal: "left" }}
+        marginThreshold={alturaCurta ? 4 : 8}
+        slotProps={{
+          list: {
+            id: idMenu,
+            "aria-label": "Conta",
+            sx: alturaCurta ? { py: 0.25 } : undefined,
+          },
+          paper: {
+            sx: {
+              width: 272,
+              maxWidth: "calc(100vw - 24px)",
+              ...(alturaCurta ? { maxHeight: "calc(100dvh - 8px)" } : {}),
+            },
+          },
+        }}
+      >
+        <Box
+          sx={{
+            px: 1.5,
+            py: alturaCurta ? 0.25 : 1,
+            borderBottom: 1,
+            borderColor: "divider",
+            color: "text.secondary",
+          }}
+        >
+          <Typography variant="caption" noWrap component="p">
             {movel ? "Conta" : usuario.email}
-          </div>
-          {!movel && (
-            <div className="flex items-center justify-between gap-2 px-2.5 py-1.5">
-              <span className="text-sm font-medium">Tema</span>
-              <SeletorTema />
-            </div>
-          )}
-          <Item icone={Bell} rotulo="Notificações" onClick={() => acionar("notificacoes")} />
-          <Item icone={KeyRound} rotulo="Trocar senha" onClick={() => acionar("senha")} />
-          <Item icone={Info} rotulo="Sobre" onClick={() => acionar("sobre")} />
-          <div className="border-t pt-1.5">
-            <Item
-              icone={LogOut}
-              rotulo={saindo ? "Saindo..." : "Sair da conta"}
-              onClick={() => acionar("sair")}
-              disabled={saindo}
-            />
-          </div>
-        </div>
-      </PopoverContent>
-    </Popover>
+          </Typography>
+        </Box>
+        <Item
+          icone={<NotificationsRoundedIcon fontSize="small" aria-hidden="true" />}
+          rotulo="Notificações"
+          onClick={() => acionar("notificacoes")}
+        />
+        <Item
+          icone={<KeyRoundedIcon fontSize="small" aria-hidden="true" />}
+          rotulo="Trocar senha"
+          onClick={() => acionar("senha")}
+        />
+        <Item
+          icone={<InfoRoundedIcon fontSize="small" aria-hidden="true" />}
+          rotulo="Sobre"
+          onClick={() => acionar("sobre")}
+        />
+        <Divider component="li" role="separator" sx={{ my: alturaCurta ? 0.25 : 0.75 }} />
+        <OpcoesAnimacoes compacto={alturaCurta} />
+        <Divider component="li" role="separator" sx={{ my: alturaCurta ? 0.25 : 0.75 }} />
+        <Item
+          icone={<LogoutRoundedIcon fontSize="small" aria-hidden="true" />}
+          rotulo={saindo ? "Saindo..." : "Sair da conta"}
+          onClick={() => acionar("sair")}
+          disabled={saindo}
+        />
+      </Menu>
+    </>
   );
 }

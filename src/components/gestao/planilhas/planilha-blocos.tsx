@@ -2,46 +2,31 @@
 
 // Controles compartilhados de edição temporária e ações de risco das planilhas.
 import { useState } from "react";
-import {
-  Archive,
-  History,
-  LoaderCircle,
-  Lock,
-  LockOpen,
-  Trash2,
-  TriangleAlert,
-  Unplug,
-} from "lucide-react";
-import { toast } from "sonner";
-import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarSucesso } from "@/lib/avisos";
+import ArchiveRoundedIcon from "@mui/icons-material/ArchiveRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import HistoryRoundedIcon from "@mui/icons-material/HistoryRounded";
+import LinkOffRoundedIcon from "@mui/icons-material/LinkOffRounded";
+import LockOpenRoundedIcon from "@mui/icons-material/LockOpenRounded";
+import LockRoundedIcon from "@mui/icons-material/LockRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { corpoJson, pedir } from "@/lib/api-cliente";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useMinutoCorrente } from "@/lib/use-relogio";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { CampoSenha } from "@/components/ui/campo-senha";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { GrupoOpcoes } from "@/components/ui/mui/grupo-opcoes";
 import { LimparCopiasPlanilha } from "./dialogo-limpar-copias";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 /** Modo completo com prazo, sem as cópias nem a remoção de aba. */
 export function BlocoModoCompletoPlanilha({
@@ -91,7 +76,7 @@ export function BlocoModoCompletoPlanilha({
         );
         await onMudou();
       } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível destravar.");
+        avisarErro(excecao, { contexto: "Não foi possível destravar." });
       } finally {
         setDestravando(false);
       }
@@ -108,129 +93,126 @@ export function BlocoModoCompletoPlanilha({
         );
         await onMudou();
       } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível encerrar.");
+        avisarErro(excecao, { contexto: "Não foi possível encerrar." });
       }
     });
   }
 
   return (
     <>
-      <section
+      <Box
+        component="section"
         aria-label="Modo completo"
-        className="superficie flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between"
+        sx={(tema) => ({
+          display: "flex",
+          flexDirection: { xs: "column", sm: "row" },
+          alignItems: { sm: "center" },
+          justifyContent: "space-between",
+          gap: 2,
+          padding: 2,
+          border: `1px solid ${tema.vars.palette.divider}`,
+          borderRadius: 2,
+        })}
       >
-        <div className="flex min-w-0 items-center gap-2">
+        <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
           {ativo ? (
-            <LockOpen size={20} aria-hidden="true" />
+            <LockOpenRoundedIcon aria-hidden="true" />
           ) : (
-            <Lock size={20} aria-hidden="true" />
+            <LockRoundedIcon aria-hidden="true" />
           )}
-          <div className="min-w-0">
-            <p className="text-sm font-medium">
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
               {ativo ? "Modo completo ativo" : "Edição protegida"}
-            </p>
-            <p className="text-muted-foreground text-xs">
+            </Typography>
+            <Typography variant="caption" sx={{ color: "text.secondary" }}>
               {ativo
                 ? `Até ${hora}${restanteMinutos !== null && restanteMinutos <= 5 ? ` · restam ${restanteMinutos} min` : ""}`
                 : "Correções e exclusões exigem liberação."}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
+            </Typography>
+          </Box>
+        </Stack>
+        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap" }}>
+          <Botao
             type="button"
-            variant="outline"
-            className="h-11"
+            variante="contorno"
             onClick={() => setDestrave(true)}
             disabled={chaveAtiva !== null}
+            icone={<LockOpenRoundedIcon />}
           >
-            <LockOpen size={16} aria-hidden="true" />
             {ativo ? "Estender" : "Liberar modo completo"}
-          </Button>
-          {ativo && (
-            <Button
+          </Botao>
+          {ativo ? (
+            <Botao
               type="button"
-              variant="ghost"
-              className="h-11"
+              variante="texto"
               onClick={() => void voltarConservador()}
               disabled={chaveAtiva !== null}
+              icone={<LockRoundedIcon />}
             >
-              <Lock size={16} aria-hidden="true" />
               Encerrar modo completo
-            </Button>
-          )}
-        </div>
-      </section>
+            </Botao>
+          ) : null}
+        </Stack>
+      </Box>
 
-      <Dialog open={destrave} onOpenChange={setDestrave}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Liberar modo completo</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs leading-relaxed">
-              Permite substituir, limpar e remover dados na planilha. Não há cópia automática;
-              exporte o arquivo antes de alterações que precisem de recuperação.
-            </p>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${idPrefixo}-frase-destrave`}>Digite {FRASE_MODO_COMPLETO}</Label>
-              <Input
-                id={`${idPrefixo}-frase-destrave`}
-                value={frase}
-                onChange={(evento) => setFrase(evento.target.value)}
-                autoComplete="off"
-                className="h-11"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-sm font-medium">Duração</span>
-              <div
-                role="radiogroup"
-                aria-label="Duração do modo completo"
-                className="superficie grid grid-cols-4 gap-1 p-1.5"
-              >
-                {DURACOES_MODO_COMPLETO.map((minutos) => (
-                  <button
-                    key={minutos}
-                    type="button"
-                    role="radio"
-                    aria-checked={duracao === minutos}
-                    onClick={() => setDuracao(minutos)}
-                    className="controle discreto pressionavel min-h-10 px-1 text-xs font-medium"
-                  >
-                    {minutos} min
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${idPrefixo}-senha-destrave`}>Senha do administrador</Label>
-              <CampoSenha
-                id={`${idPrefixo}-senha-destrave`}
-                value={senha}
-                onChange={(evento) => setSenha(evento.target.value)}
-                className="h-11"
-                autoComplete="current-password"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setDestrave(false)}>
+      <Dialogo
+        aberto={destrave}
+        onFechar={() => setDestrave(false)}
+        titulo="Liberar modo completo"
+        tamanho="medio"
+      >
+        <Stack spacing={2}>
+          <AlertaCompacto
+            variante="dados_invalidos"
+            descricao="Permite substituir, limpar e remover dados na planilha. Não há cópia automática; exporte o arquivo antes de alterações que precisem de recuperação."
+            tamanho="linha"
+          />
+          <Campo id={`${idPrefixo}-frase-destrave`} rotulo={`Digite ${FRASE_MODO_COMPLETO}`}>
+            <CampoTexto
+              id={`${idPrefixo}-frase-destrave`}
+              valor={frase}
+              onValor={setFrase}
+              autoComplete="off"
+            />
+          </Campo>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600, marginBottom: 1 }}>
+              Duração
+            </Typography>
+            <GrupoOpcoes
+              rotulo="Duração do modo completo"
+              valor={String(duracao)}
+              onValor={(valor) => setDuracao(Number(valor))}
+              opcoes={DURACOES_MODO_COMPLETO.map((minutos) => ({
+                valor: String(minutos),
+                rotulo: `${minutos} min`,
+              }))}
+            />
+          </Box>
+          <Campo id={`${idPrefixo}-senha-destrave`} rotulo="Senha do administrador">
+            <CampoSenha
+              id={`${idPrefixo}-senha-destrave`}
+              valor={senha}
+              onValor={setSenha}
+              autoComplete="current-password"
+            />
+          </Campo>
+          <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <Botao type="button" variante="contorno" onClick={() => setDestrave(false)}>
               Cancelar
-            </Button>
-            <Button
+            </Botao>
+            <Botao
               type="button"
+              variante="secundario"
               onClick={() => void destravar()}
-              disabled={
-                destravando || frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO || senha === ""
-              }
+              disabled={frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO || senha === ""}
+              carregando={destravando}
             >
-              {destravando && <LoaderCircle size={16} className="animate-spin" />}
               Liberar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </Botao>
+          </Stack>
+        </Stack>
+      </Dialogo>
     </>
   );
 }
@@ -257,6 +239,7 @@ export function BlocoRiscoPlanilha({
   const [abaRemover, setAbaRemover] = useState<string | null>(null);
   const [senha, setSenha] = useState("");
   const [frase, setFrase] = useState("");
+  const [confirmarDesconexao, setConfirmarDesconexao] = useState(false);
   const acoes = useAcoesPorChave();
   const { chaveAtiva, executar: executarPorChave } = acoes;
 
@@ -271,7 +254,7 @@ export function BlocoRiscoPlanilha({
       }
       setCopias(lista);
     } catch (excecao) {
-      toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível listar cópias.");
+      avisarErro(excecao, { contexto: "Não foi possível listar cópias." });
     }
   }
 
@@ -292,7 +275,7 @@ export function BlocoRiscoPlanilha({
         );
         await onMudou();
       } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível restaurar.");
+        avisarErro(excecao, { contexto: "Não foi possível restaurar." });
       }
     });
   }
@@ -305,12 +288,10 @@ export function BlocoRiscoPlanilha({
         setAbaRemover(null);
         setFrase("");
         setSenha("");
-        toast.success("Aba removida.");
+        avisarSucesso("Aba removida.");
         await onMudou();
       } catch (excecao) {
-        toast.error(
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível remover a aba.",
-        );
+        avisarErro(excecao, { contexto: "Não foi possível remover a aba." });
       }
     });
   }
@@ -326,225 +307,286 @@ export function BlocoRiscoPlanilha({
         );
         await onMudou();
       } catch (excecao) {
-        toast.error(excecao instanceof ErroApi ? excecao.message : "Não foi possível desconectar.");
+        avisarErro(excecao, { contexto: "Não foi possível desconectar." });
       }
     });
   }
 
   return (
     <>
-      <SecaoRecolhivel
-        nivel="interna"
-        variante="perigo"
-        titulo="Zona de risco"
-        icone={TriangleAlert}
-        aberto={aberto}
-        onAbertoChange={setAberto}
+      <Box
+        sx={(tema) => ({
+          border: `1px solid ${tema.vars.palette.error.main}`,
+          borderRadius: 2,
+          paddingX: 1,
+        })}
       >
-        <div className="flex flex-col gap-3">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-sm font-medium">Cópias antigas</p>
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11"
-              onClick={() => void carregarCopias()}
+        <Acordeao
+          titulo="Zona de risco"
+          nivelTitulo="h4"
+          resumo={<SeloRisco />}
+          aberto={aberto}
+          onChange={setAberto}
+        >
+          <Stack spacing={2}>
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{ flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}
             >
-              <Archive size={16} aria-hidden="true" />
-              Listar cópias
-            </Button>
-          </div>
-          <LimparCopiasPlanilha
-            urlBase={urlBase}
-            onMudou={async () => {
-              setCopias([]);
-              await onMudou();
-            }}
-            acoes={acoes}
-          />
-          {copias.map((item) => (
-            <div key={item.aba} className="flex flex-col gap-1 text-xs">
-              <span className="font-medium">{item.aba}</span>
-              {item.itens.length === 0 ? (
-                <span className="text-muted-foreground">Nenhuma cópia.</span>
-              ) : (
-                item.itens.map((copia) => (
-                  <div key={copia.nome} className="flex items-center justify-between gap-2">
-                    <span className="text-muted-foreground truncate">
-                      {copia.criadaEm || copia.nome}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="h-11"
-                      onClick={() => setRestaurar({ aba: item.aba, copia: copia.nome })}
-                    >
-                      <History size={16} aria-hidden="true" />
-                      Restaurar
-                    </Button>
-                  </div>
-                ))
-              )}
-            </div>
-          ))}
-        </div>
-
-        {abasCriadas.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium">Abas criadas pela integração</p>
-            {abasCriadas.map((nome) => (
-              <div key={nome} className="flex items-center justify-between gap-2 text-xs">
-                <span className="text-muted-foreground truncate">{nome}</span>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-falta-texto h-11"
-                  onClick={() => setAbaRemover(nome)}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                  Remover
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-          <div className="min-w-0">
-            <p className="text-sm font-medium">Desconectar integração</p>
-          </div>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Cópias antigas
+              </Typography>
+              <Botao
                 type="button"
-                variant="outline"
-                className="text-falta-texto h-11"
-                disabled={chaveAtiva === "desconectar"}
+                variante="contorno"
+                onClick={() => void carregarCopias()}
+                icone={<ArchiveRoundedIcon />}
               >
-                <Unplug size={16} aria-hidden="true" />
-                {chaveAtiva === "desconectar" ? "Desconectando..." : "Desconectar"}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Desconectar a planilha?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  A conexão e a configuração serão removidas do app. O arquivo no Google será
-                  mantido.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction variant="destructive" onClick={() => void desconectar()}>
-                  Desconectar
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      </SecaoRecolhivel>
+                Listar cópias
+              </Botao>
+            </Stack>
+            <LimparCopiasPlanilha
+              urlBase={urlBase}
+              onMudou={async () => {
+                setCopias([]);
+                await onMudou();
+              }}
+              acoes={acoes}
+            />
+            {copias.map((item) => (
+              <Box key={item.aba} sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                <Typography variant="caption" sx={{ fontWeight: 600 }}>
+                  {item.aba}
+                </Typography>
+                {item.itens.length === 0 ? (
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    Nenhuma cópia.
+                  </Typography>
+                ) : (
+                  item.itens.map((copia) => (
+                    <Stack
+                      key={copia.nome}
+                      direction="row"
+                      spacing={1}
+                      sx={{ alignItems: "center", justifyContent: "space-between" }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: "text.secondary",
+                          minWidth: 0,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {copia.criadaEm || copia.nome}
+                      </Typography>
+                      <Botao
+                        type="button"
+                        variante="texto"
+                        tamanho="pequeno"
+                        onClick={() => setRestaurar({ aba: item.aba, copia: copia.nome })}
+                        icone={<HistoryRoundedIcon />}
+                      >
+                        Restaurar
+                      </Botao>
+                    </Stack>
+                  ))
+                )}
+              </Box>
+            ))}
+            {abasCriadas.length > 0 ? (
+              <Stack spacing={1}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Abas criadas pela integração
+                </Typography>
+                {abasCriadas.map((nome) => (
+                  <Stack
+                    key={nome}
+                    direction="row"
+                    spacing={1}
+                    sx={{ alignItems: "center", justifyContent: "space-between" }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "text.secondary",
+                        minWidth: 0,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {nome}
+                    </Typography>
+                    <Botao
+                      type="button"
+                      variante="texto"
+                      tamanho="pequeno"
+                      onClick={() => setAbaRemover(nome)}
+                      icone={<DeleteOutlineRoundedIcon />}
+                      sx={(tema) => ({ color: tema.vars.palette.error.main })}
+                    >
+                      Remover
+                    </Botao>
+                  </Stack>
+                ))}
+              </Stack>
+            ) : null}
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{
+                flexWrap: "wrap",
+                alignItems: "center",
+                justifyContent: "space-between",
+                borderTop: 1,
+                borderColor: "divider",
+                paddingTop: 2,
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Desconectar integração
+              </Typography>
+              <Botao
+                type="button"
+                variante="contorno"
+                disabled={chaveAtiva === "desconectar"}
+                carregando={chaveAtiva === "desconectar"}
+                onClick={() => setConfirmarDesconexao(true)}
+                icone={<LinkOffRoundedIcon />}
+              >
+                Desconectar
+              </Botao>
+            </Stack>
+          </Stack>
+        </Acordeao>
+      </Box>
 
-      <Dialog open={restaurar !== null} onOpenChange={(aberto) => !aberto && setRestaurar(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Restaurar cópia</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs leading-relaxed">
-              A aba {restaurar?.aba} será trocada pela cópia {restaurar?.copia}, sem guardar a
-              versão atual. Depois, confira a estrutura de novo.
-            </p>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${idPrefixo}-frase-restaurar`}>Digite {FRASE_MODO_COMPLETO}</Label>
-              <Input
-                id={`${idPrefixo}-frase-restaurar`}
-                value={frase}
-                onChange={(evento) => setFrase(evento.target.value)}
-                autoComplete="off"
-                className="h-11"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${idPrefixo}-senha-restaurar`}>Senha do administrador</Label>
-              <CampoSenha
-                id={`${idPrefixo}-senha-restaurar`}
-                value={senha}
-                onChange={(evento) => setSenha(evento.target.value)}
-                className="h-11"
-                autoComplete="current-password"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setRestaurar(null)}>
+      <Dialogo
+        aberto={restaurar !== null}
+        onFechar={() => setRestaurar(null)}
+        titulo="Restaurar cópia"
+        tamanho="medio"
+      >
+        <Stack spacing={2}>
+          <AlertaCompacto
+            variante="dados_invalidos"
+            descricao={`A aba ${restaurar?.aba ?? ""} será trocada pela cópia ${restaurar?.copia ?? ""}, sem guardar a versão atual. Depois, confira a estrutura de novo.`}
+            tamanho="linha"
+          />
+          <Campo id={`${idPrefixo}-frase-restaurar`} rotulo={`Digite ${FRASE_MODO_COMPLETO}`}>
+            <CampoTexto
+              id={`${idPrefixo}-frase-restaurar`}
+              valor={frase}
+              onValor={setFrase}
+              autoComplete="off"
+            />
+          </Campo>
+          <Campo id={`${idPrefixo}-senha-restaurar`} rotulo="Senha do administrador">
+            <CampoSenha
+              id={`${idPrefixo}-senha-restaurar`}
+              valor={senha}
+              onValor={setSenha}
+              autoComplete="current-password"
+            />
+          </Campo>
+          <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <Botao type="button" variante="contorno" onClick={() => setRestaurar(null)}>
               Cancelar
-            </Button>
-            <Button
+            </Botao>
+            <Botao
               type="button"
+              variante="secundario"
               onClick={() => void confirmarRestaurar()}
               disabled={
                 frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO ||
                 senha === "" ||
                 chaveAtiva === "restaurar"
               }
+              carregando={chaveAtiva === "restaurar"}
             >
-              {chaveAtiva === "restaurar" ? "Restaurando..." : "Restaurar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              Restaurar
+            </Botao>
+          </Stack>
+        </Stack>
+      </Dialogo>
 
-      <Dialog open={abaRemover !== null} onOpenChange={(aberto) => !aberto && setAbaRemover(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Remover aba</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-3">
-            <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs leading-relaxed">
-              A aba {abaRemover} foi criada pela integração e será removida definitivamente, sem
-              cópia automática.
-            </p>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${idPrefixo}-frase-remover-aba`}>Digite {FRASE_MODO_COMPLETO}</Label>
-              <Input
-                id={`${idPrefixo}-frase-remover-aba`}
-                value={frase}
-                onChange={(evento) => setFrase(evento.target.value)}
-                autoComplete="off"
-                className="h-11"
-              />
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={`${idPrefixo}-senha-remover-aba`}>Senha do administrador</Label>
-              <CampoSenha
-                id={`${idPrefixo}-senha-remover-aba`}
-                value={senha}
-                onChange={(evento) => setSenha(evento.target.value)}
-                className="h-11"
-                autoComplete="current-password"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setAbaRemover(null)}>
+      <Dialogo
+        aberto={abaRemover !== null}
+        onFechar={() => setAbaRemover(null)}
+        titulo="Remover aba"
+        tamanho="medio"
+      >
+        <Stack spacing={2}>
+          <AlertaCompacto
+            variante="dados_invalidos"
+            descricao={`A aba ${abaRemover ?? ""} foi criada pela integração e será removida definitivamente, sem cópia automática.`}
+            tamanho="linha"
+          />
+          <Campo id={`${idPrefixo}-frase-remover-aba`} rotulo={`Digite ${FRASE_MODO_COMPLETO}`}>
+            <CampoTexto
+              id={`${idPrefixo}-frase-remover-aba`}
+              valor={frase}
+              onValor={setFrase}
+              autoComplete="off"
+            />
+          </Campo>
+          <Campo id={`${idPrefixo}-senha-remover-aba`} rotulo="Senha do administrador">
+            <CampoSenha
+              id={`${idPrefixo}-senha-remover-aba`}
+              valor={senha}
+              onValor={setSenha}
+              autoComplete="current-password"
+            />
+          </Campo>
+          <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <Botao type="button" variante="contorno" onClick={() => setAbaRemover(null)}>
               Cancelar
-            </Button>
-            <Button
+            </Botao>
+            <Botao
               type="button"
+              variante="destrutivo"
               onClick={() => void confirmarRemocaoAba()}
               disabled={
                 frase.trim().toUpperCase() !== FRASE_MODO_COMPLETO ||
                 senha === "" ||
                 chaveAtiva === `remover-aba-${abaRemover}`
               }
+              carregando={chaveAtiva === `remover-aba-${abaRemover}`}
             >
-              {chaveAtiva === `remover-aba-${abaRemover}` ? "Removendo..." : "Remover aba"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              Remover aba
+            </Botao>
+          </Stack>
+        </Stack>
+      </Dialogo>
+
+      <DialogoConfirmacao
+        aberto={confirmarDesconexao}
+        titulo="Desconectar a planilha?"
+        descricao="A conexão e a configuração serão removidas do app. O arquivo no Google será mantido."
+        rotuloConfirmar="Desconectar"
+        destrutivo
+        operacaoEmAndamento={chaveAtiva === "desconectar"}
+        onConfirmar={() => {
+          setConfirmarDesconexao(false);
+          void desconectar();
+        }}
+        onCancelar={() => setConfirmarDesconexao(false)}
+      />
     </>
+  );
+}
+
+function SeloRisco() {
+  return (
+    <Stack direction="row" spacing={0.5} sx={{ alignItems: "center" }}>
+      <WarningAmberRoundedIcon fontSize="inherit" color="error" aria-hidden="true" />
+      <Typography component="span" variant="body2" sx={{ color: "error" }}>
+        Cópias e remoções
+      </Typography>
+    </Stack>
   );
 }

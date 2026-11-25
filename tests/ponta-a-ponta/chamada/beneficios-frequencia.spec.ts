@@ -1,4 +1,5 @@
 // Benefícios e frequência mínima: a regra criada e editada na Gestão muda o alerta que a Chamada mostra.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, escolherDataNoPeriodo, trocarVisao } from "../helpers/pagina";
@@ -72,10 +73,10 @@ test.afterAll(limpar);
 
 async function abrirBeneficios(page: Page) {
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarAcaoConfiguracoes(page, "Escola", "Frequência");
   const secao = page.locator('[data-secao="config-beneficios"]');
-  const regiao = secao.getByRole("region", { name: "Benefícios e frequência mínima" });
+  const regiao = secao.getByRole("region", { name: "Benefícios e frequência mínima", exact: true });
   if (!(await regiao.isVisible())) {
     await secao.getByRole("button", { name: /Benefícios e frequência mínima/ }).click();
   }
@@ -111,7 +112,7 @@ for (const largura of [320, 390, 800, 1280]) {
     await dialogo.getByRole("button", { name: "Aplicar ao rascunho" }).click();
     const aviso = page.getByText("Benefício adicionado ao rascunho.", { exact: true });
     await expect(aviso).toBeVisible();
-    await page.getByRole("button", { name: "Salvar configurações", exact: true }).click({
+    await page.getByRole("button", { name: "Revisar alterações", exact: true }).click({
       trial: true,
       timeout: 2_000,
     });
@@ -165,7 +166,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   const avisoRascunho = page.getByText("Benefício adicionado ao rascunho.", { exact: true });
   await expect(avisoRascunho).toBeVisible();
   // O aviso não pode bloquear o salvamento enquanto permanece visível.
-  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click({
+  await page.getByRole("button", { name: "Revisar alterações", exact: true }).click({
     trial: true,
     timeout: 2_000,
   });
@@ -182,9 +183,9 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
   await expect(botaoMuitas).toBeVisible();
   await expect(botaoUma).toBeVisible();
   await botaoMuitas.click();
-  const painel = page.locator('[data-slot="popover-content"][data-state="open"]');
+  const painel = page.locator(".MuiPopover-paper:visible").first();
   const detalhe = painel
-    .locator("div.divide-y > div")
+    .locator("[data-aviso-beneficio]")
     .filter({ hasText: "Frequência estimada" })
     .first();
   await expect(detalhe.getByText(/^5 de \d+ aulas$/)).toBeVisible();
@@ -224,7 +225,7 @@ test("a regra criada e editada na Gestão muda o alerta mostrado na Chamada", as
     await expect
       .poll(async () => {
         const { caixa, area } = await texto.evaluate((elemento) => {
-          const painel = elemento.closest<HTMLElement>('[data-slot="popover-content"]');
+          const painel = elemento.closest<HTMLElement>(".MuiPopover-paper");
           if (!painel) throw new Error("Conteúdo fora do popover");
           const r = elemento.getBoundingClientRect();
           const p = painel.getBoundingClientRect();

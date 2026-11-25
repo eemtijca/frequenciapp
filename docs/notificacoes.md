@@ -12,7 +12,7 @@ Em Gestão, Configurações, Notificações, a administração define os tipos d
 | Novas chamadas     | Diretores de turma          | Uma chamada do dia foi criada após a escolha desse tipo e a ativação do dispositivo. Edições não repetem o aviso.  |
 | Chamadas pendentes | Coordenação e administração | Após o horário escolhido, há turma com aula ativa prevista no dia e aluno ativo não desistente, sem chamada salva. |
 
-Cada conta escolhe seus tipos no diálogo Configurar notificações. As escolhas são salvas sem pedir permissão ao navegador e valem para todos os dispositivos da conta. O resumo dos diretores existentes é preservado. Avisos desligados pela Gestão não são enviados, mesmo quando a preferência pessoal está marcada.
+Cada conta escolhe seus tipos no diálogo Configurar notificações. As escolhas são salvas sem pedir permissão ao navegador e valem para todos os dispositivos da conta. O resumo dos diretores existentes é preservado. Avisos desligados pela Gestão não são enviados, mesmo quando a preferência pessoal está marcada. Quando a linha mostra um horário ou um motivo de indisponibilidade, esse texto também é a descrição acessível do interruptor.
 
 Uma turma vazia, sem aula prevista ou somente com alunos desistentes não gera pendência. Feriados cadastrados em Gestão, Configurações, Escola, Calendário letivo não geram pendências e suspendem resumo, novas chamadas e avisos de pendências naquela data. O calendário vale para todas as turmas no ano cadastrado, sem desligar as preferências pessoais ou a agenda. Uma chamada salva encerra a pendência, inclusive quando não há faltas.
 

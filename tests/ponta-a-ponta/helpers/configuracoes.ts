@@ -1,6 +1,7 @@
 // Preserva e restaura a configuração de origem nos testes sintéticos,
 // sem deixar uma suíte alterar a seleção usada pela seguinte. Também reúne
 // os passos do rascunho único e do lote de configurações.
+import { selecionarCategoriaConfiguracoes } from "../../helpers/categorias-configuracoes";
 import { expect, type Page } from "@playwright/test";
 import type { Configuracoes } from "@/domain/frequencia";
 import { comBanco } from "./banco";
@@ -66,7 +67,7 @@ export async function enviarRascunhoConfiguracoes(page: Page, senhaBi?: string) 
       new URL(item.url()).pathname === "/api/configuracoes/lote" &&
       item.request().method() === "POST",
   );
-  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  await page.getByRole("button", { name: "Revisar alterações", exact: true }).click();
   const dialogo = page.getByRole("alertdialog", { name: "Salvar configurações?" });
   if (senhaBi) {
     await dialogo.getByLabel("Senha do administrador", { exact: true }).fill(senhaBi);
@@ -106,17 +107,5 @@ export async function selecionarAcaoConfiguracoes(
     | "Notificações"
     | "FrequenciBI",
 ): Promise<void> {
-  const navegacoes = {
-    Escola: "Ações da escola",
-    Horários: "Ações dos horários",
-    "Acesso e avisos": "Ações de acesso e avisos",
-  };
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações", exact: true })
-    .getByRole("button", { name: categoria, exact: true })
-    .click();
-  await page
-    .getByRole("navigation", { name: navegacoes[categoria], exact: true })
-    .getByRole("button", { name: acao, exact: true })
-    .click();
+  await selecionarCategoriaConfiguracoes(page, categoria, acao);
 }
