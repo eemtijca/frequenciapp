@@ -369,6 +369,7 @@ export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }:
                             input: ({ checked }) => ({
                               "aria-labelledby": idRotulo,
                               "aria-describedby": idContexto,
+                              "aria-checked": checked ? "true" : "false",
                               // Cobre o trilho à esquerda sem ampliar a borda direita da base.
                               style: checked
                                 ? {

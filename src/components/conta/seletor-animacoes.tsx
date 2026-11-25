@@ -21,7 +21,7 @@ const OPCOES = [
   { valor: "desativadas", rotulo: "Desativadas" },
 ] as const satisfies readonly { valor: ModoAnimacoes; rotulo: string }[];
 
-export function OpcoesAnimacoes() {
+export function OpcoesAnimacoes({ compacto = false }: { compacto?: boolean }) {
   const { modo, definirModo } = useAnimacoesDaInterface();
   const idRotulo = useId();
 
@@ -31,7 +31,7 @@ export function OpcoesAnimacoes() {
         id={idRotulo}
         component="p"
         variant="caption"
-        sx={{ px: 1.5, py: 0.5, color: "text.secondary" }}
+        sx={{ px: 1.5, py: compacto ? 0.25 : 0.5, color: "text.secondary" }}
       >
         {ROTULO}
       </Typography>
@@ -50,8 +50,8 @@ export function OpcoesAnimacoes() {
             onClick={() => definirModo(valor)}
             sx={{
               px: 1.5,
-              minHeight: TOKENS_LAYOUT.alvoToque,
-              "&.Mui-focusVisible": {
+              minHeight: compacto ? 44 : TOKENS_LAYOUT.alvoToque,
+              "&.Mui-focusVisible, &:focus-visible": {
                 boxShadow: (tema) => `inset 0 0 0 2px ${tema.vars.palette.primary.main}`,
               },
             }}

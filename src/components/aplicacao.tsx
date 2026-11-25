@@ -1248,7 +1248,7 @@ export default function Aplicacao({
         }}
       >
         <Toolbar sx={{ flexShrink: 0, gap: 1.5, px: { xs: 2, md: 2.5 } }}>
-          <Box sx={{ display: "flex", alignItems: "center", ml: movel ? 0 : "7px" }}>
+          <Box sx={{ display: "flex", alignItems: "center", ml: movel ? 0 : "15px" }}>
             <Logotipo tamanho={26} alt="" />
           </Box>
           <Typography
@@ -1354,16 +1354,16 @@ export default function Aplicacao({
                     />
                   </ListItem>
                 ))}
-                {(usuario.papel === "ADMIN" || usuario.papel === "COORDENACAO") && (
-                  <ListItem disablePadding>
-                    <OpcaoGaveta
-                      rotulo="FrequenciBI"
-                      icone={InsightsRoundedIcon}
-                      novaAba={{ href: "/bi", rotulo: "FrequenciBI, nova aba" }}
-                    />
-                  </ListItem>
-                )}
               </>
+            )}
+            {(usuario.papel === "ADMIN" || usuario.papel === "COORDENACAO") && (
+              <ListItem disablePadding>
+                <OpcaoGaveta
+                  rotulo="FrequenciBI"
+                  icone={InsightsRoundedIcon}
+                  novaAba={{ href: "/bi", rotulo: "FrequenciBI, nova aba" }}
+                />
+              </ListItem>
             )}
           </ListaGaveta>
           <Divider sx={{ mt: "auto" }} />

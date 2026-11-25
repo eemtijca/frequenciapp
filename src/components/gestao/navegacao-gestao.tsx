@@ -69,6 +69,8 @@ export function OpcaoGaveta({
       target={novaAba ? "_blank" : undefined}
       rel={novaAba ? "noopener" : undefined}
       data-foco-gaveta={foco}
+      // A âncora de nova aba é um link: o papel padrão do ListItemButton esconderia o href.
+      role={novaAba ? "link" : undefined}
       aria-label={novaAba?.rotulo ?? (pendente ? `${rotulo} Alterações não salvas` : undefined)}
       aria-current={atual ? "page" : undefined}
       aria-expanded={expandido}

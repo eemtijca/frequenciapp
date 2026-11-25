@@ -2,6 +2,7 @@
 
 // Menu flutuante da conta: perfil, notificações, senha, Sobre e saída.
 import { useId, useRef, useState, type ReactNode } from "react";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import ArrowDropUpRoundedIcon from "@mui/icons-material/ArrowDropUpRounded";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
@@ -37,19 +38,27 @@ interface ItemProps {
   disabled?: boolean;
 }
 
+const ALTURA_CURTA = "(max-height: 400px)";
+
 const sxItemFocado = (tema: Theme) => ({
-  "&.Mui-focusVisible": {
+  // O teclado marca :focus-visible mesmo quando o MUI não aplica Mui-focusVisible.
+  "&.Mui-focusVisible, &:focus-visible": {
     backgroundColor: tema.vars.palette.action.hover,
     boxShadow: `inset 0 0 0 2px ${tema.vars.palette.primary.main}`,
   },
 });
+
+const sxItemCompacto = {
+  minHeight: TOKENS_LAYOUT.alvoToque,
+  [`@media ${ALTURA_CURTA}`]: { minHeight: 44, py: 0 },
+};
 
 function Item({ icone, rotulo, onClick, disabled }: ItemProps) {
   return (
     <MenuItem
       onClick={onClick}
       disabled={disabled}
-      sx={[{ minHeight: TOKENS_LAYOUT.alvoToque, gap: 1.5, px: 1.5 }, sxItemFocado]}
+      sx={[{ gap: 1.5, px: 1.5 }, sxItemCompacto, sxItemFocado]}
     >
       <ListItemIcon sx={{ minWidth: 0, color: "text.secondary" }}>{icone}</ListItemIcon>
       <Box component="span" sx={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
@@ -64,6 +73,7 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
   const gatilhoRef = useRef<HTMLButtonElement | null>(null);
   const idMenu = useId();
   const aberto = ancora !== null;
+  const alturaCurta = useMediaQuery(ALTURA_CURTA);
 
   function acionar(acao: AcaoConta) {
     setAncora(null);
@@ -126,16 +136,26 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
         onClose={() => setAncora(null)}
         anchorOrigin={{ vertical: "top", horizontal: "left" }}
         transformOrigin={{ vertical: "bottom", horizontal: "left" }}
-        marginThreshold={8}
+        marginThreshold={alturaCurta ? 4 : 8}
         slotProps={{
-          list: { id: idMenu, "aria-label": "Conta" },
-          paper: { sx: { width: 272, maxWidth: "calc(100vw - 24px)" } },
+          list: {
+            id: idMenu,
+            "aria-label": "Conta",
+            sx: alturaCurta ? { py: 0.25 } : undefined,
+          },
+          paper: {
+            sx: {
+              width: 272,
+              maxWidth: "calc(100vw - 24px)",
+              ...(alturaCurta ? { maxHeight: "calc(100dvh - 8px)" } : {}),
+            },
+          },
         }}
       >
         <Box
           sx={{
             px: 1.5,
-            py: 1,
+            py: alturaCurta ? 0.25 : 1,
             borderBottom: 1,
             borderColor: "divider",
             color: "text.secondary",
@@ -160,9 +180,9 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
           rotulo="Sobre"
           onClick={() => acionar("sobre")}
         />
-        <Divider component="li" role="separator" sx={{ my: 0.75 }} />
-        <OpcoesAnimacoes />
-        <Divider component="li" role="separator" sx={{ my: 0.75 }} />
+        <Divider component="li" role="separator" sx={{ my: alturaCurta ? 0.25 : 0.75 }} />
+        <OpcoesAnimacoes compacto={alturaCurta} />
+        <Divider component="li" role="separator" sx={{ my: alturaCurta ? 0.25 : 0.75 }} />
         <Item
           icone={<LogoutRoundedIcon fontSize="small" aria-hidden="true" />}
           rotulo={saindo ? "Saindo..." : "Sair da conta"}

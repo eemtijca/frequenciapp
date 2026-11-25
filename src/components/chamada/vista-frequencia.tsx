@@ -1166,6 +1166,9 @@ export default function VistaFrequencia({
     return (
       <LayoutConteudo largura="leitura">
         <Box component="section" aria-label="Fazer chamada">
+          <Typography component="h1" tabIndex={-1} sx={VISUALMENTE_OCULTO}>
+            Chamada
+          </Typography>
           <TelaEstado
             incorporado
             variante="indisponivel"
@@ -1265,7 +1268,7 @@ export default function VistaFrequencia({
           ...(nav.resumo ? { pb: 2 } : {}),
         }}
       >
-        <Typography component="h1" sx={VISUALMENTE_OCULTO}>
+        <Typography component="h1" tabIndex={-1} sx={VISUALMENTE_OCULTO}>
           Chamada
         </Typography>
 

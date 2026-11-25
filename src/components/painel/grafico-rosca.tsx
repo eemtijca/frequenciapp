@@ -63,10 +63,12 @@ function LegendaCategorias({
   titulo,
   fatias,
   total,
+  rotuloValor,
 }: {
   titulo: string;
   fatias: (FatiaGrafico & { cor: string; marcador?: string })[];
   total: number;
+  rotuloValor: (fatia: FatiaGrafico) => string;
 }) {
   return (
     <TabelaPadrao caption={`Legenda de ${titulo}`} compacta>
@@ -103,7 +105,11 @@ function LegendaCategorias({
                 </Box>
               </Stack>
             </TableCell>
-            <TableCell align="right" sx={{ ...numeraisTabulares, fontWeight: 600 }}>
+            <TableCell
+              align="right"
+              aria-label={rotuloValor(fatia)}
+              sx={{ ...numeraisTabulares, fontWeight: 600 }}
+            >
               {fatia.valor}
             </TableCell>
             <TableCell align="right" sx={{ ...numeraisTabulares, color: "text.secondary" }}>
@@ -299,7 +305,12 @@ export default function GraficoRosca({
       </Typography>
       {porCategoria ? (
         <Box sx={{ width: "100%", flex: 1, minWidth: 0 }}>
-          <LegendaCategorias titulo={titulo} fatias={visiveis} total={total} />
+          <LegendaCategorias
+            titulo={titulo}
+            fatias={visiveis}
+            total={total}
+            rotuloValor={rotuloFatia}
+          />
         </Box>
       ) : (
         <Stack

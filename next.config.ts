@@ -25,6 +25,7 @@ const cabecalhosSeguranca = [
 const nextConfig: NextConfig = {
   agentRules: false,
   devIndicators: false,
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   experimental: {
     // Importa apenas os módulos usados pelos pacotes MUI e evita puxar o barrel inteiro.
     optimizePackageImports: [
