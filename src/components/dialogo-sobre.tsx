@@ -22,6 +22,7 @@ import { useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import pacote from "../../package.json";
 import { Logotipo } from "@/components/ui/mui/logotipo";
+import { ROTA_PRIVACIDADE } from "@/lib/rotas-publicas";
 
 interface Props {
   aberto: boolean;
@@ -195,16 +196,8 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
               <Typography variant="caption" color="text.secondary">
                 Solicitações de dados: gestão da escola.
               </Typography>
-              <Link
-                href={`${REPOSITORIO}/blob/main/docs/lgpd.md`}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="body2"
-                underline="hover"
-                sx={ACAO}
-              >
+              <Link href={ROTA_PRIVACIDADE} variant="body2" underline="hover" sx={ACAO}>
                 Como os dados são tratados
-                <OpenInNewRoundedIcon fontSize="small" aria-hidden="true" />
               </Link>
             </Stack>
           </Paper>

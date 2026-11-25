@@ -22,7 +22,7 @@ const VARIAVEIS = [
   "--template-palette-divider",
 ] as const;
 
-for (const rota of ["/", "/bi"]) {
+for (const rota of ["/", "/bi", "/privacidade"]) {
   for (const tema of ["light", "dark"] as const) {
     test(`cores do tema em ${rota}, ${tema}`, async ({ page }, info) => {
       await page.setViewportSize({ width: 390, height: 844 });
@@ -76,7 +76,9 @@ for (const rota of ["/", "/bi"]) {
       expect(falta).not.toEqual(justificada);
 
       await page.screenshot({
-        path: info.outputPath(`paleta-${rota === "/" ? "entrada" : "bi"}-${tema}.png`),
+        path: info.outputPath(
+          `paleta-${rota === "/" ? "entrada" : rota.slice(1).replaceAll("/", "-")}-${tema}.png`,
+        ),
         animations: "disabled",
       });
     });

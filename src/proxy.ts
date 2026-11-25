@@ -1,5 +1,7 @@
 // Proxy da aplicação (middleware do Next 16): bloqueio de mutações
 // cross-site (CSRF) e cabeçalhos de segurança com CSP por nonce.
+// Não autentica. /, /bi, /privacidade e /politica-de-privacidade respondem
+// sem sessão; a sessão é exigida na página inicial autenticada e nas rotas de API.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { criarPoliticaDeSeguranca } from "@/infra/csp";

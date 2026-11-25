@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { booleanoDeAmbiente } from "./src/infra/booleano";
+import { REDIRECIONAMENTO_PRIVACIDADE } from "./src/lib/rotas-publicas";
 
 // Cabeçalhos de segurança aplicados a toda resposta.
 // O CSP com nonce vive em src/proxy.ts, na borda da requisição.
@@ -43,6 +44,9 @@ const nextConfig: NextConfig = {
   // o arquivo precisa acompanhar a função no standalone e na Vercel.
   outputFileTracingIncludes: {
     "/api/docs/api.md": ["./docs/api.md"],
+  },
+  async redirects() {
+    return [REDIRECIONAMENTO_PRIVACIDADE];
   },
   async headers() {
     return [

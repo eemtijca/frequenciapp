@@ -96,6 +96,20 @@ test.describe("autenticação", () => {
     await expect(page.getByText("Chamada em poucos toques", { exact: true })).toBeHidden();
   });
 
+  test("a política de privacidade abre sem sessão", async ({ page }) => {
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await page.getByRole("link", { name: "Política de privacidade", exact: true }).click();
+    await expect(page).toHaveURL(/\/privacidade$/);
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Política de privacidade" }),
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Integração com o Google" })).toBeVisible();
+    await expect(page.getByText("https://www.googleapis.com/auth/drive.file")).toBeVisible();
+    await page.goto("/politica-de-privacidade");
+    await expect(page).toHaveURL(/\/privacidade$/);
+  });
+
   test("o Sobre abre como folha no celular e devolve o foco", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");

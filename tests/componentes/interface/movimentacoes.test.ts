@@ -193,7 +193,24 @@ it.each([
         name: "Enviar saídas e entradas para a planilha",
       });
       const medir = async (alvo: typeof data) => {
-        const caixa = await alvo.boundingBox({ timeout: 2500 });
+        // boundingBox devolve nulo quando o modelo de caixa do navegador ainda
+        // não acompanhou o layout. A medição lê o retângulo e espera altura.
+        let caixa: { x: number; y: number; width: number; height: number } | undefined;
+        await expect
+          .poll(async () => {
+            const retangulo = await alvo.evaluate((el) => {
+              const caixaAtual = el.getBoundingClientRect();
+              return {
+                x: caixaAtual.x,
+                y: caixaAtual.y,
+                width: caixaAtual.width,
+                height: caixaAtual.height,
+              };
+            });
+            if (retangulo.width > 0 && retangulo.height > 0) caixa = retangulo;
+            return retangulo.height;
+          })
+          .toBeGreaterThan(0);
         if (!caixa) throw new Error(`Controle não renderizado: ${alvo}`);
         return caixa;
       };

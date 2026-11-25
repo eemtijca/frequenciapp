@@ -26,6 +26,7 @@ import { CampoTexto } from "@/components/ui/mui/text-field";
 import DialogoSobre from "@/components/dialogo-sobre";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
+import { ROTA_PRIVACIDADE } from "@/lib/rotas-publicas";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 const CHAVE_EMAIL = "frequenciapp:email";
@@ -349,51 +350,58 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
 
             <Divider />
 
-            <Stack
-              component="nav"
-              aria-label="Projeto e ferramentas"
-              direction="row"
-              spacing={0.5}
-              useFlexGap
-              sx={{ justifyContent: "space-between", alignItems: "center" }}
-            >
-              <Link
-                href="/bi"
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="caption"
-                sx={LINK_DISCRETO}
+            <Box>
+              <Stack
+                component="nav"
+                aria-label="Projeto e ferramentas"
+                direction="row"
+                spacing={0.5}
+                useFlexGap
+                sx={{ justifyContent: "space-between", alignItems: "center" }}
               >
-                FrequenciBI
-              </Link>
-              <Link
-                href="https://github.com/eemtijca/frequenciapp"
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="caption"
-                sx={LINK_DISCRETO}
-              >
-                GitHub
-              </Link>
-              <Link
-                href="/api/docs"
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="caption"
-                sx={LINK_DISCRETO}
-              >
-                API
-              </Link>
-              <Link
-                component="button"
-                type="button"
-                variant="caption"
-                onClick={() => setSobreAberto(true)}
-                sx={LINK_DISCRETO}
-              >
-                Sobre
-              </Link>
-            </Stack>
+                <Link
+                  href="/bi"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="caption"
+                  sx={LINK_DISCRETO}
+                >
+                  FrequenciBI
+                </Link>
+                <Link
+                  href="https://github.com/eemtijca/frequenciapp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="caption"
+                  sx={LINK_DISCRETO}
+                >
+                  GitHub
+                </Link>
+                <Link
+                  href="/api/docs"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="caption"
+                  sx={LINK_DISCRETO}
+                >
+                  API
+                </Link>
+                <Link
+                  component="button"
+                  type="button"
+                  variant="caption"
+                  onClick={() => setSobreAberto(true)}
+                  sx={LINK_DISCRETO}
+                >
+                  Sobre
+                </Link>
+              </Stack>
+              <Box component="footer" sx={{ display: "flex", justifyContent: "center" }}>
+                <Link href={ROTA_PRIVACIDADE} variant="caption" sx={LINK_DISCRETO}>
+                  Política de privacidade
+                </Link>
+              </Box>
+            </Box>
 
             {/* Link oculto para agentes de IA: a raiz anônima aponta o índice do projeto. */}
             <Link href={urlIndiceAgentes} hidden aria-hidden="true" tabIndex={-1}>
