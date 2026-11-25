@@ -1,7 +1,7 @@
 "use client";
 
 // Horários da turma: janelas das aulas e disciplinas por dia, com preservação do histórico.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -275,6 +275,12 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
   const [confirmacao, setConfirmacao] = useState<ConfirmacaoAula | null>(null);
+  const novaAula = useRef<HTMLButtonElement>(null);
+  const gatilhoConfirmacao = useRef<HTMLButtonElement | null>(null);
+  // Destino do foco depois de confirmar: o mesmo comando ou, se a linha sair, Nova aula.
+  const retornoFoco = useRef<{ alvo: HTMLButtonElement | null; confirmacaoSaiu: boolean } | null>(
+    null,
+  );
 
   const aulas = turma?.horarios ?? [];
 
@@ -367,6 +373,21 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
 
   const ocupado = enviando || chaveAtiva !== null || copiando;
 
+  function devolverFocoAposConfirmacao() {
+    const pendente = retornoFoco.current;
+    // Enquanto a confirmação sai, ela continua como modal do topo e consumiria o Escape.
+    if (!pendente?.confirmacaoSaiu) return;
+    const alvo = pendente.alvo?.isConnected ? pendente.alvo : novaAula.current;
+    // Comandos desabilitados não recebem foco; tenta de novo quando a ação terminar.
+    if (!alvo || alvo.disabled) return;
+    alvo.focus();
+    if (alvo.ownerDocument.activeElement === alvo) retornoFoco.current = null;
+  }
+
+  useEffect(() => {
+    if (!ocupado) devolverFocoAposConfirmacao();
+  });
+
   function alternarAtiva(aula: Horario) {
     if (ocupado) return;
     void executarPorChave(aula.id, async () => {
@@ -407,6 +428,10 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
     const alvo = confirmacao;
     setConfirmacao(null);
     if (!alvo) return;
+    retornoFoco.current = {
+      alvo: alvo.tipo === "ativar" ? gatilhoConfirmacao.current : null,
+      confirmacaoSaiu: false,
+    };
     if (alvo.tipo === "excluir") void excluir(alvo.aula);
     else void alternarAtiva(alvo.aula);
   }
@@ -495,7 +520,10 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                       }
                       disabled={ocupado}
                       icone={<PowerSettingsNewRoundedIcon />}
-                      onClick={() => setConfirmacao({ tipo: "ativar", aula })}
+                      onClick={(evento) => {
+                        gatilhoConfirmacao.current = evento.currentTarget;
+                        setConfirmacao({ tipo: "ativar", aula });
+                      }}
                       sx={ESTILO_BOTAO_ICONE}
                     />
                     <Botao
@@ -504,7 +532,10 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
                       aria-label={`Excluir aula ${aula.ordem}`}
                       disabled={ocupado}
                       icone={<DeleteOutlineRoundedIcon />}
-                      onClick={() => setConfirmacao({ tipo: "excluir", aula })}
+                      onClick={(evento) => {
+                        gatilhoConfirmacao.current = evento.currentTarget;
+                        setConfirmacao({ tipo: "excluir", aula });
+                      }}
                       sx={{
                         ...ESTILO_BOTAO_ICONE,
                         color: "falta.texto",
@@ -523,6 +554,7 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
         {!formulario ? (
           <Stack spacing={2}>
             <Botao
+              ref={novaAula}
               variante="secundario"
               type="button"
               onClick={abrirNova}
@@ -728,6 +760,11 @@ function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Pro
         operacaoEmAndamento={confirmacao !== null && chaveAtiva === confirmacao.aula.id}
         onCancelar={() => setConfirmacao(null)}
         onConfirmar={confirmarAcao}
+        aposFechar={() => {
+          if (!retornoFoco.current) return;
+          retornoFoco.current.confirmacaoSaiu = true;
+          devolverFocoAposConfirmacao();
+        }}
       />
     </Dialogo>
   );

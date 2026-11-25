@@ -172,7 +172,18 @@ it("teclado, seleção e confirmações preservam ações e exclusões", async (
       .getByRole("button", { name: "Excluir", exact: true })
       .click();
     await expect.poll(() => exclusoes).toEqual(["/api/horarios/aula-1"]);
-    await expect.poll(() => page.getByRole("button", { name: "Nova aula" }).isEnabled()).toBe(true);
+    const novaAula = page.getByRole("button", { name: "Nova aula" });
+    await expect.poll(() => novaAula.isEnabled()).toBe(true);
+    // A linha excluída sai da lista; depois que a confirmação sai, o foco vai para Nova aula.
+    await expect.poll(() => novaAula.evaluate((el) => el === document.activeElement)).toBe(true);
+    // Desativar mantém a linha; o foco volta ao mesmo comando depois da confirmação.
+    const desativar = page.getByRole("button", { name: "Desativar aula 1" });
+    await desativar.click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Desativar", exact: true })
+      .click();
+    await expect.poll(() => desativar.evaluate((el) => el === document.activeElement)).toBe(true);
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Excluir turma 1º ano A" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Cancelar" }).click();

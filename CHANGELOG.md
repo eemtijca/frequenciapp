@@ -135,6 +135,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Nos horários da turma, confirmar a exclusão de uma aula leva o foco a Nova aula, e ativar ou desativar devolve o foco ao mesmo comando, sem perdê-lo para a página.
 - No tema claro, o campo desabilitado ganha contorno próprio, mais claro que o do campo ativo.
 - Notificações mantém texto e ações inteiros no celular ao evitar a rolagem horizontal indevida. O trilho inteiro permite alterar os avisos disponíveis. O interruptor expõe a descrição acessível quando a linha mostra um horário ou motivo de indisponibilidade.
 - A Grade usa a largura do conteúdo sem esticar Aluno ou Total. Em tabelas com rolagem horizontal, o arraste responde ao inverter nos limites e termina ao soltar o botão principal. O filtro de séries do Histórico mantém seus controles sem a faixa de sombra atrás do grupo.
