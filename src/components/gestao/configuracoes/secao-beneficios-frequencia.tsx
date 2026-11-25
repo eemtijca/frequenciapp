@@ -19,7 +19,7 @@ import {
   PERCENTUAL_MINIMO_MENOR,
   type RegraFrequenciaBeneficio,
 } from "@/domain/beneficios-frequencia";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
@@ -73,6 +73,7 @@ export default function SecaoBeneficiosFrequencia({
   beneficios: RegraFrequenciaBeneficio[];
   onMudar: (lista: RegraFrequenciaBeneficio[]) => void;
 }) {
+  const { avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const [formulario, setFormulario] = useState<Formulario | null>(null);
   const [erroFormulario, setErroFormulario] = useState("");

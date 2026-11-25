@@ -38,8 +38,7 @@ import {
   type DiretorDTO,
   type EstadoCredencial,
 } from "@/domain/diretores";
-import { publicarAviso } from "@/components/ui/mui/avisos";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -79,6 +78,7 @@ function dataCurta(iso: string | null): string {
 }
 
 export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: Props) {
+  const { avisarErro, avisarSucesso, publicarAviso } = useAvisosDaSessao();
   const [diretores, setDiretores] = useState<DiretorDTO[] | null>(null);
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<DiretorDTO | null>(null);

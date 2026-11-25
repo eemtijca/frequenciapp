@@ -127,14 +127,10 @@ export async function trocarVisao(
   const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const navegacao = await abrirNavegacao(page);
   if (visao === "gestao") {
-    const principal = navegacao.getByRole("button", {
-      name: /^Gestão(?: Alterações não salvas)?$/,
-    });
-    if (await navegacao.getByRole("button", { name: "Resumo", exact: true }).isVisible()) {
-      await voltarAoMenuPrincipal(navegacao);
-    }
-    if (await principal.isVisible()) await exporNivelGestao(page);
-    await fecharNavegacaoMovel(page);
+    if ((await page.locator("main").first().getAttribute("data-visao")) !== "gestao") {
+      const nav = await exporNivelGestao(page);
+      await nav.getByRole("button", { name: "Séries", exact: true }).click();
+    } else await fecharNavegacaoMovel(page);
   } else {
     await voltarAoMenuPrincipal(navegacao);
     await navegacao

@@ -14,7 +14,7 @@ import { Campo } from "@/components/ui/mui/campo";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { Dialogo } from "@/components/ui/mui/dialogo";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 
 function contarAlunos(quantidade: number): string {
@@ -30,6 +30,7 @@ export default function DialogoRestaurarOrigens({
   alunos: Aluno[];
   onMudanca: () => Promise<void>;
 }) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const [serieEscolhida, setSerieEscolhida] = useState("");
 

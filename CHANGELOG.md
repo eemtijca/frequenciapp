@@ -10,6 +10,9 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- Abrir Gestão, Relatórios ou Configurações e voltar de nível atualiza apenas a gaveta. Ao escolher um destino, a gaveta móvel começa a fechar sem esperar pela visão, que exibe um esqueleto no conteúdo se a espera for perceptível.
+- A entrada e a saída confirmam sucesso somente na tela de destino. Após encerrar a sessão, o painel deixa de ser exibido enquanto a entrada é preparada.
+
 - A página sem conexão e o erro global mantêm alvo de 48 px e foco de 3 px. O esqueleto de carregamento reserva a gaveta a partir de 905 px, junto com o shell. O contrato do tema registra o foco sólido de 3 px e o que foi reaproveitado dos ADRs 061 e 062, sem recuperar o CSS antigo.
 
 - FrequenciBI nomeia os comandos de mostrar e ocultar a chave de acesso, recolhe os filtros da Visão geral no celular e alinha Meta ou limiar aos campos do editor.
@@ -135,8 +138,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
-- Os avisos flutuantes alinham ícone, mensagem e fechamento; a ação de tentar novamente fica abaixo da mensagem.
-- Na Grade, os calendários dos modos diário, semanal e personalizado ocupam a largura disponível no celular. O calendário compartilhado mantém o foco e as opções dentro das datas permitidas.
+- Nos avisos flutuantes, o ícone e o botão Fechar se alinham à mensagem mesmo com uma ação abaixo dela. Fechar, Tentar novamente e Atualizar no aviso da PWA têm alvos de pelo menos 48 × 48 px.
+- Na Grade, os calendários dos modos diário, semanal e personalizado ocupam a largura disponível no celular. No calendário compartilhado, PageUp e PageDown mantêm o mês de destino mesmo quando o dia equivalente não pode ser selecionado.
 - A gaveta móvel fecha mais rápido ao escolher um destino. As telas só montam na primeira visita e mantêm seu estado nas visitas seguintes.
 - A Chamada destaca F e FJ com cores sólidas e contraste nos dois temas. O diálogo Sobre separa o cabeçalho do primeiro cartão e retira o fio abaixo dos links de ação.
 

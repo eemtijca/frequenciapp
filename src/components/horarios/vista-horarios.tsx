@@ -40,7 +40,7 @@ import { corpoAlteracao, pedir } from "@/lib/api-cliente";
 import { ouvirOrdemAlmocoMudou } from "@/lib/eventos-ordem-almoco";
 import { ouvirProvasBimestraisMudaram } from "@/lib/eventos-provas-bimestrais";
 import type { ProvaBimestral } from "@/domain/provas-bimestrais";
-import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
+import { mensagemAmigavel, useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
@@ -493,6 +493,7 @@ export default function VistaHorarios({
   onMudanca,
   onPendencia,
 }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const base = useId();
   const [turmaId, setTurmaId] = useState(turmas[0]?.id ?? "");
   const [diaSelecionado, setDiaSelecionado] = useState(String(diaDaSemana(diaCorrente)));

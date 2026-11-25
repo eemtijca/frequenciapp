@@ -15,7 +15,7 @@ import Stack from "@mui/material/Stack";
 import PreferenciasPlanilha from "./preferencias-planilha";
 import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useRascunhoConfiguracoes } from "@/components/gestao/configuracoes/rascunho-configuracoes";
@@ -93,6 +93,7 @@ export default function IntegracaoSaidas({
   onAbrirSaidas?: () => void;
   abertoInicial?: boolean;
 }) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [integracao, setIntegracao] = useState<IntegracaoSaidasAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [aberto, setAberto] = useState(abertoInicial);

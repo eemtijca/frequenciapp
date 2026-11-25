@@ -88,6 +88,54 @@ it("o calendário limitado abre no primeiro dia permitido e respeita os limites"
   }
 });
 
+async function conferirAvisoComAcao(aviso: Locator, nome: string) {
+  await verificar(aviso).toBeVisible();
+  const fechar = aviso.getByRole("button", { name: "Fechar aviso" });
+  const acao = aviso.getByRole("button", { name: nome, exact: true });
+  for (const botao of [fechar, acao]) {
+    const caixa = await botao.boundingBox();
+    expect(caixa?.height).toBeGreaterThanOrEqual(48);
+    expect(caixa?.width).toBeGreaterThanOrEqual(48);
+  }
+  expect(
+    await aviso.evaluate(
+      (el) => el.querySelectorAll("[aria-live], [role=alert], [role=status]").length,
+    ),
+  ).toBe(0);
+  const geometria = await aviso.evaluate((el) => {
+    const mensagem = el.querySelector(".MuiAlert-message");
+    const icone = el.querySelector(".MuiAlert-icon svg")?.getBoundingClientRect();
+    const fechar = el.querySelector('button[aria-label="Fechar aviso"]')?.getBoundingClientRect();
+    const acao = mensagem?.querySelector("button")?.getBoundingClientRect();
+    if (!mensagem || !icone || !fechar || !acao) throw new Error("Partes do aviso ausentes");
+    const texto = document.createTreeWalker(mensagem, NodeFilter.SHOW_TEXT);
+    const linhas: DOMRect[] = [];
+    while (texto.nextNode()) {
+      if (
+        !texto.currentNode.textContent?.trim() ||
+        texto.currentNode.parentElement?.closest("button")
+      )
+        continue;
+      const trecho = document.createRange();
+      trecho.selectNodeContents(texto.currentNode);
+      linhas.push(...trecho.getClientRects());
+    }
+    if (linhas.length === 0) throw new Error("Texto do aviso ausente");
+    const topo = Math.min(...linhas.map(({ top }) => top));
+    const base = Math.max(...linhas.map(({ bottom }) => bottom));
+    const centro = (topo + base) / 2;
+    return {
+      desvio: Math.max(
+        Math.abs(icone.y + icone.height / 2 - centro),
+        Math.abs(fechar.y + fechar.height / 2 - centro),
+      ),
+      acaoAbaixo: acao.top >= base,
+    };
+  });
+  expect(geometria.acaoAbaixo).toBe(true);
+  expect(geometria.desvio).toBeLessThanOrEqual(2);
+}
+
 it.each(["light", "dark"] as const)("toast alinha ícone, texto e ações em %s", async (tema) => {
   const page = await pagina(320, tema);
   try {
@@ -109,11 +157,10 @@ it.each(["light", "dark"] as const)("toast alinha ícone, texto e ações em %s"
     await verificar(aviso).not.toBeAttached();
     await page.getByRole("button", { name: "Mostrar erro" }).click();
     const erro = page.getByRole("alert");
-    const repetir = erro.getByRole("button", { name: "Tentar novamente" });
-    await expect
-      .poll(async () => (await repetir.boundingBox())?.height ?? 0)
-      .toBeGreaterThanOrEqual(48);
-    await repetir.click();
+    await verificar(erro).toHaveCount(1);
+    await verificar(erro).toHaveAttribute("aria-live", "assertive");
+    await conferirAvisoComAcao(erro, "Tentar novamente");
+    await erro.getByRole("button", { name: "Tentar novamente" }).tap();
     await verificar(erro).not.toBeAttached();
     await verificar(page.getByRole("status").filter({ hasText: "Carregado." })).toBeVisible();
   } finally {
@@ -161,8 +208,11 @@ it.each([
   }
 });
 
-it.each(["Fechar aviso", "Atualizar"] as const)("aviso da PWA mantém a ação %s", async (acao) => {
-  const page = await pagina(320);
+it.each([
+  ["Fechar aviso", "light"],
+  ["Atualizar", "dark"],
+] as const)("aviso da PWA mantém a ação %s e o alinhamento em %s", async (acao, tema) => {
+  const page = await pagina(320, tema);
   try {
     await page.addInitScript(() => {
       const worker = Object.assign(new EventTarget(), {
@@ -184,8 +234,10 @@ it.each(["Fechar aviso", "Atualizar"] as const)("aviso da PWA mantém a ação %
         }),
       });
     });
-    await page.goto(`${servidor.url}?tela=aviso-pwa`);
+    await page.goto(`${servidor.url}?tela=aviso-pwa&tema=${tema}`);
     const aviso = page.getByRole("status").filter({ hasText: "Versão nova do aplicativo" });
+    await verificar(aviso).toHaveCount(1);
+    await conferirAvisoComAcao(aviso, "Atualizar");
     await aviso.getByRole("button", { name: acao, exact: true }).tap();
     await verificar(aviso).not.toBeAttached();
     expect(await page.locator("body").getAttribute("data-worker")).toBe(

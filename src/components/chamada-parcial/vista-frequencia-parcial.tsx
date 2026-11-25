@@ -48,7 +48,7 @@ import {
 import { VistaResumoParcial } from "@/components/chamada-parcial/resumo-semana-parcial";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
-import { avisarErro, avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
+import { mensagemAmigavel, useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
@@ -280,6 +280,7 @@ export default function VistaFrequenciaParcial({
   onPendencia,
   onAbrirChamada,
 }: Props) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   // No domingo, a abertura é o resumo da semana encerrada.
   const limite = limiteAgendamentoParcial(diaInicial);
   const nav = useNavegacaoDoDia({
@@ -349,7 +350,7 @@ export default function VistaFrequenciaParcial({
       return;
     }
     setRecarregar((valor) => valor + 1);
-  }, [sujo]);
+  }, [sujo, avisarInfo]);
   const marcarParcialAtualizada = useAtualizacaoTela("chamada-parcial", atualizarTela);
 
   const turmasOrdenadas = useMemo(() => {

@@ -127,7 +127,7 @@ beforeAll(async () => {
       import CssBaseline from "@mui/material/CssBaseline";
       import { ThemeProvider } from "@mui/material/styles";
       import PorAluno from "@/components/relatorios/por-aluno";
-      import { ProvedorAvisos } from "@/components/ui/mui/avisos";
+      import { EscopoAvisosDaSessao, ProvedorAvisos } from "@/components/ui/mui/avisos";
       import { tema } from "@/theme/tema";
       ${temaReal ? 'import { ProvedorTema } from "@/theme/provedor-tema";' : ""}
       const massa = ${JSON.stringify(temaReal ? { ...massa, series: [serie] } : massa)};
@@ -135,9 +135,9 @@ beforeAll(async () => {
         const [mes, onMes] = useState(${JSON.stringify(mes)});
         return ${temaReal ? "h(ProvedorTema, null," : "h(ThemeProvider, { theme: tema }, h(CssBaseline, { enableColorScheme: true }),"}
           h(Box, { component: "main", sx: { ml: { xs: 2, sm: 4, md: 38 }, mr: { xs: 2, sm: 4, md: 6 }, pt: { xs: 13, md: 16 } } },
-            h(PorAluno, { ...massa, mes, onMes, mesCorrente: ${JSON.stringify(mes)},
+            h(EscopoAvisosDaSessao, { autenticado: true }, h(PorAluno, { ...massa, mes, onMes, mesCorrente: ${JSON.stringify(mes)},
               frequencias: mes === ${JSON.stringify(mes)} ? massa.frequencias : [],
-              saidas: mes === ${JSON.stringify(mes)} ? massa.saidas : [] })),
+              saidas: mes === ${JSON.stringify(mes)} ? massa.saidas : [] }))),
           h(ProvedorAvisos));
       }
       createRoot(document.getElementById("root")).render(h(Fixture));

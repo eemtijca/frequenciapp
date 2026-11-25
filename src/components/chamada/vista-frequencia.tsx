@@ -49,8 +49,7 @@ import Typography from "@mui/material/Typography";
 import { type Theme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
-import { publicarAviso } from "@/components/ui/mui/avisos";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { chaveRascunho } from "@/lib/rascunho-chamada";
 import { ouvirBeneficiosMudaram } from "@/lib/eventos-beneficios";
@@ -239,6 +238,7 @@ export default function VistaFrequencia({
   onPendencia,
   onAbrirGestao,
 }: Props) {
+  const { avisarSucesso, publicarAviso } = useAvisosDaSessao();
   const podeAdministrar = temCapacidade(usuario.papel, "administrar");
   const temTurmas = turmas.length > 0;
   const [turmaId, setTurmaId] = useState(() => alvo?.turmaId ?? turmas[0]?.id ?? "");
@@ -438,7 +438,7 @@ export default function VistaFrequencia({
       return;
     }
     setRecarregar((valor) => valor + 1);
-  }, [sujo]);
+  }, [sujo, publicarAviso]);
   const marcarChamadaAtualizada = useAtualizacaoTela("chamada", atualizarTela);
 
   // Sincroniza quando o histórico pede para abrir uma frequência específica.
@@ -626,6 +626,7 @@ export default function VistaFrequencia({
     nomeFeriadoNoCadastro,
     nav.resumo,
     marcarChamadaAtualizada,
+    publicarAviso,
   ]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -669,6 +670,7 @@ export default function VistaFrequencia({
     dia,
     turmaId,
     sabadoLiberado,
+    publicarAviso,
   ]);
 
   useEffect(() => {

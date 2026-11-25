@@ -14,7 +14,7 @@ import Typography from "@mui/material/Typography";
 import type { ApresentacaoAba } from "@/domain/planilha-apresentacao";
 import { CORES_PLANILHA } from "@/domain/planilha-apresentacao";
 import { pedir, corpoJson } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso, avisarInfo, mensagemAmigavel } from "@/lib/avisos";
+import { mensagemAmigavel, useAvisosDaSessao } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { Botao } from "@/components/ui/mui/botao";
 import { Campo } from "@/components/ui/mui/campo";
@@ -151,6 +151,7 @@ export function OrganizarPlanilha({
   abas?: string[];
   acoes?: ReturnType<typeof useAcoesPorChave>;
 }) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const idAno = useId();
   const [anoReferencia, setAnoReferencia] = useState(new Date().getFullYear());
   const [conferencias, setConferencias] = useState<ConferenciaAba[] | null>(null);

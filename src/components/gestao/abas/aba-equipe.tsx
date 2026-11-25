@@ -28,7 +28,7 @@ import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-es
 import { Selo } from "@/components/ui/mui/selo";
 import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
 import { normalizar } from "@/domain/frequencia";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -56,6 +56,7 @@ const ALVO_ACAO = {
 } as const;
 
 export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<UsuarioDTO | null>(null);

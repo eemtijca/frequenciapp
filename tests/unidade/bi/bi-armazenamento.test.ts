@@ -10,6 +10,7 @@ import {
   identificadorCacheBi,
   lerSegredoBi,
   limparTudoBi,
+  prepararExpurgoBiNoLogout,
 } from "@/lib/bi-armazenamento";
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -153,6 +154,42 @@ describe("armazenamento privado do BI", () => {
       chave: "chave-b",
     });
     expect([...restantes]).toEqual([`${idB}:acesso`]);
+  });
+  it("logout sem captura só recupera após conferir que a chave e os retratos estão ausentes", async () => {
+    const remover = vi.fn();
+    const ler = vi.fn<Storage["getItem"]>().mockImplementation(() => {
+      throw new DOMException("Bloqueado", "SecurityError");
+    });
+    vi.stubGlobal("localStorage", { getItem: ler, removeItem: remover });
+    const expurgar = prepararExpurgoBiNoLogout();
+    await expect(expurgar()).rejects.toThrow();
+
+    let retratos = 1;
+    const close = vi.fn();
+    const transaction = vi.fn(() => ({
+      objectStore: () => ({
+        count: () => {
+          const consulta = { result: retratos, onsuccess: () => undefined };
+          queueMicrotask(() => consulta.onsuccess());
+          return consulta;
+        },
+      }),
+    }));
+    const open = vi.fn(() => {
+      const pedido = { result: { transaction, close }, onsuccess: () => undefined };
+      queueMicrotask(() => pedido.onsuccess());
+      return pedido;
+    });
+    vi.stubGlobal("indexedDB", { open });
+    ler.mockReturnValue("chave-alheia");
+    await expect(expurgar()).rejects.toThrow();
+    expect(open).not.toHaveBeenCalled();
+    ler.mockReturnValue(null);
+    await expect(expurgar()).rejects.toThrow();
+    retratos = 0;
+    await expect(expurgar()).resolves.toBeUndefined();
+    expect(remover).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledTimes(2);
   });
   it("reconfere geração depois de abrir IndexedDB e antes de criar transação", async () => {
     const pedido = { onsuccess: null } as unknown as IDBOpenDBRequest;

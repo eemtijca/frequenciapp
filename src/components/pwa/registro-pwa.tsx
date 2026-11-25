@@ -3,12 +3,9 @@
 // Registro do service worker e aviso de atualização. Também detecta
 // perda de conexão para orientar enquanto o aplicativo está offline.
 import { useEffect, useState } from "react";
-import Alert from "@mui/material/Alert";
-import Button from "@mui/material/Button";
 import Snackbar from "@mui/material/Snackbar";
-import { ESTILOS_AVISO_FLUTUANTE, FecharAviso } from "@/components/ui/mui/avisos";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
-import { TOKENS_LAYOUT } from "@/theme/layout";
+import { AvisoFlutuante } from "@/components/ui/mui/avisos";
+import { avisosPublicos } from "@/lib/avisos";
 
 export default function RegistroPwa() {
   const [atualizacao, setAtualizacao] = useState<ServiceWorker | null>(null);
@@ -46,11 +43,11 @@ export default function RegistroPwa() {
     }
 
     function aoFicarOnline() {
-      avisarSucesso("Conexão de volta.", undefined, "pwa-online");
+      avisosPublicos.avisarSucesso("Conexão de volta.", undefined, "pwa-online");
     }
 
     function aoFicarOffline() {
-      avisarErro(new Error("Você está sem conexão."), {
+      avisosPublicos.avisarErro(new Error("Você está sem conexão."), {
         contexto: "Você está sem conexão.",
         descricao: "As marcações não salvas precisam de internet para sincronizar.",
         id: "pwa-offline",
@@ -80,23 +77,16 @@ export default function RegistroPwa() {
       anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       onClose={() => setAtualizacao(null)}
     >
-      <Alert
-        severity="info"
-        variant="standard"
-        role="status"
-        action={<FecharAviso onClick={() => setAtualizacao(null)} />}
-        sx={ESTILOS_AVISO_FLUTUANTE}
-      >
-        Versão nova do aplicativo disponível. Toque em Atualizar para recarregar.
-        <Button
-          color="inherit"
-          size="small"
-          onClick={aplicarAtualizacao}
-          sx={{ display: "flex", mt: 0.5, minHeight: TOKENS_LAYOUT.alvoToque }}
+      {/* A transição do Snackbar precisa de um nó que aceite ref e style. */}
+      <div>
+        <AvisoFlutuante
+          severidade="info"
+          aoFechar={() => setAtualizacao(null)}
+          acao={{ rotulo: "Atualizar", executar: aplicarAtualizacao }}
         >
-          Atualizar
-        </Button>
-      </Alert>
+          Versão nova do aplicativo disponível. Toque em Atualizar para recarregar.
+        </AvisoFlutuante>
+      </div>
     </Snackbar>
   );
 }

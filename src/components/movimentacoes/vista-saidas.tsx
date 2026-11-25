@@ -17,7 +17,7 @@ import ListItem from "@mui/material/ListItem";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
@@ -134,6 +134,7 @@ export default function VistaSaidas({
   atualizacao = 0,
   onMesVisivel,
 }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const nav = useNavegacaoDoDia({
     diaCorrente,
     max: diaCorrente,

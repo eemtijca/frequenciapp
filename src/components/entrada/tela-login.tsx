@@ -2,7 +2,6 @@
 
 // Entrada no layout sign-in-side: marca e destaques no desktop, formulário único no celular.
 import { useEffect, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
 import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
@@ -25,7 +24,8 @@ import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-es
 import { CampoTexto } from "@/components/ui/mui/text-field";
 import DialogoSobre from "@/components/dialogo-sobre";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { useAvisoDeExpiracao, useConfirmarEntrada } from "./transicao-sessao";
 import { ROTA_PRIVACIDADE } from "@/lib/rotas-publicas";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
@@ -68,14 +68,16 @@ interface Props {
 }
 
 export default function TelaLogin({ urlIndiceAgentes }: Props) {
-  const router = useRouter();
+  const confirmarEntrada = useConfirmarEntrada();
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [lembrar, setLembrar] = useState(true);
-  const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado | null>(null);
-  const [avisoEntrada, setAvisoEntrada] = useState<VarianteEstado | null>(null);
+  const expirou = useAvisoDeExpiracao();
+  const [avisoEntrada, setAvisoEntrada] = useState<VarianteEstado | null>(
+    expirou ? "sessao_expirada" : null,
+  );
   const [sobreAberto, setSobreAberto] = useState(false);
 
   // Preenche o e-mail lembrado neste dispositivo, se houver. O armazenamento
@@ -106,14 +108,11 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
     }
   }, []);
 
-  async function submeter(evento: FormEvent<HTMLFormElement>) {
-    evento.preventDefault();
-    if (enviando) return;
-    setEnviando(true);
+  const { executando: enviando, executar: entrar } = useAcaoUnica(async () => {
     setErro("");
     setErroVariante(null);
     try {
-      await pedir<{ usuario: { nome: string } }>(
+      const { usuario } = await pedir<{ usuario: { id: string } }>(
         "/api/auth/entrar",
         corpoJson({ login: email, senha, lembrar }),
       );
@@ -123,17 +122,19 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
       } catch {
         // Sem armazenamento local: o login continua.
       }
-      avisarSucesso("Entrada confirmada.");
-      router.refresh();
+      confirmarEntrada(usuario.id);
     } catch (excecao) {
       const mensagem =
         excecao instanceof ErroApi ? excecao.message : "Não foi possível entrar. Tente novamente.";
       setErro(mensagem);
       const status = excecao instanceof ErroApi ? excecao.status : 0;
       setErroVariante(status === 403 ? "conta_desativada" : status === 429 ? "limite" : null);
-    } finally {
-      setEnviando(false);
     }
+  });
+
+  function submeter(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    void entrar();
   }
 
   return (

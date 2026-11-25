@@ -15,7 +15,7 @@ import type {
   ResumoSincronizacaoFeriados,
 } from "@/domain/feriados-externos";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
@@ -63,6 +63,7 @@ export default function ControleSincronizarFeriados({
   onExecutandoChange,
   onAtualizar,
 }: Props) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const ajudaId = useId();
   const idBotao = useId();
   const senhaId = useId();

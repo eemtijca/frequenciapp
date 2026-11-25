@@ -35,7 +35,7 @@ import {
   type ProvaBimestral,
 } from "@/domain/provas-bimestrais";
 import { corpoAlteracao, corpoJson, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { deDiaCivil, paraDiaCivil } from "@/lib/data-civil";
 import {
   avisarProvasBimestraisMudaram,
@@ -180,6 +180,7 @@ function SeletorDataProva({ id, valor, min, max, disabled, onValor }: SeletorDat
 }
 
 export default function SecaoProvasBimestrais({ turmas, diaCorrente, rascunhoPendente }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const base = useId();
   const [provas, setProvas] = useState<ProvaBimestral[]>([]);
   const [carregado, setCarregado] = useState(false);

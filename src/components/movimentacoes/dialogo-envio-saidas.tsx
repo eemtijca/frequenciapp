@@ -15,8 +15,7 @@ import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { avisarSucesso } from "@/lib/avisos";
-import { publicarAviso } from "@/components/ui/mui/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { Alerta } from "@/components/ui/mui/alerta";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
@@ -112,6 +111,7 @@ export default function DialogoEnvioSaidas({
   modoCompleto,
   aoConcluir,
 }: Props) {
+  const { avisarSucesso, publicarAviso } = useAvisosDaSessao();
   const online = useOnline();
   const [simulacao, setSimulacao] = useState<SimulacaoSaidas | null>(null);
   const [previaEntradas, setPreviaEntradas] = useState<PreviaEntradas | null>(null);

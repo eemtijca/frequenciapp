@@ -24,7 +24,7 @@ import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import type { Serie } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -49,6 +49,7 @@ const ALVO_ACAO = {
 } as const;
 
 export default function AbaSeries({ series, onMudanca }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<Serie | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);

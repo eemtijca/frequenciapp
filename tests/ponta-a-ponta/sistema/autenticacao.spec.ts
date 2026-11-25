@@ -32,7 +32,17 @@ test.describe("autenticação", () => {
     await page.getByLabel("Senha", { exact: true }).fill(ADMIN_E2E.senha);
     await page.getByRole("button", { name: "Entrar" }).click();
     await expect(page.getByRole("heading", { name: "Painel" })).toBeVisible();
+    await expect(page.getByText("Entrada confirmada.", { exact: true })).toBeVisible();
+    const ativa = await page.request.get("/api/auth/sessao");
+    expect(ativa.ok()).toBe(true);
+    expect(await ativa.json()).toMatchObject({ usuario: { papel: "ADMIN" } });
+
     await sairDaConta(page);
+    await expect(page.getByRole("heading", { name: "Painel" })).toHaveCount(0);
+    await expect(page.getByText("Sessão encerrada.", { exact: true })).toBeVisible();
+    const encerrada = await page.request.get("/api/auth/sessao");
+    expect(encerrada.ok()).toBe(true);
+    expect(await encerrada.json()).toMatchObject({ usuario: null });
   });
 
   test("mantém a sessão e o e-mail quando pede para lembrar", async ({ page }) => {

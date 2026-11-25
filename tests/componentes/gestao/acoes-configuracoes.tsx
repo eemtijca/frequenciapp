@@ -3,7 +3,11 @@ import { Suspense } from "react";
 import { createRoot } from "react-dom/client";
 
 import Aplicacao from "../../../src/components/aplicacao";
-import { ProvedorAvisos } from "../../../src/components/ui/mui/avisos";
+import {
+  DestinoSessao,
+  ProvedorTransicaoSessao,
+} from "../../../src/components/entrada/transicao-sessao";
+import { EscopoAvisosDaSessao, ProvedorAvisos } from "../../../src/components/ui/mui/avisos";
 import { CONFIGURACOES_PADRAO, type Turma } from "../../../src/domain/frequencia";
 import { ProvedorTema } from "../../../src/theme/provedor-tema";
 
@@ -20,31 +24,40 @@ const turmas: Turma[] = ["A", "B", "C"].map((nome, i) => ({
 const root = document.getElementById("root");
 if (!root) throw new Error("Elemento raiz ausente");
 const parametros = new URLSearchParams(location.search);
+const tela = (
+  <Aplicacao
+    usuario={{
+      id: "teste",
+      nome: "Admin teste",
+      email: "teste@example.test",
+      papel: parametros.has("coordenacao") ? "COORDENACAO" : "ADMIN",
+      ativo: true,
+    }}
+    carregadoEm="2026-03-10T12:00:00.000Z"
+    diaCorrente="2026-03-10"
+    fuso="America/Sao_Paulo"
+    visaoInicial={parametros.get("visao") ?? "gestao"}
+    configuracoesIniciais={{ ...CONFIGURACOES_PADRAO, saidaAntecipada: true }}
+    justificativasIniciais={[]}
+    liberadoresIniciais={[]}
+    seriesIniciais={[{ id: "serie-1", nome: "1º ano", ordem: 1 }]}
+    turmasIniciais={turmas}
+    alunosIniciais={[]}
+    frequenciasIniciais={[]}
+    saidasIniciais={[]}
+    resumoInicial={null}
+  />
+);
 createRoot(root).render(
   <ProvedorTema>
     <Suspense fallback={<p>Carregando tela de teste</p>}>
-      <Aplicacao
-        usuario={{
-          id: "teste",
-          nome: "Admin teste",
-          email: "teste@example.test",
-          papel: parametros.has("coordenacao") ? "COORDENACAO" : "ADMIN",
-          ativo: true,
-        }}
-        carregadoEm="2026-03-10T12:00:00.000Z"
-        diaCorrente="2026-03-10"
-        fuso="America/Sao_Paulo"
-        visaoInicial={parametros.get("visao") ?? "gestao"}
-        configuracoesIniciais={{ ...CONFIGURACOES_PADRAO, saidaAntecipada: true }}
-        justificativasIniciais={[]}
-        liberadoresIniciais={[]}
-        seriesIniciais={[{ id: "serie-1", nome: "1º ano", ordem: 1 }]}
-        turmasIniciais={turmas}
-        alunosIniciais={[]}
-        frequenciasIniciais={[]}
-        saidasIniciais={[]}
-        resumoInicial={null}
-      />
+      {parametros.has("sessao-teste") ? (
+        <ProvedorTransicaoSessao>
+          <DestinoSessao usuarioId="teste">{tela}</DestinoSessao>
+        </ProvedorTransicaoSessao>
+      ) : (
+        <EscopoAvisosDaSessao autenticado>{tela}</EscopoAvisosDaSessao>
+      )}
     </Suspense>
     <ProvedorAvisos />
   </ProvedorTema>,

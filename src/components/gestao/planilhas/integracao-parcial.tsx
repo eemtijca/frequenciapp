@@ -13,7 +13,7 @@ import Stack from "@mui/material/Stack";
 import PreferenciasPlanilha from "./preferencias-planilha";
 import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useRascunhoConfiguracoes } from "@/components/gestao/configuracoes/rascunho-configuracoes";
 import { Abas } from "@/components/ui/mui/abas";
@@ -43,6 +43,7 @@ export default function IntegracaoParcial({
   onAbrirParcial?: () => void;
   abertoInicial?: boolean;
 }) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [integracao, setIntegracao] = useState<IntegracaoParcialAdmin | null>(null);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);

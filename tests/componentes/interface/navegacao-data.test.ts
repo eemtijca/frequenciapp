@@ -4,7 +4,13 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
+import {
+  chromium,
+  expect as esperar,
+  type Browser,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { TOKENS_LAYOUT } from "../../../src/theme/layout";
 
@@ -51,6 +57,64 @@ afterAll(async () => {
   await browser?.close();
   await servidor?.close();
   rmSync(cache, { recursive: true, force: true });
+});
+
+it("só exibe a confirmação da Chamada na sessão que iniciou o salvamento", async () => {
+  const page = await browser.newPage({ serviceWorkers: "block" });
+  const liberar = Promise.withResolvers<void>();
+  let salvamentos = 0;
+  try {
+    await page.route("**/*", (rota) => {
+      const endereco = new URL(rota.request().url());
+      if (endereco.origin !== new URL(url).origin) return rota.abort();
+      if (endereco.pathname.startsWith("/api/")) return rota.fulfill({ status: 503, json: {} });
+      return rota.continue();
+    });
+    await page.route(
+      (u) => u.origin === new URL(url).origin && u.pathname === "/api/frequencias",
+      async (rota) => {
+        if (rota.request().method() === "GET") return rota.fulfill({ json: { frequencias: [] } });
+        expect(rota.request().method()).toBe("POST");
+        if (++salvamentos === 1) await liberar.promise;
+        await rota.fulfill({
+          json: {
+            frequencia: {
+              dia: "2026-11-25",
+              turmaId: "turma",
+              revisao: 1,
+              atualizadoEm: "2026-11-25T12:00:00Z",
+              atualizadoPorNome: "Conta sintética",
+              faltas: [],
+              alunos: ["aluno"],
+            },
+          },
+        });
+      },
+    );
+    const salvar = async () => {
+      await page.getByRole("button", { name: "Salvar", exact: true }).click();
+      await page.getByRole("button", { name: "Salvar chamada", exact: true }).click();
+    };
+    await page.goto(`${url}?tela=chamada-avisos`);
+    await salvar();
+    await esperar.poll(() => salvamentos).toBe(1);
+    await page.getByRole("button", { name: "Iniciar outra sessão da mesma conta" }).click();
+    await esperar(page.getByLabel("Sessão da fixture")).toHaveText("2");
+    await esperar(page.getByRole("button", { name: "Salvar", exact: true })).toBeEnabled();
+    liberar.resolve();
+    const concluidos = page.getByLabel("Salvamentos concluídos");
+    await esperar(concluidos).toHaveText("1");
+    const confirmacao = page.getByText("Chamada salva. Todos presentes.", { exact: true });
+    await esperar(confirmacao).toHaveCount(0);
+
+    await salvar();
+    await esperar(concluidos).toHaveText("2");
+    await esperar(confirmacao).toBeVisible();
+    expect(salvamentos).toBe(2);
+  } finally {
+    liberar.resolve();
+    await page.close();
+  }
 });
 
 /** Espera o esquema do MUI e a pintura real do body antes de medir contrastes. */

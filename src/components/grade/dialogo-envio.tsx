@@ -16,7 +16,7 @@ import RadioGroup from "@mui/material/RadioGroup";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { Acordeao } from "@/components/ui/mui/acordeao";
@@ -173,6 +173,7 @@ export default function DialogoEnvio({
   todas = false,
   aoConcluir,
 }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const online = useOnline();
   const [simulacao, setSimulacao] = useState<Simulacao | null>(null);
   const [erro, setErro] = useState("");

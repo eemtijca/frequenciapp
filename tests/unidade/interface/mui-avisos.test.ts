@@ -13,6 +13,7 @@ import {
   limparAvisos,
   obterAvisos,
   publicarAviso,
+  publicarAvisoPublico,
   removerAviso,
   type Aviso,
 } from "@/components/ui/mui/avisos";
@@ -39,21 +40,27 @@ describe("fila de avisos", () => {
     limparAvisos();
   });
 
+  it("recusa aviso privado sem sessão e preserva o aviso público", () => {
+    publicarAviso({ severidade: "error", titulo: "Resultado privado" }, null);
+    publicarAvisoPublico({ severidade: "info", titulo: "Aviso público" });
+    expect(obterAvisos().map((aviso) => aviso.titulo)).toEqual(["Aviso público"]);
+  });
+
   it("mantém no máximo três avisos e descarta o mais antigo", () => {
-    publicarAviso({ severidade: "success", titulo: "Primeiro" });
-    publicarAviso({ severidade: "info", titulo: "Segundo" });
-    publicarAviso({ severidade: "error", titulo: "Terceiro" });
+    publicarAvisoPublico({ severidade: "success", titulo: "Primeiro" });
+    publicarAvisoPublico({ severidade: "info", titulo: "Segundo" });
+    publicarAvisoPublico({ severidade: "error", titulo: "Terceiro" });
     expect(obterAvisos().map((aviso) => aviso.titulo)).toEqual(["Primeiro", "Segundo", "Terceiro"]);
 
-    publicarAviso({ severidade: "success", titulo: "Quarto" });
+    publicarAvisoPublico({ severidade: "success", titulo: "Quarto" });
     expect(obterAvisos()).toHaveLength(LIMITE_AVISOS);
     expect(obterAvisos().map((aviso) => aviso.titulo)).toEqual(["Segundo", "Terceiro", "Quarto"]);
   });
 
   it("substitui o aviso repetido pelo id e o move para o fim da fila", () => {
-    publicarAviso({ id: "salvar", severidade: "info", titulo: "Salvando" });
-    publicarAviso({ id: "outro", severidade: "success", titulo: "Outro" });
-    publicarAviso({ id: "salvar", severidade: "success", titulo: "Salvo" });
+    publicarAvisoPublico({ id: "salvar", severidade: "info", titulo: "Salvando" });
+    publicarAvisoPublico({ id: "outro", severidade: "success", titulo: "Outro" });
+    publicarAvisoPublico({ id: "salvar", severidade: "success", titulo: "Salvo" });
 
     expect(obterAvisos()).toHaveLength(2);
     expect(obterAvisos().map((aviso) => aviso.titulo)).toEqual(["Outro", "Salvo"]);
@@ -61,17 +68,17 @@ describe("fila de avisos", () => {
   });
 
   it("devolve o id gerado e aplica a duração padrão ou informada", () => {
-    const gerado = publicarAviso({ severidade: "success", titulo: "Salvo" });
+    const gerado = publicarAvisoPublico({ severidade: "success", titulo: "Salvo" });
     expect(gerado).toMatch(/^aviso-\d+$/);
     expect(obterAvisos()[0]?.duracao).toBe(DURACOES_AVISO.success);
 
-    publicarAviso({ id: "curto", severidade: "info", titulo: "Curto", duracao: 3000 });
+    publicarAvisoPublico({ id: "curto", severidade: "info", titulo: "Curto", duracao: 3000 });
     expect(obterAvisos()[1]?.duracao).toBe(3000);
   });
 
   it("remove pelo id e não falha quando o aviso já saiu da fila", () => {
-    const primeiro = publicarAviso({ severidade: "success", titulo: "Primeiro" });
-    publicarAviso({ severidade: "info", titulo: "Segundo" });
+    const primeiro = publicarAvisoPublico({ severidade: "success", titulo: "Primeiro" });
+    publicarAvisoPublico({ severidade: "info", titulo: "Segundo" });
 
     removerAviso(primeiro);
     expect(obterAvisos().map((aviso) => aviso.titulo)).toEqual(["Segundo"]);
@@ -81,7 +88,7 @@ describe("fila de avisos", () => {
   });
 
   it("esvazia a fila na limpeza explícita", () => {
-    publicarAviso({ severidade: "success", titulo: "Primeiro" });
+    publicarAvisoPublico({ severidade: "success", titulo: "Primeiro" });
     limparAvisos();
     expect(obterAvisos()).toEqual([]);
   });

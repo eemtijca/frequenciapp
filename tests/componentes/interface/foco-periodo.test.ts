@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, webkit, type Browser, type Page } from "@playwright/test";
+import { chromium, webkit, expect as verificar, type Browser, type Page } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 // O foco pode demorar a voltar no WebKit sob carga; a espera padrão é curta.
@@ -44,6 +44,75 @@ beforeAll(async () => {
 afterAll(async () => {
   await servidor?.close();
   rmSync(cache, { recursive: true, force: true });
+});
+
+it("PageUp e PageDown mantêm o foco no mês de destino quando o primeiro dia é domingo", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ reducedMotion: "reduce" });
+    await page.goto(`${url}?cenario=troca-de-mes`);
+    const gatilho = page.getByRole("button", { name: /^Dia:/ });
+    await gatilho.press("Enter");
+    const calendario = page.getByRole("dialog", { name: "Dia" });
+    const dia = (data: string) => calendario.getByRole("button", { name: new RegExp(`^${data}`) });
+    const cabecalho = calendario.locator('[aria-live="polite"]');
+    await verificar(dia("1 de dezembro")).toBeFocused(ESPERA_FOCO);
+    await page.keyboard.press("PageUp");
+    await verificar(cabecalho).toHaveText(/novembro de 2026/i);
+    await verificar(dia("2 de novembro")).toBeFocused(ESPERA_FOCO);
+    await page.keyboard.press("PageDown");
+    await verificar(cabecalho).toHaveText(/dezembro de 2026/i);
+    await verificar(dia("2 de dezembro")).toBeFocused(ESPERA_FOCO);
+    await calendario.getByRole("button", { name: "Mês anterior" }).click();
+    await verificar(cabecalho).toHaveText(/novembro de 2026/i);
+    await verificar(dia("2 de novembro")).toBeFocused(ESPERA_FOCO);
+    await calendario.getByRole("button", { name: "Mês seguinte" }).click();
+    await verificar(dia("2 de dezembro")).toBeFocused(ESPERA_FOCO);
+    await verificar(calendario.getByRole("button", { name: "Mês seguinte" })).toBeDisabled();
+    await page.keyboard.press("PageDown");
+    await verificar(dia("19 de dezembro")).toBeFocused(ESPERA_FOCO);
+    await page.keyboard.press("Enter");
+    await verificar(gatilho).toHaveAccessibleName(/2026-12-19/);
+    await verificar(gatilho).toBeFocused(ESPERA_FOCO);
+  } finally {
+    await browser.close();
+  }
+});
+
+it("o calendário semanal ignora um domingo de resumo futuro no limite inferior", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ reducedMotion: "reduce" });
+    await page.goto(`${url}?cenario=resumo-futuro`);
+    const gatilho = page.getByRole("button", { name: /^Dia:/ });
+    await gatilho.press("Enter");
+    const calendario = page.getByRole("dialog", { name: "Dia" });
+    await verificar(calendario.getByRole("button", { name: /^1 de novembro/ })).toBeDisabled();
+    const segunda = calendario.getByRole("button", { name: /^2 de novembro/ });
+    await verificar(segunda).toBeFocused(ESPERA_FOCO);
+    await page.keyboard.press("ArrowLeft");
+    await verificar(segunda).toBeFocused(ESPERA_FOCO);
+    await page.keyboard.press("Enter");
+    await verificar(gatilho).toHaveAccessibleName(/2026-11-02/);
+    await verificar(gatilho).toBeFocused(ESPERA_FOCO);
+  } finally {
+    await browser.close();
+  }
+});
+
+it("o seletor sem domingo fica desabilitado quando não há dia elegível", async () => {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const page = await browser.newPage({ reducedMotion: "reduce" });
+    await page.goto(`${url}?cenario=so-domingo`);
+    const gatilho = page.getByRole("button", { name: /^Dia:/ });
+    await verificar(gatilho).toBeDisabled();
+    await page.keyboard.press("Tab");
+    await verificar(page.getByRole("button", { name: /^Mês:/ })).toBeFocused(ESPERA_FOCO);
+    await verificar(page.getByRole("dialog", { name: "Dia" })).not.toBeAttached();
+  } finally {
+    await browser.close();
+  }
 });
 
 async function abrirFixture(page: Page, modo: "dia" | "mes") {

@@ -45,7 +45,8 @@ import { Selo } from "@/components/ui/mui/selo";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorTema } from "@/components/ui/mui/seletor-tema";
 import RegistroPwa from "@/components/pwa/registro-pwa";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { EscopoAvisosDaSessao } from "@/components/ui/mui/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { useDadosBi } from "@/lib/use-dados-bi";
 import { useCalculosBi } from "@/lib/use-calculos-bi";
@@ -107,6 +108,15 @@ function dataBr(valor: string): string {
 }
 
 export default function VistaBi({ fuso }: { fuso: string }) {
+  return (
+    <EscopoAvisosDaSessao autenticado>
+      <ConteudoBi fuso={fuso} />
+    </EscopoAvisosDaSessao>
+  );
+}
+
+function ConteudoBi({ fuso }: { fuso: string }) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const fonte = useDadosBi();
   const { acesso, carregar, entrar, esquecer, armazenamentoFalhou } = fonte;
   const [personalizacao, setPersonalizacao] = useState<PersonalizacaoBi>(personalizacaoVaziaBi);

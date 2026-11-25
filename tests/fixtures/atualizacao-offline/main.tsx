@@ -7,7 +7,7 @@ import {
   ProvedorAtualizacao,
   useAtualizacaoTela,
 } from "@/components/atualizacao/contexto-atualizacao";
-import { ProvedorAvisos } from "@/components/ui/mui/avisos";
+import { EscopoAvisosDaSessao, ProvedorAvisos } from "@/components/ui/mui/avisos";
 import { BotaoAtualizar } from "@/components/ui/mui/botao-atualizar";
 import { tema } from "@/theme/tema";
 
@@ -48,9 +48,11 @@ if (!raiz) throw new Error("Raiz da fixture ausente");
 createRoot(raiz).render(
   <ThemeProvider theme={tema}>
     <CssBaseline enableColorScheme />
-    <ProvedorAtualizacao ativo="painel">
-      <Tela />
-      <ProvedorAvisos />
-    </ProvedorAtualizacao>
+    <EscopoAvisosDaSessao autenticado>
+      <ProvedorAtualizacao ativo="painel">
+        <Tela />
+        <ProvedorAvisos />
+      </ProvedorAtualizacao>
+    </EscopoAvisosDaSessao>
   </ThemeProvider>,
 );

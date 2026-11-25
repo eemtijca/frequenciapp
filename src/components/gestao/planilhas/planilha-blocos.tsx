@@ -13,7 +13,7 @@ import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { corpoJson, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useMinutoCorrente } from "@/lib/use-relogio";
 import { DURACOES_MODO_COMPLETO, FRASE_MODO_COMPLETO } from "@/domain/planilha";
@@ -42,6 +42,7 @@ export function BlocoModoCompletoPlanilha({
   ate: string | null;
   onMudou: () => Promise<void> | void;
 }) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [destrave, setDestrave] = useState(false);
   const [frase, setFrase] = useState("");
   const [duracao, setDuracao] = useState(15);
@@ -231,6 +232,7 @@ export function BlocoRiscoPlanilha({
   abasCriadas: string[];
   onMudou: () => Promise<void> | void;
 }) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const [copias, setCopias] = useState<
     { aba: string; itens: { nome: string; criadaEm: string }[] }[]

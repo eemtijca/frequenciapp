@@ -68,8 +68,7 @@ export async function exporConfiguracoes(page: Page) {
 export async function abrirConfiguracoesDaGestao(page: Page) {
   const titulo = page.getByRole("heading", { name: "Configurações", level: 1, exact: true });
   if (!(await titulo.isVisible())) {
-    await exporConfiguracoes(page);
-    await fecharNavegacaoMovel(page);
+    await selecionarCategoriaConfiguracoes(page, "Escola", "Geral");
   }
   await expect(titulo).toBeVisible();
 }

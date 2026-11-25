@@ -17,7 +17,7 @@ import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
@@ -94,6 +94,7 @@ async function registroPronto(): Promise<ServiceWorkerRegistration> {
 }
 
 export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   // O suporte é uma leitura do navegador, não um estado: vem do cliente depois
   // da hidratação e evita o estado escrito dentro de um efeito de montagem.
   const suportado = useSyncExternalStore(

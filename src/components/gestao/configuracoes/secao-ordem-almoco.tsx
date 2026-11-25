@@ -23,7 +23,7 @@ import {
   type ItemOrdemAlmoco,
   type OrdemAlmocoDoDia,
 } from "@/domain/ordem-almoco";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
@@ -71,6 +71,7 @@ export default function SecaoOrdemAlmoco({
   onMudar: (dia: number, itens: ItemOrdemAlmoco[]) => void;
   onCopiarParaTodos: (dia: number, itens: ItemOrdemAlmoco[]) => void;
 }) {
+  const { avisarSucesso } = useAvisosDaSessao();
   const base = useId();
   const [aberto, setAberto] = useState(false);
   const [dia, setDia] = useState(1);

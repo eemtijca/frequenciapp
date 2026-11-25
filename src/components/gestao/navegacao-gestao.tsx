@@ -155,7 +155,7 @@ export function OpcoesGestao({
   onConfiguracoes,
   onVoltar,
 }: {
-  atual: DestinoGestao;
+  atual: DestinoGestao | null;
   pendente: boolean;
   onCadastro: (cadastro: CadastroGestao) => void;
   onConfiguracoes: () => void;
@@ -187,7 +187,7 @@ export function OpcoesGestao({
           icone={SettingsRoundedIcon}
           indicador={ChevronRightRoundedIcon}
           foco="configuracoes"
-          destacado={atual === "configuracoes"}
+          atual={atual === "configuracoes"}
           pendente={pendente}
           onEscolher={onConfiguracoes}
         />
@@ -203,14 +203,14 @@ export function OpcoesConfiguracoes({
   onEscolher,
   onVoltar,
 }: {
-  atual: DestinoConfiguracoes;
+  atual: DestinoConfiguracoes | null;
   expandida: CategoriaConfiguracoes | null;
   onExpandir: (categoria: CategoriaConfiguracoes | null) => void;
   onEscolher: (destino: DestinoConfiguracoes) => void;
   onVoltar: () => void;
 }) {
   const id = useId();
-  const categoriaAtual = categoriaDe(atual).valor;
+  const categoriaAtual = atual === null ? null : categoriaDe(atual).valor;
   return (
     <>
       <ListItem disablePadding>

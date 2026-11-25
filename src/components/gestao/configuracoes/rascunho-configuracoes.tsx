@@ -8,6 +8,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -139,6 +140,7 @@ function infrequenciaComparavel(configuracoes: Configuracoes): {
 }
 
 export function ProvedorRascunhoConfiguracoes({ children }: { children: ReactNode }) {
+  const carregado = useRef(false);
   const [base, setBase] = useState<ConfiguracoesCompletas | null>(null);
   const [rascunho, setRascunho] = useState<ConfiguracoesCompletas | null>(null);
   const [carregando, setCarregando] = useState(true);
@@ -166,6 +168,7 @@ export function ProvedorRascunhoConfiguracoes({ children }: { children: ReactNod
       const normalizado = normalizar(dados);
       setBase(normalizado);
       setRascunho(structuredClone(normalizado));
+      carregado.current = true;
       limparErro();
     },
     [limparErro],
@@ -184,6 +187,8 @@ export function ProvedorRascunhoConfiguracoes({ children }: { children: ReactNod
   }, [aplicarDados, limparErro, registrarErro]);
 
   useEffect(() => {
+    // Ao voltar de uma verificação de sessão, Activity reconecta este efeito.
+    if (carregado.current) return;
     let viva = true;
     pedir<ConfiguracoesCompletas>("/api/configuracoes/completo")
       .then((dados) => {

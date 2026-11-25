@@ -21,7 +21,8 @@ import VistaHistorico from "@/components/relatorios/historico/vista-historico";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
 import DialogoSobre from "@/components/dialogo-sobre";
 import RegistroPwa from "@/components/pwa/registro-pwa";
-import { ProvedorAvisos, publicarAviso } from "@/components/ui/mui/avisos";
+import { EscopoAvisosDaSessao, ProvedorAvisos } from "@/components/ui/mui/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { CONFIGURACOES_PADRAO } from "@/domain/frequencia";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { tema } from "@/theme/tema";
@@ -83,6 +84,7 @@ function MesFixture({ tela }: { tela: "por-aluno" | "resumo" | "historico" }) {
 }
 
 function AvisosESobre() {
+  const { publicarAviso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   return (
     <>
@@ -114,10 +116,8 @@ function AvisosESobre() {
   );
 }
 
-const telas = {
-  "avisos-sobre": <AvisosESobre />,
-  "aviso-pwa": <RegistroPwa />,
-  "chamada-marcas": (
+function ChamadaComMarcas({ aoSalvar = vazio }: { aoSalvar?: typeof vazio }) {
+  return (
     <VistaFrequencia
       {...comum}
       diaCorrente="2026-11-25"
@@ -144,10 +144,39 @@ const telas = {
       configuracoes={CONFIGURACOES_PADRAO}
       catalogoJustificativas={[{ codigo: "At", rotulo: "Atestado", ativo: true }]}
       versaoFrequencias={0}
-      onFrequenciasMudaram={vazio}
+      onFrequenciasMudaram={aoSalvar}
       onPendencia={() => {}}
     />
+  );
+}
+
+function ChamadaComTrocaDeSessao() {
+  const [geracao, setGeracao] = useState(1);
+  const [concluidos, setConcluidos] = useState(0);
+  return (
+    <>
+      <button type="button" onClick={() => setGeracao((atual) => atual + 1)}>
+        Iniciar outra sessão da mesma conta
+      </button>
+      <output aria-label="Sessão da fixture">{geracao}</output>
+      <output aria-label="Salvamentos concluídos">{concluidos}</output>
+      <EscopoAvisosDaSessao autenticado key={geracao}>
+        <ChamadaComMarcas aoSalvar={async () => setConcluidos((total) => total + 1)} />
+      </EscopoAvisosDaSessao>
+      <ProvedorAvisos />
+    </>
+  );
+}
+
+const telas = {
+  "avisos-sobre": (
+    <EscopoAvisosDaSessao autenticado>
+      <AvisosESobre />
+    </EscopoAvisosDaSessao>
   ),
+  "aviso-pwa": <RegistroPwa />,
+  "chamada-marcas": <ChamadaComMarcas />,
+  "chamada-avisos": <ChamadaComTrocaDeSessao />,
   "calendario-limitado": (
     <SeletorPeriodo
       id="limitado"

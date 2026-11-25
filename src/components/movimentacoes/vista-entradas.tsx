@@ -27,7 +27,7 @@ import {
 import type { EntradaAtrasada } from "@/domain/entradas";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 
 import { FormularioPadrao } from "@/components/layout/formulario-padrao";
 import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
@@ -104,6 +104,7 @@ export default function VistaEntradas({
   ativo = true,
   atualizacao = 0,
 }: Props) {
+  const { avisarSucesso } = useAvisosDaSessao();
   const nav = useNavegacaoDoDia({
     diaCorrente,
     max: diaCorrente,

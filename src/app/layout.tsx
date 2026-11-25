@@ -3,6 +3,7 @@ import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
+import { ProvedorTransicaoSessao } from "@/components/entrada/transicao-sessao";
 import { ProvedorAvisos } from "@/components/ui/mui/avisos";
 import { CORES_NAVEGADOR } from "@/theme/paleta";
 import { iniciarAnimacoes } from "@/theme/preferencia-animacoes";
@@ -81,7 +82,7 @@ export default async function LayoutRaiz({
         />
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: iniciarAnimacoes }} />
         <ProvedorTema nonce={nonce}>
-          {children}
+          <ProvedorTransicaoSessao>{children}</ProvedorTransicaoSessao>
           <ProvedorAvisos />
         </ProvedorTema>
       </body>

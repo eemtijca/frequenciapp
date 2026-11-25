@@ -33,7 +33,7 @@ import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha
 import DialogoDownload from "@/components/conta/dialogo-download";
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
 import { ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
@@ -86,6 +86,7 @@ export default function VistaGrade({
   origens,
   onMes,
 }: Props) {
+  const { avisarSucesso } = useAvisosDaSessao();
   const semMovimento = !useAnimacoesDaInterface().animacoesAtivas;
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");

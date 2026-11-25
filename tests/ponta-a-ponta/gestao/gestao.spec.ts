@@ -13,7 +13,7 @@ import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 import { selecionarAcaoConfiguracoes } from "../helpers/configuracoes";
 
 test.describe("navegação da Gestão", () => {
-  test("Configurações tem contexto próprio e volta ao cadastro anterior com foco no gatilho", async ({
+  test("Configurações tem contexto próprio e voltar de nível mantém a vista e devolve o foco", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -26,21 +26,24 @@ test.describe("navegação da Gestão", () => {
     await gatilho.press("Enter");
     const voltar = nav.getByRole("button", { name: "Voltar para Gestão", exact: true });
     await expect(voltar).toBeFocused();
+    await expect(page.getByRole("heading", { name: "Turmas", level: 1 })).toBeVisible();
     await expect(page.getByRole("tablist", { name: "Áreas de gestão" })).toHaveCount(0);
     await selecionarAcaoConfiguracoes(page, "Horários", "Provas");
     await expect(page.getByRole("form", { name: "Nova prova" })).toBeVisible();
 
     await voltar.press("Enter");
-    await expect(nav.getByRole("button", { name: "Turmas", exact: true })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    const turmas = nav.getByRole("button", { name: "Turmas", exact: true });
+    await expect(turmas).not.toHaveAttribute("aria-current", "page");
     await expect(gatilho).toBeFocused();
-    await expect(page.getByRole("heading", { name: "Turmas", level: 1 })).toBeVisible();
+    await expect(page.getByRole("form", { name: "Nova prova" })).toBeVisible();
 
     await page.keyboard.press("Enter");
     await expect(voltar).toBeFocused();
     await expect(page.getByRole("form", { name: "Nova prova" })).toBeVisible();
+    await voltar.press("Enter");
+    await turmas.press("Enter");
+    await expect(turmas).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "Turmas", level: 1 })).toBeVisible();
   });
 
   const retornosGoogle = [

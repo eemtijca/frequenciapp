@@ -15,7 +15,7 @@ import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
 import { Campo } from "@/components/ui/mui/campo";
 import { Dialogo } from "@/components/ui/mui/dialogo";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { FAMILIA_MONO } from "@/theme/tipografia";
@@ -71,6 +71,7 @@ function ListaDeProblemas({ titulo, itens }: { titulo: string; itens: string[] }
 }
 
 export default function DialogoImportarRelacao({ aberto, onAbrir, turmas, onImportado }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [texto, setTexto] = useState("");
   const [arquivo, setArquivo] = useState("");
   const [erroArquivo, setErroArquivo] = useState("");

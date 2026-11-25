@@ -13,8 +13,9 @@ interface RegistroSegredoBi {
   chave: string;
   guardadoEm: number;
 }
-function lerRegistroSegredoBi(): RegistroSegredoBi | null {
-  const bruto = localStorage.getItem(CHAVE_SEGREDO_BI);
+function lerRegistroSegredoBi(
+  bruto = localStorage.getItem(CHAVE_SEGREDO_BI),
+): RegistroSegredoBi | null {
   if (!bruto) return null;
   // O formato anterior guardava só o segredo, sem opt-in nem validade.
   if (!bruto.startsWith("{")) return { chave: bruto, guardadoEm: 0 };
@@ -87,83 +88,185 @@ export async function expurgarRetratosDaChave(chave: string) {
   const id = await identificadorCacheBi(chave);
   await cacheBi("limpar", `${id}:`);
 }
-export async function expurgarBiNoLogout() {
-  const registro = lerRegistroSegredoBi();
-  if (!registro) return;
-  let falhou = false;
+/** Mantém apenas o alvo original para uma nova tentativa após falha. */
+export function prepararExpurgoBiNoLogout() {
+  let registro: RegistroSegredoBi | null | undefined;
   try {
-    removerRegistroSegredoBi(registro);
+    const bruto = localStorage.getItem(CHAVE_SEGREDO_BI);
+    registro = bruto === null ? null : (lerRegistroSegredoBi(bruto) ?? undefined);
   } catch {
-    falhou = true;
+    // O alvo continua desconhecido. Uma leitura posterior não identifica a sessão original.
   }
-  try {
-    await expurgarRetratosDaChave(registro.chave);
-  } catch {
-    falhou = true;
-  }
-  if (falhou)
-    throw new Error(
-      "Não foi possível remover todos os dados locais do BI. Confira as permissões do navegador.",
-    );
+  return async (signal?: AbortSignal) => {
+    signal?.throwIfAborted();
+    if (registro === null) return;
+    if (registro === undefined) {
+      // Sem captura, só é seguro prosseguir quando não restam chave nem retratos.
+      if (
+        localStorage.getItem(CHAVE_SEGREDO_BI) !== null ||
+        (await contarRetratosBi(signal)) !== 0 ||
+        localStorage.getItem(CHAVE_SEGREDO_BI) !== null
+      ) {
+        throw new Error("Não foi possível identificar os dados locais do BI.");
+      }
+      registro = null;
+      return;
+    }
+    const alvo = registro;
+    let falhou = false;
+    try {
+      removerRegistroSegredoBi(alvo);
+    } catch {
+      falhou = true;
+    }
+    const aindaValido = () => {
+      try {
+        const bruto = localStorage.getItem(CHAVE_SEGREDO_BI);
+        if (bruto === null) return true;
+        const atual = lerRegistroSegredoBi(bruto);
+        return !!atual && (atual.chave !== alvo.chave || atual.guardadoEm === alvo.guardadoEm);
+      } catch {
+        return false;
+      }
+    };
+    try {
+      const calculo = identificadorCacheBi(alvo.chave);
+      const id = await aguardarComSinal(calculo, signal);
+      await cacheBi("limpar", `${id}:`, undefined, aindaValido, signal);
+      if (!aindaValido()) falhou = true;
+    } catch {
+      falhou = true;
+    }
+    if (falhou)
+      throw new Error(
+        "Não foi possível remover todos os dados locais do BI. Confira as permissões do navegador.",
+      );
+    registro = null;
+  };
 }
-function abrirBanco(): Promise<IDBDatabase> {
+
+function aguardarComSinal<T>(tarefa: Promise<T>, signal?: AbortSignal) {
+  if (!signal) return tarefa;
+  return new Promise<T>((resolve, reject) => {
+    const cancelar = () => reject(signal.reason);
+    signal.addEventListener("abort", cancelar, { once: true });
+    if (signal.aborted) cancelar();
+    tarefa.then(resolve, reject).finally(() => signal.removeEventListener("abort", cancelar));
+  });
+}
+
+async function contarRetratosBi(signal?: AbortSignal) {
+  const db = await abrirBanco(signal);
+  try {
+    signal?.throwIfAborted();
+    const pedido = db.transaction("retratos").objectStore("retratos").count();
+    return await aguardarComSinal(
+      new Promise<number>((resolve, reject) => {
+        pedido.onsuccess = () => resolve(pedido.result);
+        pedido.onerror = () => reject(pedido.error);
+      }),
+      signal,
+    );
+  } finally {
+    db.close();
+  }
+}
+
+export async function expurgarBiNoLogout() {
+  await prepararExpurgoBiNoLogout()();
+}
+
+function abrirBanco(signal?: AbortSignal): Promise<IDBDatabase> {
+  signal?.throwIfAborted();
   return new Promise((resolve, reject) => {
     const pedido = indexedDB.open(BANCO, 1);
-    pedido.onupgradeneeded = () => pedido.result.createObjectStore("retratos");
-    pedido.onerror = () =>
+    let bloqueado = false;
+    const cancelar = () => reject(signal?.reason);
+    const encerrar = () => signal?.removeEventListener("abort", cancelar);
+    signal?.addEventListener("abort", cancelar, { once: true });
+    pedido.onupgradeneeded = () => {
+      if (bloqueado || signal?.aborted) pedido.transaction?.abort();
+      else pedido.result.createObjectStore("retratos");
+    };
+    pedido.onerror = () => {
+      encerrar();
       reject(new Error("O navegador não permitiu abrir o armazenamento local."));
-    pedido.onblocked = () =>
+    };
+    pedido.onblocked = () => {
+      bloqueado = true;
+      encerrar();
       reject(new Error("Feche outras abas do BI para limpar o armazenamento."));
+    };
     pedido.onsuccess = () => {
+      encerrar();
+      if (bloqueado || signal?.aborted) {
+        pedido.result.close();
+        return;
+      }
       pedido.result.onversionchange = () => pedido.result.close();
       resolve(pedido.result);
     };
   });
 }
+
 export async function cacheBi<T>(
   acao: "ler" | "gravar" | "limpar",
   id: string,
   valor?: T,
   aindaValido?: () => boolean,
+  signal?: AbortSignal,
 ): Promise<T | undefined> {
-  const db = await abrirBanco();
-  if (aindaValido && !aindaValido()) {
-    db.close();
-    return undefined;
-  }
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction("retratos", acao === "ler" ? "readonly" : "readwrite");
-    const store = tx.objectStore("retratos");
-    let resultado: T | undefined;
-    if (acao === "ler") {
-      const pedido = store.get(id);
-      pedido.onsuccess = () => {
-        resultado = pedido.result as T | undefined;
-      };
-    } else if (acao === "gravar") store.put(valor, id);
-    else {
-      const cursor = store.openCursor();
-      cursor.onsuccess = () => {
-        const c = cursor.result;
-        if (c) {
-          if (String(c.key).startsWith(id)) c.delete();
-          c.continue();
+  const db = await abrirBanco(signal);
+  try {
+    signal?.throwIfAborted();
+    if (aindaValido && !aindaValido()) return undefined;
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction("retratos", acao === "ler" ? "readonly" : "readwrite");
+      const cancelar = () => {
+        try {
+          tx.abort();
+        } catch {
+          // Se o commit terminou, resta aguardar o evento terminal da transação.
         }
       };
-    }
-    tx.oncomplete = () => {
-      db.close();
-      resolve(resultado);
-    };
-    tx.onerror = () => {
-      db.close();
-      reject(new Error("Não foi possível guardar os dados. Confira o espaço do dispositivo."));
-    };
-    tx.onabort = () => {
-      db.close();
-      reject(new Error("O armazenamento local foi interrompido."));
-    };
-  });
+      const encerrar = () => signal?.removeEventListener("abort", cancelar);
+      const store = tx.objectStore("retratos");
+      let resultado: T | undefined;
+      if (acao === "ler") {
+        const pedido = store.get(id);
+        pedido.onsuccess = () => {
+          resultado = pedido.result as T | undefined;
+        };
+      } else if (acao === "gravar") store.put(valor, id);
+      else {
+        const cursor = store.openCursor();
+        cursor.onsuccess = () => {
+          if (signal?.aborted || (aindaValido && !aindaValido())) {
+            cancelar();
+            return;
+          }
+          const c = cursor.result;
+          if (c) {
+            if (String(c.key).startsWith(id)) c.delete();
+            c.continue();
+          }
+        };
+      }
+      tx.oncomplete = () => {
+        encerrar();
+        if (signal?.aborted) reject(signal.reason);
+        else resolve(resultado);
+      };
+      // A falha de um pedido aborta a transação; só o evento terminal libera a recuperação.
+      tx.onabort = () => {
+        encerrar();
+        reject(new Error("O armazenamento local foi interrompido."));
+      };
+      signal?.addEventListener("abort", cancelar, { once: true });
+    });
+  } finally {
+    db.close();
+  }
 }
 export async function limparTudoBi() {
   let falhou = false;
