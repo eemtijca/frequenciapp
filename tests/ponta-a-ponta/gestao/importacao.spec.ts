@@ -1,5 +1,6 @@
 // Relação de alunos em CSV na Gestão: botões inteiros no celular, arquivo fora
 // do padrão sinalizado, importação com prévia e exportação no mesmo schema.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
@@ -11,8 +12,8 @@ async function abrirAlunos(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Alunos" }).click();
-  return page.locator("#painel-alunos");
+  await selecionarCadastroGestao(page, "Alunos");
+  return page.getByRole("region", { name: "Gestão da escola", exact: true });
 }
 
 test.describe("relação de alunos em CSV", () => {

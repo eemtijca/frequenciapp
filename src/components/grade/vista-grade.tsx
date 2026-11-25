@@ -1,19 +1,24 @@
 "use client";
 
-// Grade de frequência por turma de origem: modos dia, semana de aula,
-// período personalizado e mês; células P, F e FJ, saída no dia e coluna
-// acumulada (F + FJ) de todo o histórico.
+// Grade de frequência por turma de origem, com P, F, FJ e S, coluna fixa e exportação.
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
-import { motion, useReducedMotion } from "motion/react";
-import {
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
-  Download,
-  LoaderCircle,
-  Send,
-  Table2,
-} from "lucide-react";
+import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
+import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import TableViewRoundedIcon from "@mui/icons-material/TableViewRounded";
+import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
+import Fade from "@mui/material/Fade";
+import Stack from "@mui/material/Stack";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
+import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import type { Aluno, Frequencia, ModoPeriodo, ResumoAcumulado, Turma } from "@/domain/frequencia";
 import {
   diasDoMes,
@@ -30,11 +35,13 @@ import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envi
 import { ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import { Button } from "@/components/ui/button";
-import { BarraBusca } from "@/components/ui/barra-busca";
-import { Selecionar } from "@/components/ui/selecionar";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 
 interface Props {
   alunos: Aluno[];
@@ -49,6 +56,9 @@ interface Props {
   origens: Turma[];
   onMes: (mes: string) => void;
 }
+
+// Fixa somente as células de identidade da Grade, que mistura th e td na mesma linha.
+const colunaAlunoFixa = { position: "sticky", left: 0, bgcolor: "background.paper" } as const;
 
 const MODOS: { valor: ModoPeriodo; rotulo: string }[] = [
   { valor: "mes", rotulo: "Mês" },
@@ -75,7 +85,7 @@ export default function VistaGrade({
   origens,
   onMes,
 }: Props) {
-  const semMovimento = useReducedMotion() ?? false;
+  const semMovimento = !useAnimacoesDaInterface().animacoesAtivas;
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [busca, setBusca] = useState("");
@@ -188,113 +198,6 @@ export default function VistaGrade({
 
   const [downloadAberto, setDownloadAberto] = useState(false);
 
-  // As células não são reconstruídas enquanto o campo de busca recebe a digitação.
-  const tabela = useMemo(
-    () => (
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-sm">
-          <caption className="sr-only">
-            Frequência dos alunos da turma original {rotuloDe(turmaEfetiva)} no período
-          </caption>
-          <thead>
-            <tr className="border-b">
-              <th
-                scope="col"
-                className="coluna-fixa bg-card text-muted-foreground min-w-36 border-r px-3 py-2 text-left text-xs font-medium"
-              >
-                Aluno
-              </th>
-              {grade.dias.map((dia) => (
-                <th
-                  key={dia}
-                  scope="col"
-                  className={`numerais-tabulares w-8 border-l px-1 py-2 text-center text-[11px] font-medium ${
-                    dia === hoje ? "bg-primary/10 text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  {mesmoMes(dia, grade.dias) ? dia.slice(8) : dataCurta(dia)}
-                </th>
-              ))}
-              <th
-                scope="col"
-                title="Faltas totais (F + FJ) de todo o histórico"
-                className="numerais-tabulares text-muted-foreground border-l px-2 py-2 text-center text-[11px] font-medium"
-              >
-                Total
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {linhas.map((linha) => (
-              <tr key={linha.aluno.id} className="border-b last:border-b-0">
-                <th
-                  scope="row"
-                  className="coluna-fixa bg-card max-w-44 truncate border-r px-3 py-1.5 text-left font-normal"
-                >
-                  <span className="block truncate text-sm">{linha.aluno.nome}</span>
-                  <span className="text-muted-foreground block truncate text-[10px]">
-                    atual {turmaAtualDe(linha.aluno.turmaId)}
-                  </span>
-                </th>
-                {grade.dias.map((dia) => {
-                  const marca = linha.marcas[dia];
-                  return (
-                    <td
-                      key={dia}
-                      className={`border-l px-1 py-1.5 text-center ${
-                        dia === hoje ? "bg-primary/5" : ""
-                      }`}
-                    >
-                      {marca === "F" || marca === "FJ" ? (
-                        <span
-                          className={
-                            marca === "FJ"
-                              ? "border-justificada text-justificada-texto inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] border px-0.5 text-[9px] font-bold"
-                              : "bg-falta text-falta-foreground inline-flex size-5 items-center justify-center rounded-[4px] text-[10px] font-bold"
-                          }
-                          role="img"
-                          aria-label={`${linha.aluno.nome} com ${
-                            marca === "FJ" ? "falta justificada" : "falta"
-                          } em ${dia}`}
-                        >
-                          {marca}
-                        </span>
-                      ) : marca === "S" ? (
-                        <span
-                          className="border-falta text-falta-texto inline-flex size-5 items-center justify-center rounded-[4px] border text-[10px] font-bold"
-                          role="img"
-                          aria-label={`${linha.aluno.nome} presente em parte das aulas em ${dia}`}
-                        >
-                          S
-                        </span>
-                      ) : marca === "P" ? (
-                        <span
-                          className="bg-primary/60 inline-flex size-1.5 rounded-full"
-                          role="img"
-                          aria-label={`${linha.aluno.nome} presente em ${dia}`}
-                        />
-                      ) : (
-                        <span
-                          className="text-muted-foreground/50 text-[10px]"
-                          role="img"
-                          aria-label={`${linha.aluno.nome} sem frequência em ${dia}`}
-                        />
-                      )}
-                    </td>
-                  );
-                })}
-                <td className="numerais-tabulares text-falta-texto border-l px-2 py-1.5 text-center text-sm font-semibold">
-                  {acumuladoDe(linha.aluno.id) > 0 ? acumuladoDe(linha.aluno.id) : ""}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    ),
-    [linhas, grade.dias, rotuloDe, turmaEfetiva, hoje, turmaAtualDe, acumuladoDe],
-  );
-
   // A busca da tela não interfere: a planilha leva todos os alunos ativos.
   function prepararPlanilha() {
     const turma = turmaPlanilhaDaGrade(
@@ -315,97 +218,124 @@ export default function VistaGrade({
   }
 
   return (
-    <section aria-label="Grade de frequência" className="flex flex-col gap-4 pb-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-xl font-semibold tracking-tight">Grade</h2>
-          <p className="text-muted-foreground text-sm">Frequência por turma de origem.</p>
-        </div>
-        <div className="flex items-center justify-end gap-1">
-          {estadoPlanilha?.podeEnviar && (
-            <Button
-              variant="outline"
-              className="h-11"
+    <Box
+      component="section"
+      aria-label="Grade de frequência"
+      sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 3, minWidth: 0 }}
+    >
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={2}
+        sx={{ alignItems: { xs: "stretch", sm: "center" }, justifyContent: "space-between" }}
+      >
+        <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap>
+          <Typography component="h2" variant="h4">
+            Grade
+          </Typography>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Frequência por turma de origem.
+          </Typography>
+        </Stack>
+        <Stack direction="row" spacing={1} sx={{ justifyContent: "flex-end" }}>
+          {estadoPlanilha?.podeEnviar ? (
+            <Botao
+              variante="contorno"
+              icone={<SendRoundedIcon />}
               aria-label="Enviar para a planilha"
               onClick={() => setEnvioAberto(true)}
               disabled={grade.linhas.length === 0 || carregandoPeriodo}
             >
-              <Send size={16} />
-              <span className="hidden sm:inline">Enviar para a planilha</span>
-            </Button>
-          )}
-          <Button
-            variant="secondary"
-            size="icon"
-            className="size-11"
-            aria-label="Baixar planilha (CSV)"
+              <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+                Enviar para a planilha
+              </Box>
+            </Botao>
+          ) : null}
+          <BotaoIcone
+            rotulo="Baixar planilha (CSV)"
+            variante="secundario"
+            icone={<DownloadRoundedIcon />}
             title="Baixar planilha (CSV) da turma de origem"
             onClick={() => setDownloadAberto(true)}
             disabled={grade.linhas.length === 0 || carregandoPeriodo}
-          >
-            <Download size={18} />
-          </Button>
-        </div>
-      </div>
+            sx={{ width: 48, height: 48 }}
+          />
+        </Stack>
+      </Stack>
 
-      <div className="sm:hidden">
+      <Box sx={{ display: { xs: "block", sm: "none" } }}>
         <Selecionar
           ariaLabel="Turma de origem da grade"
-          value={turmaEfetiva}
-          onValueChange={setTurmaId}
+          valor={turmaEfetiva}
+          onValor={setTurmaId}
+          truncarRotuloSelecionado
+          quebrarRotulosDasOpcoes
           opcoes={turmasOriginais.map((turma) => ({
             valor: turma.id,
             rotulo: `${turma.rotulo} (${alunos.filter((aluno) => aluno.ativo && aluno.turmaOriginalId === turma.id).length})`,
           }))}
         />
-      </div>
-      <div className="hidden flex-wrap items-center gap-2 sm:flex">
+      </Box>
+      <Stack
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ display: { xs: "none", sm: "flex" }, flexWrap: "wrap" }}
+      >
         {turmasOriginais.map((turma) => {
           const ativo = turma.id === turmaEfetiva;
           const quantidade = alunos.filter(
             (aluno) => aluno.ativo && aluno.turmaOriginalId === turma.id,
           ).length;
           return (
-            <button
+            <Botao
               key={turma.id}
-              type="button"
+              variante="contorno"
               aria-pressed={ativo}
               onClick={() => setTurmaId(turma.id)}
-              className="controle pressionavel flex h-11 items-center gap-2 px-4 text-sm font-medium transition-colors"
+              sx={{
+                minHeight: 48,
+                bgcolor: ativo ? "action.selected" : undefined,
+                borderColor: ativo ? "primary.main" : undefined,
+              }}
             >
-              <span>{turma.rotulo}</span>
-              <span className="numerais-tabulares text-xs opacity-70">{quantidade}</span>
-            </button>
+              <Box component="span">{turma.rotulo}</Box>
+              <Box
+                component="span"
+                sx={{ ml: 1, fontSize: 12, opacity: 0.7, fontVariantNumeric: "tabular-nums" }}
+              >
+                {quantidade}
+              </Box>
+            </Botao>
           );
         })}
-      </div>
+      </Stack>
 
-      <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-1.5 sm:max-w-xs">
+      <Stack spacing={2}>
+        <Box sx={{ maxWidth: { sm: 320 } }}>
           <Selecionar
             id="grade-modo"
-            value={modo}
-            onValueChange={(valor) => {
-              setModo(valor as ModoPeriodo);
+            valor={modo}
+            onValor={(valor) => {
+              const proximo = MODOS.find((item) => item.valor === valor)?.valor;
+              if (!proximo) return;
+              setModo(proximo);
               setDoPeriodo(null);
             }}
             ariaLabel="Período da consulta"
             opcoes={MODOS.map((item) => ({ valor: item.valor, rotulo: item.rotulo }))}
           />
-        </div>
+        </Box>
 
         {modo === "mes" ? (
-          <div className="navegacao-dia flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-11 shrink-0"
-              aria-label="Mês anterior"
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <BotaoIcone
+              rotulo="Mês anterior"
+              variante="contorno"
+              icone={<ChevronLeftRoundedIcon />}
               onClick={() => onMes(mesSeguinte(mes, -1))}
-            >
-              <ChevronLeft size={18} />
-            </Button>
-            <div className="min-w-0 flex-1">
+              sx={{ width: 48, height: 48 }}
+            />
+            <Box sx={{ minWidth: 0, flex: 1 }}>
               <SeletorPeriodo
                 id="mes-grade"
                 modo="mes"
@@ -415,24 +345,26 @@ export default function VistaGrade({
                 rotulo={rotuloMes(mes)}
                 onValor={onMes}
               />
-            </div>
-            <Button
-              variant="outline"
-              size="icon"
-              className="size-11 shrink-0"
-              aria-label="Mês seguinte"
+            </Box>
+            <BotaoIcone
+              rotulo="Mês seguinte"
+              variante="contorno"
+              icone={<ChevronRightRoundedIcon />}
               disabled={mes >= mesCorrente}
               onClick={() => onMes(mesSeguinte(mes, 1))}
-            >
-              <ChevronRight size={18} />
-            </Button>
-          </div>
+              sx={{ width: 48, height: 48 }}
+            />
+          </Stack>
         ) : (
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <span className="text-muted-foreground text-xs font-medium">
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ alignItems: "flex-end" }}
+          >
+            <Stack spacing={1} sx={{ minWidth: 0, flex: 1 }}>
+              <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 500 }}>
                 {modo === "periodo" ? "De" : modo === "semana" ? "Data da semana" : "Data"}
-              </span>
+              </Typography>
               <SeletorPeriodo
                 id="grade-dia"
                 modo="dia"
@@ -443,10 +375,12 @@ export default function VistaGrade({
                 detalhe={rotuloDiaSemana(diaBase)}
                 onValor={setDiaBase}
               />
-            </div>
-            {modo === "periodo" && (
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <span className="text-muted-foreground text-xs font-medium">Até</span>
+            </Stack>
+            {modo === "periodo" ? (
+              <Stack spacing={1} sx={{ minWidth: 0, flex: 1 }}>
+                <Typography variant="caption" sx={{ color: "text.secondary", fontWeight: 500 }}>
+                  Até
+                </Typography>
                 <SeletorPeriodo
                   id="grade-dia-fim"
                   modo="dia"
@@ -457,111 +391,372 @@ export default function VistaGrade({
                   detalhe={rotuloDiaSemana(diaFim)}
                   onValor={setDiaFim}
                 />
-              </div>
-            )}
-            {modo === "semana" && (
-              <p className="text-muted-foreground text-xs">Segunda a sexta da semana escolhida.</p>
-            )}
-          </div>
+              </Stack>
+            ) : null}
+            {modo === "semana" ? (
+              <Typography variant="caption" sx={{ color: "text.secondary", pb: 1 }}>
+                Segunda a sexta da semana escolhida.
+              </Typography>
+            ) : null}
+          </Stack>
         )}
 
-        {modo === "mes" && mes !== mesCorrente && (
-          <Button
-            type="button"
-            onClick={() => onMes(mesCorrente)}
-            variant="secondary"
-            className="self-start"
-          >
-            <RotateCcw size={16} aria-hidden="true" />
-            Voltar para este mês
-          </Button>
-        )}
-      </div>
+        {modo === "mes" && mes !== mesCorrente ? (
+          <Box sx={{ display: "flex" }}>
+            <Botao
+              variante="secundario"
+              icone={<ReplayRoundedIcon />}
+              onClick={() => onMes(mesCorrente)}
+            >
+              Voltar para este mês
+            </Botao>
+          </Box>
+        ) : null}
+      </Stack>
 
-      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+      {erro ? <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" /> : null}
 
       {turmasOriginais.length === 0 ? (
-        <div className="superficie flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
-          <Table2 size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Sem alunos ativos</p>
-          <p className="text-muted-foreground text-sm">
-            Quando houver alunos nas suas turmas, a consulta aparece aqui.
-          </p>
-        </div>
+        <EstadoVazio
+          icone={<TableViewRoundedIcon />}
+          titulo="Sem alunos ativos"
+          descricao="Quando houver alunos nas suas turmas, a consulta aparece aqui."
+        />
       ) : (
-        <motion.div
-          key={turmaEfetiva + modo}
-          initial={semMovimento ? false : { opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={semMovimento ? { duration: 0 } : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-          className="superficie overflow-hidden"
+        <Fade
+          key={`${turmaEfetiva}-${modo}`}
+          in
+          appear={!semMovimento}
+          timeout={semMovimento ? 0 : 220}
         >
-          <BarraBusca
-            id="busca-grade"
-            valor={busca}
-            onValor={setBusca}
-            placeholder="Buscar aluno"
-            className="rounded-none px-3 py-1.5"
-          />
-          {carregandoPeriodo ? (
-            <div className="text-muted-foreground flex min-h-40 items-center justify-center gap-2 text-sm">
-              <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-              Buscando o período...
-            </div>
-          ) : linhas.length === 0 ? (
-            <div className="text-muted-foreground flex min-h-40 items-center justify-center px-6 text-center text-sm">
-              Nenhum aluno encontrado para esta busca.
-            </div>
-          ) : (
-            tabela
-          )}
-          <div className="text-muted-foreground border-t px-4 py-2.5 text-xs">
-            <div className="flex flex-wrap items-center gap-4">
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="bg-primary/60 inline-flex size-1.5 rounded-full"
-                  aria-hidden="true"
-                />
-                presente
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="bg-falta text-falta-foreground inline-flex size-4 items-center justify-center rounded-[3px] text-[9px] font-bold"
-                  aria-hidden="true"
+          <Box sx={{ minWidth: 0 }}>
+            <BarraBusca
+              id="busca-grade"
+              valor={busca}
+              onValor={setBusca}
+              placeholder="Buscar aluno"
+              sx={{ mb: 2 }}
+            />
+            {carregandoPeriodo ? (
+              <Stack
+                direction="row"
+                spacing={1}
+                role="status"
+                sx={{ alignItems: "center", justifyContent: "center", minHeight: 160 }}
+              >
+                <CircularProgress size={18} aria-hidden="true" />
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Buscando o período...
+                </Typography>
+              </Stack>
+            ) : linhas.length === 0 ? (
+              <Box sx={{ py: 5, textAlign: "center" }}>
+                <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                  Nenhum aluno encontrado para esta busca.
+                </Typography>
+              </Box>
+            ) : (
+              <TabelaPadrao
+                larguraIntrinseca
+                arrastarHorizontalComMouse
+                rotuloRolagem="Rolagem da Grade de frequência"
+                caption={`Frequência dos alunos da turma original ${rotuloDe(turmaEfetiva)} no período`}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell
+                      scope="col"
+                      sx={{
+                        ...colunaAlunoFixa,
+                        zIndex: 3,
+                        minWidth: 144,
+                        borderRight: 1,
+                        borderColor: "divider",
+                        textAlign: "left",
+                      }}
+                    >
+                      Aluno
+                    </TableCell>
+                    {grade.dias.map((dia) => (
+                      <TableCell
+                        key={dia}
+                        scope="col"
+                        align="center"
+                        sx={{
+                          width: 32,
+                          borderLeft: 1,
+                          borderColor: "divider",
+                          px: 0.5,
+                          fontSize: 11,
+                          fontVariantNumeric: "tabular-nums",
+                          bgcolor: dia === hoje ? "action.selected" : undefined,
+                          color: dia === hoje ? "primary.main" : "text.secondary",
+                        }}
+                      >
+                        {mesmoMes(dia, grade.dias) ? dia.slice(8) : dataCurta(dia)}
+                      </TableCell>
+                    ))}
+                    <TableCell
+                      scope="col"
+                      align="center"
+                      title="Faltas totais (F + FJ) de todo o histórico"
+                      sx={{
+                        // Reserva só a largura do conteúdo, sem disputar a sobra com Aluno.
+                        width: "1px",
+                        whiteSpace: "nowrap",
+                        borderLeft: 1,
+                        borderColor: "divider",
+                        px: 1,
+                        fontSize: 11,
+                        color: "text.secondary",
+                      }}
+                    >
+                      Total
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {linhas.map((linha) => (
+                    <TableRow key={linha.aluno.id}>
+                      <TableCell
+                        component="th"
+                        scope="row"
+                        sx={{
+                          ...colunaAlunoFixa,
+                          zIndex: 2,
+                          maxWidth: 176,
+                          borderRight: 1,
+                          borderColor: "divider",
+                          textAlign: "left",
+                          fontWeight: 400,
+                        }}
+                      >
+                        <Typography noWrap sx={{ fontSize: "0.875rem" }}>
+                          {linha.aluno.nome}
+                        </Typography>
+                        <Typography
+                          noWrap
+                          component="span"
+                          sx={{ display: "block", fontSize: 10, color: "text.secondary" }}
+                        >
+                          atual {turmaAtualDe(linha.aluno.turmaId)}
+                        </Typography>
+                      </TableCell>
+                      {grade.dias.map((dia) => {
+                        const marca = linha.marcas[dia];
+                        return (
+                          <TableCell
+                            key={dia}
+                            align="center"
+                            sx={{
+                              borderLeft: 1,
+                              borderColor: "divider",
+                              px: 0.5,
+                              py: 0.5,
+                              bgcolor: dia === hoje ? "action.hover" : undefined,
+                            }}
+                          >
+                            {marca === "F" || marca === "FJ" ? (
+                              <Box
+                                component="span"
+                                role="img"
+                                aria-label={`${linha.aluno.nome} com ${
+                                  marca === "FJ" ? "falta justificada" : "falta"
+                                } em ${dia}`}
+                                sx={[
+                                  {
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    minWidth: 20,
+                                    height: 20,
+                                    px: 0.25,
+                                    borderRadius: "4px",
+                                    fontSize: marca === "FJ" ? 9 : 10,
+                                    fontWeight: 700,
+                                    lineHeight: 1,
+                                  },
+                                  marca === "FJ"
+                                    ? (tema) => ({
+                                        border: 1,
+                                        borderColor: tema.vars.palette.justificada.main,
+                                        color: tema.vars.palette.justificada.texto,
+                                      })
+                                    : (tema) => ({
+                                        bgcolor: tema.vars.palette.falta.main,
+                                        color: tema.vars.palette.falta.contrastText,
+                                      }),
+                                ]}
+                              >
+                                {marca}
+                              </Box>
+                            ) : marca === "S" ? (
+                              <Box
+                                component="span"
+                                role="img"
+                                aria-label={`${linha.aluno.nome} presente em parte das aulas em ${dia}`}
+                                sx={(tema) => ({
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  width: 20,
+                                  height: 20,
+                                  border: 1,
+                                  borderColor: tema.vars.palette.falta.main,
+                                  borderRadius: "4px",
+                                  color: tema.vars.palette.falta.texto,
+                                  fontSize: 10,
+                                  fontWeight: 700,
+                                  lineHeight: 1,
+                                })}
+                              >
+                                S
+                              </Box>
+                            ) : marca === "P" ? (
+                              <Box
+                                component="span"
+                                role="img"
+                                aria-label={`${linha.aluno.nome} presente em ${dia}`}
+                                sx={{
+                                  display: "inline-block",
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: "50%",
+                                  bgcolor: "primary.main",
+                                  opacity: 0.6,
+                                }}
+                              />
+                            ) : (
+                              <Box
+                                component="span"
+                                role="img"
+                                aria-label={`${linha.aluno.nome} sem frequência em ${dia}`}
+                                sx={{
+                                  display: "inline-block",
+                                  minWidth: 1,
+                                  minHeight: 1,
+                                  fontSize: 10,
+                                  color: "text.disabled",
+                                }}
+                              />
+                            )}
+                          </TableCell>
+                        );
+                      })}
+                      <TableCell
+                        align="center"
+                        sx={{
+                          borderLeft: 1,
+                          borderColor: "divider",
+                          px: 1,
+                          whiteSpace: "nowrap",
+                          color: "falta.texto",
+                          fontWeight: 600,
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {acumuladoDe(linha.aluno.id) > 0 ? acumuladoDe(linha.aluno.id) : ""}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </TabelaPadrao>
+            )}
+            <Stack spacing={1} sx={{ mt: 2, color: "text.secondary" }}>
+              <Stack direction="row" spacing={2} useFlexGap sx={{ flexWrap: "wrap" }}>
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+                  <Box
+                    aria-hidden="true"
+                    sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "primary.main" }}
+                  />
+                  <Typography variant="caption">presente</Typography>
+                </Stack>
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+                  <Box
+                    aria-hidden="true"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 16,
+                      height: 16,
+                      borderRadius: "3px",
+                      bgcolor: "falta.main",
+                      color: "falta.contrastText",
+                      fontSize: 9,
+                      fontWeight: 700,
+                    }}
+                  >
+                    F
+                  </Box>
+                  <Typography variant="caption">falta</Typography>
+                </Stack>
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+                  <Box
+                    aria-hidden="true"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: 16,
+                      px: 0.25,
+                      borderRadius: "3px",
+                      border: 1,
+                      borderColor: "justificada.main",
+                      color: "justificada.texto",
+                      fontSize: 8,
+                      fontWeight: 700,
+                    }}
+                  >
+                    FJ
+                  </Box>
+                  <Typography variant="caption">falta justificada</Typography>
+                </Stack>
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+                  <Box
+                    aria-hidden="true"
+                    sx={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: 16,
+                      height: 16,
+                      borderRadius: "3px",
+                      border: 1,
+                      borderColor: "falta.main",
+                      color: "falta.texto",
+                      fontSize: 9,
+                      fontWeight: 700,
+                    }}
+                  >
+                    S
+                  </Box>
+                  <Typography variant="caption">presente em parte das aulas</Typography>
+                </Stack>
+              </Stack>
+              <Box component="details">
+                <Typography
+                  component="summary"
+                  variant="caption"
+                  sx={{ cursor: "pointer", py: 0.5, color: "primary.main", fontWeight: 500 }}
                 >
-                  F
-                </span>
-                falta
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="border-justificada text-justificada-texto inline-flex h-4 items-center justify-center rounded-[3px] border px-0.5 text-[8px] font-bold"
-                  aria-hidden="true"
-                >
-                  FJ
-                </span>
-                falta justificada
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span
-                  className="border-falta text-falta-texto inline-flex size-4 items-center justify-center rounded-[3px] border text-[9px] font-bold"
-                  aria-hidden="true"
-                >
-                  S
-                </span>
-                presente em parte das aulas
-              </span>
-            </div>
-            <details className="mt-2">
-              <summary className="text-primary cursor-pointer py-1 font-medium">Como ler</summary>
-              <div className="space-y-1 pt-1">
-                <p>Total: faltas (F + FJ) de todo o histórico.</p>
-                <p>Célula vazia: turma sem frequência no dia.</p>
-                <p>Baixar planilha: todos os alunos ativos da turma de origem.</p>
-              </div>
-            </details>
-          </div>
-        </motion.div>
+                  Como ler
+                </Typography>
+                <Stack spacing={0.5} sx={{ pt: 0.5 }}>
+                  <Typography variant="caption">
+                    Total: faltas (F + FJ) de todo o histórico.
+                  </Typography>
+                  <Typography variant="caption">
+                    Célula vazia: turma sem frequência no dia.
+                  </Typography>
+                  <Typography variant="caption">
+                    Baixar planilha: todos os alunos ativos da turma de origem.
+                  </Typography>
+                </Stack>
+              </Box>
+            </Stack>
+          </Box>
+        </Fade>
       )}
 
       <DialogoDownload
@@ -575,7 +770,7 @@ export default function VistaGrade({
           )
         }
       />
-      {estadoPlanilha?.podeEnviar && grade.dias.length > 0 && (
+      {estadoPlanilha?.podeEnviar && grade.dias.length > 0 ? (
         <DialogoEnvio
           aberto={envioAberto}
           onAbrir={setEnvioAberto}
@@ -586,8 +781,8 @@ export default function VistaGrade({
           modoCompleto={estadoPlanilha.modo === "completo"}
           aoConcluir={() => void recarregarPlanilha()}
         />
-      )}
-    </section>
+      ) : null}
+    </Box>
   );
 }
 

@@ -3,17 +3,17 @@
 // Ordem do almoço no rascunho: a administração ordena as turmas de cada dia
 // da semana, com horário opcional, e a aba Horários mostra.
 import { useId, useState } from "react";
-import {
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  HelpCircle,
-  ListPlus,
-  Plus,
-  Trash2,
-  Utensils,
-  X,
-} from "lucide-react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
+import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import PlaylistAddRoundedIcon from "@mui/icons-material/PlaylistAddRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type { Turma } from "@/domain/frequencia";
 import { DIAS_DA_SEMANA } from "@/domain/horarios-semanais";
 import {
@@ -24,23 +24,15 @@ import {
   type OrdemAlmocoDoDia,
 } from "@/domain/ordem-almoco";
 import { avisarSucesso } from "@/lib/avisos";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
-import { Selecionar } from "@/components/ui/selecionar";
-import { SeletorHorario } from "@/components/ui/seletor-horario";
-import { Selo } from "@/components/ui/selo";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { SeletorHorario } from "@/components/ui/mui/seletor-horario";
+import { Selo } from "@/components/ui/mui/selo";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface ItemRascunho {
   turmaId: string;
@@ -121,205 +113,284 @@ export default function SecaoOrdemAlmoco({
   }
 
   return (
-    <SecaoRecolhivel
-      titulo="Ordem do almoço"
-      icone={Utensils}
-      aberto={aberto}
-      onAbertoChange={setAberto}
-      dataSecao="config-ordem-almoco"
-      resumo={
-        <Selo>
-          {diasDefinidos} {diasDefinidos === 1 ? "dia definido" : "dias definidos"}
-        </Selo>
-      }
-    >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex min-w-0 flex-1 flex-col gap-1.5 sm:max-w-xs">
-          <Label htmlFor={`${base}-dia`}>Dia da semana</Label>
-          <Selecionar
-            id={`${base}-dia`}
-            value={String(dia)}
-            onValueChange={trocarDia}
-            opcoes={DIAS_ORDEM_ALMOCO.map((valor) => ({
-              valor: String(valor),
-              rotulo: rotuloDia(valor),
-            }))}
-          />
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="min-h-11 min-w-0 whitespace-normal"
-          aria-label="Copiar para os outros dias"
-          disabled={rascunho.length === 0}
-          onClick={() => setCopiando(true)}
+    <Box data-secao="config-ordem-almoco">
+      <Acordeao
+        titulo="Ordem do almoço"
+        resumo={
+          <Selo>{`${diasDefinidos} ${diasDefinidos === 1 ? "dia definido" : "dias definidos"}`}</Selo>
+        }
+        aberto={aberto}
+        onChange={setAberto}
+      >
+        <Box
+          role="region"
+          aria-label="Ordem do almoço"
+          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
         >
-          <Copy size={16} aria-hidden="true" />
-          Copiar para os outros dias
-        </Button>
-      </div>
-
-      {restantes.length > 0 ? (
-        <div className="superficie flex flex-col gap-3 p-3">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor={`${base}-adicionar`}>Turma</Label>
-            <Selecionar
-              id={`${base}-adicionar`}
-              buscavel
-              value={paraAdicionar}
-              onValueChange={setParaAdicionar}
-              placeholder="Selecione a turma"
-              opcoes={restantes.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo }))}
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            spacing={2}
+            sx={{ alignItems: { sm: "flex-end" }, flexWrap: "wrap" }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0, maxWidth: { sm: 320 } }}>
+              <Campo id={`${base}-dia`} rotulo="Dia da semana">
+                <Selecionar
+                  id={`${base}-dia`}
+                  valor={String(dia)}
+                  onValor={trocarDia}
+                  opcoes={DIAS_ORDEM_ALMOCO.map((valor) => ({
+                    valor: String(valor),
+                    rotulo: rotuloDia(valor),
+                  }))}
+                />
+              </Campo>
+            </Box>
+            <Botao
               type="button"
-              className="h-auto min-h-11 min-w-0 px-2 whitespace-normal"
-              aria-label="Adicionar à ordem"
-              disabled={!paraAdicionar}
-              onClick={() => {
-                aplicar([...rascunho, { turmaId: paraAdicionar, inicio: "" }]);
-                setParaAdicionar("");
+              variante="contorno"
+              icone={<ContentCopyRoundedIcon />}
+              aria-label="Copiar para os outros dias"
+              disabled={rascunho.length === 0}
+              onClick={() => setCopiando(true)}
+            >
+              Copiar para os outros dias
+            </Botao>
+          </Stack>
+
+          {restantes.length > 0 ? (
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                padding: 2,
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 2,
               }}
             >
-              <Plus size={16} aria-hidden="true" />
-              Adicionar
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-auto min-h-11 min-w-0 px-2 whitespace-normal"
-              aria-label="Incluir todas as turmas restantes"
-              onClick={() => {
-                aplicar([
-                  ...rascunho,
-                  ...restantes.map((turma) => ({ turmaId: turma.id, inicio: "" })),
-                ]);
-                setParaAdicionar("");
+              <Campo id={`${base}-adicionar`} rotulo="Turma">
+                <Selecionar
+                  id={`${base}-adicionar`}
+                  buscavel
+                  valor={paraAdicionar}
+                  onValor={setParaAdicionar}
+                  placeholder="Selecione a turma"
+                  opcoes={restantes.map((turma) => ({ valor: turma.id, rotulo: turma.rotulo }))}
+                />
+              </Campo>
+              <Box sx={{ display: "grid", gap: 1, gridTemplateColumns: "1fr 1fr" }}>
+                <Botao
+                  type="button"
+                  variante="primario"
+                  aria-label="Adicionar à ordem"
+                  icone={<AddRoundedIcon />}
+                  disabled={!paraAdicionar}
+                  onClick={() => {
+                    aplicar([...rascunho, { turmaId: paraAdicionar, inicio: "" }]);
+                    setParaAdicionar("");
+                  }}
+                >
+                  Adicionar
+                </Botao>
+                <Botao
+                  type="button"
+                  variante="contorno"
+                  aria-label="Incluir todas as turmas restantes"
+                  icone={<PlaylistAddRoundedIcon />}
+                  onClick={() => {
+                    aplicar([
+                      ...rascunho,
+                      ...restantes.map((turma) => ({ turmaId: turma.id, inicio: "" })),
+                    ]);
+                    setParaAdicionar("");
+                  }}
+                >
+                  Incluir todas
+                </Botao>
+              </Box>
+            </Box>
+          ) : null}
+
+          {rascunho.length === 0 ? (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Nenhuma turma na ordem de {rotuloDia(dia)}.
+            </Typography>
+          ) : (
+            <Box
+              component="ol"
+              aria-label={`Ordem do almoço de ${rotuloDia(dia)}`}
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
+                border: 1,
+                borderColor: "divider",
+                borderRadius: 2,
               }}
             >
-              <ListPlus size={16} aria-hidden="true" />
-              Incluir todas
-            </Button>
-          </div>
-        </div>
-      ) : null}
-
-      {rascunho.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Nenhuma turma na ordem de {rotuloDia(dia)}.</p>
-      ) : (
-        <ol
-          aria-label={`Ordem do almoço de ${rotuloDia(dia)}`}
-          className="flex flex-col divide-y rounded-2xl border"
-        >
-          {rascunho.map((item, indice) => {
-            const rotulo = rotuloDe.get(item.turmaId) ?? "Turma";
-            return (
-              <li key={item.turmaId} className="flex flex-col gap-2 px-3 py-3">
-                <div className="flex items-center gap-2">
-                  <span className="controle numerais-tabulares flex size-9 shrink-0 items-center justify-center text-sm font-semibold">
-                    <span aria-hidden="true">{indice + 1}º</span>
-                    <span className="sr-only">{indice + 1}º lugar</span>
-                  </span>
-                  <span className="min-w-0 flex-1 text-sm font-medium break-words">{rotulo}</span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Subir ${rotulo}`}
-                    disabled={indice === 0}
-                    onClick={() => mover(indice, -1)}
+              {rascunho.map((item, indice) => {
+                const rotulo = rotuloDe.get(item.turmaId) ?? "Turma";
+                return (
+                  <Stack
+                    component="li"
+                    key={item.turmaId}
+                    spacing={1}
+                    sx={{
+                      paddingX: 2,
+                      paddingY: 1.5,
+                      borderBottom: 1,
+                      borderColor: "divider",
+                      "&:last-of-type": { borderBottom: 0 },
+                    }}
                   >
-                    <ChevronUp size={16} aria-hidden="true" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label={`Descer ${rotulo}`}
-                    disabled={indice === rascunho.length - 1}
-                    onClick={() => mover(indice, 1)}
-                  >
-                    <ChevronDown size={16} aria-hidden="true" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="text-falta-texto"
-                    aria-label={`Tirar ${rotulo} da ordem`}
-                    onClick={() => aplicar(rascunho.filter((_, i) => i !== indice))}
-                  >
-                    <Trash2 size={16} aria-hidden="true" />
-                  </Button>
-                </div>
-                <div className="flex items-center gap-2 pl-11">
-                  <div className="min-w-0 flex-1 sm:max-w-48">
-                    <SeletorHorario
-                      id={`${base}-inicio-${item.turmaId}`}
-                      valor={item.inicio}
-                      rotuloAcessivel={`Horário de ${rotulo} no almoço`}
-                      onValor={(valor) => atualizarInicio(indice, valor)}
-                    />
-                  </div>
-                  {item.inicio ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label={`Limpar horário de ${rotulo}`}
-                      onClick={() => atualizarInicio(indice, "")}
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center", minWidth: 0 }}>
+                      <Box
+                        sx={(tema) => ({
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          border: `1px solid ${tema.vars.palette.divider}`,
+                          fontVariantNumeric: "tabular-nums",
+                          fontWeight: 600,
+                        })}
+                      >
+                        <span aria-hidden="true">{indice + 1}º</span>
+                        <Box component="span" sx={ESTILO_SOMENTE_LEITOR}>
+                          {indice + 1}º lugar
+                        </Box>
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        sx={{ flex: 1, minWidth: 0, fontWeight: 600, overflowWrap: "anywhere" }}
+                      >
+                        {rotulo}
+                      </Typography>
+                      <BotaoIcone
+                        rotulo={`Subir ${rotulo}`}
+                        variante="texto"
+                        tamanho="pequeno"
+                        disabled={indice === 0}
+                        icone={<ArrowUpwardRoundedIcon />}
+                        onClick={() => mover(indice, -1)}
+                        sx={ESTILO_ALVO_TOQUE}
+                      />
+                      <BotaoIcone
+                        rotulo={`Descer ${rotulo}`}
+                        variante="texto"
+                        tamanho="pequeno"
+                        disabled={indice === rascunho.length - 1}
+                        icone={<ArrowDownwardRoundedIcon />}
+                        onClick={() => mover(indice, 1)}
+                        sx={ESTILO_ALVO_TOQUE}
+                      />
+                      <BotaoIcone
+                        rotulo={`Tirar ${rotulo} da ordem`}
+                        variante="texto"
+                        tamanho="pequeno"
+                        icone={<DeleteOutlineRoundedIcon />}
+                        onClick={() => aplicar(rascunho.filter((_, i) => i !== indice))}
+                        sx={(tema) => ({
+                          ...ESTILO_ALVO_TOQUE,
+                          color: tema.vars.palette.falta.main,
+                        })}
+                      />
+                    </Stack>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      sx={{ alignItems: "center", paddingLeft: { sm: 6 }, minWidth: 0 }}
                     >
-                      <X size={16} aria-hidden="true" />
-                    </Button>
-                  ) : null}
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      )}
-
-      {erro ? <AvisoCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" /> : null}
-
-      <details className="text-muted-foreground text-xs">
-        <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
-          <HelpCircle size={16} aria-hidden="true" />
-          Ajuda
-        </summary>
-        <p className="mt-1 leading-relaxed">
-          Use as setas para ordenar as turmas. Os horários são opcionais. A ordem aparece na
-          consulta de Horários depois de salvar as configurações.
-        </p>
-      </details>
-
-      <AlertDialog open={copiando} onOpenChange={setCopiando}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Copiar a ordem para os outros dias?</AlertDialogTitle>
-            <AlertDialogDescription>
-              A ordem e os horários de {rotuloDia(dia)} substituem os de todos os outros dias, de
-              segunda a sábado, no rascunho.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                onCopiarParaTodos(dia, paraItens(rascunho));
-                setCopiando(false);
-                avisarSucesso(
-                  "Ordem copiada no rascunho.",
-                  "Salve as configurações para aplicar aos outros dias.",
+                      <Box sx={{ flex: 1, minWidth: 0, maxWidth: { sm: 220 } }}>
+                        <SeletorHorario
+                          id={`${base}-inicio-${item.turmaId}`}
+                          valor={item.inicio}
+                          rotuloAcessivel={`Horário de ${rotulo} no almoço`}
+                          onValor={(valor) => atualizarInicio(indice, valor)}
+                        />
+                      </Box>
+                      {item.inicio ? (
+                        <BotaoIcone
+                          rotulo={`Limpar horário de ${rotulo}`}
+                          variante="texto"
+                          tamanho="pequeno"
+                          icone={<CloseRoundedIcon />}
+                          onClick={() => atualizarInicio(indice, "")}
+                          sx={ESTILO_ALVO_TOQUE}
+                        />
+                      ) : null}
+                    </Stack>
+                  </Stack>
                 );
-              }}
-            >
-              Copiar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </SecaoRecolhivel>
+              })}
+            </Box>
+          )}
+
+          {erro ? (
+            <AlertaCompacto variante="dados_invalidos" descricao={erro} tamanho="linha" />
+          ) : null}
+
+          <Acordeao
+            titulo="Ajuda"
+            nivelTitulo="h4"
+            resumo={
+              <Typography
+                component="span"
+                variant="body2"
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />
+                Como a ordem aparece em Horários
+              </Typography>
+            }
+          >
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Use as setas para ordenar as turmas. Os horários são opcionais. A ordem aparece na
+              consulta de Horários depois de salvar as configurações.
+            </Typography>
+          </Acordeao>
+        </Box>
+      </Acordeao>
+
+      <DialogoConfirmacao
+        aberto={copiando}
+        titulo="Copiar a ordem para os outros dias?"
+        descricao={`A ordem e os horários de ${rotuloDia(dia)} substituem os de todos os outros dias, de segunda a sábado, no rascunho.`}
+        rotuloConfirmar="Copiar"
+        onConfirmar={() => {
+          onCopiarParaTodos(dia, paraItens(rascunho));
+          setCopiando(false);
+          avisarSucesso(
+            "Ordem copiada no rascunho.",
+            "Salve as configurações para aplicar aos outros dias.",
+          );
+        }}
+        onCancelar={() => setCopiando(false)}
+      />
+    </Box>
   );
 }
+
+const ESTILO_ALVO_TOQUE = {
+  width: TOKENS_LAYOUT.alvoToque,
+  height: TOKENS_LAYOUT.alvoToque,
+  minWidth: TOKENS_LAYOUT.alvoToque,
+} as const;
+
+const ESTILO_SOMENTE_LEITOR = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;

@@ -53,7 +53,7 @@ async function fonteReal(page: Page, alvo: Locator, placeholder = false) {
       carregada: document.fonts.check(consulta, texto),
     };
   }, placeholder);
-  // A fallback gerada pelo Next também contém Jakarta no nome; não aceitá-la.
+  // A fallback gerada pelo Next também contém o nome da fonte; não aceitá-la.
   expect(resultado.primeira, JSON.stringify(resultado)).toMatch(/jakarta/i);
   expect(resultado.primeira, JSON.stringify(resultado)).not.toMatch(/fallback/i);
   expect(resultado.texto.trim(), JSON.stringify(resultado)).not.toBe("");
@@ -75,6 +75,18 @@ const casos = ([320, 390, 1280] as const).flatMap((largura) =>
 
 test.describe("login real sem sessão", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
+  test("@anon Entrar tem preenchimento sólido e sem brilho no tema escuro", async ({ page }) => {
+    await tema(page, "dark");
+    await somenteLeitura(page);
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", "dark");
+    const botao = page.getByRole("button", { name: "Entrar", exact: true });
+    await expect(botao).toBeVisible();
+    await expect(botao).toHaveCSS("background-image", "none");
+    await expect(botao).toHaveCSS("box-shadow", "none");
+  });
+
   for (const { largura, cor } of casos) {
     test(`@anon placeholder e fonte em ${largura}px ${cor}`, async ({ page }, info) => {
       await page.setViewportSize({ width: largura, height: 900 });
@@ -82,7 +94,7 @@ test.describe("login real sem sessão", () => {
       await somenteLeitura(page);
       await page.goto("/");
       await aguardarHidratacao(page);
-      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${cor}\\b`));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", cor);
       const campo = page.getByLabel("E-mail ou identificador");
       await expect(campo).toBeVisible();
       await expect(campo).toHaveValue("");
@@ -281,7 +293,7 @@ test.describe("seletor real com massa sintética", () => {
       await page.goto("/");
       await aguardarHidratacao(page);
       await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
-      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${cor}\\b`));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", cor);
       const secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
       const gatilho = secao.locator("#dia-frequencia");
       await expect(gatilho).toBeEnabled();
@@ -353,7 +365,7 @@ test.describe("seletor real com massa sintética", () => {
       await page.goto("/");
       await aguardarHidratacao(page);
       await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
-      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${cor}\\b`));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", cor);
       const secao = page.getByRole("region", { name: "Fazer chamada", exact: true });
       const gatilho = secao.locator("#dia-frequencia");
       const anterior = secao.getByRole("button", { name: "Dia anterior", exact: true });
@@ -414,7 +426,7 @@ test.describe("seletor real com massa sintética", () => {
       await page.goto("/");
       await aguardarHidratacao(page);
       await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
-      await expect(page.locator("html")).toHaveClass(new RegExp(`\\b${cor}\\b`));
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", cor);
       const gatilho = page.locator("#dia-frequencia");
       await expect(gatilho).toBeEnabled();
       const hoje = diaCorrente();

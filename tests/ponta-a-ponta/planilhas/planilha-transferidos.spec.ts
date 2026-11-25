@@ -2,7 +2,7 @@
 // A remoção exige modo completo e confirmação explícita; dados sintéticos.
 import { expect, test, type Page } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarRelatorio, aguardarHidratacao } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(criarMassaE2E);
@@ -83,8 +83,7 @@ async function abrir(page: Page, modoCompleto: boolean, falharReleitura = false)
   });
   await page.goto("/");
   await aguardarHidratacao(page);
-  await trocarVisao(page, "Relatórios", "relatorios");
-  await page.getByRole("tab", { name: "Grade", exact: true }).click();
+  await selecionarRelatorio(page, "Grade");
   await page.getByRole("button", { name: "Enviar para a planilha", exact: true }).click();
   return { dialogo: page.getByRole("dialog"), envios };
 }

@@ -5,7 +5,12 @@ import { mesSeguinte, ultimoDiaDeChamada } from "@/domain/frequencia";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { escolherMesNoPeriodo } from "../helpers/calendario";
 import { diaCorrente } from "../helpers/dia";
-import { aguardarHidratacao, escolherDataNoPeriodo, trocarVisao } from "../helpers/pagina";
+import {
+  selecionarRelatorio,
+  aguardarHidratacao,
+  escolherDataNoPeriodo,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.beforeAll(criarMassaE2E);
 test.afterAll(limparMassaE2E);
@@ -54,13 +59,7 @@ test.describe("atualização do Painel ao voltar para a aba", () => {
         const requisicaoDeAtualizacao =
           acionado &&
           (mesCoincide ? doMes && pedido.headers()["x-e2e-visibilidade"] === "1" : doDia);
-        const resposta = await rota.fetch();
-        if (resposta.status() !== 200) {
-          await rota.fulfill({ response: resposta });
-          return;
-        }
         if (requisicaoDeAtualizacao) atualizado = true;
-        const dados = (await resposta.json()) as { frequencias: { dia: string }[] };
         const frequencia = {
           dia,
           turmaId,
@@ -72,16 +71,13 @@ test.describe("atualização do Painel ao voltar para a aba", () => {
           faltas: atualizado ? [{ alunoId: primeiroAluno.id, horarios: ["aula-sintetica"] }] : [],
         };
         await rota.fulfill({
-          response: resposta,
           json: {
-            ...dados,
             ...(doDia ? { feriado: null } : {}),
-            frequencias: [...dados.frequencias.filter((item) => item.dia !== dia), frequencia],
+            frequencias: [frequencia],
           },
         });
       });
-      await trocarVisao(page, "Relatórios", "relatorios");
-      await page.getByRole("tab", { name: "Histórico" }).click();
+      await selecionarRelatorio(page, "Histórico");
       const historico = page.getByRole("region", { name: "Histórico de frequências", exact: true });
       const cargaDoMes = page.waitForResponse((resposta) => {
         const url = new URL(resposta.url());
@@ -176,18 +172,28 @@ test("Saídas e entradas: o botão da planilha fica na linha das abas", async ({
   const botao = page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" });
   const caixaAbas = await abas.boundingBox();
   const caixaBotao = await botao.boundingBox();
-  expect(caixaAbas).not.toBeNull();
-  expect(caixaBotao).not.toBeNull();
-  // Mesma linha: o centro do botão cai dentro da faixa vertical das abas.
-  const centro = (caixaBotao?.y ?? 0) + (caixaBotao?.height ?? 0) / 2;
-  expect(centro).toBeGreaterThan(caixaAbas?.y ?? 0);
-  expect(centro).toBeLessThan((caixaAbas?.y ?? 0) + (caixaAbas?.height ?? 0));
-  expect((caixaBotao?.x ?? 0) + (caixaBotao?.width ?? 0)).toBeLessThanOrEqual(360);
+  if (!caixaAbas || !caixaBotao) throw new Error("Abas ou botão da planilha indisponíveis.");
+  expect(caixaBotao.width).toBe(48);
+  expect(caixaBotao.height).toBe(48);
+  expect(caixaBotao.y + caixaBotao.height / 2).toBeCloseTo(caixaAbas.y + caixaAbas.height / 2, 0);
+  expect(caixaBotao.x + caixaBotao.width).toBeLessThanOrEqual(360);
+  await expect(botao).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+
+  const raio = (elemento: Element) =>
+    Number.parseFloat(getComputedStyle(elemento).borderBottomLeftRadius);
+  const selecionada = abas.getByRole("tab", { name: "Saídas", selected: true, exact: true });
+  const caixaSelecionada = await selecionada.boundingBox();
+  if (!caixaSelecionada) throw new Error("Aba Saídas não selecionada.");
+  expect((await abas.evaluate(raio)) - (await selecionada.evaluate(raio))).toBeCloseTo(
+    caixaSelecionada.x - caixaAbas.x,
+    0,
+  );
 
   // Sem faixa de título vazia: a data vem logo abaixo da linha das abas.
   const data = page.locator("#dia-saidas");
   const caixaData = await data.boundingBox();
-  expect((caixaData?.y ?? 0) - ((caixaAbas?.y ?? 0) + (caixaAbas?.height ?? 0))).toBeLessThan(40);
+  if (!caixaData) throw new Error("Seletor de data indisponível.");
+  expect(caixaData.y - (caixaAbas.y + caixaAbas.height)).toBeLessThan(40);
 
   const estouro = await page.evaluate(
     () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
@@ -196,5 +202,70 @@ test("Saídas e entradas: o botão da planilha fica na linha das abas", async ({
 
   // O mesmo botão único atende as duas abas: não há botão separado nas Entradas.
   await page.getByRole("tab", { name: "Entradas", exact: true }).click();
+  await expect(botao).toHaveCount(1);
   await expect(botao).toBeVisible();
 });
+
+test("Planilha disponível abre a mesma janela por teclado nas Entradas", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  // Só o estado da integração é simulado; o teste não confirma envio.
+  await page.route("**/api/planilha-saidas/estado", (rota) =>
+    rota.fulfill({
+      json: {
+        estado: {
+          ativa: true,
+          modo: "conservador",
+          modoCompletoAte: null,
+          configurada: true,
+          podeEnviar: true,
+        },
+      },
+    }),
+  );
+  await page.goto("/?visao=saidas&aba=entradas");
+  await aguardarHidratacao(page);
+  const botao = page.getByRole("button", { name: "Enviar saídas e entradas para a planilha" });
+  await expect(botao).toBeEnabled();
+  await expect(botao).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await botao.focus();
+  await page.keyboard.press("Enter");
+  const janela = page.getByRole("dialog", { name: /^Enviar saídas e entradas/ });
+  await expect(janela).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(janela).toBeHidden();
+  await expect(botao).toBeFocused();
+});
+
+for (const largura of [390, 1440]) {
+  test(`Saídas e Entradas: a Planilha não reduz a largura dos painéis a ${largura} px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: largura, height: 900 });
+    await page.goto("/?visao=saidas&aba=saidas");
+    await aguardarHidratacao(page);
+
+    const abas = page.getByRole("tablist", { name: "Tipo de registro", exact: true });
+    const planilha = page.getByRole("button", {
+      name: "Enviar saídas e entradas para a planilha",
+      exact: true,
+    });
+    for (const nome of ["Saídas", "Entradas"]) {
+      await abas.getByRole("tab", { name: nome, exact: true }).click();
+      const painel = page.getByRole("tabpanel", { name: nome, exact: true });
+      const proximoDia = painel.getByRole("button", { name: "Dia seguinte", exact: true });
+      await expect(proximoDia).toBeVisible();
+      const [trilho, botao, conteudo, seta] = await Promise.all([
+        abas.boundingBox(),
+        planilha.boundingBox(),
+        painel.boundingBox(),
+        proximoDia.boundingBox(),
+      ]);
+      if (!trilho || !botao || !conteudo || !seta) {
+        throw new Error("Controles ou painel indisponíveis.");
+      }
+      expect(conteudo.x).toBeCloseTo(trilho.x, 0);
+      expect(conteudo.x + conteudo.width).toBeCloseTo(botao.x + botao.width, 0);
+      expect(seta.x + seta.width).toBeCloseTo(botao.x + botao.width, 0);
+    }
+  });
+}

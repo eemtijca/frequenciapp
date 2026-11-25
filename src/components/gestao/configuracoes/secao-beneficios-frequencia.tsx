@@ -3,39 +3,32 @@
 // Benefícios e frequência mínima no rascunho: a administração cria, edita,
 // desativa e remove as regras que alimentam o alerta da Chamada.
 import { useState } from "react";
-import { Check, HelpCircle, Pencil, Percent, Plus, Power, Trash2, X } from "lucide-react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
+import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import {
+  AULAS_POR_DIA_MAXIMO,
   PERCENTUAL_MINIMO_MAIOR,
   PERCENTUAL_MINIMO_MENOR,
-  AULAS_POR_DIA_MAXIMO,
   type RegraFrequenciaBeneficio,
 } from "@/domain/beneficios-frequencia";
 import { avisarSucesso } from "@/lib/avisos";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SecaoRecolhivel } from "@/components/ui/secao-recolhivel";
-import { Selo } from "@/components/ui/selo";
-import { Switch } from "@/components/ui/switch";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
+import { Acordeao } from "@/components/ui/mui/acordeao";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { Interruptor } from "@/components/ui/mui/interruptor";
+import { Selo } from "@/components/ui/mui/selo";
 
 interface Formulario {
   /** Nulo ao criar um benefício novo. */
@@ -61,6 +54,17 @@ function percentualValido(texto: string): number | null {
   const valor = Number(texto);
   return valor >= PERCENTUAL_MINIMO_MENOR && valor <= PERCENTUAL_MINIMO_MAIOR ? valor : null;
 }
+
+const CARTAO_BENEFICIO = {
+  display: "flex",
+  flexDirection: "column",
+  gap: 2,
+  padding: 2,
+  border: 1,
+  borderColor: "divider",
+  borderRadius: 2,
+  minWidth: 0,
+} as const;
 
 export default function SecaoBeneficiosFrequencia({
   beneficios,
@@ -152,239 +156,253 @@ export default function SecaoBeneficiosFrequencia({
   const ativos = beneficios.filter((beneficio) => beneficio.ativo).length;
 
   return (
-    <SecaoRecolhivel
-      titulo="Benefícios e frequência mínima"
-      icone={Percent}
-      aberto={aberto}
-      onAbertoChange={setAberto}
-      dataSecao="config-beneficios"
-      resumo={
-        <Selo>
-          {ativos} {ativos === 1 ? "ativo" : "ativos"}
-        </Selo>
-      }
-    >
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" className="min-h-11" onClick={() => abrirFormulario(null)}>
-          <Plus size={16} aria-hidden="true" />
-          Novo benefício
-        </Button>
-      </div>
-      {beneficios.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Nenhum benefício cadastrado.</p>
-      ) : (
-        <ul aria-label="Benefícios" className="flex flex-col gap-3">
-          {beneficios.map((beneficio) => (
-            <li key={beneficio.id} className="superficie flex min-w-0 flex-col gap-3 p-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 text-sm font-medium break-words">{beneficio.nome}</span>
-                <Selo variante={beneficio.ativo ? "sucesso" : "neutro"}>
-                  {beneficio.ativo ? "Ativo" : "Inativo"}
-                </Selo>
-                {beneficio.id.startsWith("novo-") && <Selo>Novo</Selo>}
-              </div>
-              <div className="flex flex-wrap items-center gap-2 text-xs">
-                <Selo>Mínimo de {beneficio.percentualMinimoFrequencia}% de frequência</Selo>
-                <span className="text-muted-foreground">
-                  Faltas justificadas {beneficio.faltasJustificadasContam ? "contam" : "não contam"}
-                  .
-                </span>
-              </div>
-              <p className="text-muted-foreground text-xs">
-                {beneficio.aulasPorDia === null
-                  ? "Projeção pela grade da turma."
-                  : `Projeção de ${beneficio.aulasPorDia} aulas por dia.`}
-              </p>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-auto min-h-11 min-w-0 flex-col gap-1 px-1 py-2 text-xs whitespace-normal sm:flex-row sm:gap-2 sm:text-sm"
-                  aria-label={`Editar ${beneficio.nome}`}
-                  onClick={() => abrirFormulario(beneficio)}
-                >
-                  <Pencil size={14} aria-hidden="true" />
-                  Editar
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-auto min-h-11 min-w-0 flex-col gap-1 px-1 py-2 text-xs whitespace-normal sm:flex-row sm:gap-2 sm:text-sm"
-                  aria-label={`${beneficio.ativo ? "Desativar" : "Ativar"} ${beneficio.nome}`}
-                  onClick={() => alternarSituacao(beneficio)}
-                >
-                  <Power size={14} aria-hidden="true" />
-                  {beneficio.ativo ? "Desativar" : "Ativar"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-auto min-h-11 min-w-0 flex-col gap-1 px-1 py-2 text-xs whitespace-normal sm:flex-row sm:gap-2 sm:text-sm"
-                  aria-label={`Excluir ${beneficio.nome}`}
-                  onClick={() => setParaExcluir(beneficio)}
-                >
-                  <Trash2 size={14} aria-hidden="true" />
-                  Excluir
-                </Button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <details className="text-muted-foreground text-xs">
-        <summary className="flex min-h-11 cursor-pointer items-center gap-2 font-medium">
-          <HelpCircle size={16} aria-hidden="true" />
-          Como funcionam os alertas
-        </summary>
-        <p className="mt-1 leading-relaxed">
-          O mínimo de frequência vale para as aulas do mês. Quando as faltas ultrapassam o limite, a
-          Chamada mostra o nome do benefício. Regras inativas não geram alertas.
-        </p>
-      </details>
-
-      <Dialog
-        open={formulario !== null}
-        onOpenChange={(valor) => {
-          if (!valor) setFormulario(null);
-        }}
+    <Box data-secao="config-beneficios">
+      <Acordeao
+        titulo="Benefícios e frequência mínima"
+        resumo={<Selo>{`${ativos} ${ativos === 1 ? "ativo" : "ativos"}`}</Selo>}
+        aberto={aberto}
+        onChange={setAberto}
       >
-        <DialogContent className="max-h-[90dvh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{formulario?.id ? "Editar benefício" : "Novo benefício"}</DialogTitle>
-            <DialogDescription>
-              Defina o mínimo de frequência e as faltas consideradas.
-            </DialogDescription>
-          </DialogHeader>
-          {formulario && (
-            <form
-              className="flex flex-col gap-4"
-              noValidate
-              onSubmit={(evento) => {
-                evento.preventDefault();
-                salvar();
+        <Box
+          role="region"
+          aria-label="Benefícios e frequência mínima"
+          sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+        >
+          <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1 }}>
+            <Botao
+              variante="primario"
+              type="button"
+              icone={<AddRoundedIcon />}
+              onClick={() => abrirFormulario(null)}
+            >
+              Novo benefício
+            </Botao>
+          </Box>
+          {beneficios.length === 0 ? (
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              Nenhum benefício cadastrado.
+            </Typography>
+          ) : (
+            <Box
+              component="ul"
+              aria-label="Benefícios"
+              sx={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 2,
+                margin: 0,
+                padding: 0,
+                listStyle: "none",
               }}
             >
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="beneficio-nome">Nome do benefício</Label>
-                <Input
-                  id="beneficio-nome"
-                  value={formulario.nome}
-                  maxLength={60}
-                  onChange={(evento) => setFormulario({ ...formulario, nome: evento.target.value })}
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="beneficio-percentual">Frequência mínima, em %</Label>
-                <Input
-                  id="beneficio-percentual"
-                  type="number"
-                  inputMode="numeric"
-                  min={PERCENTUAL_MINIMO_MENOR}
-                  max={PERCENTUAL_MINIMO_MAIOR}
-                  step={1}
-                  value={formulario.percentual}
-                  onChange={(evento) =>
-                    setFormulario({ ...formulario, percentual: evento.target.value })
-                  }
-                  className="numerais-tabulares h-11"
-                />
-                <p className="text-muted-foreground text-xs">Presença nas aulas do mês.</p>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex w-full flex-col gap-1.5">
-                  <Label htmlFor="beneficio-aulas-dia">Aulas por dia</Label>
-                  <Input
-                    id="beneficio-aulas-dia"
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    max={AULAS_POR_DIA_MAXIMO}
-                    step={1}
-                    value={formulario.aulasPorDia}
-                    placeholder="Usar grade da turma"
-                    aria-describedby="beneficio-aulas-dia-ajuda"
-                    onChange={(evento) =>
-                      setFormulario({ ...formulario, aulasPorDia: evento.target.value })
-                    }
-                    className="numerais-tabulares h-11"
-                  />
-                  <p id="beneficio-aulas-dia-ajuda" className="text-muted-foreground text-xs">
-                    Vazio usa a grade. Chamadas salvas mantêm as aulas registradas.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <Label htmlFor="beneficio-justificadas">Faltas justificadas contam</Label>
-                </div>
-                <Switch
-                  id="beneficio-justificadas"
-                  checked={formulario.justificadasContam}
-                  onCheckedChange={(valor) =>
-                    setFormulario({ ...formulario, justificadasContam: valor })
-                  }
-                />
-              </div>
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <Label htmlFor="beneficio-ativo">Benefício ativo</Label>
-                </div>
-                <Switch
-                  id="beneficio-ativo"
-                  checked={formulario.ativo}
-                  onCheckedChange={(valor) => setFormulario({ ...formulario, ativo: valor })}
-                />
-              </div>
-              {erroFormulario && (
-                <AvisoCompacto
-                  variante="dados_invalidos"
-                  descricao={erroFormulario}
-                  tamanho="linha"
-                />
-              )}
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="min-h-11"
-                  onClick={() => setFormulario(null)}
-                >
-                  <X size={16} aria-hidden="true" />
-                  Cancelar
-                </Button>
-                <Button type="submit" className="min-h-11">
-                  <Check size={16} aria-hidden="true" />
-                  Aplicar ao rascunho
-                </Button>
-              </DialogFooter>
-            </form>
+              {beneficios.map((beneficio) => (
+                <Box component="li" key={beneficio.id} sx={CARTAO_BENEFICIO}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ flexWrap: "wrap", alignItems: "center" }}
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{ fontWeight: 600, overflowWrap: "anywhere", minWidth: 0 }}
+                    >
+                      {beneficio.nome}
+                    </Typography>
+                    <Selo tom={beneficio.ativo ? "sucesso" : "neutro"}>
+                      {beneficio.ativo ? "Ativo" : "Inativo"}
+                    </Selo>
+                    {beneficio.id.startsWith("novo-") ? <Selo>Novo</Selo> : null}
+                  </Stack>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    sx={{ flexWrap: "wrap", alignItems: "center" }}
+                  >
+                    <Selo>Mínimo de {beneficio.percentualMinimoFrequencia}% de frequência</Selo>
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                      Faltas justificadas{" "}
+                      {beneficio.faltasJustificadasContam ? "contam" : "não contam"}.
+                    </Typography>
+                  </Stack>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                    {beneficio.aulasPorDia === null
+                      ? "Projeção pela grade da turma."
+                      : `Projeção de ${beneficio.aulasPorDia} aulas por dia.`}
+                  </Typography>
+                  <Box
+                    sx={{
+                      display: "grid",
+                      gap: 1,
+                      gridTemplateColumns: { xs: "1fr", sm: "repeat(3, minmax(0, 1fr))" },
+                    }}
+                  >
+                    <Botao
+                      type="button"
+                      variante="contorno"
+                      tamanho="pequeno"
+                      icone={<EditRoundedIcon />}
+                      aria-label={`Editar ${beneficio.nome}`}
+                      onClick={() => abrirFormulario(beneficio)}
+                    >
+                      Editar
+                    </Botao>
+                    <Botao
+                      type="button"
+                      variante="contorno"
+                      tamanho="pequeno"
+                      icone={<PowerSettingsNewRoundedIcon />}
+                      aria-label={`${beneficio.ativo ? "Desativar" : "Ativar"} ${beneficio.nome}`}
+                      onClick={() => alternarSituacao(beneficio)}
+                    >
+                      {beneficio.ativo ? "Desativar" : "Ativar"}
+                    </Botao>
+                    <Botao
+                      type="button"
+                      variante="texto"
+                      tamanho="pequeno"
+                      icone={<DeleteOutlineRoundedIcon />}
+                      aria-label={`Excluir ${beneficio.nome}`}
+                      onClick={() => setParaExcluir(beneficio)}
+                    >
+                      Excluir
+                    </Botao>
+                  </Box>
+                </Box>
+              ))}
+            </Box>
           )}
-        </DialogContent>
-      </Dialog>
 
-      <AlertDialog
-        open={paraExcluir !== null}
-        onOpenChange={(valor) => {
-          if (!valor) setParaExcluir(null);
-        }}
+          <Acordeao
+            titulo="Como funcionam os alertas"
+            nivelTitulo="h4"
+            resumo={
+              <Typography
+                component="span"
+                variant="body2"
+                sx={{ display: "flex", alignItems: "center", gap: 1 }}
+              >
+                <HelpOutlineRoundedIcon fontSize="inherit" aria-hidden="true" />
+                Mínimo de frequência por mês
+              </Typography>
+            }
+          >
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              O mínimo de frequência vale para as aulas do mês. Quando as faltas ultrapassam o
+              limite, a Chamada mostra o nome do benefício. Regras inativas não geram alertas.
+            </Typography>
+          </Acordeao>
+        </Box>
+      </Acordeao>
+
+      <Dialogo
+        aberto={formulario !== null}
+        onFechar={() => setFormulario(null)}
+        titulo={formulario?.id ? "Editar benefício" : "Novo benefício"}
+        descricao="Defina o mínimo de frequência e as faltas consideradas."
+        tamanho="medio"
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir benefício?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {paraExcluir ? `${paraExcluir.nome}. ` : ""}Ao salvar as configurações, a regra e seus
-              alertas serão removidos. As frequências salvas permanecem.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={confirmarExclusao}>
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </SecaoRecolhivel>
+        {formulario ? (
+          <Box
+            component="form"
+            noValidate
+            onSubmit={(evento) => {
+              evento.preventDefault();
+              salvar();
+            }}
+            sx={{ display: "flex", flexDirection: "column", gap: 2 }}
+          >
+            <Campo id="beneficio-nome" rotulo="Nome do benefício">
+              <CampoTexto
+                id="beneficio-nome"
+                valor={formulario.nome}
+                onValor={(valor) => setFormulario({ ...formulario, nome: valor })}
+                maxLength={60}
+              />
+            </Campo>
+            <Campo
+              id="beneficio-percentual"
+              rotulo="Frequência mínima, em %"
+              descricao="Presença nas aulas do mês."
+            >
+              <CampoTexto
+                id="beneficio-percentual"
+                valor={formulario.percentual}
+                onValor={(valor) => setFormulario({ ...formulario, percentual: valor })}
+                inputMode="numeric"
+                maxLength={3}
+              />
+            </Campo>
+            <Campo
+              id="beneficio-aulas-dia"
+              rotulo="Aulas por dia"
+              descricao="Vazio usa a grade. Chamadas salvas mantêm as aulas registradas."
+            >
+              <CampoTexto
+                id="beneficio-aulas-dia"
+                valor={formulario.aulasPorDia}
+                onValor={(valor) => setFormulario({ ...formulario, aulasPorDia: valor })}
+                placeholder="Usar grade da turma"
+                inputMode="numeric"
+              />
+            </Campo>
+            <Interruptor
+              id="beneficio-justificadas"
+              rotulo="Faltas justificadas contam"
+              checked={formulario.justificadasContam}
+              onChange={(valor) => setFormulario({ ...formulario, justificadasContam: valor })}
+            />
+            <Interruptor
+              id="beneficio-ativo"
+              rotulo="Benefício ativo"
+              checked={formulario.ativo}
+              onChange={(valor) => setFormulario({ ...formulario, ativo: valor })}
+            />
+            {erroFormulario ? (
+              <AlertaCompacto
+                variante="dados_invalidos"
+                descricao={erroFormulario}
+                tamanho="linha"
+              />
+            ) : null}
+            <Stack
+              direction="row"
+              spacing={2}
+              sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}
+            >
+              <Botao
+                type="button"
+                variante="contorno"
+                icone={<CloseRoundedIcon />}
+                onClick={() => setFormulario(null)}
+              >
+                Cancelar
+              </Botao>
+              <Botao
+                type="submit"
+                variante="secundario"
+                icone={<CheckRoundedIcon />}
+                disabled={formulario.nome.trim().length < 2 || formulario.percentual.trim() === ""}
+              >
+                Aplicar ao rascunho
+              </Botao>
+            </Stack>
+          </Box>
+        ) : null}
+      </Dialogo>
+
+      <DialogoConfirmacao
+        aberto={paraExcluir !== null}
+        titulo="Excluir benefício?"
+        descricao={
+          paraExcluir
+            ? `${paraExcluir.nome}. Ao salvar as configurações, a regra e seus alertas serão removidos. As frequências salvas permanecem.`
+            : "Ao salvar as configurações, a regra e seus alertas serão removidos. As frequências salvas permanecem."
+        }
+        rotuloConfirmar="Excluir"
+        destrutivo
+        onConfirmar={confirmarExclusao}
+        onCancelar={() => setParaExcluir(null)}
+      />
+    </Box>
   );
 }

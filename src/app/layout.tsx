@@ -1,21 +1,23 @@
-// Layout raiz com a tipografia dos seletores, tema e avisos compartilhados.
+// Layout raiz com a tipografia Plus Jakarta Sans, o tema Material UI e os avisos compartilhados.
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
-import { Plus_Jakarta_Sans, JetBrains_Mono } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import { Toaster } from "@/components/ui/sonner";
-import { ModalidadeFoco } from "@/components/ui/modalidade-foco";
-import CorDoTema from "@/components/pwa/cor-do-tema";
-import "./globals.css";
+import { JetBrains_Mono, Plus_Jakarta_Sans } from "next/font/google";
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
+import { ProvedorAvisos } from "@/components/ui/mui/avisos";
+import { CORES_NAVEGADOR } from "@/theme/paleta";
+import { iniciarAnimacoes } from "@/theme/preferencia-animacoes";
+import { ProvedorTema } from "@/theme/provedor-tema";
 
 const fonteInterface = Plus_Jakarta_Sans({
   variable: "--font-jakarta",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const fonteNumeros = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -56,8 +58,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f6f6f6" },
-    { media: "(prefers-color-scheme: dark)", color: "#1c1b19" },
+    { media: "(prefers-color-scheme: light)", color: CORES_NAVEGADOR.claro },
+    { media: "(prefers-color-scheme: dark)", color: CORES_NAVEGADOR.escuro },
   ],
 };
 
@@ -70,27 +72,18 @@ export default async function LayoutRaiz({
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body
-        className={`${fonteInterface.variable} ${fonteNumeros.variable} bg-background text-foreground font-sans antialiased`}
-      >
-        <ModalidadeFoco />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
+      <body className={`${fonteInterface.variable} ${fonteNumeros.variable}`}>
+        <InitColorSchemeScript
+          attribute="data-mui-color-scheme"
+          defaultMode="system"
+          modeStorageKey="theme"
           nonce={nonce}
-        >
+        />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: iniciarAnimacoes }} />
+        <ProvedorTema nonce={nonce}>
           {children}
-          <CorDoTema />
-          <Toaster
-            position="bottom-right"
-            offset={20}
-            mobileOffset={84}
-            richColors
-            closeButton={false}
-          />
-        </ThemeProvider>
+          <ProvedorAvisos />
+        </ProvedorTema>
       </body>
     </html>
   );

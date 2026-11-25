@@ -1,4 +1,5 @@
 // Restaurar origens em Gestão, Alunos: prévia por turma, avisos, cancelamento, toque duplo e alunos de volta.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -32,7 +33,7 @@ async function abrir(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Alunos", exact: true }).click();
+  await selecionarCadastroGestao(page, "Alunos");
 }
 
 test.beforeEach(async () => {

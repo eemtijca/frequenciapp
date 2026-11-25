@@ -1,10 +1,11 @@
 // A política pública descreve o tratamento real e abre sem sessão.
-import { createElement, type ReactNode } from "react";
+import { createElement } from "react";
 import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ThemeProvider } from "next-themes";
+import { ThemeProvider } from "@mui/material/styles";
 import { expect, it, vi } from "vitest";
 import nextConfig from "../../../next.config";
+import { tema } from "@/theme/tema";
 import VistaPrivacidade, { LACUNAS_PRIVACIDADE } from "@/components/privacidade/vista-privacidade";
 import { REDIRECIONAMENTO_PRIVACIDADE, ROTA_PRIVACIDADE } from "@/lib/rotas-publicas";
 
@@ -12,14 +13,9 @@ vi.mock("next/image", () => ({
   default: (props: { alt?: string }) => createElement("img", { alt: props.alt ?? "" }),
 }));
 
-vi.mock("next/link", () => ({
-  default: (props: { href: string; className?: string; children?: ReactNode }) =>
-    createElement("a", { href: props.href, className: props.className }, props.children),
-}));
-
 function htmlDaPolitica(): string {
   return renderToStaticMarkup(
-    createElement(ThemeProvider, { attribute: "class" }, createElement(VistaPrivacidade)),
+    createElement(ThemeProvider, { theme: tema }, createElement(VistaPrivacidade)),
   );
 }
 
@@ -37,6 +33,8 @@ it("expõe a política, o escopo drive.file e as lacunas institucionais", () => 
   expect(html).toContain(LACUNAS_PRIVACIDADE.encarregado);
   expect(html).toContain(LACUNAS_PRIVACIDADE.email);
   expect(html).toContain('data-lacuna="email"');
+  expect(html).toContain('<h1 class="');
+  expect(html).not.toContain("tailwind");
   expect(html).not.toMatch(/\bvocês?\b/i);
   for (const titulo of [
     "Controladora e âmbito",

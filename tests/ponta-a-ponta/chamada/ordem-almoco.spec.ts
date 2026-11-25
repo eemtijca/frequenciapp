@@ -1,4 +1,5 @@
 // Ordem do almoço: a administração ordena as turmas na Gestão e a aba Horários mostra a ordem do dia, com a turma em destaque.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -65,11 +66,11 @@ test("a ordem definida na Gestão aparece na aba Horários do dia", async ({ pag
   await aguardarHidratacao(page);
 
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarAcaoConfiguracoes(page, "Horários", "Almoço");
   const secao = page.locator('[data-secao="config-ordem-almoco"]');
   await secao.getByRole("button", { name: /Ordem do almoço/ }).click();
-  const regiao = secao.getByRole("region", { name: "Ordem do almoço" });
+  const regiao = secao.getByRole("region", { name: "Ordem do almoço", exact: true });
   await expect(regiao).toBeVisible();
 
   await escolher(page, regiao.getByRole("combobox", { name: "Dia da semana" }), ROTULO_DIA);

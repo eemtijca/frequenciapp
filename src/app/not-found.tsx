@@ -1,5 +1,5 @@
 // Página 404 para rotas reais desconhecidas.
-import { TelaEstado } from "@/components/ui/tela-estado";
+import { TelaEstado } from "@/components/ui/mui/tela-estado";
 
 export default function NaoEncontrada() {
   return (

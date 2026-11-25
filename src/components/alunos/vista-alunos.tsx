@@ -1,13 +1,24 @@
 "use client";
 
-// Alunos: lista de consulta do professor, agrupada por turma atual ou por
-// turma de origem. O cadastro e a edição acontecem na área de Gestão.
+// Alunos: consulta do professor por turma atual ou de origem, com busca e estados.
 import { memo, useDeferredValue, useMemo, useState } from "react";
-import { UserRound, Users } from "lucide-react";
+import PersonOffRoundedIcon from "@mui/icons-material/PersonOffRounded";
+import SearchOffRoundedIcon from "@mui/icons-material/SearchOffRounded";
+import Box from "@mui/material/Box";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import { TOKENS_LAYOUT } from "@/theme/layout";
+import Typography from "@mui/material/Typography";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
-import { BarraBusca } from "@/components/ui/barra-busca";
-import { AtualizadoDaVisao } from "@/components/ui/atualizado-em";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
+import { Botao } from "@/components/ui/mui/botao";
+import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { Selo } from "@/components/ui/mui/selo";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 interface Props {
@@ -33,44 +44,75 @@ interface PropsGrupo {
 
 const GrupoAlunos = memo(function GrupoAlunos({ turma, lista, agrupamento, rotuloDe }: PropsGrupo) {
   return (
-    <div className="superficie grupo-distante overflow-hidden">
-      <div className="bg-secondary/50 flex items-center justify-between border-b px-4 py-2.5">
-        <h2 className="font-medium">{turma?.rotulo ?? "Turma"}</h2>
-        <span className="numerais-tabulares text-muted-foreground text-xs">
+    <Paper variant="outlined" sx={{ overflow: "hidden", boxShadow: "none" }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        sx={{
+          alignItems: "center",
+          justifyContent: "space-between",
+          borderBottom: 1,
+          borderColor: "divider",
+          bgcolor: "action.hover",
+          px: 2,
+          py: 1,
+        }}
+      >
+        <Typography component="h2" variant="subtitle2" sx={{ overflowWrap: "anywhere" }}>
+          {turma?.rotulo ?? "Turma"}
+        </Typography>
+        <Typography
+          variant="caption"
+          sx={{ color: "text.secondary", fontVariantNumeric: "tabular-nums", flexShrink: 0 }}
+        >
           {lista.filter((aluno) => aluno.ativo).length} ativos
-        </span>
-      </div>
-      <ul className="divide-y">
+        </Typography>
+      </Stack>
+      <List disablePadding>
         {lista.map((aluno) => (
-          <li
+          <ListItem
             key={aluno.id}
-            className={`flex items-center gap-3 px-4 py-2.5 ${aluno.ativo ? "" : "opacity-55"}`}
+            divider
+            sx={{
+              gap: 1,
+              py: 1,
+              "&:last-of-type": { borderBottom: 0 },
+            }}
           >
-            <span className="numerais-tabulares text-muted-foreground w-7 shrink-0 text-sm">
+            <Typography
+              component="span"
+              variant="body2"
+              sx={{
+                width: 28,
+                flexShrink: 0,
+                color: "text.secondary",
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
               {String(aluno.ordem).padStart(2, "0")}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{aluno.nome}</p>
-              {agrupamento === "atual" && aluno.turmaOriginalId !== aluno.turmaId && (
-                <p className="text-muted-foreground text-xs">
+            </Typography>
+            <Box sx={{ minWidth: 0, flex: 1, overflowWrap: "anywhere" }}>
+              <Typography sx={{ fontWeight: 500 }}>{aluno.nome}</Typography>
+              {agrupamento === "atual" && aluno.turmaOriginalId !== aluno.turmaId ? (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Origem {rotuloDe(aluno.turmaOriginalId, "outra turma")}
-                </p>
-              )}
-              {agrupamento === "origem" && aluno.turmaId !== aluno.turmaOriginalId && (
-                <p className="text-muted-foreground text-xs">
+                </Typography>
+              ) : null}
+              {agrupamento === "origem" && aluno.turmaId !== aluno.turmaOriginalId ? (
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   Atual {rotuloDe(aluno.turmaId, "outra turma")}
-                </p>
-              )}
-            </div>
+                </Typography>
+              ) : null}
+            </Box>
             {aluno.desistenteEm ? (
-              <span className="text-muted-foreground text-xs">Desistente</span>
+              <Selo rotulo="Desistente" tom="atencao" />
             ) : !aluno.ativo ? (
-              <span className="text-muted-foreground text-xs">desativado</span>
+              <Selo rotulo="desativado" />
             ) : null}
-          </li>
+          </ListItem>
         ))}
-      </ul>
-    </div>
+      </List>
+    </Paper>
   );
 });
 
@@ -134,72 +176,73 @@ export default function VistaAlunos({ alunos, turmas, fuso, onAtualizar }: Props
   }, [grupos, nomesParaBusca, buscaAplicada]);
 
   return (
-    <section
+    <Box
+      component="section"
       aria-label="Lista de alunos"
       aria-busy={busca !== buscaAplicada}
-      className="flex flex-col gap-4 pb-6"
+      sx={{ display: "flex", flexDirection: "column", gap: 2, pb: 3, minWidth: 0 }}
     >
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Alunos</h1>
-          <p className="text-muted-foreground text-sm">
-            {alunos.length} no total · {ativos} ativos
-          </p>
-        </div>
-        <Users size={22} className="text-muted-foreground" aria-hidden="true" />
-      </div>
-      <div className="flex justify-end">
-        <AtualizadoDaVisao fuso={fuso} />
-      </div>
+      <CabecalhoPagina
+        compacto
+        titulo="Alunos"
+        descricao={`${alunos.length} no total · ${ativos} ativos`}
+        acoes={<AtualizadoDaVisao fuso={fuso} sx={{ whiteSpace: "normal" }} />}
+      />
 
-      <p className="bg-secondary/60 text-secondary-foreground rounded-lg border px-4 py-3 text-xs leading-relaxed">
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>
         Cadastros, transferências e desligamentos são feitos pelo administrador em Gestão.
-      </p>
+      </Typography>
 
-      <div
+      <Stack
         role="group"
         aria-label="Agrupamento da lista"
-        className="superficie grid grid-cols-2 gap-1 p-1.5"
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: "wrap" }}
       >
         {AGRUPAMENTOS.map((opcao) => {
-          const ativo = agrupamento === opcao.valor;
+          const selecionado = agrupamento === opcao.valor;
           return (
-            <button
+            <Botao
               key={opcao.valor}
-              type="button"
-              aria-pressed={ativo}
+              variante="contorno"
+              aria-pressed={selecionado}
               onClick={() => setAgrupamento(opcao.valor)}
-              className="controle pressionavel relative flex min-h-11 items-center justify-center px-2 text-xs font-medium transition-colors"
+              sx={{
+                minHeight: TOKENS_LAYOUT.alvoToque,
+                bgcolor: selecionado ? "action.selected" : "transparent",
+                borderColor: selecionado ? "primary.main" : "divider",
+              }}
             >
               {opcao.rotulo}
-            </button>
+            </Botao>
           );
         })}
-      </div>
+      </Stack>
 
-      {agrupamento === "origem" && (
-        <p className="text-muted-foreground -mt-2 text-xs leading-relaxed">
+      {agrupamento === "origem" ? (
+        <Typography variant="caption" sx={{ color: "text.secondary" }}>
           Turma da matrícula, usada na Grade e na planilha.
-        </p>
-      )}
+        </Typography>
+      ) : null}
 
-      {alunos.length > 0 && (
+      {alunos.length > 0 ? (
         <BarraBusca id="busca-alunos" valor={busca} onValor={setBusca} placeholder="Buscar aluno" />
-      )}
+      ) : null}
 
       {alunos.length === 0 ? (
-        <div className="superficie flex min-h-52 flex-col items-center justify-center gap-2 px-6 text-center">
-          <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Nenhum aluno nas suas turmas</p>
-          <p className="text-muted-foreground text-sm">
-            Peça ao administrador para cadastrar os alunos e atribuir as turmas a você.
-          </p>
-        </div>
+        <EstadoVazio
+          icone={<PersonOffRoundedIcon />}
+          titulo="Nenhum aluno nas suas turmas"
+          descricao="Peça ao administrador para cadastrar os alunos e atribuir as turmas a você."
+        />
       ) : gruposFiltrados.length === 0 ? (
-        <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-          <p className="font-medium">Nenhum aluno encontrado</p>
-          <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
-        </div>
+        <EstadoVazio
+          icone={<SearchOffRoundedIcon />}
+          titulo="Nenhum aluno encontrado"
+          descricao="Tente outro termo de busca."
+        />
       ) : (
         gruposFiltrados.map(([id, turma, lista]) => (
           <GrupoAlunos
@@ -211,6 +254,6 @@ export default function VistaAlunos({ alunos, turmas, fuso, onAtualizar }: Props
           />
         ))
       )}
-    </section>
+    </Box>
   );
 }

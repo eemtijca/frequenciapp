@@ -1,5 +1,11 @@
 // Utilidades comuns dos testes de ponta a ponta.
 import { expect, type Locator, type Page } from "@playwright/test";
+import {
+  exporNivelGestao,
+  fecharNavegacaoMovel,
+  menuMovel,
+  voltarAoMenuPrincipal,
+} from "../../helpers/categorias-configuracoes";
 import { nomeDoMes } from "@/domain/frequencia";
 import { navegarCalendario } from "./calendario-historico";
 import { validarDiaCivil } from "./navegacao-periodo";
@@ -59,7 +65,7 @@ const VISOES_COM_RESUMO = new Set(["painel", "chamada", "chamada-parcial", "said
  */
 export async function abrirDiaSeResumo(page: Page): Promise<void> {
   if (!hojeEDomingo()) return;
-  const visao = await page.locator("main").getAttribute("data-visao");
+  const visao = await page.locator("main").first().getAttribute("data-visao");
   const seletores: Record<string, string[]> = {
     painel: ["#dia-painel"],
     chamada: ["#dia-frequencia"],
@@ -110,17 +116,68 @@ export async function trocarVisao(
   page: Page,
   rotulo: string,
   visao: string,
-  opcoes?: { manterResumo?: boolean },
+  opcoes?: { manterResumo?: boolean; relatorio?: Relatorio },
 ): Promise<void> {
+  if (visao === "relatorios") {
+    await selecionarRelatorio(page, opcoes?.relatorio ?? "Resumo");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", visao);
+    return;
+  }
   // O indicador de rascunho integra o nome acessível depois da recuperação em segundo plano.
   const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const navegacao = await abrirNavegacao(page);
-  await navegacao
-    .getByRole("button", { name: new RegExp(`^${nome}(?: Alterações não salvas)?$`) })
-    .click();
+  if (visao === "gestao") {
+    const principal = navegacao.getByRole("button", {
+      name: /^Gestão(?: Alterações não salvas)?$/,
+    });
+    if (await navegacao.getByRole("button", { name: "Resumo", exact: true }).isVisible()) {
+      await voltarAoMenuPrincipal(navegacao);
+    }
+    if (await principal.isVisible()) await exporNivelGestao(page);
+    await fecharNavegacaoMovel(page);
+  } else {
+    await voltarAoMenuPrincipal(navegacao);
+    await navegacao
+      .getByRole("button", { name: new RegExp(`^${nome}(?: Alterações não salvas)?$`) })
+      .click();
+  }
   await expect(page.getByRole("dialog", { name: "Menu do aplicativo", exact: true })).toBeHidden();
-  await expect(page.locator("main")).toHaveAttribute("data-visao", visao);
+  await expect(page.locator("main").first()).toHaveAttribute("data-visao", visao);
   if (!opcoes?.manterResumo && VISOES_COM_RESUMO.has(visao)) await abrirDiaSeResumo(page);
+}
+
+const regioesRelatorios = {
+  Resumo: "Resumo dos relatórios",
+  Histórico: "Histórico de frequências",
+  Grade: "Grade de frequência",
+  "Por aluno": "Relatório por aluno",
+  "Saídas e Entradas": "Relatório de saídas e entradas",
+} as const;
+
+export type Relatorio = keyof typeof regioesRelatorios;
+
+export async function exporRelatorios(page: Page): Promise<Locator> {
+  const nav = await abrirNavegacao(page);
+  const resumo = nav.getByRole("button", { name: "Resumo", exact: true });
+  const principal = nav.getByRole("button", { name: "Relatórios", exact: true });
+  const voltar = nav.getByRole("button", { name: /^Voltar (para Gestão|ao menu principal)$/ });
+  await expect(resumo.or(principal).or(voltar).first()).toBeVisible();
+  if (!(await resumo.isVisible())) {
+    await voltarAoMenuPrincipal(nav);
+    await principal.click();
+  }
+  await expect(resumo).toBeVisible();
+  return nav;
+}
+
+/** Seleciona o destino pelo painel lateral e aguarda o conteúdo, não a animação da lista. */
+export async function selecionarRelatorio(page: Page, rotulo: Relatorio): Promise<Locator> {
+  const nav = await exporRelatorios(page);
+  await nav.getByRole("button", { name: rotulo, exact: true }).click();
+  await expect(menuMovel(page)).not.toBeAttached();
+  const painel = page.getByRole("region", { name: regioesRelatorios[rotulo], exact: true });
+  await expect(painel).toBeVisible();
+  return painel;
 }
 
 /** Clica em Salvar e confirma o resumo, sem esperar o resultado da gravação. */
@@ -183,7 +240,7 @@ export async function registrarSaida(page: Page): Promise<void> {
   await expect(dialogo).toBeVisible();
   await dialogo.getByRole("button", { name: "Registrar saída", exact: true }).click();
   await expect(dialogo).toBeHidden();
-  await expect(page.locator("#saida-aluno")).toContainText("Selecione o aluno");
+  await expect(page.locator("#saida-aluno")).toHaveValue("");
 }
 
 /** Clica em Registrar entrada, confirma o resumo e aguarda o formulário limpar. */
@@ -193,7 +250,7 @@ export async function registrarEntrada(page: Page): Promise<void> {
   await expect(dialogo).toBeVisible();
   await dialogo.getByRole("button", { name: "Registrar entrada", exact: true }).click();
   await expect(dialogo).toBeHidden();
-  await expect(page.locator("#entrada-aluno")).toContainText("Selecione o aluno");
+  await expect(page.locator("#entrada-aluno")).toHaveAttribute("placeholder", "Selecione o aluno");
 }
 
 /** Confirma o salvamento de uma frequência parcial no diálogo já aberto. */
@@ -241,7 +298,15 @@ export async function desbloquearChamada(secao: Locator): Promise<void> {
 export async function liberarSabadoSeNecessario(secao: Locator): Promise<void> {
   const liberar = secao.getByRole("button", { name: "Desbloquear sábado letivo", exact: true });
   if (!(await liberar.isVisible().catch(() => false))) return;
-  await expect(liberar).toBeEnabled();
+  const jaLiberado = secao.getByRole("button", { name: "Sábado letivo", exact: true });
+  // Depois de recarregar, o botão aparece desabilitado enquanto a chamada é lida.
+  await expect
+    .poll(async () => {
+      if (await jaLiberado.isVisible().catch(() => false)) return "liberado";
+      return (await liberar.isEnabled().catch(() => false)) ? "liberar" : "aguardando";
+    })
+    .not.toBe("aguardando");
+  if (await jaLiberado.isVisible().catch(() => false)) return;
   await liberar.click();
   const dialogo = secao
     .page()
@@ -259,19 +324,15 @@ export async function liberarSabadoSeNecessario(secao: Locator): Promise<void> {
 /** Escolhe um horário "HH:MM" pelo popover próprio, como a pessoa faria com o mouse. */
 export async function escolherHorario(page: Page, id: string, horario: string): Promise<void> {
   const [hora, minuto] = horario.split(":");
-  await page.locator(id).click();
-  const painel = page
-    .getByRole("dialog")
-    .filter({ has: page.getByRole("listbox", { name: "Horas" }) });
-  await painel
-    .getByRole("listbox", { name: "Horas" })
-    .getByRole("option", { name: hora ?? "", exact: true })
-    .click();
-  await painel
-    .getByRole("listbox", { name: "Minutos" })
-    .getByRole("option", { name: minuto ?? "", exact: true })
-    .click();
-  await expect(painel).toHaveCount(0);
+  const campo = page
+    .locator(id)
+    .locator('xpath=ancestor::div[contains(@class,"MuiPickersInputBase-root")]')
+    .first();
+  await campo.getByRole("spinbutton", { name: "Horas", exact: true }).click();
+  await page.keyboard.type(hora ?? "");
+  await campo.getByRole("spinbutton", { name: "Minutos", exact: true }).click();
+  await page.keyboard.type(minuto ?? "");
+  await page.keyboard.press("Tab");
 }
 
 /** Abre uma aba da área de saídas e entradas. */

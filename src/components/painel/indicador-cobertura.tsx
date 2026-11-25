@@ -1,26 +1,42 @@
 // Cobertura das chamadas com barra ponderada pelos alunos e pendências por turma.
-import { CheckCircle2, ChevronDown, Clock3 } from "lucide-react";
 import { useId } from "react";
+import Accordion from "@mui/material/Accordion";
+import AccordionDetails from "@mui/material/AccordionDetails";
+import AccordionSummary from "@mui/material/AccordionSummary";
+import Box from "@mui/material/Box";
+import Skeleton from "@mui/material/Skeleton";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import type { CoberturaTurmaDia } from "@/domain/relatorios";
-import { BarraProgresso } from "@/components/ui/barra-progresso";
-import { CartaoIndicador } from "@/components/ui/cartao-indicador";
+import { BarraProgresso } from "@/components/ui/mui/barra-progresso";
+import { CartaoTitulo } from "@/components/ui/mui/cartao";
 import { IndicadorFeriado } from "@/components/painel/indicador-feriado";
+import { TOKENS_LAYOUT } from "@/theme/layout";
+
+const TEXTO_OCULTO = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
 
 interface Props {
   turmas: CoberturaTurmaDia[];
+  escopo: string;
   feriado?: string;
+  carregando: boolean;
 }
 
-export function IndicadorCobertura({ turmas, feriado }: Props) {
+export function IndicadorCobertura({ turmas, escopo, feriado, carregando }: Props) {
   const descricaoId = useId();
-  if (feriado) {
-    return (
-      <CartaoIndicador titulo="Cobertura do dia" rotuloAcessivel="Cobertura do dia">
-        <IndicadorFeriado nome={feriado} />
-        <span className="sr-only">Não há chamadas pendentes nesta data.</span>
-      </CartaoIndicador>
-    );
-  }
   const esperados = turmas.reduce((total, item) => total + item.esperados, 0);
   const registrados = turmas.reduce(
     (total, item) => total + (item.concluida ? item.esperados : 0),
@@ -32,57 +48,119 @@ export function IndicadorCobertura({ turmas, feriado }: Props) {
   const contagem = `${registrados} de ${esperados} alunos com chamada salva`;
 
   return (
-    <CartaoIndicador titulo="Cobertura do dia" rotuloAcessivel="Cobertura do dia">
-      <div className="flex flex-col gap-2">
-        <span
-          aria-hidden="true"
-          className="numerais-tabulares text-primary text-3xl font-semibold sm:text-4xl"
-        >
-          {progresso}%
-        </span>
-        <BarraProgresso
-          valor={progresso}
-          rotulo="Alunos com chamada salva"
-          descricao={esperados > 0 ? contagem : "Nenhum aluno ativo cadastrado"}
-          descritoPor={esperados > 0 ? descricaoId : undefined}
-          testId="cobertura-preenchida"
-        />
-        <p id={descricaoId} className="sr-only">
-          {turmas
-            .map((item) => `${item.turma.rotulo}: ${item.concluida ? "concluída" : "pendente"}`)
-            .join("; ")}
-        </p>
-        {esperados === 0 ? (
-          <span className="text-muted-foreground text-xs">Sem alunos</span>
-        ) : turmasPendentes.length === 0 ? (
-          <span className="text-primary flex items-center gap-1.5 text-xs">
-            <CheckCircle2 aria-hidden="true" className="size-4 shrink-0" />
-            Concluída
-          </span>
-        ) : null}
-      </div>
-      {esperados > 0 && turmasPendentes.length > 0 && (
-        <details className="group">
-          <summary className="text-falta-texto focus-visible:ring-ring -mx-1 flex min-h-11 w-fit cursor-pointer list-none items-center gap-1 rounded-full px-1 text-xs focus-visible:ring-2 focus-visible:outline-none sm:gap-1.5 sm:px-2 sm:text-sm [&::-webkit-details-marker]:hidden">
-            <Clock3 aria-hidden="true" className="size-4 shrink-0" />
-            <span>
-              {turmasPendentes.length}{" "}
-              {turmasPendentes.length === 1 ? "turma pendente" : "turmas pendentes"}
-            </span>
-            <ChevronDown aria-hidden="true" className="size-4 shrink-0 group-open:rotate-180" />
-          </summary>
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {turmasPendentes.map((turma) => (
-              <span
-                key={turma.id}
-                className="bg-falta-fraca text-falta-texto rounded-md px-2 py-1 text-xs font-medium"
+    <Stack role="group" aria-label="Cobertura do dia" aria-busy={carregando} spacing={1}>
+      <CartaoTitulo>Cobertura do dia</CartaoTitulo>
+      <Typography variant="caption" color="text.secondary">
+        {escopo}
+      </Typography>
+      {feriado ? (
+        <>
+          <IndicadorFeriado nome={feriado} />
+          <Typography sx={TEXTO_OCULTO}>Não há chamadas pendentes nesta data.</Typography>
+        </>
+      ) : carregando ? (
+        <Skeleton variant="rounded" width="100%" height={64} />
+      ) : (
+        <>
+          <Stack spacing={1}>
+            <Typography
+              aria-hidden="true"
+              variant="h3"
+              component="p"
+              sx={{
+                fontVariantNumeric: "tabular-nums",
+                fontWeight: 600,
+                color: "text.primary",
+              }}
+            >
+              {progresso}%
+            </Typography>
+            <BarraProgresso
+              valor={progresso}
+              rotulo="Alunos com chamada salva"
+              descricao={esperados > 0 ? contagem : "Nenhum aluno ativo cadastrado"}
+              descritoPor={esperados > 0 ? descricaoId : undefined}
+              testId="cobertura-preenchida"
+            />
+            <Typography id={descricaoId} sx={TEXTO_OCULTO}>
+              {turmas
+                .map((item) => `${item.turma.rotulo}: ${item.concluida ? "concluída" : "pendente"}`)
+                .join("; ")}
+            </Typography>
+            {esperados > 0 && (
+              <Typography variant="caption" color="text.secondary">
+                {contagem}
+              </Typography>
+            )}
+            {esperados === 0 ? (
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                Sem alunos
+              </Typography>
+            ) : turmasPendentes.length === 0 ? (
+              <Stack direction="row" spacing={0.75} sx={{ alignItems: "center" }}>
+                <CheckCircleRoundedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
+                <Typography variant="caption" sx={{ color: "primary.main" }}>
+                  Concluída
+                </Typography>
+              </Stack>
+            ) : null}
+          </Stack>
+          {esperados > 0 && turmasPendentes.length > 0 && (
+            <Accordion
+              disableGutters
+              elevation={0}
+              sx={{
+                "&:before": { display: "none" },
+                backgroundColor: "transparent",
+              }}
+            >
+              <AccordionSummary
+                expandIcon={<ExpandMoreRoundedIcon />}
+                sx={{ px: 0.5, minHeight: TOKENS_LAYOUT.alvoToque }}
               >
-                {turma.rotulo}
-              </span>
-            ))}
-          </div>
-        </details>
+                <Stack direction="row" spacing={0.75} sx={{ alignItems: "center", minWidth: 0 }}>
+                  <AccessTimeRoundedIcon aria-hidden="true" sx={{ fontSize: 16 }} />
+                  <Typography variant="caption" sx={{ color: "falta.texto" }}>
+                    {turmasPendentes.length}{" "}
+                    {turmasPendentes.length === 1 ? "turma pendente" : "turmas pendentes"}
+                  </Typography>
+                </Stack>
+              </AccordionSummary>
+              <AccordionDetails sx={{ px: 0.5, pt: 0, mb: 0 }}>
+                <Box
+                  component="ul"
+                  sx={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 0.75,
+                    listStyle: "none",
+                    m: 0,
+                    p: 0,
+                  }}
+                >
+                  {turmasPendentes.map((turma) => (
+                    <Box
+                      component="li"
+                      key={turma.id}
+                      sx={(theme) => ({
+                        px: 1,
+                        py: 0.5,
+                        borderRadius: 1,
+                        backgroundColor: theme.vars.palette.falta.fraco,
+                        color: theme.vars.palette.falta.texto,
+                        fontSize: "0.75rem",
+                        fontWeight: 500,
+                      })}
+                    >
+                      {turma.rotulo}
+                    </Box>
+                  ))}
+                </Box>
+              </AccordionDetails>
+            </Accordion>
+          )}
+        </>
       )}
-    </CartaoIndicador>
+    </Stack>
   );
 }

@@ -1,5 +1,6 @@
 // Origem configurável na Chamada, consulta por origem nos Alunos
 // e definição da turma original em massa na Gestão.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { tituloResumoDoDia } from "../helpers/dia";
@@ -174,8 +175,8 @@ test.describe("origem em massa (administração)", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Alunos" }).click();
-    const painel = page.locator("#painel-alunos");
+    await selecionarCadastroGestao(page, "Alunos");
+    const painel = page.getByRole("region", { name: "Gestão da escola", exact: true });
     await painel.getByRole("button", { name: "Definir origem" }).click();
     await page.locator("#busca-gestao-aluno").fill("E2E Origem");
     await painel.getByRole("button", { name: "Selecionar todos" }).click();

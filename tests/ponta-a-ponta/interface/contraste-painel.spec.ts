@@ -1,4 +1,4 @@
-// Verifica a visibilidade e o contraste dos controles de data do painel.
+// Verifica a disposição dos indicadores e o contraste dos controles do Painel.
 import { expect, test, type Locator } from "@playwright/test";
 import { contraste, type Rgb } from "../../helpers/cor";
 import { aguardarHidratacao } from "../helpers/pagina";
@@ -24,7 +24,20 @@ async function cores(elemento: Locator) {
       return Array.from(desenho.getImageData(0, 0, 1, 1).data);
     };
     const estilo = getComputedStyle(no);
-    const superficie = getComputedStyle(document.body).backgroundColor;
+    const camadas: string[] = [];
+    for (let pai = no.parentElement; pai; pai = pai.parentElement) {
+      const fundo = getComputedStyle(pai).backgroundColor;
+      camadas.push(fundo);
+      if (cor(fundo)[3] === 255) break;
+    }
+    desenho.clearRect(0, 0, 1, 1);
+    for (const fundo of camadas.reverse()) {
+      desenho.fillStyle = fundo;
+      desenho.fillRect(0, 0, 1, 1);
+    }
+    const [r, g, b, a] = desenho.getImageData(0, 0, 1, 1).data;
+    if (a !== 255) throw new Error("A superfície sob o controle precisa ser opaca.");
+    const superficie = `rgb(${r}, ${g}, ${b})`;
     return {
       fundo: compor(estilo.backgroundColor, superficie),
       fundoBruto: cor(estilo.backgroundColor),
@@ -40,7 +53,49 @@ function rgb(cor: number[]): Rgb {
   return [(cor[0] ?? 0) / 255, (cor[1] ?? 0) / 255, (cor[2] ?? 0) / 255];
 }
 
-test("as setas de data do painel têm fundo suave e fio sutil no tema claro", async ({
+test("o divisor dos indicadores muda de orientação e mantém espaço dos dois lados", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  const periodo = page.getByRole("button", { name: /^(Dia do painel|Resumo da semana):/ });
+  await expect(periodo).toBeVisible();
+  if ((await periodo.getAttribute("aria-label"))?.startsWith("Resumo da semana")) {
+    await page.getByRole("button", { name: "Dia anterior", exact: true }).click();
+  }
+  const cartao = page.getByRole("region", { name: "Indicadores do dia", exact: true });
+  const infrequencia = cartao.getByRole("group", { name: "Resumo do dia", exact: true });
+  const cobertura = cartao.getByRole("group", { name: "Cobertura do dia", exact: true });
+  const divisor = cartao.locator('hr:visible, [role="separator"]:visible');
+  await expect(infrequencia).toBeVisible();
+  await expect(cobertura).toBeVisible();
+
+  for (const largura of [320, 390, 768, 904, 905, 1440]) {
+    await page.setViewportSize({ width: largura, height: 900 });
+    await expect(divisor).toHaveCount(1);
+    await expect
+      .poll(async () => {
+        const [a, b, linha] = await Promise.all([
+          infrequencia.boundingBox(),
+          cobertura.boundingBox(),
+          divisor.boundingBox(),
+        ]);
+        if (!a || !b || !linha || Math.abs(a.width - b.width) > 1) return "indefinido";
+        const horizontal = linha.width > linha.height && linha.height > 0;
+        const vertical = linha.height > linha.width && linha.width > 0;
+        const folgaAntes = horizontal ? linha.y - a.y - a.height : linha.x - a.x - a.width;
+        const folgaDepois = horizontal ? b.y - linha.y - linha.height : b.x - linha.x - linha.width;
+        if (Math.min(folgaAntes, folgaDepois) < 15) return "espaçamento insuficiente";
+        if (horizontal && Math.abs(a.x - b.x) < 1) return "empilhados";
+        if (vertical && Math.abs(a.y - b.y) < 1) return "lado a lado";
+        return "indefinido";
+      })
+      .toBe(largura < 905 ? "empilhados" : "lado a lado");
+  }
+});
+
+test("as setas de data do painel têm fundo neutro transparente e contorno legível", async ({
   page,
 }, info) => {
   await page.setViewportSize({ width: 390, height: 844 });
@@ -62,9 +117,9 @@ test("as setas de data do painel têm fundo suave e fio sutil no tema claro", as
     }),
     contentType: "application/json",
   });
-  expect(medida.fundoBruto[3]).toBe(255);
+  expect(medida.fundoBruto[3]).toBe(0);
   expect(medida.larguraBorda).toBe("1px");
-  expect(contraste(rgb(medida.borda), rgb(medida.superficie))).toBeGreaterThanOrEqual(1.3);
+  expect(contraste(rgb(medida.borda), rgb(medida.superficie))).toBeGreaterThanOrEqual(3);
   expect(contraste(texto, fundo)).toBeGreaterThanOrEqual(4.5);
   await anterior.click();
   await expect(page.getByRole("button", { name: "Dia seguinte", exact: true })).toBeEnabled();
@@ -77,7 +132,7 @@ for (const tema of ["light", "dark"] as const) {
     await page.addInitScript(() => localStorage.setItem("theme", "system"));
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.locator("html")).toHaveClass(new RegExp(tema));
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
     await page.mouse.move(389, 843);
     const anterior = page.getByRole("button", { name: "Dia anterior", exact: true });
     const seguinte = page.getByRole("button", { name: "Dia seguinte", exact: true });
@@ -88,12 +143,13 @@ for (const tema of ["light", "dark"] as const) {
     // O resumo semanal não tem navegação de gráficos; o seletor de período
     // continua presente tanto no domingo quanto nos demais dias.
     const controle = await cores(periodo);
-    expect(seta.fundoBruto[3]).toBe(255);
-    expect(controle.fundoBruto[3]).toBe(255);
+    expect(seta.fundoBruto[3]).toBe(0);
+    expect(controle.fundoBruto[3]).toBe(0);
     expect(seta.larguraBorda).toBe("1px");
     expect(controle.larguraBorda).toBe("1px");
-    expect(contraste(rgb(seta.borda), rgb(seta.superficie))).toBeGreaterThanOrEqual(1.3);
-    expect(contraste(rgb(controle.borda), rgb(controle.superficie))).toBeGreaterThanOrEqual(1.3);
+    expect(contraste(rgb(seta.borda), rgb(seta.superficie))).toBeGreaterThanOrEqual(3);
+    expect(contraste(rgb(controle.borda), rgb(controle.superficie))).toBeGreaterThanOrEqual(3);
+    expect(contraste(rgb(controle.texto), rgb(controle.fundo))).toBeGreaterThanOrEqual(4.5);
     const caixa = await anterior.boundingBox();
     expect(caixa?.width).toBeGreaterThanOrEqual(44);
     expect(caixa?.height).toBeGreaterThanOrEqual(44);
@@ -119,10 +175,10 @@ for (const tema of ["light", "dark"] as const) {
     await expect(periodo).toHaveAttribute("aria-label", /^Dia do painel:/);
     const grafico = page.getByRole("button", { name: "Próximo gráfico", exact: true });
     const coresGrafico = await cores(grafico);
-    expect(coresGrafico.fundoBruto[3]).toBe(255);
+    expect(coresGrafico.fundoBruto[3]).toBe(0);
     expect(coresGrafico.larguraBorda).toBe("1px");
     expect(contraste(rgb(coresGrafico.borda), rgb(coresGrafico.superficie))).toBeGreaterThanOrEqual(
-      1.3,
+      3,
     );
   });
 }

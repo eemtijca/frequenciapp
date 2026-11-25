@@ -2,7 +2,7 @@
 
 // Fronteira de erro da rota raiz: tela padrão com recarga e volta ao início.
 import { useEffect } from "react";
-import { TelaEstado } from "@/components/ui/tela-estado";
+import { TelaEstado } from "@/components/ui/mui/tela-estado";
 
 export default function Erro({
   error,

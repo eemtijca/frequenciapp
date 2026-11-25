@@ -60,7 +60,7 @@ function leituraDeRascunho(contexto: Record<string, unknown>): () => void {
 describe("leitura local da chamada", () => {
   it("não apaga cópia recuperável se a leitura é bloqueada", () => {
     const removeItem = vi.fn();
-    const toast = { error: vi.fn() };
+    const publicarAviso = vi.fn();
     const ler = leituraDeRascunho({
       usuario: { id: "u" },
       dia: "d",
@@ -72,14 +72,14 @@ describe("leitura local da chamada", () => {
         },
         removeItem,
       },
-      toast,
+      publicarAviso,
     });
     expect(ler).not.toThrow();
     expect(removeItem).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalledOnce();
+    expect(publicarAviso).toHaveBeenCalledOnce();
   });
   it("falha ao remover conteúdo comprovadamente inválido não derruba a chamada", () => {
-    const toast = { error: vi.fn() };
+    const publicarAviso = vi.fn();
     const ler = leituraDeRascunho({
       usuario: { id: "u" },
       dia: "d",
@@ -91,10 +91,10 @@ describe("leitura local da chamada", () => {
           throw new DOMException("Bloqueado", "SecurityError");
         },
       },
-      toast,
+      publicarAviso,
     });
     expect(ler).not.toThrow();
-    expect(toast.error).toHaveBeenCalled();
+    expect(publicarAviso).toHaveBeenCalled();
   });
 });
 
@@ -111,7 +111,7 @@ describe("rascunho no efeito da chamada", () => {
         },
         removeItem,
       };
-      const toast = { error: vi.fn() };
+      const publicarAviso = vi.fn();
       const estado = {
         sujo: true,
         dia: "d",
@@ -126,14 +126,14 @@ describe("rascunho no efeito da chamada", () => {
         falhaRascunho: { current: "" },
         chaveRascunho: (u: string, d: string, t: string) => `${u}:${d}:${t}`,
         sessionStorage: armazenamento,
-        toast,
+        publicarAviso,
       };
       const gravar = efeitoDeGravacao(estado);
       gravar();
       gravar();
       expect(copias.get("u:d:t")).toBe("cópia anterior");
       expect(removeItem).not.toHaveBeenCalled();
-      expect(toast.error).toHaveBeenCalledOnce();
+      expect(publicarAviso).toHaveBeenCalledOnce();
       falhar = false;
       gravar();
       expect(JSON.parse(copias.get("u:d:t") ?? "null")).toMatchObject({
@@ -142,7 +142,7 @@ describe("rascunho no efeito da chamada", () => {
       });
       falhar = true;
       gravar();
-      expect(toast.error).toHaveBeenCalledTimes(2);
+      expect(publicarAviso).toHaveBeenCalledTimes(2);
       expect(estado.ausencias.has("aluno")).toBe(true);
     });
   }

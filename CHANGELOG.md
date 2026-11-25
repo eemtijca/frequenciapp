@@ -10,6 +10,22 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A página sem conexão e o erro global mantêm alvo de 48 px e foco de 3 px. O esqueleto de carregamento reserva a gaveta a partir de 905 px, junto com o shell. O contrato do tema registra o foco sólido de 3 px e o que foi reaproveitado dos ADRs 061 e 062, sem recuperar o CSS antigo.
+
+- FrequenciBI nomeia os comandos de mostrar e ocultar a chave de acesso, recolhe os filtros da Visão geral no celular e alinha Meta ou limiar aos campos do editor.
+
+- Minhas turmas compacta a barra e os indicadores no celular, distingue filtros e limite com contraste, separa barras de alunos com nomes semelhantes e mantém os valores da tabela alcançáveis por teclado. A troca de turma ou mês aguarda o resultado dos novos filtros. A legenda da tabela permanece legível durante a rolagem horizontal.
+
+- Em Relatórios, Saídas e Entradas reúne os grupos de período e agrupamento quando há espaço, mantém seus alvos de 48 px e compacta a faixa de filtros e totais para mostrar os registros mais cedo.
+
+- Por aluno organiza mês, busca e comandos de expansão e separa a ação Emitir relatório. Nomes e rótulos longos permanecem legíveis sem encobrir os contadores de frequência.
+
+- O Resumo de Relatórios reúne mês, série e turma, aproxima os indicadores dos filtros e amplia a área de evolução em painéis largos. Os dados diários e os controles do ranking ganham alvos maiores, sem mudar cálculos, critérios ou ordenação.
+
+- A interface migra para Material UI 9 com um tema próprio em CSS variables, componentes compartilhados em `src/components/ui/mui` e gráficos MUI X; o FrequenciBI mantém Recharts como exceção documentada. Tailwind, Radix, Lucide, Sonner, next-themes e Motion foram removidos, e a galeria visual passa a registrar as telas em claro e escuro.
+
+- Gestão e Configurações passam a navegar pela gaveta, sem trilhos duplicados, preservando telas visitadas e rascunhos. No celular, escolher um destino final fecha a gaveta e leva o foco ao título; apenas dispensar o menu devolve o foco a Abrir menu. A preferência Animações da interface fica na conta, vale para todo o aplicativo e é lembrada no navegador.
+
 - A Chamada Parcial usa um cabeçalho sem subtítulo, reúne turma e data em um painel e integra a busca e o filtro de situação à lista de alunos. Os controles se empilham quando há pouco espaço.
 
 - As massas dos testes de chamada alinham o cadastro das turmas e dos alunos ao dia de referência, evitando conflitos históricos artificiais no domingo. Uma regressão usa domingo fixo na geração da massa e salva o sábado pela API real, sem alterar o relógio do aplicativo nem dispensar a confirmação histórica quando necessária.
@@ -119,6 +135,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- Nos horários da turma, confirmar a exclusão de uma aula leva o foco a Nova aula, e ativar ou desativar devolve o foco ao mesmo comando, sem perdê-lo para a página.
+- No tema claro, o campo desabilitado ganha contorno próprio, mais claro que o do campo ativo.
+- Notificações mantém texto e ações inteiros no celular ao evitar a rolagem horizontal indevida. O trilho inteiro permite alterar os avisos disponíveis. O interruptor expõe a descrição acessível quando a linha mostra um horário ou motivo de indisponibilidade.
+- A Grade usa a largura do conteúdo sem esticar Aluno ou Total. Em tabelas com rolagem horizontal, o arraste responde ao inverter nos limites e termina ao soltar o botão principal. O filtro de séries do Histórico mantém seus controles sem a faixa de sombra atrás do grupo.
 - O backup drena todo o fluxo após listar o catálogo PostgreSQL, sem travar a cifra nem segurar indefinidamente a trava de operações em dumps grandes.
 - O primeiro backup do instalador passa a conferir o escopo a partir da identidade operacional e do banco efetivo, reutilizando a verificação oficial e preservando as recusas de artefatos, ponteiro, schema ou destino divergentes. A repetição confere novamente os arquivos e o remoto configurado sem gerar outro dump nem declarar a restauração exercitada.
 - A troca de canal e o comando de backup passam a conferir o conjunto pelo verificador oficial, com alvo, banco, schema e destino resolvidos pela operação e ambiente restrito ao allowlist. O planejamento de downgrade usa a conferência somente leitura, sem trava, diretórios ou temporários na instalação, e não gera outro dump. As recusas de artefatos, escopo e remoto indisponível preservam o conjunto e não avançam a instalação; a preferência de canal e tag segue o comportamento anterior de gravação antes do backup no caminho de aplicação.

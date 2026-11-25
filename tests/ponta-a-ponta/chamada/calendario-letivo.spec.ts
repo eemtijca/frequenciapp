@@ -1,5 +1,6 @@
 // Calendário anual de feriados: cadastro, bloqueio de chamadas e proteção do histórico.
 // A massa usa nomes próprios e datas livres, sem apagar registros preexistentes.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaLocal } from "@/domain/frequencia";
 import { comBanco } from "../helpers/banco";
@@ -110,11 +111,7 @@ async function abrirCalendario(page: Page): Promise<Locator> {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações", exact: true })
-    .getByRole("button", { name: "Escola", exact: true })
-    .click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarAcaoConfiguracoes(page, "Escola", "Calendário");
   const secao = page.locator('[data-secao="config-calendario"]');
   const abrir = secao.getByRole("button", { name: /^Calendário letivo/ });
@@ -124,24 +121,13 @@ async function abrirCalendario(page: Page): Promise<Locator> {
   return secao;
 }
 
-/** Escolhe o ano no popover, percorrendo os blocos até encontrá-lo. */
+/** Escolhe o ano na lista de opções do seletor. */
 async function escolherAno(page: Page, secao: Locator, ano: string) {
   const gatilho = secao.getByLabel("Ano do calendário", { exact: true });
-  if ((await gatilho.getAttribute("aria-expanded")) !== "true") await gatilho.click();
-  const painel = page.getByRole("dialog", { name: "Ano do calendário", exact: true });
-  await expect(painel).toBeVisible();
-  for (let tentativa = 0; tentativa < 12; tentativa += 1) {
-    const alvo = painel.getByRole("button", { name: ano, exact: true });
-    if ((await alvo.count()) > 0) {
-      await alvo.click();
-      await expect(painel).toBeHidden();
-      return;
-    }
-    const anterior = painel.getByRole("button", { name: "Bloco de anos anterior", exact: true });
-    if (await anterior.isDisabled()) break;
-    await anterior.click();
-  }
-  throw new Error(`Ano ${ano} não encontrado no calendário.`);
+  await gatilho.click();
+  await gatilho.fill(ano);
+  await page.getByRole("option", { name: ano, exact: true }).click();
+  await expect(gatilho).toHaveValue(ano);
 }
 
 async function adicionarPelaInterface(page: Page, secao: Locator, dia: string, nome: string) {
@@ -237,14 +223,14 @@ test("cadastra feriado no ano escolhido, recarrega e remove somente após confir
   test.setTimeout(120_000);
   let secao = await abrirCalendario(page);
   const ano = secao.getByLabel("Ano do calendário", { exact: true });
-  await expect(ano).toHaveAttribute("aria-haspopup", "dialog");
+  await expect(ano).toHaveAttribute("role", "combobox");
   expect((await adicionarPelaInterface(page, secao, DIA_ANUAL, NOME_ANUAL)).status()).toBe(200);
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
   await escolherAno(page, secao, "1995");
-  await expect(ano).toContainText("1995");
+  await expect(ano).toHaveValue("1995");
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toHaveCount(0);
   await escolherAno(page, secao, "1994");
-  await expect(ano).toContainText("1994");
+  await expect(ano).toHaveValue("1994");
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
 
   secao = await abrirCalendario(page);
@@ -257,7 +243,7 @@ test("cadastra feriado no ano escolhido, recarrega e remove somente após confir
     );
     for (const tema of ["light", "dark"] as const) {
       await page.emulateMedia({ colorScheme: tema });
-      await expect(page.locator("html")).toHaveClass(tema === "dark" ? /dark/ : /light/);
+      await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
       await info.attach(`Calendário ${largura}px ${tema}`, {
         body: await secao.screenshot(),
         contentType: "image/png",
@@ -398,7 +384,7 @@ test("falha do lote mantém o feriado no rascunho e permite tentar de novo", asy
   await expect(secao.getByText(NOME_ANUAL, { exact: true })).toBeVisible();
 
   await page.route("**/api/configuracoes/lote", (rota) => rota.abort("failed"));
-  await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+  await page.getByRole("button", { name: "Revisar alterações", exact: true }).click();
   const revisao = page.getByRole("alertdialog", { name: "Salvar configurações?" });
   await revisao.getByRole("button", { name: "Salvar configurações", exact: true }).click();
   await expect(revisao).toBeVisible();

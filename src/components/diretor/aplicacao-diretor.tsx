@@ -4,29 +4,43 @@
 // No primeiro acesso, a troca da palavra-chave vem antes de qualquer dado.
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, Info, KeyRound, LoaderCircle, LogOut } from "lucide-react";
-import { toast } from "sonner";
+import AppBar from "@mui/material/AppBar";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Toolbar from "@mui/material/Toolbar";
+import Typography from "@mui/material/Typography";
+import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
+import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
 import { pedir } from "@/lib/api-cliente";
 import { expurgarBiNoLogout } from "@/lib/bi-armazenamento";
-import { avisarSucesso } from "@/lib/avisos";
+import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios";
 import type { ContextoDiretor } from "@/domain/estatisticas-diretor";
-import { Button } from "@/components/ui/button";
-import { SeletorTema } from "@/components/ui/seletor-tema";
-import { BotaoAtualizar } from "@/components/ui/botao-atualizar";
-import { AtualizadoEm } from "@/components/ui/atualizado-em";
+import { LayoutConteudo } from "@/components/layout/layout-conteudo";
+import { LayoutPagina } from "@/components/layout/layout-pagina";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { AtualizadoEm } from "@/components/ui/mui/atualizado-em";
+import { BotaoAtualizar } from "@/components/ui/mui/botao-atualizar";
+import { BotaoIcone } from "@/components/ui/mui/botao";
+import { SeletorTema } from "@/components/ui/mui/seletor-tema";
+import { SeletorAnimacoes } from "@/components/conta/seletor-animacoes";
 import DialogoSenha from "@/components/conta/dialogo-senha";
 import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import DialogoSobre from "@/components/dialogo-sobre";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   usuario: Identidade;
   contexto: ContextoDiretor;
   fuso: string;
 }
+
+const ALVO_ACAO = { width: TOKENS_LAYOUT.alvoToque, height: TOKENS_LAYOUT.alvoToque } as const;
 
 export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
   const router = useRouter();
@@ -40,8 +54,8 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
   const { executando: saindo, executar: sair } = useAcaoUnica(async () => {
     try {
       await pedir<{ ok: boolean }>("/api/auth/sair", { method: "POST" });
-    } catch {
-      toast.error("Não foi possível sair. Tente novamente.");
+    } catch (excecao) {
+      avisarErro(excecao, { contexto: "Não foi possível sair. Tente novamente." });
       return;
     }
     try {
@@ -54,84 +68,131 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
   });
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="superficie sticky top-0 z-20 rounded-none border-0 border-b">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-2.5 sm:px-6">
-          <div className="min-w-0">
-            <p className="truncate font-semibold tracking-tight">FrequenciApp</p>
-            <p className="text-muted-foreground truncate text-xs">
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        minHeight: "100dvh",
+        "& > main": { flex: 1, minHeight: 0 },
+      }}
+    >
+      <AppBar
+        position="sticky"
+        sx={{
+          paddingTop: "env(safe-area-inset-top, 0px)",
+          paddingLeft: { xs: "env(safe-area-inset-left, 0px)", sm: 0 },
+          paddingRight: "env(safe-area-inset-right, 0px)",
+        }}
+      >
+        <Toolbar
+          sx={{
+            alignItems: "center",
+            flexWrap: "wrap",
+            columnGap: { xs: 1, sm: 0 },
+            rowGap: 0.5,
+            paddingY: { xs: 1, sm: 0 },
+          }}
+        >
+          <Box sx={{ minWidth: 0, flex: 1, mr: { sm: 1 } }}>
+            <Typography variant="subtitle1" component="p" noWrap sx={{ fontWeight: 600 }}>
+              FrequenciApp
+            </Typography>
+            <Typography
+              variant="caption"
+              component="p"
+              sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+            >
               {primeiroNome(usuario.nome)} · {rotuloDePapel(usuario.papel)}
-            </p>
-            <AtualizadoEm instante={atualizadoEm} fuso={fuso} className="mt-0.5" />
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <BotaoAtualizar
-              variante="ghost"
-              onAtualizar={() => {
-                setAtualizacao((valor) => valor + 1);
-              }}
-            />
-            <SeletorTema variante="ghost" />
-            {!contexto.trocaObrigatoria ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-11"
-                aria-label="Configurar notificações"
-                title="Configurar notificações"
-                onClick={() => setNotificacoesAbertas(true)}
-              >
-                <Bell size={18} />
-              </Button>
-            ) : null}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-11"
-              aria-label="Sobre"
-              title="Sobre"
-              onClick={() => setSobreAberto(true)}
-            >
-              <Info size={18} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-11"
-              aria-label="Trocar minha palavra-chave"
-              title="Trocar minha palavra-chave"
-              onClick={() => setTrocaAberta(true)}
-            >
-              <KeyRound size={18} />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-11"
-              aria-label="Sair da conta"
-              title="Sair da conta"
-              disabled={saindo}
-              onClick={() => void sair()}
-            >
-              {saindo ? <LoaderCircle size={18} className="animate-spin" /> : <LogOut size={18} />}
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-4 sm:px-6" data-visao="diretor">
-        {contexto.trocaObrigatoria ? (
-          <div className="text-muted-foreground flex min-h-60 items-center justify-center text-center text-sm">
-            Crie sua palavra-chave para ver as estatísticas.
-          </div>
-        ) : (
-          <VistaMinhasTurmas
-            contexto={contexto}
-            atualizacao={atualizacao}
-            onAtualizado={marcarAtualizado}
+            </Typography>
+            <AtualizadoEm instante={atualizadoEm} fuso={fuso} sx={{ whiteSpace: "normal" }} />
+          </Box>
+          <BotaoAtualizar
+            variante="texto"
+            onAtualizar={() => setAtualizacao((valor) => valor + 1)}
+            sx={{ mr: { sm: 0.5 } }}
           />
-        )}
-      </main>
+          <Stack
+            direction="row"
+            useFlexGap
+            sx={{
+              alignItems: "center",
+              flexWrap: "wrap",
+              flex: { xs: "0 0 100%", sm: "0 0 auto" },
+              justifyContent: { xs: "space-evenly", sm: "flex-end" },
+              columnGap: { sm: 0.5 },
+              rowGap: 0.5,
+              maxWidth: "100%",
+            }}
+          >
+            <Box
+              sx={{
+                display: "inline-flex",
+                "& > button": {
+                  width: TOKENS_LAYOUT.alvoToque,
+                  height: TOKENS_LAYOUT.alvoToque,
+                  backgroundColor: "transparent",
+                  borderColor: "transparent",
+                  "&:hover": { backgroundColor: "action.hover" },
+                },
+              }}
+            >
+              <SeletorTema />
+            </Box>
+            <SeletorAnimacoes />
+            {!contexto.trocaObrigatoria ? (
+              <BotaoIcone
+                rotulo="Configurar notificações"
+                icone={<NotificationsRoundedIcon />}
+                variante="texto"
+                onClick={() => setNotificacoesAbertas(true)}
+                sx={ALVO_ACAO}
+              />
+            ) : null}
+            <BotaoIcone
+              rotulo="Sobre"
+              icone={<InfoRoundedIcon />}
+              variante="texto"
+              onClick={() => setSobreAberto(true)}
+              sx={ALVO_ACAO}
+            />
+            <BotaoIcone
+              rotulo="Trocar minha palavra-chave"
+              icone={<KeyRoundedIcon />}
+              variante="texto"
+              onClick={() => setTrocaAberta(true)}
+              sx={ALVO_ACAO}
+            />
+            <BotaoIcone
+              rotulo="Sair da conta"
+              icone={<LogoutRoundedIcon />}
+              variante="texto"
+              carregando={saindo}
+              onClick={() => void sair()}
+              sx={ALVO_ACAO}
+            />
+          </Stack>
+        </Toolbar>
+      </AppBar>
+
+      <LayoutPagina>
+        <LayoutConteudo largura="leitura">
+          <Box data-visao="diretor">
+            {contexto.trocaObrigatoria ? (
+              <EstadoVazio
+                icone={<KeyRoundedIcon />}
+                titulo="Palavra-chave necessária"
+                descricao="Crie sua palavra-chave para ver as estatísticas."
+              />
+            ) : (
+              <VistaMinhasTurmas
+                contexto={contexto}
+                atualizacao={atualizacao}
+                onAtualizado={marcarAtualizado}
+              />
+            )}
+          </Box>
+        </LayoutConteudo>
+      </LayoutPagina>
 
       <DialogoSenha
         palavraChave
@@ -145,6 +206,6 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
       <DialogoNotificacoes aberto={notificacoesAbertas} onAbrir={setNotificacoesAbertas} />
       <DialogoSobre aberto={sobreAberto} onAbrir={setSobreAberto} />
       <RegistroPwa />
-    </div>
+    </Box>
   );
 }

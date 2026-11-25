@@ -1,4 +1,8 @@
 // Organização coletiva: mapa salvo, andamento, falhas por aba e ausência de reenvio.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page } from "@playwright/test";
 import { colunasDeApresentacao } from "../../../src/domain/planilha-apresentacao";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -34,11 +38,8 @@ async function abrir(page: Page, comMapa = true) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações" }).click();
-  await page
-    .getByRole("navigation", { name: "Categorias de configurações" })
-    .getByRole("button", { name: "Planilhas", exact: true })
-    .click();
+  await abrirConfiguracoesDaGestao(page);
+  await selecionarCategoriaConfiguracoes(page, "Planilhas");
   const cartao = page.locator('[data-secao="planilha-frequencia"]');
   await cartao.getByRole("button", { name: /Planilha de frequência/ }).click();
   await selecionarAcaoPlanilha(cartao, "Organizar");
@@ -97,7 +98,7 @@ test("processa só as turmas mapeadas, mostra falhas e não repete a gravação"
     exact: true,
   });
   await botao.click();
-  const dialogo = page.getByRole("alertdialog");
+  const dialogo = page.getByRole("dialog");
   await expect(dialogo.getByText(/Abas prontas: 2 de 3/)).toBeVisible();
   expect(leituras).toEqual(nomes);
   await expect(dialogo.getByText("QA Ano C: Não será alterada", { exact: true })).toBeVisible();
@@ -130,7 +131,7 @@ test("processa só as turmas mapeadas, mostra falhas e não repete a gravação"
   await dialogo.screenshot({
     path: `docs/imagens/locais/planilha-todas-pendencias-${contexto.project.name}.png`,
   });
-  await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Fechar", exact: true }).last().click();
   todasRecusadas = true;
   await botao.click();
   await expect(dialogo.getByText(/Abas prontas: 0 de 3/)).toBeVisible();

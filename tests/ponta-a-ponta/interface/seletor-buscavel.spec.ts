@@ -1,4 +1,5 @@
 // Busca compartilhada dentro de diálogo e em lista longa, com toque e área reduzida.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -15,33 +16,32 @@ test.afterAll(limparMassaE2E);
 
 test("buscar uma turma mantém o formulário aberto ao reduzir a tela e cancelar a lista", async ({
   page,
-  isMobile,
 }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Alunos", exact: true }).click();
+  await selecionarCadastroGestao(page, "Alunos");
   await page.getByRole("button", { name: "Novo aluno", exact: true }).click();
   const formulario = page.getByRole("dialog", { name: "Novo aluno", exact: true });
   const turma = formulario.getByRole("combobox", { name: "Turma atual", exact: true });
-  await turma.click();
-  const busca = page.getByRole("textbox", { name: "Filtrar opções", exact: true });
-  if (isMobile) await busca.tap();
-  else await busca.click();
+  // A lista acompanha a janela: reduza antes de abrir para testar o painel estreito.
   await page.setViewportSize({ width: 360, height: 500 });
+  await turma.click();
+  const busca = turma;
+  await busca.press("Control+A");
   await busca.pressSequentially("E2E Ano");
   await expect(busca).toHaveValue("E2E Ano");
   await expect(busca).toBeFocused();
   await expect(formulario).toBeVisible();
   await busca.press("Escape");
-  await expect(busca).toHaveCount(0);
+  await expect(page.getByRole("listbox")).toHaveCount(0);
   await expect(turma).toBeFocused();
   await expect(formulario).toBeVisible();
   await turma.click();
-  await expect(busca).toHaveValue("");
+  await busca.press("Control+A");
   await busca.pressSequentially("E2E Ano A");
   await busca.press("Enter");
-  await expect(turma).toContainText("E2E Ano A");
+  await expect(turma).toHaveValue("E2E Ano A");
   await expect(formulario).toBeVisible();
   await formulario.getByRole("button", { name: "Cancelar", exact: true }).click();
   await expect(formulario).toHaveCount(0);
@@ -56,8 +56,8 @@ test("a lista longa rola dentro do painel e seleciona por toque ou teclado", asy
   await trocarVisao(page, "Saídas e Entradas", "saidas");
   const aluno = page.locator("#saida-aluno");
   await aluno.click();
-  const busca = page.getByRole("textbox", { name: "Filtrar opções", exact: true });
-  const lista = page.getByRole("listbox", { name: "Opções", exact: true });
+  const busca = aluno;
+  const lista = page.getByRole("listbox");
   await expect(lista.getByRole("option")).toHaveCount(32);
   await lista.evaluate((elemento) => {
     elemento.scrollTop = elemento.scrollHeight;
@@ -66,19 +66,20 @@ test("a lista longa rola dentro do painel e seleciona por toque ou teclado", asy
   await expect(ultima).toBeInViewport();
   if (isMobile) await ultima.tap();
   else await ultima.click();
-  await expect(aluno).toContainText("E2E Lista 30");
-  await expect(busca).toHaveCount(0);
+  await expect(aluno).toHaveValue("E2E Lista 30 · E2E Ano A");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
   await aluno.press("ArrowDown");
   await expect(busca).toBeFocused();
   await busca.press("ArrowDown");
   await expect(lista.getByRole("option").first()).toBeInViewport();
   await busca.press("Enter");
-  await expect(aluno).toContainText("E2E Aluno Dois");
+  await expect(aluno).toHaveValue("E2E Aluno Dois · E2E Ano A");
   await aluno.click();
+  await busca.press("Control+A");
   await busca.pressSequentially("E2E Lista 01");
   await expect(lista.getByRole("option")).toHaveCount(1);
   // Clicar fora cancela a escolha sem alterar o aluno selecionado.
   await page.getByRole("heading", { name: "Registrar saída", exact: true }).click();
-  await expect(busca).toHaveCount(0);
-  await expect(aluno).toContainText("E2E Aluno Dois");
+  await expect(page.getByRole("listbox")).toHaveCount(0);
+  await expect(aluno).toHaveValue("E2E Aluno Dois · E2E Ano A");
 });

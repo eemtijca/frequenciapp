@@ -78,7 +78,7 @@ export async function pngBi(
 
   const estilo = getComputedStyle(elemento);
   const fundo = getComputedStyle(document.body).backgroundColor;
-  ctx.fillStyle = !fundo || fundo === "rgba(0, 0, 0, 0)" ? "#1c1b19" : fundo;
+  ctx.fillStyle = !fundo || fundo === "rgba(0, 0, 0, 0)" ? "#05070a" : fundo;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.fillStyle = estilo.color;
   ctx.font = "600 28px sans-serif";

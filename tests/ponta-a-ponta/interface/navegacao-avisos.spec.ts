@@ -1,10 +1,49 @@
 // Avisos de sucesso preservam o acesso à Gestão no celular e no tablet.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "../helpers/configuracoes";
 import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
-import { registrarTestemunha } from "../helpers/testemunha-aviso";
 
 let inicial: ConfiguracaoOrigem | null = null;
+
+// Função autocontida: Playwright a serializa para executar no navegador.
+function registrarTestemunhaAviso(botao: HTMLElement, tipoEvento: string) {
+  const resultado = { recebido: false, confiavel: false, avisoVisivel: false, instante: 0 };
+  const observar = (evento: Event) => {
+    if (!(evento.target instanceof Node) || !botao.contains(evento.target)) return;
+    resultado.recebido = true;
+    resultado.confiavel = evento.isTrusted;
+    resultado.instante = Date.now();
+    const aviso = [...document.querySelectorAll('[role="status"]')].find((elemento) =>
+      elemento.textContent?.includes("Configurações salvas."),
+    );
+    if (aviso) {
+      const retangulos = [...aviso.getClientRects()];
+      let visivel = retangulos.some((retangulo) => {
+        const esquerda = Math.max(0, retangulo.left);
+        const topo = Math.max(0, retangulo.top);
+        const direita = Math.min(window.innerWidth, retangulo.right);
+        const base = Math.min(window.innerHeight, retangulo.bottom);
+        return direita > esquerda && base > topo;
+      });
+      for (let elemento: Element | null = aviso; elemento; elemento = elemento.parentElement) {
+        const estilo = getComputedStyle(elemento);
+        if (
+          estilo.display === "none" ||
+          estilo.visibility !== "visible" ||
+          Number(estilo.opacity) === 0
+        ) {
+          visivel = false;
+          break;
+        }
+      }
+      resultado.avisoVisivel = visivel;
+    }
+    document.removeEventListener(tipoEvento, observar, true);
+  };
+  document.addEventListener(tipoEvento, observar, true);
+  return resultado;
+}
 
 test.beforeEach(async () => {
   inicial = await lerOrigem();
@@ -38,7 +77,7 @@ for (const largura of [390, 800]) {
       chamada.getByRole("button", { name: "Tentar novamente", exact: true }),
     ).toBeHidden();
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+    await abrirConfiguracoesDaGestao(page);
 
     // Mede o cabeçalho antes da janela curta do aviso.
     const caixaCabecalho = await page.getByRole("banner").boundingBox();
@@ -46,7 +85,7 @@ for (const largura of [390, 800]) {
 
     const origem = page.getByRole("group", { name: "Turma de origem na Chamada", exact: true });
     await origem.getByRole("switch").click();
-    await page.getByRole("button", { name: "Salvar configurações", exact: true }).click();
+    await page.getByRole("button", { name: "Revisar alterações", exact: true }).click();
     const confirmar = page.getByRole("alertdialog", { name: "Salvar configurações?", exact: true });
     const resposta = page.waitForResponse(
       (item) =>
@@ -56,9 +95,18 @@ for (const largura of [390, 800]) {
     await confirmar.getByRole("button", { name: "Salvar configurações", exact: true }).click();
     expect((await resposta).status()).toBe(200);
 
-    const aviso = page.locator("[data-sonner-toast]").filter({
-      has: page.locator("[data-title]").filter({ hasText: /^Configurações salvas\.$/ }),
-    });
+    const aviso = page.getByRole("status").filter({ hasText: /^Configurações salvas\./ });
+    await expect(aviso).toBeVisible();
+    await expect
+      .poll(async () => {
+        const caixaAviso = await aviso.boundingBox();
+        return (
+          caixaAviso !== null &&
+          caixaAviso.y >= (caixaCabecalho?.y ?? 0) + (caixaCabecalho?.height ?? 0)
+        );
+      })
+      .toBe(true);
+
     await expect(aviso).toBeVisible();
     await expect
       .poll(async () => {
@@ -73,7 +121,7 @@ for (const largura of [390, 800]) {
     // A navegação segue real; o pré-aquecimento reduz trabalho, mas não garante
     // que a interação termine antes de o aviso expirar e não cobre Chamada fria.
     await trocarVisao(page, "Chamada", "chamada", { manterResumo: true });
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "chamada");
     const navegacao = await abrirNavegacao(page);
     const gestao = navegacao.getByRole("button", { name: /^Gestão(?: Alterações não salvas)?$/ });
 
@@ -81,11 +129,10 @@ for (const largura of [390, 800]) {
     // Isso não prova que outro elemento não encobre visualmente o aviso; uma
     // captura estática separada pode fornecer apenas evidência visual parcial.
     const testemunha = await gestao.evaluateHandle(
-      registrarTestemunha,
+      registrarTestemunhaAviso,
       hasTouch ? "touchstart" : "pointerdown",
     );
 
-    await expect(aviso).toBeVisible();
     if (hasTouch) await gestao.tap();
     else await gestao.click();
     const registro = await testemunha.jsonValue();
@@ -98,8 +145,14 @@ for (const largura of [390, 800]) {
     expect(registro.instante).toBeGreaterThan(0);
     await expect(
       page.getByRole("dialog", { name: "Menu do aplicativo", exact: true }),
-    ).toBeHidden();
-    await expect(page.locator("main")).toHaveAttribute("data-visao", "gestao");
-    await expect(page.getByRole("heading", { name: "Gestão", exact: true })).toBeVisible();
+    ).toBeVisible();
+    await expect(
+      navegacao.getByRole("button", { name: "Voltar ao menu principal", exact: true }),
+    ).toBeFocused();
+    await navegacao.getByRole("button", { name: "Séries", exact: true }).click();
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "gestao");
+    await expect(
+      page.getByRole("heading", { name: "Séries", level: 1, exact: true }),
+    ).toBeFocused();
   });
 }

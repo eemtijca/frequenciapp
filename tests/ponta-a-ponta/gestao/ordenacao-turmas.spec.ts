@@ -1,4 +1,5 @@
 // Reorganização global de alunos: confirmação, toque duplo e atualização da chamada.
+import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Page, type Response } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, escolherTurmaNaChamada, trocarVisao } from "../helpers/pagina";
@@ -33,7 +34,7 @@ async function abrir(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Turmas", exact: true }).click();
+  await selecionarCadastroGestao(page, "Turmas");
 }
 
 test.beforeEach(async () => {

@@ -291,7 +291,7 @@ test("preserva a linha histórica após transferência e desativação do aluno"
   );
   const secao = await abrirParcial(page);
   const linha = secao.getByTestId(`parcial-aluno-${alunoId}`);
-  await expect(linha.getByRole("heading")).toHaveText("E2E Parcial Um");
+  await expect(linha.getByText("E2E Parcial Um", { exact: true })).toBeVisible();
   await expect(
     linha.getByRole("button", { name: "Editar frequência parcial de E2E Parcial Um" }),
   ).toBeEnabled();
@@ -335,7 +335,7 @@ test("confirma presença por turno e por aulas, filtra a pendência e invalida a
       // Emula um aparelho sem cursor sobre a pilha, preservando a saída natural dos avisos.
       await page.mouse.move(0, 0);
       // Testa o fluxo após os avisos sumirem naturalmente, não o acesso enquanto visíveis.
-      await expect(page.locator("[data-sonner-toast]")).toHaveCount(0, { timeout: 15_000 });
+      await expect(page.locator(".MuiSnackbar-root")).toHaveCount(0, { timeout: 15_000 });
       await controle.tap();
     } else {
       await controle.click();

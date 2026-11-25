@@ -1,6 +1,10 @@
 // Diretores de turma: cadastro na Gestão com turma, palavra-chave mostrada
 // uma única vez, revogação com motivo, parâmetros de acesso e a visão só de
 // leitura do diretor, que entra pelo identificador e troca a palavra.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCadastroGestao,
+} from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import { diaCorrente, diaDeChamada } from "../helpers/dia";
 import {
@@ -29,7 +33,7 @@ test.describe("diretores de turma na Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await selecionarCadastroGestao(page, "Diretores");
     await page
       .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
       .first()
@@ -59,7 +63,7 @@ test.describe("diretores de turma na Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await selecionarCadastroGestao(page, "Diretores");
 
     await page
       .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
@@ -78,7 +82,9 @@ test.describe("diretores de turma na Gestão", () => {
     await expect(item.getByText("Sem palavra-chave")).toBeVisible();
     await expect(item.getByText("E2E Ano A")).toBeVisible();
 
-    await item.getByRole("button", { name: "Gerar palavra-chave" }).click();
+    await item
+      .getByRole("button", { name: "Gerar palavra-chave para E2E Diretora", exact: true })
+      .click();
     const palavra = page.locator("[data-palavra-chave]");
     await expect(palavra).toHaveText(/^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
     await page.getByRole("button", { name: "Já entreguei" }).click();
@@ -86,13 +92,13 @@ test.describe("diretores de turma na Gestão", () => {
     await expect(item.getByText("Aguardando primeiro acesso")).toBeVisible();
 
     await item.getByRole("button", { name: "Revogar a palavra-chave de E2E Diretora" }).click();
-    const revogar = page.getByRole("alertdialog");
-    await expect(revogar.getByRole("button", { name: "Revogar" })).toBeDisabled();
+    const revogar = page.getByRole("dialog", { name: /Revogar a palavra-chave/ });
+    await expect(revogar.getByRole("button", { name: "Revogar", exact: true })).toBeDisabled();
     await revogar.getByLabel("Motivo").fill("Teste de ponta a ponta");
-    await revogar.getByRole("button", { name: "Revogar" }).click();
+    await revogar.getByRole("button", { name: "Revogar", exact: true }).click();
     await expect(page.getByText("Palavra-chave revogada.")).toBeVisible();
     await expect(item.getByText("Revogada", { exact: true })).toBeVisible();
-    await expect(item.getByText(/revogada: Teste de ponta a ponta/)).toBeVisible();
+    await expect(item.getByText("Motivo: Teste de ponta a ponta", { exact: true })).toBeVisible();
   });
 
   test("desativa e reativa o diretor, bloqueando a palavra-chave enquanto desativado", async ({
@@ -101,7 +107,7 @@ test.describe("diretores de turma na Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await selecionarCadastroGestao(page, "Diretores");
     await page
       .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
       .first()
@@ -117,26 +123,28 @@ test.describe("diretores de turma na Gestão", () => {
     await item.getByRole("button", { name: "Desativar E2E Desativar" }).click();
     await expect(page.getByText("Diretor desativado.")).toBeVisible();
     await expect(item.getByText("desativado")).toBeVisible();
-    await expect(item.getByRole("button", { name: "Gerar palavra-chave" })).toBeDisabled();
+    const gerar = item.getByRole("button", {
+      name: "Gerar palavra-chave para E2E Desativar",
+      exact: true,
+    });
+    await expect(gerar).toBeDisabled();
 
     await item.getByRole("button", { name: "Reativar E2E Desativar" }).click();
     await expect(page.getByText("Diretor reativado.")).toBeVisible();
     await expect(item.getByText("desativado")).toHaveCount(0);
-    await expect(item.getByRole("button", { name: "Gerar palavra-chave" })).toBeEnabled();
+    await expect(gerar).toBeEnabled();
   });
 
   test("ajusta os parâmetros de acesso em Configurações", async ({ page }) => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Config/ }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Acesso e avisos", exact: true })
-      .click();
+    await abrirConfiguracoesDaGestao(page);
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Diretores");
     const secao = page.locator('[data-secao="config-acesso-diretores"]');
-    await secao.getByRole("button", { name: /Acesso dos diretores/ }).click();
+    await expect(
+      secao.getByRole("heading", { name: "Acesso dos diretores de turma", exact: true }),
+    ).toBeVisible();
     const validade = secao.getByLabel("Validade da palavra-chave");
     await expect(validade).toHaveValue("90");
     await validade.fill("30");
@@ -165,7 +173,7 @@ test.describe("diretores de turma na Gestão", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: /Diretores/ }).click();
+    await selecionarCadastroGestao(page, "Diretores");
     await page
       .getByRole("button", { name: /Novo diretor|Cadastrar diretor/ })
       .first()
@@ -176,7 +184,9 @@ test.describe("diretores de turma na Gestão", () => {
     await formulario.getByLabel("E2E Ano A").check();
     await formulario.getByRole("button", { name: "Cadastrar" }).click();
     const item = page.locator('[data-diretor="e2e-leitor"]');
-    await item.getByRole("button", { name: "Gerar palavra-chave" }).click();
+    await item
+      .getByRole("button", { name: "Gerar palavra-chave para E2E Leitor", exact: true })
+      .click();
     const palavra = (await page.locator("[data-palavra-chave]").textContent()) ?? "";
     expect(palavra).toMatch(/^[a-z2-9]{4}-[a-z2-9]{4}-[a-z2-9]{4}$/);
     await page.getByRole("button", { name: "Já entreguei" }).click();
@@ -239,7 +249,7 @@ test.describe("diretores de turma na Gestão", () => {
         }
       }
     }
-    await expect(diretor.locator("main")).toHaveAttribute("data-visao", "diretor");
+    await expect(diretor.locator('[data-visao="diretor"]')).toBeVisible();
     await expect(diretor.getByText("E2E Ano A").first()).toBeVisible();
     // No primeiro dia do mês, um domingo consulta a chamada do mês anterior.
     if (dia.slice(0, 7) !== diaCorrente().slice(0, 7)) {

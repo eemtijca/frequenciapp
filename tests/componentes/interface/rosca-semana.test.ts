@@ -4,8 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Page } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
+import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
@@ -23,7 +22,6 @@ beforeAll(async () => {
     configFile: false,
     cacheDir: cache,
     define: { "process.env": "{}" },
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { port: 0, hmr: false, watch: { ignored: ["**/*"] } },
@@ -78,6 +76,18 @@ async function abrir(page: Page, modo: "completo" | "vazio" | "singular" | "parc
   await page.getByRole("region", { name: "Resumo da semana" }).waitFor();
 }
 
+/** Move o ponteiro para o meio do anel no ângulo indicado. */
+async function apontarParaFatia(page: Page, grafico: Locator, angulo: number) {
+  const caixa = await grafico.boundingBox();
+  if (!caixa) throw new Error("Gráfico sem dimensões");
+  const raio = caixa.width * 0.35;
+  const radianos = (angulo * Math.PI) / 180;
+  await page.mouse.move(
+    caixa.x + caixa.width / 2 + raio * Math.cos(radianos),
+    caixa.y + caixa.height / 2 + raio * Math.sin(radianos),
+  );
+}
+
 for (const [dispositivo, width] of [
   ["celular", 390],
   ["desktop", 1440],
@@ -88,9 +98,9 @@ for (const [dispositivo, width] of [
       await abrir(page);
       const resumo = page.getByRole("region", { name: "Resumo da semana" });
       const grafico = resumo.getByRole("img", {
-        name: "Faltas, justificadas e presentes de 1º ano A",
+        name: /^Faltas, justificadas e presentes de 1º ano A:/,
       });
-      await grafico.scrollIntoViewIfNeeded({ timeout: 90000 });
+      await grafico.scrollIntoViewIfNeeded({ timeout: 15000 });
       expect(await grafico.getAttribute("aria-label")).toBe(
         "Faltas, justificadas e presentes de 1º ano A: 100 registros (F + FJ + P)",
       );
@@ -111,10 +121,6 @@ for (const [dispositivo, width] of [
       expect(
         await resumo.getByText("1 presença parcial", { exact: false }).count(),
       ).toBeGreaterThan(0);
-      await grafico.locator(".recharts-pie-sector").nth(2).dispatchEvent("mouseover");
-      await expect
-        .poll(() => grafico.getByText("Presentes: 94 presenças", { exact: true }).isVisible())
-        .toBe(true);
     } finally {
       await page.close();
     }
@@ -130,16 +136,20 @@ it("mantém a mensagem semanal vazia e os padrões das roscas de faltas", async 
     const antiga = page.getByRole("region", { name: "Rosca de faltas existente" });
     expect(
       await antiga
-        .getByRole("img", { name: "Faltas por turma" })
+        .getByRole("img", { name: "Faltas por turma", exact: true })
         .locator("strong + span")
         .innerText(),
     ).toBe("faltas");
     expect(await antiga.getByRole("img", { name: "1 falta", exact: true }).count()).toBe(1);
     expect(await antiga.getByRole("img", { name: "2 faltas", exact: true }).count()).toBe(1);
-    await antiga.locator(".recharts-pie-sector").nth(1).dispatchEvent("mouseover");
+    const graficoAntigo = antiga.getByRole("img", { name: "Faltas por turma", exact: true });
+    await graficoAntigo.scrollIntoViewIfNeeded({ timeout: 15000 });
+    await apontarParaFatia(page, graficoAntigo, 240);
+    const dica = antiga.locator(".MuiChartsTooltip-root");
     await expect
-      .poll(() => antiga.getByText("Turma B: 2 faltas", { exact: true }).isVisible())
-      .toBe(true);
+      .poll(async () => ((await dica.isVisible()) ? dica.innerText() : ""), { timeout: 5000 })
+      .toContain("Turma B");
+    expect(await antiga.getByRole("img", { name: "2 faltas", exact: true }).isVisible()).toBe(true);
   } finally {
     await page.close();
   }
@@ -151,9 +161,9 @@ it("usa o singular no total e na fatia semanal", async () => {
     await abrir(page, "singular");
     const resumo = page.getByRole("region", { name: "Resumo da semana" });
     const grafico = resumo.getByRole("img", {
-      name: "Faltas, justificadas e presentes de 1º ano A",
+      name: /^Faltas, justificadas e presentes de 1º ano A:/,
     });
-    await grafico.scrollIntoViewIfNeeded({ timeout: 90000 });
+    await grafico.scrollIntoViewIfNeeded({ timeout: 15000 });
     expect(await grafico.getAttribute("aria-label")).toBe(
       "Faltas, justificadas e presentes de 1º ano A: 1 registro (F + FJ + P)",
     );

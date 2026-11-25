@@ -3,39 +3,37 @@
 // Aba de equipe: contas da coordenação e da administração, com papel,
 // senha e situação. Sem atribuições de turma.
 import { useEffect, useMemo, useState } from "react";
-import { KeyRound, LoaderCircle, Pencil, Plus, Power, Trash2, UserRound } from "lucide-react";
-import { toast } from "sonner";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
+import PowerSettingsNewRoundedIcon from "@mui/icons-material/PowerSettingsNewRounded";
+import SearchOffRoundedIcon from "@mui/icons-material/SearchOffRounded";
+import CircularProgress from "@mui/material/CircularProgress";
+import Stack from "@mui/material/Stack";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
+import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
+import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { Campo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { Selo } from "@/components/ui/mui/selo";
+import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
+import { normalizar } from "@/domain/frequencia";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
-import { normalizar } from "@/domain/frequencia";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
-import { Button } from "@/components/ui/button";
-import { CampoSenha } from "@/components/ui/campo-senha";
-import { Input } from "@/components/ui/input";
-import { BarraBusca } from "@/components/ui/barra-busca";
-import { Label } from "@/components/ui/label";
-import { Selecionar } from "@/components/ui/selecionar";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { TOKENS_LAYOUT } from "@/theme/layout";
+import { TabelaCadastrosAdministrativos } from "./tabela-cadastros-administrativos";
 
 interface Props {
   usuarioId: string;
@@ -52,6 +50,11 @@ interface Formulario {
 
 const VAZIO: Formulario = { nome: "", email: "", senha: "", papel: "COORDENACAO" };
 
+const ALVO_ACAO = {
+  width: TOKENS_LAYOUT.alvoToque,
+  height: TOKENS_LAYOUT.alvoToque,
+} as const;
+
 export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Props) {
   const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
   const [dialogoAberto, setDialogoAberto] = useState(false);
@@ -60,15 +63,14 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("dados_invalidos");
+  const [excluirAlvo, setExcluirAlvo] = useState<UsuarioDTO | null>(null);
 
   const { executando: carregando, executar: recarregar } = useAcaoUnica(async () => {
     try {
       const dados = await pedir<{ usuarios: UsuarioDTO[] }>("/api/usuarios");
       setUsuarios(dados.usuarios);
     } catch (excecao) {
-      const mensagem =
-        excecao instanceof ErroApi ? excecao.message : "Não foi possível carregar a equipe.";
-      toast.error(mensagem);
+      avisarErro(excecao, { contexto: "Não foi possível carregar a equipe." });
       setUsuarios([]);
     }
   });
@@ -161,9 +163,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
         );
         await recarregar();
       } catch (excecao) {
-        const mensagem =
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível alterar a conta.";
-        toast.error(mensagem);
+        avisarErro(excecao, { contexto: "Não foi possível alterar a conta." });
       }
     });
   }
@@ -178,46 +178,56 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
         );
         await recarregar();
       } catch (excecao) {
-        const mensagem =
-          excecao instanceof ErroApi ? excecao.message : "Não foi possível excluir a conta.";
-        toast.error(mensagem);
+        avisarErro(excecao, { contexto: "Não foi possível excluir a conta." });
       }
     });
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-muted-foreground text-sm">
+    <Stack spacing={2}>
+      <Stack
+        direction="row"
+        spacing={2}
+        useFlexGap
+        sx={{ alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}
+      >
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {usuarios === null
             ? "Carregando..."
             : `${usuarios.filter((u) => u.papel === "COORDENACAO").length} coordenação · ${usuarios.filter((u) => u.papel === "ADMIN").length} administração`}
-        </p>
-        <Button size="lg" className="h-11" onClick={abrirNovo}>
-          <Plus size={16} />
+        </Typography>
+        <Botao variante="principal" icone={<AddRoundedIcon />} onClick={abrirNovo}>
           Nova conta
-        </Button>
-      </div>
+        </Botao>
+      </Stack>
 
       {carregando ? (
-        <div className="text-muted-foreground flex min-h-32 items-center justify-center gap-2 text-sm">
-          <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-          Carregando contas...
-        </div>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: 128,
+            color: "text.secondary",
+          }}
+        >
+          <CircularProgress size={20} aria-hidden="true" />
+          <Typography variant="body2">Carregando contas...</Typography>
+        </Stack>
       ) : (usuarios ?? []).length === 0 ? (
-        <div className="superficie flex min-h-44 flex-col items-center justify-center gap-2 px-6 text-center">
-          <UserRound size={28} className="text-muted-foreground" aria-hidden="true" />
-          <p className="font-medium">Nenhuma conta além da sua</p>
-          <p className="text-muted-foreground text-sm">
-            Crie a conta de cada pessoa da equipe para liberar o acesso.
-          </p>
-          <Button variant="outline" className="mt-2" onClick={abrirNovo}>
-            <Plus size={16} />
-            Criar conta
-          </Button>
-        </div>
+        <EstadoVazio
+          icone={<PersonAddRoundedIcon />}
+          titulo="Nenhuma conta além da sua"
+          descricao="Crie a conta de cada pessoa da equipe para liberar o acesso."
+          acao={
+            <Botao variante="contorno" icone={<AddRoundedIcon />} onClick={abrirNovo}>
+              Criar conta
+            </Botao>
+          }
+        />
       ) : (
-        <div className="flex flex-col gap-3">
+        <Stack spacing={2}>
           <BarraBusca
             id="busca-equipe"
             valor={busca}
@@ -225,201 +235,176 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
             placeholder="Buscar por nome ou e-mail"
           />
           {usuariosFiltrados.length === 0 ? (
-            <div className="superficie flex min-h-40 flex-col items-center justify-center gap-1 px-6 text-center">
-              <p className="font-medium">Nenhuma conta encontrada</p>
-              <p className="text-muted-foreground text-sm">Tente outro termo de busca.</p>
-            </div>
+            <EstadoVazio
+              icone={<SearchOffRoundedIcon />}
+              titulo="Nenhuma conta encontrada"
+              descricao="Tente outro termo de busca."
+            />
           ) : (
-            <ul className="flex flex-col gap-3">
-              {usuariosFiltrados.map((usuario) => {
-                const propria = usuario.id === usuarioId;
-                const ultimoAdmin =
-                  usuario.papel === "ADMIN" && usuario.ativo && administradoresAtivos === 1;
-                return (
-                  <li
-                    key={usuario.id}
-                    className={`superficie overflow-hidden ${usuario.ativo ? "" : "opacity-60"}`}
-                  >
-                    <div className="flex items-center gap-3 px-4 py-3">
-                      <div className="min-w-0 flex-1">
-                        <p className="flex items-center gap-2 truncate font-medium">
-                          {usuario.nome}
-                          <span className="bg-secondary text-secondary-foreground rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap">
-                            {rotuloDePapel(usuario.papel)}
-                          </span>
-                          {propria && (
-                            <span className="bg-primary/15 text-primary rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap">
-                              Você
-                            </span>
-                          )}
-                        </p>
-                        <p className="text-muted-foreground truncate text-sm">{usuario.email}</p>
-                        <p className="text-muted-foreground mt-0.5 text-xs">
-                          {usuario.ativo ? "ativa" : "desativada"}
-                        </p>
-                      </div>
-                      <div className="flex shrink-0 items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="size-11"
-                          aria-label={`Editar conta de ${usuario.nome}`}
-                          onClick={() => abrirEdicao(usuario)}
-                        >
-                          <Pencil size={16} />
-                        </Button>
-                        {!propria && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="size-11"
-                            aria-label={
-                              usuario.ativo
-                                ? `Desativar conta de ${usuario.nome}`
-                                : `Reativar conta de ${usuario.nome}`
-                            }
-                            disabled={ultimoAdmin || chaveAtiva === usuario.id}
-                            title={
-                              ultimoAdmin
-                                ? "A escola precisa de ao menos um administrador ativo."
-                                : undefined
-                            }
-                            onClick={() => alternarAtivo(usuario)}
+            <TabelaCadastrosAdministrativos
+              caption="Contas da coordenação e da administração."
+              identidade="Conta"
+            >
+              <TableBody role="rowgroup">
+                {usuariosFiltrados.map((usuario) => {
+                  const propria = usuario.id === usuarioId;
+                  const ultimoAdmin =
+                    usuario.papel === "ADMIN" && usuario.ativo && administradoresAtivos === 1;
+                  return (
+                    <TableRow key={usuario.id} data-conta={usuario.id} role="row">
+                      <TableCell component="th" scope="row" role="rowheader">
+                        <Stack spacing={0.5} sx={{ minWidth: 0 }}>
+                          <Typography sx={{ fontWeight: 600 }}>{usuario.nome}</Typography>
+                          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+                            {usuario.email}
+                          </Typography>
+                          <Stack
+                            direction="row"
+                            spacing={1}
+                            useFlexGap
+                            sx={{ alignItems: "center", flexWrap: "wrap" }}
                           >
-                            <Power size={16} />
-                          </Button>
-                        )}
-                        {!propria && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="text-falta-texto size-11"
-                                aria-label={`Excluir conta de ${usuario.nome}`}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>
-                                  Excluir a conta de {usuario.nome}?
-                                </AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  A exclusão remove o acesso. As frequências da escola são
-                                  preservadas, sem a autoria desta conta.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                <AlertDialogAction
-                                  variant="destructive"
-                                  onClick={() => excluir(usuario)}
-                                  disabled={chaveAtiva === usuario.id}
-                                >
-                                  Excluir
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
+                            <Selo
+                              rotulo={rotuloDePapel(usuario.papel)}
+                              tom={usuario.papel === "ADMIN" ? "atencao" : "neutro"}
+                            />
+                            {propria ? <Selo rotulo="Você" tom="sucesso" /> : null}
+                            {!usuario.ativo ? <Selo rotulo="desativada" /> : null}
+                          </Stack>
+                          {usuario.ativo ? (
+                            <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                              ativa
+                            </Typography>
+                          ) : null}
+                        </Stack>
+                      </TableCell>
+                      <TableCell align="right" role="cell">
+                        <Stack
+                          direction="row"
+                          spacing={0.5}
+                          sx={{ justifyContent: "flex-end", flexWrap: "wrap" }}
+                        >
+                          <BotaoIcone
+                            rotulo={`Editar conta de ${usuario.nome}`}
+                            icone={<EditRoundedIcon fontSize="small" />}
+                            variante="texto"
+                            sx={ALVO_ACAO}
+                            onClick={() => abrirEdicao(usuario)}
+                          />
+                          {!propria ? (
+                            <BotaoIcone
+                              rotulo={
+                                usuario.ativo
+                                  ? `Desativar conta de ${usuario.nome}`
+                                  : `Reativar conta de ${usuario.nome}`
+                              }
+                              icone={<PowerSettingsNewRoundedIcon fontSize="small" />}
+                              variante="texto"
+                              sx={ALVO_ACAO}
+                              disabled={ultimoAdmin || chaveAtiva === usuario.id}
+                              title={
+                                ultimoAdmin
+                                  ? "A escola precisa de ao menos um administrador ativo."
+                                  : undefined
+                              }
+                              onClick={() => alternarAtivo(usuario)}
+                            />
+                          ) : null}
+                          {!propria ? (
+                            <BotaoIcone
+                              rotulo={`Excluir conta de ${usuario.nome}`}
+                              icone={<DeleteRoundedIcon fontSize="small" />}
+                              variante="texto"
+                              sx={[ALVO_ACAO, (tema) => ({ color: tema.vars.palette.falta.texto })]}
+                              disabled={chaveAtiva === usuario.id}
+                              onClick={() => setExcluirAlvo(usuario)}
+                            />
+                          ) : null}
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </TabelaCadastrosAdministrativos>
           )}
-        </div>
+        </Stack>
       )}
 
-      <Dialog open={dialogoAberto} onOpenChange={setDialogoAberto}>
-        <DialogContent className="max-h-[90dvh] max-w-sm overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{emEdicao ? `Editar ${emEdicao.nome}` : "Nova conta"}</DialogTitle>
-          </DialogHeader>
-          <form
-            className="flex flex-col gap-4"
-            onSubmit={(evento) => {
-              evento.preventDefault();
-              void submeter();
-            }}
-            noValidate
-          >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="nome-usuario">Nome</Label>
-              <Input
-                id="nome-usuario"
-                value={formulario.nome}
+      <Dialogo
+        aberto={dialogoAberto}
+        onFechar={() => setDialogoAberto(false)}
+        titulo={emEdicao ? `Editar ${emEdicao.nome}` : "Nova conta"}
+        quebrarTitulo
+        tamanho="grande"
+        acoes={
+          <>
+            <Botao variante="texto" onClick={() => setDialogoAberto(false)}>
+              Cancelar
+            </Botao>
+            <Botao variante="secundario" carregando={enviando} onClick={() => void submeter()}>
+              {emEdicao ? "Salvar" : "Criar"}
+            </Botao>
+          </>
+        }
+      >
+        <form
+          onSubmit={(evento) => {
+            evento.preventDefault();
+            void submeter();
+          }}
+          noValidate
+        >
+          <Stack spacing={2}>
+            <Campo id="nome-usuario" rotulo="Nome">
+              <CampoTexto
+                valor={formulario.nome}
+                onValor={(nome) => setFormulario((atual) => ({ ...atual, nome }))}
                 required
                 maxLength={100}
                 autoComplete="off"
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, nome: evento.target.value }))
-                }
                 placeholder="Nome de tratamento"
-                className="h-11"
               />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email-usuario">E-mail de acesso</Label>
-              <Input
-                id="email-usuario"
-                type="email"
-                value={formulario.email}
+            </Campo>
+            <Campo id="email-usuario" rotulo="E-mail de acesso">
+              <CampoTexto
+                valor={formulario.email}
+                onValor={(email) => setFormulario((atual) => ({ ...atual, email }))}
+                tipo="email"
                 required
                 autoComplete="off"
                 inputMode="email"
-                onChange={(evento) =>
-                  setFormulario((atual) => ({ ...atual, email: evento.target.value }))
-                }
                 placeholder="pessoa@escola.br"
-                className="h-11"
               />
-            </div>
+            </Campo>
             {emEdicao?.id === usuarioId ? (
-              <p className="text-muted-foreground text-xs">
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 A sua própria senha muda no ícone de senha do cabeçalho, com a senha atual.
-              </p>
+              </Typography>
             ) : (
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="senha-usuario">
-                  {emEdicao ? "Nova senha (opcional)" : "Senha inicial"}
-                </Label>
-                <div className="relative">
-                  <KeyRound
-                    size={15}
-                    aria-hidden="true"
-                    className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 -translate-y-1/2"
-                  />
-                  <CampoSenha
-                    id="senha-usuario"
-                    value={formulario.senha}
-                    autoComplete="new-password"
-                    minLength={emEdicao ? 0 : 8}
-                    required={emEdicao === null}
-                    onChange={(evento) =>
-                      setFormulario((atual) => ({ ...atual, senha: evento.target.value }))
-                    }
-                    placeholder="Mínimo 8 caracteres, com letra e número"
-                    className="h-11 rounded-lg pl-9"
-                  />
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  {emEdicao
+              <Campo
+                id="senha-usuario"
+                rotulo={emEdicao ? "Nova senha (opcional)" : "Senha inicial"}
+                descricao={
+                  emEdicao
                     ? "Redefinir a senha encerra os acessos abertos da pessoa."
-                    : "A pessoa troca a senha depois, no ícone de senha do cabeçalho."}
-                </p>
-              </div>
+                    : "A pessoa troca a senha depois, no ícone de senha do cabeçalho."
+                }
+              >
+                <CampoSenha
+                  valor={formulario.senha}
+                  onValor={(senha) => setFormulario((atual) => ({ ...atual, senha }))}
+                  autoComplete="new-password"
+                  required={emEdicao === null}
+                  placeholder="Mínimo 8 caracteres, com letra e número"
+                />
+              </Campo>
             )}
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="papel-usuario">Papel</Label>
+            <Campo id="papel-usuario" rotulo="Papel">
               <Selecionar
-                id="papel-usuario"
-                value={formulario.papel}
+                valor={formulario.papel}
                 disabled={emEdicao?.id === usuarioId}
-                onValueChange={(valor) =>
+                onValor={(valor) =>
                   setFormulario((atual) => ({
                     ...atual,
                     papel: valor === "ADMIN" ? "ADMIN" : "COORDENACAO",
@@ -430,25 +415,34 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                   { valor: "ADMIN", rotulo: "Administração (acesso total)" },
                 ]}
               />
-              {emEdicao?.id === usuarioId && (
-                <p className="text-muted-foreground text-xs">
-                  O próprio acesso de administração não pode ser removido.
-                </p>
-              )}
-            </div>
-            {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDialogoAberto(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={enviando}>
-                {enviando && <LoaderCircle size={16} className="animate-spin" />}
-                {emEdicao ? "Salvar" : "Criar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-    </div>
+            </Campo>
+            {emEdicao?.id === usuarioId ? (
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                O próprio acesso de administração não pode ser removido.
+              </Typography>
+            ) : null}
+            {erro ? (
+              <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />
+            ) : null}
+          </Stack>
+        </form>
+      </Dialogo>
+
+      <DialogoConfirmacao
+        aberto={excluirAlvo !== null}
+        titulo={`Excluir a conta de ${excluirAlvo?.nome ?? ""}?`}
+        quebrarTitulo
+        descricao="A exclusão remove o acesso. As frequências da escola são preservadas, sem a autoria desta conta."
+        rotuloConfirmar="Excluir"
+        destrutivo
+        operacaoEmAndamento={excluirAlvo !== null && chaveAtiva === excluirAlvo.id}
+        onConfirmar={() => {
+          const alvo = excluirAlvo;
+          setExcluirAlvo(null);
+          if (alvo) excluir(alvo);
+        }}
+        onCancelar={() => setExcluirAlvo(null)}
+      />
+    </Stack>
   );
 }

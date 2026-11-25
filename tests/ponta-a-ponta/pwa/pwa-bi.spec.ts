@@ -42,11 +42,11 @@ async function contarRetratosDaChave(page: Page, hash: string): Promise<number> 
 }
 
 async function aba(page: Page, nome: string) {
-  const navegacao = page.getByRole("navigation", { name: "Seções do FrequenciBI" });
+  const navegacao = page.getByRole("tablist", { name: "Seções do FrequenciBI" });
   const seletor = page.getByRole("combobox", { name: "Seção do FrequenciBI", exact: true });
   await expect(navegacao.or(seletor).first()).toBeVisible();
   if (await navegacao.isVisible().catch(() => false)) {
-    await navegacao.getByRole("button", { name: nome, exact: true }).click();
+    await navegacao.getByRole("tab", { name: nome, exact: true }).click();
     return;
   }
   await seletor.click();

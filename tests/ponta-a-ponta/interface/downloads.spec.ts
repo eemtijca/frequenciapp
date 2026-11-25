@@ -1,10 +1,15 @@
 // Exportações protegidas nos três pontos do app, com senha local,
 // cancelamento, extração real e ausência de download em caso de falha.
+import {
+  abrirConfiguracoesDaGestao,
+  selecionarCadastroGestao,
+  selecionarCategoriaConfiguracoes,
+} from "../../helpers/categorias-configuracoes";
 import { mkdir, readFile } from "node:fs/promises";
 import { expect, test, type Download, type Page } from "@playwright/test";
 import { Uint8ArrayReader, ZipReader } from "@zip.js/zip.js";
 import { ADMIN_E2E, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import { selecionarRelatorio, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 const SENHA = "E2E frase exclusiva de exportação 2026!";
 test.use({ serviceWorkers: "block" });
@@ -19,11 +24,11 @@ async function abrirDownload(
   await page.goto("/");
   await aguardarHidratacao(page);
   if (tipo === "grade") {
-    await trocarVisao(page, "Relatórios", "relatorios");
-    await page.getByRole("tab", { name: "Grade" }).click();
+    await selecionarRelatorio(page, "Grade");
     const grade = page.locator('section[aria-label="Grade de frequência"]');
     const turma = grade.getByRole("button", { name: /E2E Ano A/ });
-    if (await turma.isVisible().catch(() => false)) await turma.click();
+    if (await turma.isVisible().catch(() => false))
+      await turma.evaluate((elemento: HTMLElement) => elemento.click());
     if (perfilImagem) {
       await expect(grade.getByRole("button", { name: "Baixar planilha (CSV)" })).toBeEnabled();
       await mkdir("docs/imagens/locais", { recursive: true });
@@ -36,14 +41,14 @@ async function abrirDownload(
     await grade.getByRole("button", { name: "Baixar planilha (CSV)" }).click();
   } else {
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: tipo === "relacao" ? "Alunos" : "Configurações" }).click();
+    if (tipo === "relacao") await selecionarCadastroGestao(page, "Alunos");
+    else await abrirConfiguracoesDaGestao(page);
     if (tipo === "copia") {
-      await page
-        .getByRole("navigation", { name: "Categorias de configurações" })
-        .getByRole("button", { name: "Dados", exact: true })
-        .click();
+      await selecionarCategoriaConfiguracoes(page, "Dados");
       const secao = page.locator('[data-secao="config-copia"]');
-      await secao.getByRole("button", { name: "Cópia de segurança" }).click();
+      await expect(
+        secao.getByRole("heading", { name: "Cópia de segurança", exact: true }),
+      ).toBeVisible();
       await secao.getByRole("button", { name: "Baixar cópia" }).click();
     } else {
       await page.getByRole("button", { name: "Exportar relação" }).click();

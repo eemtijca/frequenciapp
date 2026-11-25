@@ -6,7 +6,7 @@ import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagi
 
 test.describe("responsividade", () => {
   test("no celular usa o menu lateral e centraliza os formulários", async ({ page }, info) => {
-    await page.setViewportSize({ width: 390, height: 844 });
+    await page.setViewportSize({ width: 320, height: 844 });
     await page.goto("/");
     await aguardarHidratacao(page);
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toHaveCount(0);
@@ -19,17 +19,13 @@ test.describe("responsividade", () => {
     });
     const atualizar = cabecalho.getByRole("button", { name: "Atualizar tela", exact: true });
     const caixaAbrir = await abrir.boundingBox();
-    const caixaAtualizar = await atualizar.boundingBox();
     const caixaNotificacoes = await notificacoes.boundingBox();
     expect(caixaAbrir).not.toBeNull();
-    expect(caixaAtualizar).not.toBeNull();
     expect(caixaNotificacoes).not.toBeNull();
-    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(
-      caixaAtualizar?.x ?? 0,
-    );
-    expect((caixaAtualizar?.x ?? 0) + (caixaAtualizar?.width ?? 0)).toBeLessThanOrEqual(
-      caixaNotificacoes?.x ?? 0,
-    );
+    await expect(atualizar).toHaveCount(0);
+    const marca = cabecalho.getByText("FrequenciApp", { exact: true });
+    await expect(marca).toBeVisible();
+    expect(await marca.evaluate((el) => el.scrollWidth <= el.clientWidth + 1)).toBe(true);
 
     const semEstouro = await cabecalho.evaluate(
       (elemento) => elemento.scrollWidth <= elemento.clientWidth + 1,
@@ -38,28 +34,32 @@ test.describe("responsividade", () => {
     const tema = cabecalho.getByRole("button", { name: /tema/i });
     const caixaTema = await tema.boundingBox();
     expect(caixaTema).not.toBeNull();
-    expect((caixaAtualizar?.x ?? 0) + (caixaAtualizar?.width ?? 0)).toBeLessThanOrEqual(
-      caixaTema?.x ?? 0,
-    );
+    expect((caixaAbrir?.x ?? 0) + (caixaAbrir?.width ?? 0)).toBeLessThanOrEqual(caixaTema?.x ?? 0);
     expect((caixaTema?.x ?? 0) + (caixaTema?.width ?? 0)).toBeLessThanOrEqual(
       caixaNotificacoes?.x ?? 0,
     );
-    await expect(cabecalho.getByRole("button")).toHaveCount(4);
-    await expect(page.locator("main").locator("+ nav")).toHaveCount(0);
-    await info.attach("conteudo-mobile-390", {
+    await expect(cabecalho.getByRole("button")).toHaveCount(3);
+    await expect(page.locator("main").first().locator("+ nav")).toHaveCount(0);
+    await info.attach("conteudo-mobile-320", {
       body: await page.screenshot({ animations: "disabled" }),
       contentType: "image/png",
     });
     const navegacao = await abrirNavegacao(page);
     await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toBeVisible();
-    await info.attach("menu-mobile-390", {
+    await expect(
+      page.getByRole("dialog", { name: "Menu do aplicativo" }).getByRole("button", {
+        name: "Atualizar tela",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await info.attach("menu-mobile-320", {
       body: await page.screenshot({ animations: "disabled" }),
       contentType: "image/png",
     });
 
     await trocarVisao(page, "Gestão", "gestao");
     await page.getByRole("button", { name: "Nova série" }).click();
-    const caixa = await page.locator('[data-slot="dialog-content"]').boundingBox();
+    const caixa = await page.locator(".MuiDialog-paper:visible").first().boundingBox();
     expect(caixa).not.toBeNull();
     // O formulário fica centralizado na tela, como no desktop.
     const centro = (caixa?.y ?? 0) + (caixa?.height ?? 0) / 2;
@@ -81,6 +81,11 @@ test.describe("responsividade", () => {
       .evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1);
     expect(semEstouro).toBe(true);
     const asideCaixa = await page.locator("aside").boundingBox();
+    const conteudoCaixa = await page.getByRole("main").boundingBox();
+    expect(asideCaixa).not.toBeNull();
+    expect(conteudoCaixa).not.toBeNull();
+    const fimDaGaveta = (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0);
+    expect(Math.abs((conteudoCaixa?.x ?? 0) - fimDaGaveta)).toBeLessThanOrEqual(1);
     const sairCaixa = await page.getByRole("button", { name: /^Conta de / }).boundingBox();
     expect((sairCaixa?.x ?? 0) + (sairCaixa?.width ?? 0)).toBeLessThanOrEqual(
       (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0) + 1,
@@ -127,7 +132,7 @@ test.describe("responsividade", () => {
       const fechar = menu.getByRole("button", { name: "Fechar menu", exact: true });
       await expect(fechar).toBeInViewport();
       await expect(menu.getByRole("button", { name: /tema/i })).toHaveCount(0);
-      expect(caixa?.width ?? Infinity).toBeLessThanOrEqual(240 + 1);
+      expect(caixa?.width ?? Infinity).toBeLessThanOrEqual(256 + 1);
       for (const nome of ["Gestão"]) {
         const acao = menu.getByRole("button", { name: nome, exact: true });
         await acao.scrollIntoViewIfNeeded();
@@ -175,7 +180,7 @@ test.describe("responsividade", () => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "FrequenciApp" })).toBeVisible();
     const aside = await page.locator("aside").boundingBox();
-    const principal = await page.locator("main").boundingBox();
+    const principal = await page.locator("main > div").last().boundingBox();
     expect(Math.abs((aside?.width ?? 0) - (principal?.width ?? 0))).toBeLessThanOrEqual(1);
   });
 
@@ -189,11 +194,16 @@ test.describe("responsividade", () => {
     expect(campo?.x ?? 0).toBeGreaterThanOrEqual(28);
 
     // A marca e o título acompanham o centro do cartão, não só o espaço restante.
-    const cartao = await page.locator("main .superficie").first().boundingBox();
+    const cartao = await page
+      .locator('main section[aria-labelledby="titulo-entrada"]')
+      .boundingBox();
     const titulo = await page
       .getByRole("heading", { name: "FrequenciApp", exact: true })
       .boundingBox();
-    const marca = await page.locator('main img[src$="icon.svg"]').first().boundingBox();
+    const marca = await page
+      .locator('main section[aria-labelledby="titulo-entrada"] img')
+      .first()
+      .boundingBox();
     expect(cartao).not.toBeNull();
     expect(titulo).not.toBeNull();
     expect(marca).not.toBeNull();
@@ -215,11 +225,11 @@ test.describe("responsividade", () => {
       await page.goto("/");
       await aguardarHidratacao(page);
       for (const [rotulo, visao, largura] of [
-        ["Painel", "painel", 1024],
-        ["Chamada", "chamada", 1152],
-        ["Chamada Parcial", "chamada-parcial", 1152],
+        ["Painel", "painel", 840],
+        ["Chamada", "chamada", 840],
+        ["Chamada Parcial", "chamada-parcial", 840],
         ["Relatórios", "relatorios", 1280],
-        ["Gestão", "gestao", 1152],
+        ["Gestão", "gestao", 1040],
       ] as const) {
         await trocarVisao(page, rotulo, visao);
         const painel = page.locator("main > div > section:not([hidden])");

@@ -2,27 +2,23 @@
 
 // Cópia da grade entre turmas, com prévia e confirmação antes da gravação.
 import { useMemo, useState } from "react";
-import { Copy, LoaderCircle } from "lucide-react";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import Box from "@mui/material/Box";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import type { Horario, Turma } from "@/domain/frequencia";
 import { DIAS_DA_SEMANA } from "@/domain/horarios-semanais";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo } from "@/components/ui/mui/campo";
+import { Selecionar } from "@/components/ui/mui/selecionar";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Selecionar } from "@/components/ui/selecionar";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 interface Props {
   destino: Turma;
@@ -82,55 +78,86 @@ export function DialogoCopiarHorarios({ destino, turmas, disabled, onOcupado, on
     }
   });
 
-  if (!aberto)
+  if (!aberto) {
     return (
-      <Button
-        type="button"
-        variant="outline"
-        className="min-h-11"
+      <Botao
+        variante="contorno"
+        icone={<ContentCopyRoundedIcon />}
         disabled={disabled || opcoes.length === 0}
         onClick={() => setAberto(true)}
       >
-        <Copy size={16} />
         Copiar de outra turma
-      </Button>
+      </Botao>
     );
+  }
 
   return (
-    <section aria-label="Copiar grade" className="superficie flex min-w-0 flex-col gap-3 p-3">
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="horarios-turma-origem">Turma de origem</Label>
+    <Box
+      component="section"
+      aria-label="Copiar grade"
+      sx={(tema) => ({
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        minWidth: 0,
+        p: 2,
+        border: `1px solid ${tema.vars.palette.divider}`,
+        borderRadius: 1,
+      })}
+    >
+      <Campo id="horarios-turma-origem" rotulo="Turma de origem">
         <Selecionar
-          id="horarios-turma-origem"
           buscavel
-          value={origemId}
+          valor={origemId}
           opcoes={opcoes}
           disabled={disabled || executando}
-          onValueChange={(valor) => {
+          onValor={(valor) => {
             setOrigemId(valor);
             setErro("");
           }}
           placeholder="Selecionar turma"
         />
-      </div>
-      <p className="text-sm break-words">
-        Destino: <span className="font-medium">{destino.rotulo}</span>
-      </p>
-      {origem &&
-        (aulas.length === 0 ? (
-          <p className="text-muted-foreground text-sm">A turma de origem não tem horários.</p>
+      </Campo>
+      <Typography variant="body2">
+        Destino:{" "}
+        <Box component="span" sx={{ fontWeight: 600 }}>
+          {destino.rotulo}
+        </Box>
+      </Typography>
+      {origem ? (
+        aulas.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            A turma de origem não tem horários.
+          </Typography>
         ) : (
-          <div className="flex flex-col gap-2">
-            <p className="text-sm font-medium break-words">
+          <Stack spacing={1}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
               {aulas.length} {aulas.length === 1 ? "aula" : "aulas"} de {origem.rotulo}
-            </p>
-            <ul aria-label="Prévia da grade" className="divide-y rounded-lg border">
+            </Typography>
+            <List
+              aria-label="Prévia da grade"
+              disablePadding
+              sx={{ border: 1, borderColor: "divider", borderRadius: 1 }}
+            >
               {aulas.map((aula) => (
-                <li key={aula.id} className="flex min-w-0 flex-col gap-1 px-3 py-2 text-sm">
-                  <p className="numerais-tabulares font-medium">
+                <ListItem
+                  key={aula.id}
+                  sx={{
+                    flexDirection: "column",
+                    alignItems: "flex-start",
+                    gap: 0.5,
+                    borderBottom: 1,
+                    borderColor: "divider",
+                    "&:last-of-type": { borderBottom: 0 },
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
+                  >
                     Aula {aula.ordem}: {aula.inicio} às {aula.fim}
-                  </p>
-                  <p className="text-muted-foreground text-xs break-words">
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
                     {aula.diasSemana
                       .map((dia) => {
                         const rotulo =
@@ -138,19 +165,26 @@ export function DialogoCopiarHorarios({ destino, turmas, disabled, onOcupado, on
                         return `${rotulo}: ${aula.disciplinas?.[String(dia)] || "sem disciplina"}`;
                       })
                       .join(" · ")}
-                  </p>
-                  {!aula.ativo && <p className="text-muted-foreground text-xs">Desativada</p>}
-                </li>
+                  </Typography>
+                  {!aula.ativo ? (
+                    <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                      Desativada
+                    </Typography>
+                  ) : null}
+                </ListItem>
               ))}
-            </ul>
-          </div>
-        ))}
-      {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button
-          type="button"
-          variant="outline"
-          className="min-h-11"
+            </List>
+          </Stack>
+        )
+      ) : null}
+      {erro ? <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" /> : null}
+      <Stack
+        direction={{ xs: "column-reverse", sm: "row" }}
+        spacing={1}
+        sx={{ justifyContent: "flex-end" }}
+      >
+        <Botao
+          variante="texto"
           disabled={disabled || executando}
           onClick={() => {
             setAberto(false);
@@ -158,46 +192,24 @@ export function DialogoCopiarHorarios({ destino, turmas, disabled, onOcupado, on
           }}
         >
           Cancelar cópia
-        </Button>
-        <Button
-          type="button"
-          className="min-h-11"
-          disabled={!origem || aulas.length === 0 || disabled || executando}
+        </Botao>
+        <Botao
+          variante="secundario"
+          disabled={!origem || aulas.length === 0 || disabled}
           onClick={() => setConfirmando(true)}
         >
           Copiar grade
-        </Button>
-      </div>
-      <AlertDialog
-        open={confirmando}
-        onOpenChange={(valor) => {
-          if (!executando) setConfirmando(valor);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Copiar grade?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Copia {aulas.length} {aulas.length === 1 ? "aula" : "aulas"} de {origem?.rotulo} para{" "}
-              {destino.rotulo}, incluindo ordem, horários, dias, disciplinas e estado de ativação.
-              Aulas existentes e faltas são preservadas. Ordens repetidas impedem a cópia inteira.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={executando}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={disabled || executando || !origem || aulas.length === 0}
-              onClick={(evento) => {
-                evento.preventDefault();
-                void executar();
-              }}
-            >
-              {executando && <LoaderCircle size={16} className="animate-spin" />}
-              Confirmar cópia
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </section>
+        </Botao>
+      </Stack>
+      <DialogoConfirmacao
+        aberto={confirmando}
+        titulo="Copiar grade?"
+        descricao={`Copia ${aulas.length} ${aulas.length === 1 ? "aula" : "aulas"} de ${origem?.rotulo ?? ""} para ${destino.rotulo}, incluindo ordem, horários, dias, disciplinas e estado de ativação. Aulas existentes e faltas são preservadas. Ordens repetidas impedem a cópia inteira.`}
+        rotuloConfirmar="Confirmar cópia"
+        operacaoEmAndamento={executando}
+        onConfirmar={() => void executar()}
+        onCancelar={() => setConfirmando(false)}
+      />
+    </Box>
   );
 }

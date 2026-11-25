@@ -1,11 +1,14 @@
 // Monta a grade real com dois gráficos e dados fictícios para testes no navegador.
 import { useState } from "react";
 import { createRoot } from "react-dom/client";
+import Box from "@mui/material/Box";
+import CssBaseline from "@mui/material/CssBaseline";
+import { ThemeProvider } from "@mui/material/styles";
 import { GradePaineisBi } from "@/components/bi/grade-paineis";
 import { esquemaFiltrosBi } from "@/domain/bi-analise";
 import { graficoBi } from "@/domain/bi-painel";
 import type { PainelBi } from "@/domain/bi-personalizacao";
-import "@/app/globals.css";
+import { tema } from "../../../src/theme/tema";
 
 const filtros = esquemaFiltrosBi.parse({});
 const inicial: PainelBi = {
@@ -54,4 +57,17 @@ function Fixture() {
 }
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Elemento raiz ausente");
-createRoot(raiz).render(<Fixture />);
+const temaInicial = new URLSearchParams(location.search).get("tema") === "dark" ? "dark" : "light";
+createRoot(raiz).render(
+  <ThemeProvider
+    theme={tema}
+    defaultMode={temaInicial}
+    modeStorageKey="theme"
+    disableTransitionOnChange
+  >
+    <CssBaseline enableColorScheme />
+    <Box sx={{ p: 2 }}>
+      <Fixture />
+    </Box>
+  </ThemeProvider>,
+);

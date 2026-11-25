@@ -3,14 +3,14 @@ import { expect, test } from "@playwright/test";
 import { abrirNavegacao, aguardarHidratacao } from "../helpers/pagina";
 
 for (const tema of ["light", "dark"] as const) {
-  test(`atualização lateral no desktop em ${tema}`, async ({ page }) => {
+  test(`atualização no cabeçalho no desktop em ${tema}`, async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.emulateMedia({ colorScheme: tema, reducedMotion: "reduce" });
     await page.addInitScript(() => localStorage.setItem("theme", "system"));
     await page.goto("/");
     await aguardarHidratacao(page);
     await page.mouse.move(1279, 799);
-    const botao = page.locator("aside").getByRole("button", { name: "Atualizar tela" });
+    const botao = page.getByRole("banner").getByRole("button", { name: "Atualizar tela" });
     await expect(botao).toBeVisible();
     await expect(botao).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   });
@@ -21,7 +21,7 @@ for (const tema of ["light", "dark"] as const) {
     await page.addInitScript(() => localStorage.setItem("theme", "system"));
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.locator("html")).toHaveClass(new RegExp(tema));
+    await expect(page.locator("html")).toHaveAttribute("data-mui-color-scheme", tema);
     await page.mouse.move(389, 843);
     const cabecalho = page.getByRole("banner");
     for (const nome of [

@@ -1,5 +1,6 @@
 // Exibição de origem configurável pela escola: seleção por série e turma,
 // persistência e desativação reversível, somente com dados sintéticos.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import {
@@ -71,7 +72,7 @@ test.afterAll(async () => {
 
 async function abrirConfiguracoes(page: Page): Promise<Locator> {
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await abrirConfiguracoesDaGestao(page);
   return page.getByRole("group", { name: "Turma de origem na Chamada", exact: true });
 }
 

@@ -1,10 +1,9 @@
-// Verifica reversões e foco durante animações de seções recolhíveis.
+// Verifica recolhimento, seleção, foco e cores forçadas do seletor de turmas.
 import path from "node:path";
 import { createRequire } from "node:module";
 import { pathToFileURL } from "node:url";
-import { chromium, type Browser, type Locator } from "@playwright/test";
-import tailwind from "@tailwindcss/postcss";
-import { afterAll, beforeAll, expect, it } from "vitest";
+import { chromium, expect, type Browser, type Locator, type Page } from "@playwright/test";
+import { afterAll, beforeAll, it } from "vitest";
 
 const requireVitest = createRequire(import.meta.url);
 const caminho = requireVitest.resolve("vite", {
@@ -17,7 +16,6 @@ let url: string;
 beforeAll(async () => {
   servidor = await createServer({
     configFile: false,
-    css: { postcss: { plugins: [tailwind()] } },
     esbuild: { jsx: "automatic" },
     resolve: { alias: { "@": path.resolve("src") } },
     server: { port: 0, hmr: false, watch: { ignored: ["**/*"] } },
@@ -32,252 +30,109 @@ afterAll(async () => {
   await browser?.close();
   await servidor?.close();
 });
+
 async function abrir(reducedMotion: "reduce" | "no-preference" = "no-preference") {
   const page = await browser.newPage({ reducedMotion });
   await page.goto(url);
   const gatilho = page.getByRole("button", { name: "Turmas", exact: true });
   await gatilho.click({ timeout: 90000 });
-  return { page, gatilho, painel: page.locator('[aria-label="Turma atual"] > div[data-state]') };
-}
-// Mede imediatamente antes e depois da mudança de estado, no próprio navegador.
-async function inverter(botao: Locator, seletor: string, estado: string) {
-  return botao.evaluate(
-    async (botao: HTMLButtonElement, { seletor, estado }) => {
-      const el = document.querySelector<HTMLElement>(seletor);
-      if (!el) throw new Error("Conteúdo ausente");
-      const mudar = () =>
-        new Promise<void>((resolve, reject) => {
-          const anterior = el.dataset.state;
-          const observador = new MutationObserver(() => {
-            if (el.dataset.state !== anterior) {
-              observador.disconnect();
-              resolve();
-            }
-          });
-          observador.observe(el, { attributes: true, attributeFilter: ["data-state"] });
-          botao.click();
-          setTimeout(() => {
-            observador.disconnect();
-            reject(new Error("Estado não mudou"));
-          }, 1000);
-        });
-      await mudar();
-      if (el.dataset.state !== estado) throw new Error("Estado inicial inesperado");
-      const animacao = el.getAnimations().find((item) => item instanceof CSSAnimation);
-      if (!animacao) throw new Error("Animação real ausente");
-      animacao.pause();
-      const duracao = animacao.effect?.getComputedTiming().endTime;
-      if (typeof duracao !== "number" || duracao <= 0) throw new Error("Duração inválida");
-      animacao.currentTime = duracao * 0.45;
-      const antes = el.getBoundingClientRect().height;
-      const completo = el.firstElementChild?.getBoundingClientRect().height ?? 0;
-      await mudar();
-      const depois = el.getBoundingClientRect().height;
-      const novaAnimacao = el.getAnimations().find((item) => item instanceof CSSAnimation);
-      if (!novaAnimacao) throw new Error("Animação de reversão ausente");
-      novaAnimacao.pause();
-      const novaDuracao = novaAnimacao.effect?.getComputedTiming().endTime;
-      if (typeof novaDuracao !== "number" || novaDuracao <= 0) throw new Error("Duração inválida");
-      novaAnimacao.currentTime = novaDuracao * 0.9;
-      return { antes, depois, completo, avancado: el.getBoundingClientRect().height };
-    },
-    { seletor, estado },
-  );
-}
-for (const alvo of ["painel", "serie", "secao"] as const) {
-  it(`${alvo}: reversão durante saída não salta`, async () => {
-    const { page, gatilho } = await abrir();
-    try {
-      let botao = gatilho;
-      let seletor = '[aria-label="Turma atual"] > div[data-state]';
-      if (alvo === "serie") {
-        botao = page.getByRole("button", { name: "1ª série", exact: true });
-        seletor = '[aria-label="Séries"] > div[data-state] > div[data-state]';
-      }
-      if (alvo === "secao") {
-        botao = page.getByRole("button", { name: "Teste seção" });
-        seletor = '[aria-label="Teste seção"][role="region"]';
-        await botao.click();
-      }
-      await page.waitForTimeout(350);
-      const r = await inverter(botao, seletor, "closed");
-      expect(r.antes).toBeGreaterThan(2);
-      expect(r.antes).toBeLessThan(r.completo - 2);
-      expect(Math.abs(r.depois - r.antes)).toBeLessThan(3);
-      expect(r.avancado).toBeGreaterThan(r.antes);
-    } finally {
-      await page.close();
-    }
-  });
-}
-for (const alvo of ["painel", "serie"] as const) {
-  it(`${alvo}: conteúdo inerte e fora da navegação ao iniciar saída`, async () => {
-    const { page, painel, gatilho } = await abrir();
-    try {
-      await page.waitForTimeout(350);
-      await page.addStyleTag({
-        content: 'div[data-state="closed"] { animation-play-state: paused !important; }',
-      });
-      const botao =
-        alvo === "painel" ? gatilho : page.getByRole("button", { name: "1ª série", exact: true });
-      const conteudo =
-        alvo === "painel"
-          ? painel
-          : page.locator('[aria-label="Séries"] > div[data-state] > div[data-state]');
-      await botao.focus();
-      await botao.press("Enter");
-      const r = await conteudo.evaluate((el: HTMLElement) => ({
-        inert: el.inert,
-        height: el.getBoundingClientRect().height,
-        state: el.dataset.state,
-      }));
-      expect(r.state).toBe("closed");
-      expect(r.height).toBeGreaterThan(0);
-      expect(r.inert).toBe(true);
-      expect(await botao.evaluate((el) => document.activeElement === el)).toBe(true);
-      await page.keyboard.press("Tab");
-      expect(await conteudo.evaluate((el) => el.contains(document.activeElement))).toBe(false);
-    } finally {
-      await page.close();
-    }
-  });
-}
-it("painel inicial mede corretamente a série ativa aninhada", async () => {
-  const { page, painel } = await abrir();
-  try {
-    await page.waitForTimeout(350);
-    const r = await painel.evaluate((el) => ({
-      altura: el.getBoundingClientRect().height,
-      conteudo: el.firstElementChild?.getBoundingClientRect().height ?? 0,
-    }));
-    expect(Math.abs(r.altura - r.conteudo)).toBeLessThan(1);
-    expect(await page.getByRole("button", { name: "1ª série A" }).isVisible()).toBe(true);
-  } finally {
-    await page.close();
-  }
-});
-
-it("fechamento externo devolve o foco interno ao gatilho da seção", async () => {
-  const { page } = await abrir();
-  try {
-    const gatilho = page.getByRole("button", { name: "Teste seção" });
-    await gatilho.click();
-    await page.waitForTimeout(300);
-    await page.getByRole("button", { name: "Controle interno" }).focus();
-    await page
-      .getByRole("button", { name: "Fechar seção externamente" })
-      .evaluate((el: HTMLButtonElement) => el.click());
-    expect(await gatilho.evaluate((el) => el === document.activeElement)).toBe(true);
-  } finally {
-    await page.close();
-  }
-});
-
-it("altura alvo inicial inclui a série aninhada aberta", async () => {
-  const { page, painel } = await abrir();
-  try {
-    const alvo = await painel.evaluate((el) =>
-      parseFloat(getComputedStyle(el).getPropertyValue("--radix-collapsible-content-height")),
-    );
-    await page.waitForTimeout(350);
-    const final = await painel.evaluate((el) => el.getBoundingClientRect().height);
-    expect(Math.abs(alvo - final)).toBeLessThan(2);
-  } finally {
-    await page.close();
-  }
-});
-
-for (const alvo of ["painel", "serie", "secao"] as const) {
-  it(`${alvo}: reversão durante entrada não salta`, async () => {
-    const { page, gatilho } = await abrir();
-    try {
-      let botao = gatilho;
-      let seletor = '[aria-label="Turma atual"] > div[data-state]';
-      if (alvo === "serie") {
-        botao = page.getByRole("button", { name: "1ª série", exact: true });
-        seletor = '[aria-label="Séries"] > div[data-state] > div[data-state]';
-      }
-      if (alvo === "secao") {
-        botao = page.getByRole("button", { name: "Teste seção" });
-        seletor = '[aria-label="Teste seção"][role="region"]';
-      } else {
-        await page.waitForTimeout(350);
-        await botao.click();
-        await page.waitForTimeout(350);
-      }
-      const r = await inverter(botao, seletor, "open");
-      expect(r.antes).toBeGreaterThan(2);
-      expect(r.antes).toBeLessThan(r.completo - 2);
-      expect(Math.abs(r.depois - r.antes)).toBeLessThan(3);
-      expect(r.avancado).toBeLessThan(r.antes);
-    } finally {
-      await page.close();
-    }
-  });
+  const serie = page.getByRole("button", { name: "1ª série", exact: true });
+  const grupoSeries = page.getByRole("group", { name: "Séries", exact: true });
+  return { page, gatilho, serie, grupoSeries };
 }
 
-it("não herda a altura inicial de um painel recolhível externo", async () => {
-  const { page, painel } = await abrir();
-  try {
-    const interno = page.locator('[aria-label="Séries"] > div[data-state] > div[data-state]');
-    await painel.evaluate((el) => el.style.setProperty("--altura-recolhivel-inicial", "999px"));
-    expect(
-      await interno.evaluate((el) =>
-        getComputedStyle(el).getPropertyValue("--altura-recolhivel-inicial").trim(),
-      ),
-    ).not.toBe("999px");
-  } finally {
-    await page.close();
-  }
-});
+function turma(grupo: Locator, nome: string): Locator {
+  return grupo.getByRole("button", { name: `1ª série ${nome}`, exact: true });
+}
 
-it("preserva o contorno de foco depois da expansão", async () => {
-  const { page, painel } = await abrir();
+it("abre o painel, expande a série e preserva a turma escolhida", async () => {
+  const { page, gatilho, grupoSeries } = await abrir();
   try {
-    await expect.poll(() => painel.evaluate((el) => el.getAnimations().length)).toBe(0);
-    expect(await painel.evaluate((el) => getComputedStyle(el).overflow)).toBe("visible");
+    await expect(gatilho).toHaveAttribute("aria-expanded", "true");
     const serie = page.getByRole("button", { name: "1ª série", exact: true });
-    await serie.focus();
-    expect(await serie.evaluate((el) => document.activeElement === el)).toBe(true);
-  } finally {
-    await page.close();
-  }
-});
+    await expect(serie).toHaveAttribute("aria-expanded", "true");
+    const turmaA = turma(grupoSeries, "A");
+    const turmaB = turma(grupoSeries, "B");
+    await expect(turmaA).toHaveAttribute("aria-pressed", "true");
+    await turmaB.click();
+    await expect(turmaB).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByLabel("Turma escolhida")).toHaveText("turma-B");
 
-it("movimento reduzido desativa as animações e desmonta o conteúdo", async () => {
-  const { page, gatilho, painel } = await abrir("reduce");
-  try {
-    const serie = page.getByRole("button", { name: "1ª série", exact: true });
-    const interna = page.locator('[aria-label="Séries"] > div[data-state] > div[data-state]');
-    const secao = page.getByRole("button", { name: "Teste seção" });
-    await secao.click();
-    const regiao = page.getByRole("region", { name: "Teste seção" });
-    for (const el of [painel, interna, regiao]) {
-      const css = await el.evaluate((node) => ({
-        nome: getComputedStyle(node).animationName,
-        duracao: parseFloat(getComputedStyle(node).animationDuration),
-      }));
-      expect(css.nome === "none" || css.duracao <= 0.00001).toBe(true);
-    }
     await serie.click();
-    expect(await page.getByRole("button", { name: "1ª série A" }).count()).toBe(0);
+    await expect(serie).toHaveAttribute("aria-expanded", "false");
+    await expect(turmaB).toBeHidden();
+    await serie.click();
+    await expect(turmaB).toHaveAttribute("aria-pressed", "true");
     await gatilho.click();
-    expect(await page.getByRole("button", { name: "1ª série", exact: true }).count()).toBe(0);
-    await secao.click();
-    await expect.poll(() => page.getByRole("button", { name: "Controle interno" }).count()).toBe(0);
+    await expect(serie).toBeHidden();
   } finally {
     await page.close();
   }
 });
 
-it("turma selecionada não repete o ícone e mantém a borda em cores forçadas", async () => {
-  const page = await browser.newPage({ forcedColors: "active" });
+it("Escape fecha o painel e devolve o foco ao gatilho", async () => {
+  const { page, gatilho } = await abrir();
+  try {
+    const turmaA = turma(page.getByRole("group", { name: "Séries" }), "A");
+    await turmaA.focus();
+    await page.keyboard.press("Escape");
+    await expect(gatilho).toHaveAttribute("aria-expanded", "false");
+    expect(await gatilho.evaluate((el) => el === document.activeElement)).toBe(true);
+    await expect(page.getByRole("group", { name: "Séries" })).toBeHidden();
+  } finally {
+    await page.close();
+  }
+});
+
+it("alterna o painel em quadros consecutivos sem perder a seleção", async () => {
+  const { page, gatilho } = await abrir();
+  try {
+    await gatilho.evaluate(async (botao: HTMLButtonElement) => {
+      for (let i = 0; i < 3; i++) {
+        botao.click();
+        await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      }
+    });
+    await expect(gatilho).toHaveAttribute("aria-expanded", "false");
+    await gatilho.click();
+    const grupo = page.getByRole("group", { name: "Séries" });
+    await expect(grupo).toBeVisible();
+    const turmaA = turma(grupo, "A");
+    await expect(turmaA).toHaveAttribute("aria-pressed", "true");
+    await expect(turmaA).toBeVisible();
+  } finally {
+    await page.close();
+  }
+});
+
+it("mantém a navegação com movimento reduzido", async () => {
+  const { page, gatilho, serie, grupoSeries } = await abrir("reduce");
+  try {
+    await expect(serie).toBeVisible();
+    const turmaB = turma(grupoSeries, "B");
+    await expect(turmaB).toBeVisible();
+    await turmaB.click();
+    await serie.click();
+    await expect(turmaB).toBeHidden();
+    await serie.click();
+    await expect(turmaB).toBeVisible();
+    await gatilho.click();
+    await expect(serie).toBeHidden();
+    await gatilho.press("Enter");
+    await expect(turmaB).toBeVisible();
+  } finally {
+    await page.close();
+  }
+});
+
+it("preserva a seleção e distingue a borda em cores forçadas", async () => {
+  const page = await browser.newPage({ forcedColors: "active", reducedMotion: "reduce" });
   try {
     await page.goto(url);
     await page.getByRole("button", { name: "Turmas", exact: true }).click({ timeout: 90000 });
-    const grupo = page.getByRole("group", { name: "Turmas de 1ª série" });
-    const selecionada = grupo.getByRole("button", { name: "1ª série A", exact: true });
-    const outra = grupo.getByRole("button", { name: "1ª série B", exact: true });
+    const grupo = page.getByRole("group", { name: "Séries" });
+    const selecionada = turma(grupo, "A");
+    const outra = turma(grupo, "B");
     expect(await selecionada.getAttribute("aria-pressed")).toBe("true");
     expect(await selecionada.locator("svg.lucide-check").count()).toBe(0);
     const borda = (alvo: Locator) =>
@@ -285,9 +140,31 @@ it("turma selecionada não repete o ícone e mantém a borda em cores forçadas"
         const estilo = getComputedStyle(el);
         return { cor: estilo.borderTopColor, largura: estilo.borderTopWidth };
       });
-    const [selecionadaBorda, outraBorda] = await Promise.all([borda(selecionada), borda(outra)]);
-    expect(selecionadaBorda.largura).toBe("1px");
-    expect(selecionadaBorda.cor).not.toBe(outraBorda.cor);
+    const [bordaSelecionada, bordaOutra] = await Promise.all([borda(selecionada), borda(outra)]);
+    expect(bordaSelecionada.largura).toBe("1px");
+    expect(bordaSelecionada.cor).not.toBe(bordaOutra.cor);
+  } finally {
+    await page.close();
+  }
+});
+
+it("expõe foco visível no gatilho e na série ao navegar por teclado", async () => {
+  const page: Page = await browser.newPage({ reducedMotion: "reduce" });
+  try {
+    await page.goto(url);
+    const gatilho = page.getByRole("button", { name: "Turmas", exact: true });
+    await gatilho.focus();
+    await page.keyboard.press("Enter");
+    const serie = page.getByRole("button", { name: "1ª série", exact: true });
+    for (let i = 0; i < 6 && !(await serie.evaluate((el) => el === document.activeElement)); i += 1)
+      await page.keyboard.press("Tab");
+    expect(await serie.evaluate((el) => el === document.activeElement)).toBe(true);
+    expect(await serie.evaluate((el) => el.matches(":focus-visible"))).toBe(true);
+    const estilos = await serie.evaluate((el) => {
+      const estilo = getComputedStyle(el);
+      return { contorno: estilo.outlineStyle, sombra: estilo.boxShadow };
+    });
+    expect(estilos.contorno !== "none" || estilos.sombra !== "none").toBe(true);
   } finally {
     await page.close();
   }

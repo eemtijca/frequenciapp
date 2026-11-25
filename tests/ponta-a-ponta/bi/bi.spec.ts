@@ -141,12 +141,18 @@ async function abrir(page: Page) {
   await page.getByRole("button", { name: "Testar e entrar", exact: true }).click();
   await expect(page.getByRole("region", { name: "Indicadores gerais" })).toContainText("20%");
 }
+async function abrirFiltrosGerais(page: Page) {
+  if (await page.evaluate(() => matchMedia("(min-width: 600px)").matches)) return;
+  const botao = page.getByRole("button", { name: "Filtros da análise", exact: true });
+  await expect(botao).toBeVisible();
+  if ((await botao.getAttribute("aria-expanded")) === "false") await botao.click();
+}
 async function aba(page: Page, nome: string) {
-  const navegacao = page.getByRole("navigation", { name: "Seções do FrequenciBI" });
+  const navegacao = page.getByRole("tablist", { name: "Seções do FrequenciBI" });
   const seletor = page.getByRole("combobox", { name: "Seção do FrequenciBI", exact: true });
   await expect(navegacao.or(seletor).first()).toBeVisible();
   if (await navegacao.isVisible().catch(() => false)) {
-    await navegacao.getByRole("button", { name: nome, exact: true }).click();
+    await navegacao.getByRole("tab", { name: nome, exact: true }).click();
     return;
   }
   await seletor.click();
@@ -343,7 +349,9 @@ test("revogação remove chave e cache, preservando as visões locais", async ({
   await page.getByText("Configurações deste navegador", { exact: true }).click();
   await page.getByRole("button", { name: "Conferir chave novamente", exact: true }).click();
   await expect(page.getByRole("button", { name: "Testar e entrar", exact: true })).toBeVisible();
-  expect(await page.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBeNull();
+  await expect
+    .poll(() => page.evaluate(() => localStorage.getItem("frequencibi:chave")))
+    .toBeNull();
   expect(
     await page.evaluate(
       () => JSON.parse(localStorage.getItem("frequencibi:personalizacao") ?? "{}").visoes.length,
@@ -493,7 +501,10 @@ test("links compartilham só filtros e configuração exportada não inclui segr
   const configuracoes = page.getByText("Configurações deste navegador", { exact: true });
   if (test.info().project.use.hasTouch) await configuracoes.tap();
   else await configuracoes.click();
-  await expect(configuracoes.locator("..")).toHaveJSProperty("open", true);
+  await expect(configuracoes).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Configurações deste navegador", exact: true }),
+  ).toHaveAttribute("aria-expanded", "true");
   const evento = page.waitForEvent("download");
   await page.getByRole("button", { name: "Exportar configurações", exact: true }).click();
   await page
@@ -611,6 +622,7 @@ test("personaliza modelo, preserva filtros do painel e aplica link sem alterar o
   await expect(page.locator("[data-painel-item]")).toHaveCount(5);
   await page.goto("/bi?inicio=2026-10-01&fim=2026-10-31");
   await expect(page.getByRole("region", { name: "Indicadores gerais" })).toBeVisible();
+  await abrirFiltrosGerais(page);
   await expect(page.getByRole("button", { name: /^Início da análise:/ })).toContainText(
     "01/10/2026",
   );
@@ -665,6 +677,7 @@ test("recorte por aluno calcula a presença histórica e atualizar renova també
   page,
 }) => {
   await abrir(page);
+  await abrirFiltrosGerais(page);
   await page.getByText("Mais filtros", { exact: true }).click();
   await escolher(page, "Aluno", "QA Aluna");
   const indicador = page

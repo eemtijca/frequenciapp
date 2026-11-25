@@ -1,5 +1,6 @@
 // Horário de provas bimestrais: a administração cadastra na Gestão para uma série inteira, o conflito
 // de horário é recusado, a aba Horários mostra as provas da turma e o encerramento apaga tudo.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { test, expect, type Page } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
 import { aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -49,7 +50,7 @@ async function abrirProvas(page: Page) {
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Gestão", "gestao");
-  await page.getByRole("tab", { name: "Configurações", exact: true }).click();
+  await abrirConfiguracoesDaGestao(page);
   await selecionarAcaoConfiguracoes(page, "Horários", "Provas");
   const formulario = page.getByRole("form", { name: "Nova prova" });
   await expect(formulario).toBeVisible();

@@ -3,15 +3,21 @@
 // Área compartilhada de saídas e entradas, em abas, com registros independentes.
 // A aba ativa vai para a URL (?visao=saidas&aba=entradas) enquanto a área está aberta.
 import { useCallback, useEffect, useState, type ComponentProps } from "react";
-import { FileSpreadsheet, LogIn, LogOut } from "lucide-react";
+import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
+import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
+import TableChartOutlinedIcon from "@mui/icons-material/TableChartOutlined";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
 import VistaSaidas from "./vista-saidas";
 import VistaEntradas from "./vista-entradas";
-import AbasDeslizantes, { type AbaItem } from "@/components/ui/abas-deslizantes";
-import { Button } from "@/components/ui/button";
+import { Abas, type ItemAba } from "@/components/ui/mui/abas";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
 import DialogoEnvioSaidas, {
   useEstadoPlanilhaSaidas,
 } from "@/components/movimentacoes/dialogo-envio-saidas";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
+import { TOKENS_LAYOUT } from "@/theme/layout";
 
 export type AbaMovimentacao = "saidas" | "entradas";
 
@@ -19,11 +25,6 @@ type Props = ComponentProps<typeof VistaSaidas> & {
   abaInicial?: AbaMovimentacao;
   onAbrirGestao?: () => void;
 };
-
-const ABAS: AbaItem<AbaMovimentacao>[] = [
-  { valor: "saidas", rotulo: "Saídas", icone: LogOut },
-  { valor: "entradas", rotulo: "Entradas", icone: LogIn },
-];
 
 /** Grava a aba na URL sem criar entrada de histórico; sem argumento, limpa os parâmetros. */
 function refletirNaUrl(aba: AbaMovimentacao | null) {
@@ -79,19 +80,53 @@ export default function VistaMovimentacoes({
     if (ativo) void recarregarPlanilha();
   }, [ativo, recarregarPlanilha]);
 
+  const itens: ItemAba<AbaMovimentacao>[] = [
+    {
+      valor: "saidas",
+      rotulo: "Saídas",
+      icone: <LogoutRoundedIcon fontSize="small" />,
+      conteudo: (
+        <VistaSaidas
+          {...props}
+          ativo={props.ativo && aba === "saidas"}
+          atualizacao={atualizacao}
+          onMesVisivel={aoMesVisivel}
+        />
+      ),
+    },
+    {
+      valor: "entradas",
+      rotulo: "Entradas",
+      icone: <LoginRoundedIcon fontSize="small" />,
+      conteudo: (
+        <VistaEntradas
+          diaCorrente={props.diaCorrente}
+          fuso={props.fuso}
+          ativo={props.ativo && aba === "entradas"}
+          turmas={props.turmas}
+          alunos={props.alunos}
+          liberadores={props.liberadores}
+          catalogoJustificativas={props.catalogoJustificativas}
+          atualizacao={atualizacao}
+        />
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-4">
-      <AbasDeslizantes
+    <Stack spacing={2}>
+      <Abas
         rotuloAcessivel="Tipo de registro"
-        abaInicial={abaInicial}
-        abas={ABAS}
+        itens={itens}
+        ativo={aba}
+        onChange={aoTrocar}
+        variant="fullWidth"
         dataPager="movimentacoes"
-        aoTrocar={aoTrocar}
-        acao={
-          <Button
+        acaoNoTrilho={
+          <Botao
             type="button"
-            variant="outline"
-            className="h-11 shrink-0 px-3"
+            variante="contorno"
+            tamanho="pequeno"
             aria-label="Enviar saídas e entradas para a planilha"
             disabled={!estadoPlanilha?.podeEnviar}
             title={
@@ -100,34 +135,32 @@ export default function VistaMovimentacoes({
                 : "Planilha não conectada. Configure em Gestão."
             }
             onClick={() => setEnvioAberto(true)}
+            sx={(tema) => ({
+              flexShrink: 0,
+              height: TOKENS_LAYOUT.alvoToque,
+              width: { xs: TOKENS_LAYOUT.alvoToque, sm: "auto" },
+              minWidth: TOKENS_LAYOUT.alvoToque,
+              px: { xs: 0, sm: 1.5 },
+              gap: 0.75,
+              "&&": {
+                bgcolor: "transparent",
+                borderColor: "bordaControle",
+                "&:hover": { bgcolor: "action.hover" },
+                "&:active": { bgcolor: "action.selected" },
+                "&.Mui-disabled": {
+                  background: "transparent !important",
+                  borderColor: `${tema.vars.palette.divider} !important`,
+                },
+              },
+            })}
           >
-            <FileSpreadsheet size={16} aria-hidden="true" />
-            <span className="hidden sm:inline">Planilha</span>
-          </Button>
+            <TableChartOutlinedIcon sx={{ fontSize: 20 }} />
+            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+              Planilha
+            </Box>
+          </Botao>
         }
-      >
-        {(atual, ativa) =>
-          atual === "saidas" ? (
-            <VistaSaidas
-              {...props}
-              ativo={props.ativo && ativa}
-              atualizacao={atualizacao}
-              onMesVisivel={aoMesVisivel}
-            />
-          ) : (
-            <VistaEntradas
-              diaCorrente={props.diaCorrente}
-              fuso={props.fuso}
-              ativo={props.ativo && ativa}
-              turmas={props.turmas}
-              alunos={props.alunos}
-              liberadores={props.liberadores}
-              catalogoJustificativas={props.catalogoJustificativas}
-              atualizacao={atualizacao}
-            />
-          )
-        }
-      </AbasDeslizantes>
+      />
       <DialogoEnvioSaidas
         aberto={envioAberto}
         onAbrir={setEnvioAberto}
@@ -137,21 +170,16 @@ export default function VistaMovimentacoes({
         aoConcluir={() => void recarregarPlanilha()}
       />
       {estadoPlanilha && !estadoPlanilha.podeEnviar && (
-        <p className="text-muted-foreground text-xs">
-          Planilha não conectada.{" "}
-          {onAbrirGestao ? (
-            <button
-              type="button"
-              onClick={onAbrirGestao}
-              className="text-primary font-medium underline-offset-4 hover:underline"
-            >
-              Configurar na Gestão
-            </button>
-          ) : (
-            "Configure na Gestão."
-          )}
-        </p>
+        <AlertaCompacto
+          variante="dados_invalidos"
+          titulo="Planilha não conectada"
+          descricao={onAbrirGestao ? undefined : "Configure na Gestão."}
+          tamanho="linha"
+          acao={
+            onAbrirGestao ? { rotulo: "Configurar na Gestão", onClick: onAbrirGestao } : undefined
+          }
+        />
       )}
-    </div>
+    </Stack>
   );
 }

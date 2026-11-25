@@ -1,6 +1,6 @@
 # Fixture: bloqueio de atualização offline
 
-Esta fixture usa o `ProvedorAtualizacao`, `useAtualizacaoTela`, `BotaoAtualizar` e o toast reais. Os dados são sintéticos; o callback registrado é um spy sem I/O, com Promise liberada manualmente. Não requer aplicação, banco, Docker, sessão ou `.auth`. O Playwright inicia apenas o Vite da fixture em `127.0.0.1:3196`, sem reutilizar servidor existente; o browser bloqueia service workers e rejeita e registra requisições de outras origens.
+Esta fixture usa o `ProvedorAtualizacao`, `useAtualizacaoTela`, `BotaoAtualizar` e o aviso real. Os dados são sintéticos; o callback registrado é um spy sem I/O, com Promise liberada manualmente. Não requer aplicação, banco, Docker, sessão ou `.auth`. O Playwright inicia apenas o Vite da fixture em `127.0.0.1:3196`, sem reutilizar servidor existente; o browser bloqueia service workers e rejeita e registra requisições de outras origens.
 
 Após instalar as dependências e o Chromium compatível com o Playwright, execute no worktree (não em paralelo com outro servidor na porta):
 

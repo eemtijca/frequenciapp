@@ -4,22 +4,26 @@
 // obrigatória das duas abas, remoções marcadas no modo completo (saídas) e
 // confirmação. Nada é gravado sem revisão.
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { LoaderCircle, Send } from "lucide-react";
-import { toast } from "sonner";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
+import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import CircularProgress from "@mui/material/CircularProgress";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { AvisoCompacto, type VarianteEstado } from "@/components/ui/tela-estado";
+import { avisarSucesso } from "@/lib/avisos";
+import { publicarAviso } from "@/components/ui/mui/avisos";
+import { Alerta } from "@/components/ui/mui/alerta";
+import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Dialogo } from "@/components/ui/mui/dialogo";
+import { Selo } from "@/components/ui/mui/selo";
 import { diasDoMes, rotuloMes } from "@/domain/frequencia";
-import { Button } from "@/components/ui/button";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface ResumoEnvioSaidas {
   criar: number;
@@ -83,6 +87,20 @@ function useOnline(): boolean {
     },
     () => navigator.onLine,
     () => true,
+  );
+}
+
+function IndicadorLeitura() {
+  return (
+    <Stack
+      direction="row"
+      spacing={1}
+      role="status"
+      sx={{ alignItems: "center", color: "text.secondary" }}
+    >
+      <CircularProgress size={16} aria-hidden="true" />
+      <Typography variant="body2">Lendo a planilha e montando a prévia...</Typography>
+    </Stack>
   );
 }
 
@@ -232,147 +250,176 @@ export default function DialogoEnvioSaidas({
     }
 
     if (problemas.length === 0) {
-      toast.success(`${feitos.join(". ")}.`);
+      avisarSucesso(`${feitos.join(". ")}.`);
       onAbrir(false);
       aoConcluir();
       return;
     }
     setErro(problemas.join(" "));
-    if (feitos.length > 0) toast.success(`${feitos.join(". ")}.`);
-    toast.error(
-      parcial
+    if (feitos.length > 0) avisarSucesso(`${feitos.join(". ")}.`);
+    publicarAviso({
+      severidade: "error",
+      titulo: parcial
         ? "O envio ficou parcial. Confira a planilha antes de tentar de novo."
         : "Parte do envio não foi concluída. Confira a planilha antes de tentar de novo.",
-    );
+    });
     aoConcluir();
   });
 
   const bloqueado = simulacao?.bloqueado ?? false;
 
   return (
-    <Dialog open={aberto} onOpenChange={onAbrir}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Enviar saídas e entradas · {rotuloMes(mes)}</DialogTitle>
-        </DialogHeader>
+    <Dialogo
+      aberto={aberto}
+      onFechar={() => onAbrir(false)}
+      titulo={`Enviar saídas e entradas · ${rotuloMes(mes)}`}
+      tamanho="medio"
+      acoes={
+        <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+          <Botao type="button" variante="contorno" onClick={() => onAbrir(false)}>
+            Cancelar
+          </Botao>
+          <Botao
+            type="button"
+            variante="secundario"
+            onClick={() => void enviar()}
+            disabled={carregando || (!podeSaidas && !podeEntradas) || !online}
+            carregando={enviando}
+            icone={<SendRoundedIcon />}
+          >
+            Enviar
+          </Botao>
+        </Stack>
+      }
+    >
+      <Stack spacing={2}>
+        <Box sx={{ width: { xs: "100%", sm: 224 } }}>
+          <SeletorPeriodo
+            id="envio-mes"
+            modo="mes"
+            valor={mes}
+            max={mes}
+            disabled={enviando}
+            rotuloAcessivel="Mês do envio das saídas e entradas"
+            rotulo={rotuloMes(mes)}
+            onValor={trocarMes}
+          />
+        </Box>
 
-        <div className="flex flex-col gap-3">
-          <div className="w-full sm:w-56">
-            <SeletorPeriodo
-              id="envio-mes"
-              modo="mes"
-              valor={mes}
-              max={mes}
-              disabled={enviando}
-              rotuloAcessivel="Mês do envio das saídas e entradas"
-              rotulo={rotuloMes(mes)}
-              onValor={trocarMes}
-            />
-          </div>
+        {modoCompleto && (
+          <Alerta severity="warning">
+            Modo completo ativo. A planilha guarda cópia antes de corrigir ou remover.
+          </Alerta>
+        )}
 
-          {modoCompleto && (
-            <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
-              Modo completo ativo. A planilha guarda cópia antes de corrigir ou remover.
-            </p>
-          )}
+        {!online && (
+          <Alerta severity="error">
+            Sem conexão. O envio fica indisponível até a internet voltar.
+          </Alerta>
+        )}
 
-          {!online && (
-            <p className="bg-falta-fraca text-falta-texto rounded-lg px-3 py-2 text-xs">
-              Sem conexão. O envio fica indisponível até a internet voltar.
-            </p>
-          )}
+        {carregando && <IndicadorLeitura />}
 
-          {carregando && (
-            <p className="text-muted-foreground flex items-center gap-2 text-sm">
-              <LoaderCircle size={16} className="animate-spin" />
-              Lendo a planilha e montando a prévia...
-            </p>
-          )}
+        {!carregando && bloqueado && (
+          <AlertaCompacto
+            variante="dados_invalidos"
+            descricao={
+              simulacao?.avisos[0] ??
+              "A estrutura da planilha impede a escrita. Ajuste o cabeçalho."
+            }
+            tamanho="linha"
+          />
+        )}
 
-          {!carregando && bloqueado && (
-            <AvisoCompacto
-              variante="dados_invalidos"
-              descricao={
-                simulacao?.avisos[0] ??
-                "A estrutura da planilha impede a escrita. Ajuste o cabeçalho."
-              }
-              tamanho="linha"
-            />
-          )}
-
-          {simulacao && !carregando && !bloqueado && (
-            <div className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs">
-              <span className="font-medium">Aba {simulacao.aba}</span>
-              <span>
+        {simulacao && !carregando && !bloqueado && (
+          <Paper variant="outlined" sx={{ p: 1.5, boxShadow: "none" }}>
+            <Stack spacing={0.5}>
+              <Box>
+                <Selo rotulo={`Aba ${simulacao.aba}`} tom="sucesso" />
+              </Box>
+              <Typography variant="caption" component="p">
                 {simulacao.resumo.criar}{" "}
                 {simulacao.resumo.criar === 1 ? "linha nova" : "linhas novas"} ·{" "}
                 {simulacao.resumo.preencher}{" "}
                 {simulacao.resumo.preencher === 1 ? "célula a preencher" : "células a preencher"} ·{" "}
                 {simulacao.resumo.puladasOcupadas} ocupadas ignoradas ·{" "}
                 {simulacao.resumo.puladasFormula} fórmulas protegidas
-              </span>
+              </Typography>
               {modoCompleto && (
-                <span>
+                <Typography variant="caption" component="p">
                   {simulacao.resumo.substituir} correções · {simulacao.resumo.remover} remoções
                   marcadas · {simulacao.resumo.ambiguidades} ambiguidades
-                </span>
+                </Typography>
               )}
               {simulacao.criar.length > 0 && (
-                <span className="text-muted-foreground">
+                <Typography variant="caption" component="p" sx={{ color: "text.secondary" }}>
                   Novas:{" "}
                   {simulacao.criar
                     .slice(0, 5)
                     .map((item) => `${item.nome} (${item.dia})`)
                     .join(", ")}
                   {simulacao.criar.length > 5 ? " ..." : ""}
-                </span>
+                </Typography>
               )}
               {simulacao.substituir.length > 0 && (
-                <span className="text-falta-texto">
+                <Typography variant="caption" component="p" sx={{ color: "falta.texto" }}>
                   Correções:{" "}
                   {simulacao.substituir
                     .slice(0, 5)
                     .map((item) => `${item.celula} ${item.anterior || "vazia"} para ${item.valor}`)
                     .join(", ")}
                   {simulacao.substituir.length > 5 ? " ..." : ""}
-                </span>
+                </Typography>
               )}
               {simulacao.avisos.slice(0, 3).map((aviso) => (
-                <span key={aviso} className="text-muted-foreground">
+                <Typography
+                  key={aviso}
+                  variant="caption"
+                  component="p"
+                  sx={{ color: "text.secondary" }}
+                >
                   {aviso}
-                </span>
+                </Typography>
               ))}
-            </div>
-          )}
+            </Stack>
+          </Paper>
+        )}
 
-          {!carregando && previaEntradas && (
-            <div className="bg-secondary/40 flex flex-col gap-1 rounded-lg px-3 py-2 text-xs">
-              <span className="font-medium">Aba Entradas</span>
+        {!carregando && previaEntradas && (
+          <Paper variant="outlined" sx={{ p: 1.5, boxShadow: "none" }}>
+            <Stack spacing={0.5}>
+              <Typography component="p" variant="subtitle2">
+                Aba Entradas
+              </Typography>
               {previaEntradas.bloqueado ? (
-                <span className="text-falta-texto">
+                <Typography variant="caption" component="p" sx={{ color: "falta.texto" }}>
                   {previaEntradas.avisos[0] ?? "A aba Entradas precisa de conferência."}
-                </span>
+                </Typography>
               ) : (
-                <span>
+                <Typography variant="caption" component="p">
                   {previaEntradas.novas}{" "}
                   {previaEntradas.novas === 1 ? "linha nova" : "linhas novas"} ·{" "}
                   {previaEntradas.existentes}{" "}
                   {previaEntradas.existentes === 1 ? "já está na planilha" : "já estão na planilha"}
-                </span>
+                </Typography>
               )}
-            </div>
-          )}
+            </Stack>
+          </Paper>
+        )}
 
-          {!carregando && !previaEntradas && avisoEntradas && (
-            <p className="text-muted-foreground text-xs">Entradas: {avisoEntradas}</p>
-          )}
+        {!carregando && !previaEntradas && avisoEntradas && (
+          <Typography variant="caption" component="p" sx={{ color: "text.secondary" }}>
+            Entradas: {avisoEntradas}
+          </Typography>
+        )}
 
-          {modoCompleto &&
-            !carregando &&
-            simulacao?.candidatosRemocao.map((item) => (
-              <label key={item.linha} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
+        {modoCompleto &&
+          !carregando &&
+          simulacao?.candidatosRemocao.map((item) => (
+            <FormControlLabel
+              key={item.linha}
+              control={
+                <Checkbox
                   checked={removerMarcadas.includes(item.linha)}
                   onChange={(evento) =>
                     setRemoverMarcadas((atuais) =>
@@ -381,30 +428,15 @@ export default function DialogoEnvioSaidas({
                         : atuais.filter((linha) => linha !== item.linha),
                     )
                   }
-                  className="size-4 accent-[var(--primary)]"
                 />
-                Remover {item.nome} ({item.dia}, linha {item.linha})
-              </label>
-            ))}
+              }
+              label={`Remover ${item.nome} (${item.dia}, linha ${item.linha})`}
+            />
+          ))}
 
-          {erro && <AvisoCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
-        </div>
-
-        <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onAbrir(false)}>
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void enviar()}
-            disabled={enviando || carregando || (!podeSaidas && !podeEntradas) || !online}
-          >
-            {enviando ? <LoaderCircle size={16} className="animate-spin" /> : <Send size={16} />}
-            Enviar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        {erro && <AlertaCompacto variante={erroVariante} descricao={erro} tamanho="linha" />}
+      </Stack>
+    </Dialogo>
   );
 }
 

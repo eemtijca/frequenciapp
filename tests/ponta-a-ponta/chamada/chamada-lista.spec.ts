@@ -137,18 +137,33 @@ test("simplifica a chamada bloqueada, destaca os estados e atualiza o mês após
   expect(await marcaF.evaluate((e) => getComputedStyle(e).backgroundColor)).not.toBe(
     await marcaFj.evaluate((e) => getComputedStyle(e).backgroundColor),
   );
-  await expect
-    .poll(async () => (await marcaF.boundingBox())?.height ?? 0)
-    .toBeGreaterThanOrEqual(44);
-  await expect
-    .poll(async () => (await marcaFj.boundingBox())?.height ?? 0)
-    .toBeGreaterThanOrEqual(44);
+
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   for (const tema of ["light", "dark"] as const) {
     await page.emulateMedia({ colorScheme: tema });
     await lista.screenshot({ path: info.outputPath(`lista-${tema}.png`), animations: "disabled" });
   }
   await desbloquearChamada(secao);
+  for (const linha of [falta, justificada]) {
+    const botao = linha.getByRole("button", { name: /: falta/ });
+    await expect(botao).toBeEnabled();
+    const faixa = linha.locator("[data-faixa-toque]");
+    await faixa.evaluate((elemento) => elemento.scrollIntoView({ block: "center" }));
+    const caixa = await faixa.boundingBox();
+    if (!caixa) throw new Error("Faixa de marcação sem posição.");
+    expect(caixa.height).toBeGreaterThanOrEqual(48);
+    expect(caixa.width).toBeGreaterThanOrEqual(48);
+    // O selo é decorativo. As extremidades da faixa acionam o botão do aluno.
+    expect(
+      await botao.evaluate(
+        (elemento, area) =>
+          [area.y + 2, area.y + area.height - 2].every((y) =>
+            elemento.contains(document.elementFromPoint(area.x + area.width - 4, y)),
+          ),
+        caixa,
+      ),
+    ).toBe(true);
+  }
   await expect(justificada.getByRole("textbox", { name: /Observação da falta/ })).toHaveValue(
     "Motivo de demonstração",
   );

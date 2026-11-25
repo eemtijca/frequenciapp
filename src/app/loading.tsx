@@ -1,31 +1,58 @@
+"use client";
+
 // Esqueleto do shell enquanto a página resolve a sessão e os dados do mês.
+import Box from "@mui/material/Box";
+import Skeleton from "@mui/material/Skeleton";
+import Stack from "@mui/material/Stack";
+import { TOKENS_LAYOUT } from "@/theme/layout";
+
 export default function Carregando() {
   return (
-    <div className="flex min-h-dvh w-full flex-col lg:flex-row" aria-busy="true">
-      <div className="superficie hidden w-60 shrink-0 rounded-none border-0 border-r lg:block" />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <div className="superficie rounded-none border-0 border-b">
-          <div className="flex items-center justify-between px-4 py-3 sm:px-6">
-            <div className="flex flex-col gap-1.5">
-              <div className="bg-secondary h-5 w-36 animate-pulse rounded" />
-              <div className="bg-secondary h-3 w-24 animate-pulse rounded" />
-            </div>
-            <div className="flex gap-1">
-              <div className="bg-secondary size-11 animate-pulse rounded-full" />
-              <div className="bg-secondary size-11 animate-pulse rounded-full" />
-            </div>
-          </div>
-        </div>
-        <div className="flex flex-1 flex-col gap-4 px-4 pt-4 sm:px-6 lg:px-8">
-          <div className="bg-secondary h-6 w-44 animate-pulse rounded" />
-          <div className="superficie h-11 w-full animate-pulse" />
-          <div className="grid grid-cols-2 gap-3">
-            <div className="superficie h-16 animate-pulse" />
-            <div className="superficie h-16 animate-pulse" />
-          </div>
-          <div className="superficie h-64 w-full animate-pulse" />
-        </div>
-      </div>
-    </div>
+    <Box
+      aria-busy="true"
+      sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, minHeight: "100dvh" }}
+    >
+      <Box
+        sx={{
+          display: { xs: "none", md: "block" },
+          width: TOKENS_LAYOUT.gaveta,
+          flexShrink: 0,
+          borderRight: 1,
+          borderColor: "divider",
+        }}
+      />
+      <Box sx={{ display: "flex", flex: 1, minWidth: 0, flexDirection: "column" }}>
+        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+          <Stack
+            direction="row"
+            spacing={2}
+            sx={{
+              alignItems: "center",
+              justifyContent: "space-between",
+              px: { xs: 2, sm: 3 },
+              py: 1.5,
+            }}
+          >
+            <Stack spacing={0.75}>
+              <Skeleton variant="text" width={144} height={24} />
+              <Skeleton variant="text" width={96} height={16} />
+            </Stack>
+            <Stack direction="row" spacing={1}>
+              <Skeleton variant="circular" width={44} height={44} />
+              <Skeleton variant="circular" width={44} height={44} />
+            </Stack>
+          </Stack>
+        </Box>
+        <Stack spacing={2} sx={{ flex: 1, px: { xs: 2, sm: 3, lg: 4 }, pt: 2 }}>
+          <Skeleton variant="text" width={176} height={28} />
+          <Skeleton variant="rounded" height={44} />
+          <Stack direction="row" spacing={1.5}>
+            <Skeleton variant="rounded" height={64} sx={{ flex: 1 }} />
+            <Skeleton variant="rounded" height={64} sx={{ flex: 1 }} />
+          </Stack>
+          <Skeleton variant="rounded" height={256} />
+        </Stack>
+      </Box>
+    </Box>
   );
 }

@@ -3,7 +3,23 @@
 // Horário das provas bimestrais na Gestão: a administração cadastra as provas do período por turma,
 // remove uma prova e encerra o período, que apaga o horário inteiro.
 import { useEffect, useId, useMemo, useState } from "react";
-import { CalendarClock, CalendarX, LoaderCircle, Plus, Trash2 } from "lucide-react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
+import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
+import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import Divider from "@mui/material/Divider";
+import FormControl from "@mui/material/FormControl";
+import FormControlLabel from "@mui/material/FormControlLabel";
+import FormLabel from "@mui/material/FormLabel";
+import Grid from "@mui/material/Grid";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import dayjs, { type Dayjs } from "dayjs";
+import { useReduzirAnimacoesDosSeletores } from "@/theme/animacoes-da-interface";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import {
   diaDaSemanaIso,
   diaSeguinte,
@@ -20,31 +36,24 @@ import {
 } from "@/domain/provas-bimestrais";
 import { corpoAlteracao, corpoJson, pedir } from "@/lib/api-cliente";
 import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { deDiaCivil, paraDiaCivil } from "@/lib/data-civil";
 import {
   avisarProvasBimestraisMudaram,
   ouvirProvasBimestraisMudaram,
 } from "@/lib/eventos-provas-bimestrais";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { SeletorHorario } from "@/components/ui/seletor-horario";
-import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
+import { Botao } from "@/components/ui/mui/botao";
+import { Campo, useCampo } from "@/components/ui/mui/campo";
+import { CampoTexto } from "@/components/ui/mui/text-field";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
+import { SeletorHorario } from "@/components/ui/mui/seletor-horario";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { ESPACO_COMPOSICAO, TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   turmas: Turma[];
   diaCorrente: string;
+  rascunhoPendente: boolean;
 }
 
 /** A mesma prova cadastrada para várias turmas aparece numa linha só. */
@@ -55,6 +64,26 @@ interface GrupoDeProva {
   fim: string;
   provas: ProvaBimestral[];
 }
+
+const TEXTO_INVISIVEL = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
+
+const ESTILO_BOTAO_ICONE = {
+  minWidth: TOKENS_LAYOUT.alvoToque,
+  width: TOKENS_LAYOUT.alvoToque,
+  height: TOKENS_LAYOUT.alvoToque,
+  padding: 0,
+  "& .MuiButton-startIcon": { margin: 0 },
+} as const;
 
 function agruparPorProva(provas: readonly ProvaBimestral[]): GrupoDeProva[] {
   const grupos = new Map<string, GrupoDeProva>();
@@ -82,7 +111,75 @@ function contarTurmas(quantidade: number): string {
   return quantidade === 1 ? "1 turma" : `${quantidade} turmas`;
 }
 
-export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
+function comoDia(dia: string): Dayjs | null {
+  const data = deDiaCivil(dia);
+  return data ? dayjs(data) : null;
+}
+
+interface SeletorDataProps {
+  id: string;
+  valor: string;
+  min: string;
+  max: string;
+  disabled: boolean;
+  onValor: (valor: string) => void;
+}
+
+/** Data civil da prova em DatePicker, ligada ao Campo pelo contexto do formulário. */
+function SeletorDataProva({ id, valor, min, max, disabled, onValor }: SeletorDataProps) {
+  const campo = useCampo();
+  const reduzirAnimacoes = useReduzirAnimacoesDosSeletores();
+
+  return (
+    <DatePicker
+      reduceAnimations={reduzirAnimacoes}
+      value={comoDia(valor)}
+      onChange={(novo) => {
+        const convertido = paraDiaCivil(novo?.toDate() ?? null);
+        if (convertido) onValor(convertido);
+      }}
+      format="DD/MM/YYYY"
+      minDate={comoDia(min) ?? undefined}
+      maxDate={comoDia(max) ?? undefined}
+      shouldDisableDate={(data) => data.day() === 0}
+      disabled={disabled}
+      label="Data"
+      slotProps={{
+        textField: {
+          id,
+          fullWidth: true,
+          error: Boolean(campo?.erro),
+          slotProps: {
+            htmlInput: { "aria-describedby": campo?.descritoPor },
+            ...(campo ? { input: { notched: false }, inputLabel: { sx: TEXTO_INVISIVEL } } : {}),
+          },
+          sx: (tema) => ({
+            width: "100%",
+            "& .MuiPickersOutlinedInput-root": {
+              minHeight: TOKENS_LAYOUT.campo.medio,
+              borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
+            },
+            "& .MuiPickersOutlinedInput-notchedOutline": {
+              borderRadius: `${TOKENS_LAYOUT.campo.raio}px`,
+            },
+            "& .MuiPickersOutlinedInput-root.Mui-focused": {
+              boxShadow: `0 0 0 ${TOKENS_LAYOUT.campo.foco}px color-mix(in srgb, ${tema.palette.primary.main} 24%, transparent)`,
+            },
+          }),
+        },
+        openPickerButton: {
+          sx: { width: TOKENS_LAYOUT.alvoToque, height: TOKENS_LAYOUT.alvoToque },
+        },
+        actionBar: {
+          sx: { "& .MuiButton-root": { minHeight: TOKENS_LAYOUT.alvoToque } },
+        },
+      }}
+      sx={{ width: "100%" }}
+    />
+  );
+}
+
+export default function SecaoProvasBimestrais({ turmas, diaCorrente, rascunhoPendente }: Props) {
   const base = useId();
   const [provas, setProvas] = useState<ProvaBimestral[]>([]);
   const [carregado, setCarregado] = useState(false);
@@ -212,257 +309,286 @@ export default function SecaoProvasBimestrais({ turmas, diaCorrente }: Props) {
   });
 
   return (
-    <div className="flex min-w-0 flex-col gap-4">
-      <p className="text-muted-foreground text-sm">
-        O horário de provas vale só durante o período de provas. A aba Horários mostra a cada turma
-        as provas de hoje em diante; datas passadas saem sozinhas, e Encerrar período de provas
-        apaga o horário inteiro.
-      </p>
-      <form
-        aria-label="Nova prova"
-        className="superficie flex min-w-0 flex-col gap-3 p-3"
+    <Stack spacing={3} sx={{ minWidth: 0 }}>
+      <Box
+        component="form"
+        aria-labelledby={`${base}-titulo`}
+        aria-describedby={`${base}-descricao`}
         onSubmit={(evento) => {
           evento.preventDefault();
           void adicionar();
         }}
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          minWidth: 0,
+        }}
       >
-        <div className="grid min-w-0 gap-3 sm:grid-cols-3">
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor={`${base}-dia`}>Data</Label>
-            <SeletorPeriodo
-              id={`${base}-dia`}
-              modo="dia"
-              valor={dia}
-              min={diaCorrente}
-              max="2199-12-31"
-              semDomingo
-              mostrarSelo={false}
-              rotuloAcessivel="Data da prova"
-              rotulo={rotuloData(dia)}
-              disabled={adicionando}
-              onValor={(valor) => {
-                setDia(valor);
-                setErro("");
-              }}
-            />
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor={`${base}-inicio`}>Início</Label>
-            <SeletorHorario
-              id={`${base}-inicio`}
-              valor={inicio}
-              rotuloAcessivel="Início da prova"
-              disabled={adicionando}
-              onValor={(valor) => {
-                setInicio(valor);
-                setErro("");
-              }}
-            />
-          </div>
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor={`${base}-fim`}>Fim</Label>
-            <SeletorHorario
-              id={`${base}-fim`}
-              valor={fim}
-              rotuloAcessivel="Fim da prova"
-              disabled={adicionando}
-              onValor={(valor) => {
-                setFim(valor);
-                setErro("");
-              }}
-            />
-          </div>
-        </div>
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor={`${base}-disciplina`}>Disciplina</Label>
-          <Input
-            id={`${base}-disciplina`}
-            value={disciplina}
-            maxLength={LIMITE_DISCIPLINA_PROVA}
-            placeholder="Ex.: Matemática"
-            disabled={adicionando}
-            onChange={(evento) => {
-              setDisciplina(evento.target.value);
-              setErro("");
-            }}
-          />
-        </div>
-        <fieldset disabled={adicionando} className="flex min-w-0 flex-col gap-3">
-          <legend className="mb-1 text-sm font-medium">Turmas</legend>
+        <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap>
+          <Typography id={`${base}-titulo`} component="h3" variant="h6">
+            Nova prova
+          </Typography>
+          <Typography id={`${base}-descricao`} variant="body2" color="text.secondary">
+            Adicionar prova grava o horário na hora, fora do rascunho de configurações.
+          </Typography>
+        </Stack>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <Campo id={`${base}-dia`} rotulo="Data">
+              <SeletorDataProva
+                id={`${base}-dia`}
+                valor={dia}
+                min={diaCorrente}
+                max="2199-12-31"
+                disabled={adicionando}
+                onValor={(valor) => {
+                  setDia(valor);
+                  setErro("");
+                }}
+              />
+            </Campo>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <Campo id={`${base}-inicio`} rotulo="Início">
+              <SeletorHorario
+                valor={inicio}
+                rotuloAcessivel="Início da prova"
+                disabled={adicionando}
+                onValor={(valor) => {
+                  setInicio(valor);
+                  setErro("");
+                }}
+              />
+            </Campo>
+          </Grid>
+          <Grid size={{ xs: 12, sm: 4 }}>
+            <Campo id={`${base}-fim`} rotulo="Fim">
+              <SeletorHorario
+                valor={fim}
+                rotuloAcessivel="Fim da prova"
+                disabled={adicionando}
+                onValor={(valor) => {
+                  setFim(valor);
+                  setErro("");
+                }}
+              />
+            </Campo>
+          </Grid>
+          <Grid size={12}>
+            <Campo id={`${base}-disciplina`} rotulo="Disciplina">
+              <CampoTexto
+                valor={disciplina}
+                onValor={(valor) => {
+                  setDisciplina(valor);
+                  setErro("");
+                }}
+                maxLength={LIMITE_DISCIPLINA_PROVA}
+                placeholder="Ex.: Matemática"
+                disabled={adicionando}
+              />
+            </Campo>
+          </Grid>
+        </Grid>
+        <FormControl
+          component="fieldset"
+          disabled={adicionando}
+          sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
+        >
+          <FormLabel component="legend">Turmas</FormLabel>
           {series.map((serie) => {
             const ids = serie.turmas.map((turma) => turma.id);
             const marcadas = ids.filter((id) => turmaIds.includes(id)).length;
             return (
-              <div key={serie.id} className="flex min-w-0 flex-col gap-2">
-                <label className="faixa-toque flex min-h-11 items-center gap-3 rounded-lg px-1 text-sm font-medium">
-                  <input
-                    type="checkbox"
-                    className="accent-primary size-4 shrink-0"
-                    aria-label={`Toda a ${serie.nome}`}
-                    checked={marcadas === ids.length}
-                    ref={(elemento) => {
-                      if (elemento) elemento.indeterminate = marcadas > 0 && marcadas < ids.length;
-                    }}
-                    onChange={(evento) => alternarTurmas(ids, evento.target.checked)}
-                  />
-                  {serie.nome}
-                </label>
-                <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">
+              <Stack key={serie.id} spacing={1} sx={{ minWidth: 0 }}>
+                <FormControlLabel
+                  disabled={adicionando}
+                  sx={{ minHeight: TOKENS_LAYOUT.alvoToque, m: 0 }}
+                  control={
+                    <Checkbox
+                      checked={marcadas === ids.length}
+                      indeterminate={marcadas > 0 && marcadas < ids.length}
+                      disabled={adicionando}
+                      slotProps={{ input: { "aria-label": `Toda a ${serie.nome}` } }}
+                      onChange={(evento) => alternarTurmas(ids, evento.target.checked)}
+                    />
+                  }
+                  label={serie.nome}
+                />
+                <Grid container spacing={1}>
                   {serie.turmas.map((turma) => (
-                    <label
-                      key={turma.id}
-                      className="faixa-toque bg-secondary/40 flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        className="accent-primary size-4 shrink-0"
-                        checked={turmaIds.includes(turma.id)}
-                        onChange={(evento) => alternarTurmas([turma.id], evento.target.checked)}
+                    <Grid key={turma.id} size={{ xs: 6, sm: 4 }}>
+                      <FormControlLabel
+                        disabled={adicionando}
+                        sx={{
+                          minHeight: TOKENS_LAYOUT.alvoToque,
+                          m: 0,
+                          width: "100%",
+                          "& .MuiFormControlLabel-label": { overflowWrap: "anywhere" },
+                        }}
+                        control={
+                          <Checkbox
+                            checked={turmaIds.includes(turma.id)}
+                            disabled={adicionando}
+                            onChange={(evento) => alternarTurmas([turma.id], evento.target.checked)}
+                          />
+                        }
+                        label={turma.rotulo}
                       />
-                      {turma.rotulo}
-                    </label>
+                    </Grid>
                   ))}
-                </div>
-              </div>
+                </Grid>
+              </Stack>
             );
           })}
-        </fieldset>
-        {erro ? <AvisoCompacto variante="dados_invalidos" titulo={erro} tamanho="linha" /> : null}
-        <Button type="submit" className="min-h-11 self-start" disabled={adicionando}>
-          {adicionando ? (
-            <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
-          ) : (
-            <Plus size={16} aria-hidden="true" />
-          )}
+        </FormControl>
+        {erro ? <AlertaCompacto variante="dados_invalidos" titulo={erro} tamanho="linha" /> : null}
+        <Botao
+          variante={rascunhoPendente ? "contorno" : "principal"}
+          type="submit"
+          carregando={adicionando}
+          disabled={adicionando}
+          icone={<AddRoundedIcon />}
+          sx={{ alignSelf: "flex-start", minHeight: TOKENS_LAYOUT.alvoToque, height: "auto" }}
+        >
           {turmaIds.length > 1
             ? `Adicionar prova para ${contarTurmas(turmaIds.length)}`
             : "Adicionar prova"}
-        </Button>
-      </form>
+        </Botao>
+      </Box>
 
-      {erroLeitura ? (
-        <AvisoCompacto variante="erro_interno" titulo={erroLeitura} tamanho="linha" />
-      ) : null}
-      {carregado && !erroLeitura && dias.length === 0 ? (
-        <p className="text-muted-foreground text-sm">Nenhuma prova cadastrada.</p>
-      ) : null}
-      {dias.length > 0 ? (
-        <section aria-label="Provas cadastradas" className="superficie overflow-hidden">
-          <h2 className="bg-secondary/50 flex items-center gap-2 border-b px-4 py-3 text-sm font-medium">
-            <CalendarClock size={16} aria-hidden="true" className="shrink-0" />
-            Provas cadastradas
-          </h2>
-          <ol className="divide-y">
+      <Divider />
+      <Stack component="section" aria-labelledby={`${base}-cadastradas`} spacing={2}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={{ xs: ESPACO_COMPOSICAO.textoAcaoEmpilhada, sm: 1 }}
+          useFlexGap
+          sx={{ justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" } }}
+        >
+          <Stack spacing={ESPACO_COMPOSICAO.tituloDescricao} useFlexGap sx={{ minWidth: 0 }}>
+            <Typography id={`${base}-cadastradas`} component="h3" variant="h6">
+              Provas cadastradas
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              A aba Horários mostra as provas de hoje em diante. Encerrar o período apaga todo o
+              horário de provas.
+            </Typography>
+          </Stack>
+          {dias.length > 0 ? (
+            <Botao
+              variante="contorno"
+              type="button"
+              icone={<EventBusyRoundedIcon />}
+              onClick={() => setEncerrando(true)}
+              sx={{
+                color: "falta.texto",
+                minHeight: TOKENS_LAYOUT.alvoToque,
+                height: "auto",
+                flexShrink: 0,
+              }}
+            >
+              Encerrar período de provas
+            </Botao>
+          ) : null}
+        </Stack>
+        {erroLeitura ? (
+          <AlertaCompacto variante="erro_interno" titulo={erroLeitura} tamanho="linha" />
+        ) : null}
+        {carregado && !erroLeitura && dias.length === 0 ? (
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Nenhuma prova cadastrada.
+          </Typography>
+        ) : null}
+        {dias.length > 0 ? (
+          <List disablePadding>
             {dias.map((grupoDoDia) => (
-              <li key={grupoDoDia.dia} className="flex flex-col gap-2 px-4 py-3">
-                <h3 className="text-sm font-medium">{rotuloDoDia(grupoDoDia.dia)}</h3>
-                <ul className="flex flex-col gap-2">
+              <ListItem
+                key={grupoDoDia.dia}
+                disableGutters
+                divider
+                sx={{ display: "block", py: 1.5 }}
+              >
+                <Typography component="h4" variant="subtitle2" sx={{ mb: 1 }}>
+                  {rotuloDoDia(grupoDoDia.dia)}
+                </Typography>
+                <List disablePadding>
                   {agruparPorProva(grupoDoDia.provas).map((grupo) => (
-                    <li key={grupo.chave} className="flex min-w-0 items-start gap-3 text-sm">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium break-words">
+                    <ListItem key={grupo.chave} disableGutters sx={{ gap: 2, py: 1 }}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, overflowWrap: "anywhere" }}
+                        >
                           {grupo.disciplina}
-                          <span className="numerais-tabulares text-muted-foreground font-normal">
+                          <Typography
+                            component="span"
+                            variant="caption"
+                            sx={{
+                              color: "text.secondary",
+                              fontVariantNumeric: "tabular-nums",
+                              fontWeight: 400,
+                            }}
+                          >
                             {" "}
                             · {grupo.inicio} às {grupo.fim}
-                          </span>
-                        </p>
-                        <p className="text-muted-foreground text-xs break-words">
+                          </Typography>
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ color: "text.secondary", overflowWrap: "anywhere" }}
+                        >
                           {grupo.provas
                             .map((prova) => rotuloDe.get(prova.turmaId) ?? "Turma")
                             .join(", ")}
-                        </p>
-                      </div>
-                      <Button
+                        </Typography>
+                      </Box>
+                      <Botao
+                        variante="texto"
                         type="button"
-                        variant="ghost"
-                        size="icon"
                         aria-label={`Remover a prova de ${grupo.disciplina} de ${rotuloDataCurta(grupoDoDia.dia)}`}
+                        icone={<DeleteOutlineRoundedIcon />}
                         onClick={() => setRemovendo({ dia: grupoDoDia.dia, grupo })}
-                      >
-                        <Trash2 size={16} aria-hidden="true" />
-                      </Button>
-                    </li>
+                        sx={{ ...ESTILO_BOTAO_ICONE, color: "falta.texto" }}
+                      />
+                    </ListItem>
                   ))}
-                </ul>
-              </li>
+                </List>
+              </ListItem>
             ))}
-          </ol>
-        </section>
-      ) : null}
-      {dias.length > 0 ? (
-        <Button
-          type="button"
-          variant="outline"
-          className="text-falta-texto min-h-11 self-start"
-          onClick={() => setEncerrando(true)}
-        >
-          <CalendarX size={16} aria-hidden="true" />
-          Encerrar período de provas
-        </Button>
-      ) : null}
+          </List>
+        ) : null}
+      </Stack>
 
-      <AlertDialog
-        open={removendo !== null}
-        onOpenChange={(aberto) => {
-          if (!aberto && !removendoAgora) setRemovendo(null);
+      <DialogoConfirmacao
+        aberto={removendo !== null}
+        titulo="Remover a prova?"
+        descricao={
+          removendo
+            ? `${removendo.grupo.disciplina} em ${rotuloData(removendo.dia)}, das ${removendo.grupo.inicio} às ${removendo.grupo.fim}, sai do horário de ${contarTurmas(removendo.grupo.provas.length)}.`
+            : ""
+        }
+        rotuloConfirmar="Remover prova"
+        rotuloCancelar="Cancelar"
+        destrutivo
+        operacaoEmAndamento={removendoAgora}
+        onCancelar={() => {
+          if (!removendoAgora) setRemovendo(null);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remover a prova?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {removendo
-                ? `${removendo.grupo.disciplina} em ${rotuloData(removendo.dia)}, das ${removendo.grupo.inicio} às ${removendo.grupo.fim}, sai do horário de ${contarTurmas(removendo.grupo.provas.length)}.`
-                : ""}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={removendoAgora}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={removendoAgora}
-              onClick={(evento) => {
-                evento.preventDefault();
-                void remover();
-              }}
-            >
-              {removendoAgora ? <LoaderCircle size={16} className="animate-spin" /> : null}
-              Remover prova
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-      <AlertDialog
-        open={encerrando}
-        onOpenChange={(aberto) => {
-          if (!encerrandoAgora) setEncerrando(aberto);
+        onConfirmar={() => void remover()}
+      />
+      <DialogoConfirmacao
+        aberto={encerrando}
+        titulo="Encerrar o período de provas?"
+        descricao="O horário de provas de todas as turmas será apagado e deixa de aparecer na aba Horários. As aulas não mudam."
+        rotuloConfirmar="Encerrar período"
+        rotuloCancelar="Cancelar"
+        destrutivo
+        operacaoEmAndamento={encerrandoAgora}
+        onCancelar={() => {
+          if (!encerrandoAgora) setEncerrando(false);
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Encerrar o período de provas?</AlertDialogTitle>
-            <AlertDialogDescription>
-              O horário de provas de todas as turmas será apagado e deixa de aparecer na aba
-              Horários. As aulas não mudam.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={encerrandoAgora}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              variant="destructive"
-              disabled={encerrandoAgora}
-              onClick={(evento) => {
-                evento.preventDefault();
-                void encerrar();
-              }}
-            >
-              {encerrandoAgora ? <LoaderCircle size={16} className="animate-spin" /> : null}
-              Encerrar período
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        onConfirmar={() => void encerrar()}
+      />
+    </Stack>
   );
 }

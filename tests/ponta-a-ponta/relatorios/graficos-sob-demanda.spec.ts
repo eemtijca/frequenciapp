@@ -1,4 +1,4 @@
-// Confere o download adiado de Recharts, a montagem por visibilidade e a contenção de falhas.
+// Confere o download adiado do MUI X, a montagem por visibilidade e a contenção de falhas.
 import { expect, test, type Page } from "@playwright/test";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
 import { diaDeChamada } from "../helpers/dia";
@@ -40,7 +40,7 @@ async function medirBiblioteca(page: Page, recusar = false) {
   await page.route(/\/_next\/static\/chunks\/.*\.js(?:\?|$)/, async (rota) => {
     const resposta = await rota.fetch();
     const codigo = await resposta.text();
-    if (codigo.includes("recharts-wrapper")) {
+    if (codigo.includes("MuiChartsSurface")) {
       arquivos.add(rota.request().url());
       if (recusar) {
         await rota.abort("failed");
@@ -62,20 +62,20 @@ test("baixa a biblioteca após abrir o painel e monta só o cartão em exibiçã
   await trocarVisao(page, "Painel", "painel");
   const escola = page.getByRole("article", { name: /: Toda a escola$/ });
   await escola.scrollIntoViewIfNeeded();
-  await expect(escola.locator(".recharts-wrapper")).toHaveCount(1);
+  await expect(escola.locator(".MuiChartsSurface-root")).toHaveCount(1);
   expect(arquivos.size).toBeGreaterThan(0);
   const serie = page.getByRole("article", { name: /: E2E Ano$/, includeHidden: true });
   // Só o cartão em exibição monta; os demais esperam a seleção no seletor.
-  await expect(serie.locator(".recharts-wrapper")).toHaveCount(0);
+  await expect(serie.locator(".MuiChartsSurface-root")).toHaveCount(0);
   const baixados = arquivos.size;
   await rolarAteGrafico(page, "E2E Ano");
-  await expect(serie.locator(".recharts-wrapper")).toHaveCount(1);
+  await expect(serie.locator(".MuiChartsSurface-root")).toHaveCount(1);
   await rolarAteGrafico(page, "Toda a escola");
-  await expect(escola.locator(".recharts-wrapper")).toHaveCount(1);
+  await expect(escola.locator(".MuiChartsSurface-root")).toHaveCount(1);
   expect(arquivos.size).toBe(baixados);
   await trocarVisao(page, "Chamada", "chamada");
   await trocarVisao(page, "Painel", "painel");
-  await expect(escola.locator(".recharts-wrapper")).toHaveCount(1);
+  await expect(escola.locator(".MuiChartsSurface-root")).toHaveCount(1);
 });
 
 test("continua exibindo gráficos quando a observação de visibilidade não está disponível", async ({
@@ -88,7 +88,7 @@ test("continua exibindo gráficos quando a observação de visibilidade não est
   await aguardarHidratacao(page);
   await abrirDiaSeResumo(page);
   const escola = page.getByRole("article", { name: /: Toda a escola$/ });
-  await expect(escola.locator(".recharts-wrapper")).toHaveCount(1);
+  await expect(escola.locator(".MuiChartsSurface-root")).toHaveCount(1);
 });
 
 test("isola uma falha no download do gráfico sem bloquear a chamada", async ({ page }) => {

@@ -1,5 +1,6 @@
 // Configuração dos avisos pela Gestão e preferências da equipe na interface,
 // com restauração das regras e imagens locais fora do versionamento.
+import { abrirConfiguracoesDaGestao } from "../../helpers/categorias-configuracoes";
 import { expect, test } from "@playwright/test";
 import type { ConfiguracaoNotificacoes } from "@/domain/notificacoes";
 import { abrirNotificacoes, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
@@ -29,45 +30,40 @@ test.describe("configuração de notificações", () => {
     await page.goto("/");
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações", exact: true }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Acesso e avisos", exact: true })
-      .click();
+    await abrirConfiguracoesDaGestao(page);
     const secao = page.locator('[data-secao="notificacoes"]');
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Notificações");
-    await secao.getByRole("button", { name: /Notificações/ }).click();
+    await expect(secao.getByRole("heading", { name: "Notificações", exact: true })).toBeVisible();
     const pendencias = secao.getByRole("switch", { name: "Chamadas pendentes para a coordenação" });
-    await expect(pendencias).toHaveAttribute("aria-checked", "false");
+    await expect(pendencias).not.toBeChecked();
     await pendencias.click();
-    await secao.getByRole("button", { name: "Horário do aviso de pendências: 17:00" }).click();
+    const campoHorario = secao
+      .locator("#horario-pendencias-notificacoes")
+      .locator('xpath=ancestor::div[contains(@class,"MuiPickersInputBase-root")]')
+      .first();
+    await campoHorario.getByRole("button", { name: /^Escolha uma hora/ }).click();
     const horario = page.getByRole("dialog", { name: "Horário do aviso de pendências" });
     await horario
-      .getByRole("listbox", { name: "Horas" })
-      .getByRole("option", { name: "16", exact: true })
+      .getByRole("listbox", { name: "Selecione horas", exact: true })
+      .getByRole("option", { name: "16 horas", exact: true })
       .click();
     await horario
-      .getByRole("listbox", { name: "Minutos" })
-      .getByRole("option", { name: "30", exact: true })
+      .getByRole("listbox", { name: "Selecione minutos", exact: true })
+      .getByRole("option", { name: "30 minutos", exact: true })
       .click();
+    await horario.getByRole("button", { name: "OK", exact: true }).click();
     await salvarConfiguracoes(page);
     await expect(page.getByText("Configurações salvas.")).toBeVisible();
     await page.reload();
     await aguardarHidratacao(page);
     await trocarVisao(page, "Gestão", "gestao");
-    await page.getByRole("tab", { name: "Configurações", exact: true }).click();
-    await page
-      .getByRole("navigation", { name: "Categorias de configurações" })
-      .getByRole("button", { name: "Acesso e avisos", exact: true })
-      .click();
+    await abrirConfiguracoesDaGestao(page);
     await selecionarAcaoConfiguracoes(page, "Acesso e avisos", "Notificações");
-    await secao.getByRole("button", { name: /Notificações/ }).click();
+    await expect(secao.getByRole("heading", { name: "Notificações", exact: true })).toBeVisible();
     await expect(
       secao.getByRole("switch", { name: "Chamadas pendentes para a coordenação" }),
-    ).toHaveAttribute("aria-checked", "true");
-    await expect(
-      secao.getByRole("button", { name: "Horário do aviso de pendências: 16:30" }),
-    ).toBeVisible();
+    ).toBeChecked();
+    await expect(secao.locator("#horario-pendencias-notificacoes")).toHaveValue("16:30");
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

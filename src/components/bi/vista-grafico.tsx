@@ -1,6 +1,7 @@
 "use client";
 
-// Gráficos configuráveis com lacunas preservadas, mapa acessível e filtros cruzados.
+// Gráficos configuráveis do BI com lacunas preservadas, mapa acessível e filtros cruzados.
+// Recharts é a exceção documentada do BI; as demais telas usam MUI X.
 import { useMemo } from "react";
 import {
   ResponsiveContainer,
@@ -23,6 +24,9 @@ import {
   Legend,
   LabelList,
 } from "recharts";
+import Box from "@mui/material/Box";
+import Typography from "@mui/material/Typography";
+import { useTheme } from "@mui/material/styles";
 import { NOMES_MEDIDAS, type GraficoBi, type PontoBi } from "@/domain/bi-analise";
 import {
   CORES_BI,
@@ -41,6 +45,8 @@ export default function VistaGrafico({
   pontos: PontoBi[];
   onFiltrar: (p: PontoBi) => void;
 }) {
+  const tema = useTheme();
+  const paleta = tema.vars?.palette ?? tema.palette;
   const pontos = useMemo(() => rotularPontosBi(originais), [originais]);
   const cores = CORES_BI[config.paleta];
   const cor = cores[0];
@@ -93,12 +99,12 @@ export default function VistaGrafico({
           : formatar(v)
       }
       contentStyle={{
-        background: "var(--background)",
-        color: "var(--foreground)",
-        borderColor: "var(--border)",
-        borderRadius: 12,
+        background: paleta.background.paper,
+        color: paleta.text.primary,
+        borderColor: paleta.divider,
+        borderRadius: 8,
       }}
-      labelStyle={{ color: "var(--foreground)" }}
+      labelStyle={{ color: paleta.text.primary }}
     />
   );
   const valores = config.mostrarValores ? (
@@ -112,19 +118,19 @@ export default function VistaGrafico({
   ) : null;
   const base = (
     <>
-      <CartesianGrid stroke="var(--border)" strokeDasharray="3 3" />
+      <CartesianGrid stroke={paleta.divider} strokeDasharray="3 3" />
       {tooltip}
-      <YAxis width={54} tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+      <YAxis width={54} tick={{ fill: paleta.text.secondary, fontSize: 11 }} />
       <XAxis
         dataKey="nome"
         tickFormatter={rotuloEixoBi}
-        tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+        tick={{ fill: paleta.text.secondary, fontSize: 11 }}
         interval="preserveStartEnd"
       />
       {config.meta !== null && (
         <ReferenceLine
           y={config.meta}
-          stroke="var(--falta-texto)"
+          stroke={paleta.falta.main}
           strokeDasharray="4 4"
           label="Referência"
         />
@@ -133,26 +139,49 @@ export default function VistaGrafico({
   );
   if (!pontos.some((p) => p.valor !== null))
     return (
-      <p className="text-muted-foreground flex h-full items-center justify-center p-5 text-center text-sm">
+      <Typography
+        variant="body2"
+        sx={{
+          display: "flex",
+          height: "100%",
+          alignItems: "center",
+          justifyContent: "center",
+          p: 2,
+          textAlign: "center",
+          color: "text.secondary",
+        }}
+      >
         Sem base de cálculo neste recorte.
-      </p>
+      </Typography>
     );
 
   if (config.tipo === "calor") {
     const largura = Math.max(400, calor.colunas.length * 64 + 170);
     return (
-      <div
-        className="h-full overflow-auto print:h-auto print:overflow-visible"
+      <Box
         role="region"
         aria-label="Mapa de calor com rolagem"
         tabIndex={0}
+        sx={{
+          height: "100%",
+          overflow: "auto",
+          "@media print": {
+            height: "auto",
+            overflow: "visible",
+            "& svg": {
+              width: "100% !important",
+              maxWidth: "100% !important",
+              height: "auto !important",
+            },
+          },
+        }}
       >
         <svg
           data-grafico
           viewBox={`0 0 ${largura} ${calor.linhas.length * 48 + 70}`}
           width={largura}
           height={calor.linhas.length * 48 + 70}
-          className="max-w-none print:h-auto print:w-full print:max-w-full"
+          style={{ maxWidth: "none" }}
           aria-label={`Mapa de calor: ${config.titulo}`}
         >
           {config.mostrarLegenda && (
@@ -190,18 +219,18 @@ export default function VistaGrafico({
                       width={60}
                       height={44}
                       rx={7}
-                      fill={p && p.valor !== null ? cor : "var(--muted)"}
+                      fill={p && p.valor !== null ? cor : paleta.action.disabledBackground}
                       fillOpacity={
                         p && p.valor !== null
                           ? 0.15 + Math.max(0, p.valor / calor.maximo) * 0.85
                           : 1
                       }
-                      stroke={p?.valor === null ? "var(--muted-foreground)" : "none"}
+                      stroke={p?.valor === null ? paleta.text.secondary : "none"}
                       strokeDasharray={p?.valor === null ? "3 3" : undefined}
                       role={p ? "button" : "img"}
                       tabIndex={p ? 0 : undefined}
                       aria-label={descricao}
-                      className="focus:stroke-foreground focus:stroke-2 focus:outline-none"
+                      style={{ outlineOffset: 2 }}
                       onClick={() => {
                         if (p) filtrar(p);
                       }}
@@ -234,12 +263,12 @@ export default function VistaGrafico({
           ))}
         </svg>
         {calor.omitidos > 0 && (
-          <p className="text-muted-foreground mt-2 text-xs">
+          <Typography variant="caption" sx={{ display: "block", mt: 1, color: "text.secondary" }}>
             Exibidos até 20 colunas e 12 linhas. {calor.omitidos} grupos adicionais na tabela e no
             CSV.
-          </p>
+          </Typography>
         )}
-      </div>
+      </Box>
     );
   }
   return (
@@ -270,18 +299,18 @@ export default function VistaGrafico({
         </PieChart>
       ) : config.tipo === "dispersao" ? (
         <ScatterChart margin={{ top: 24, right: 24, bottom: 5, left: 0 }}>
-          <CartesianGrid stroke="var(--border)" />
+          <CartesianGrid stroke={paleta.divider} />
           <XAxis
             type="number"
             dataKey="registros"
             name="Registros"
-            tick={{ fill: "var(--muted-foreground)" }}
+            tick={{ fill: paleta.text.secondary }}
           />
           <YAxis
             type="number"
             dataKey="valor"
             name={NOMES_MEDIDAS[config.medida]}
-            tick={{ fill: "var(--muted-foreground)" }}
+            tick={{ fill: paleta.text.secondary }}
           />
           {tooltip}
           <Scatter
@@ -366,14 +395,14 @@ export default function VistaGrafico({
           layout="vertical"
           margin={{ top: 5, right: config.mostrarValores ? 65 : 24, bottom: 5, left: 0 }}
         >
-          <CartesianGrid stroke="var(--border)" />
-          <XAxis type="number" tick={{ fill: "var(--muted-foreground)", fontSize: 11 }} />
+          <CartesianGrid stroke={paleta.divider} />
+          <XAxis type="number" tick={{ fill: paleta.text.secondary, fontSize: 11 }} />
           <YAxis
             dataKey="nome"
             type="category"
             width={105}
             tickFormatter={rotuloEixoBi}
-            tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+            tick={{ fill: paleta.text.secondary, fontSize: 11 }}
           />
           {tooltip}
           <Bar

@@ -2,8 +2,12 @@
 
 // Cabeçalho de etapa dos cards de planilha: número quando pendente, check
 // quando concluída, com resumo e ações ao lado.
-import { Check } from "lucide-react";
 import type { ReactNode } from "react";
+import CheckRoundedIcon from "@mui/icons-material/CheckRounded";
+import Box from "@mui/material/Box";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
+import { ESPACO_COMPOSICAO } from "@/theme/layout";
 
 export type EstadoEtapa = "pendente" | "atual" | "concluida";
 
@@ -23,50 +27,103 @@ export function EtapaPlanilha({
   children: ReactNode;
 }) {
   const concluida = estado === "concluida";
+
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-3">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          {numero !== undefined && (
-            <span
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={{ xs: ESPACO_COMPOSICAO.textoAcaoEmpilhada, sm: 2 }}
+        useFlexGap
+        sx={{ alignItems: { sm: "flex-start" }, minWidth: 0 }}
+      >
+        <Stack
+          direction="row"
+          spacing={1.5}
+          sx={{ alignItems: "flex-start", flex: 1, minWidth: 0 }}
+        >
+          {numero !== undefined ? (
+            <Box
               aria-hidden="true"
-              className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
-                concluida
-                  ? "bg-primary/10 text-primary"
+              sx={(tema) => ({
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                width: 24,
+                height: 24,
+                marginTop: 0.25,
+                borderRadius: "50%",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                ...(concluida
+                  ? {
+                      color: tema.vars.palette.primary.main,
+                      backgroundColor: `color-mix(in srgb, ${tema.vars.palette.primary.main} 12%, transparent)`,
+                    }
                   : estado === "atual"
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-muted-foreground"
-              }`}
+                    ? {
+                        color: tema.vars.palette.primary.contrastText,
+                        backgroundColor: tema.vars.palette.primary.main,
+                      }
+                    : {
+                        color: tema.vars.palette.text.secondary,
+                        backgroundColor: `color-mix(in srgb, ${tema.vars.palette.text.primary} 8%, transparent)`,
+                      }),
+              })}
             >
-              {concluida ? <Check size={14} /> : numero}
-            </span>
-          )}
-          <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-            <p
-              className={`text-sm font-medium ${
-                estado === "pendente" ? "text-muted-foreground" : ""
-              }`}
+              {concluida ? <CheckRoundedIcon sx={{ fontSize: 16 }} /> : numero}
+            </Box>
+          ) : null}
+          <Stack
+            spacing={ESPACO_COMPOSICAO.tituloDescricao}
+            useFlexGap
+            sx={{ minWidth: 0, flex: 1 }}
+          >
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 600, color: estado === "pendente" ? "text.secondary" : undefined }}
             >
               {titulo}
-            </p>
-            {resumo && (
-              <div className="text-muted-foreground flex flex-wrap items-center gap-1.5 text-xs">
+            </Typography>
+            {resumo ? (
+              <Stack
+                direction="row"
+                spacing={0.5}
+                useFlexGap
+                sx={{ flexWrap: "wrap", alignItems: "center", color: "text.secondary" }}
+              >
                 {resumo}
-              </div>
-            )}
-          </div>
-        </div>
-        {acoes && (
-          <div
-            className={`flex flex-wrap items-center gap-2 sm:shrink-0 ${numero !== undefined ? "pl-9 sm:pl-0" : ""}`}
+              </Stack>
+            ) : null}
+          </Stack>
+        </Stack>
+        {acoes ? (
+          <Stack
+            direction="row"
+            spacing={1}
+            useFlexGap
+            sx={{
+              flexWrap: "wrap",
+              alignItems: "center",
+              flexShrink: 0,
+              paddingLeft: numero !== undefined ? { xs: 4.5, sm: 0 } : 0,
+            }}
           >
             {acoes}
-          </div>
-        )}
-      </div>
-      <div className={`flex flex-col gap-3 ${numero !== undefined ? "sm:pl-9" : ""}`}>
+          </Stack>
+        ) : null}
+      </Stack>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          minWidth: 0,
+          paddingLeft: numero !== undefined ? { xs: 0, sm: 4.5 } : 0,
+        }}
+      >
         {children}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }

@@ -2,15 +2,23 @@
 
 // Resumo semanal de frequência, com seções recolhíveis e atualização silenciosa.
 import { useCallback, useMemo, useState } from "react";
-import {
-  CalendarDays,
-  CheckCircle2,
-  ClipboardList,
-  Clock3,
-  LoaderCircle,
-  TriangleAlert,
-  Users,
-} from "lucide-react";
+import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import ScheduleRoundedIcon from "@mui/icons-material/ScheduleRounded";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
+import Box from "@mui/material/Box";
+import List from "@mui/material/List";
+import ListItem from "@mui/material/ListItem";
+import Paper from "@mui/material/Paper";
+import Skeleton from "@mui/material/Skeleton";
+import Stack from "@mui/material/Stack";
+import Table from "@mui/material/Table";
+import TableBody from "@mui/material/TableBody";
+import TableCell from "@mui/material/TableCell";
+import TableHead from "@mui/material/TableHead";
+import TableRow from "@mui/material/TableRow";
+import Typography from "@mui/material/Typography";
 import type { Feriado } from "@/domain/calendario-letivo";
 import type { Aluno, Configuracoes, Frequencia, SaidaAntecipada, Turma } from "@/domain/frequencia";
 import { rotuloData, rotuloDataCurta, rotuloDiaSemana, rotuloMomento } from "@/domain/frequencia";
@@ -23,10 +31,11 @@ import {
 import { limiaresDoPainel } from "@/domain/relatorios";
 import { resumirSemanaDaTurma, type ResumoSemanaTurma } from "@/domain/resumo-semana";
 import { pedir } from "@/lib/api-cliente";
-import { AvisoCompacto } from "@/components/ui/tela-estado";
-import { Button } from "@/components/ui/button";
-import { CirculosAcumulado } from "@/components/ui/circulo-contagem";
-import { Selo } from "@/components/ui/selo";
+import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
+import { BarraProgresso } from "@/components/ui/mui/barra-progresso";
+import { Botao } from "@/components/ui/mui/botao";
+import { CirculosAcumulado } from "@/components/ui/mui/circulo-contagem";
+import { Selo } from "@/components/ui/mui/selo";
 import {
   CabecalhoResumo,
   CartaoDia,
@@ -68,6 +77,18 @@ interface DadosSemana {
 const LIMITE_ALUNOS = 5;
 const LIMITE_MOVIMENTACOES = 8;
 
+const VISUALMENTE_OCULTO = {
+  position: "absolute",
+  width: "1px",
+  height: "1px",
+  padding: 0,
+  margin: "-1px",
+  overflow: "hidden",
+  clip: "rect(0, 0, 0, 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+} as const;
+
 function horarioDoDia(dia: { feriado: string | null; salva: boolean; previsto: boolean }): {
   rotulo: string;
   tom: "salva" | "pendente" | "neutro";
@@ -87,59 +108,89 @@ function RankingAlunos({ resumo }: { resumo: ResumoSemanaTurma }) {
   if (resumo.alunos.length === 0) return <ResumoVazio texto="Nenhuma falta nesta semana." />;
   const visiveis = listaCompleta ? resumo.alunos : resumo.alunos.slice(0, LIMITE_ALUNOS);
   return (
-    <div className="flex flex-col gap-3">
-      <table className="w-full table-fixed text-left text-sm">
-        <caption className="sr-only">Alunos com mais faltas na semana</caption>
-        <thead>
-          <tr className="text-muted-foreground border-b text-xs">
-            <th scope="col" className="w-8 py-2">
+    <Stack spacing={1.5}>
+      <Table size="small" sx={{ tableLayout: "fixed", textAlign: "left" }}>
+        <Typography component="caption" sx={VISUALMENTE_OCULTO}>
+          Alunos com mais faltas na semana
+        </Typography>
+        <TableHead>
+          <TableRow>
+            <TableCell sx={{ width: 32, py: 1, fontWeight: 500, color: "text.secondary" }}>
               #
-            </th>
-            <th scope="col">Aluno</th>
-            <th scope="col" className="w-9 text-right">
+            </TableCell>
+            <TableCell sx={{ py: 1, fontWeight: 500, color: "text.secondary" }}>Aluno</TableCell>
+            <TableCell
+              align="right"
+              sx={{ width: 36, py: 1, fontWeight: 500, color: "text.secondary" }}
+            >
               F
-            </th>
-            <th scope="col" className="w-10 text-right">
+            </TableCell>
+            <TableCell
+              align="right"
+              sx={{ width: 40, py: 1, fontWeight: 500, color: "text.secondary" }}
+            >
               FJ
-            </th>
-            <th scope="col" className="w-12 text-right">
+            </TableCell>
+            <TableCell
+              align="right"
+              sx={{ width: 48, py: 1, fontWeight: 500, color: "text.secondary" }}
+            >
               Total
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
+            </TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
           {visiveis.map((aluno, indice) => (
-            <tr key={aluno.alunoId}>
-              <td className="text-muted-foreground numerais-tabulares py-2">{indice + 1}</td>
-              <th scope="row" className="min-w-0 py-2 font-normal break-words">
+            <TableRow key={aluno.alunoId}>
+              <TableCell
+                sx={{ py: 1, color: "text.secondary", fontVariantNumeric: "tabular-nums" }}
+              >
+                {indice + 1}
+              </TableCell>
+              <TableCell
+                component="th"
+                scope="row"
+                sx={{ py: 1, fontWeight: 400, overflowWrap: "anywhere" }}
+              >
                 {aluno.nome}
-              </th>
-              <td className="text-falta-texto numerais-tabulares py-2 text-right">
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{ py: 1, color: "falta.texto", fontVariantNumeric: "tabular-nums" }}
+              >
                 {aluno.faltas}
-              </td>
-              <td className="text-justificada-texto numerais-tabulares py-2 text-right">
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{ py: 1, color: "justificada.texto", fontVariantNumeric: "tabular-nums" }}
+              >
                 {aluno.justificadas}
-              </td>
-              <td className="numerais-tabulares py-2 text-right font-semibold">
+              </TableCell>
+              <TableCell
+                align="right"
+                sx={{ py: 1, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+              >
                 {aluno.faltas + aluno.justificadas}
-              </td>
-            </tr>
+              </TableCell>
+            </TableRow>
           ))}
-        </tbody>
-      </table>
-      <p className="text-muted-foreground text-xs">F: falta. FJ: falta justificada.</p>
+        </TableBody>
+      </Table>
+      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        F: falta. FJ: falta justificada.
+      </Typography>
       {resumo.alunos.length > LIMITE_ALUNOS ? (
-        <Button
-          type="button"
-          variant="link"
-          className="min-h-11 self-start px-0"
+        <Botao
+          variante="texto"
+          tamanho="pequeno"
           aria-expanded={listaCompleta}
           onClick={() => setListaCompleta((valor) => !valor)}
+          sx={{ alignSelf: "flex-start", px: 0 }}
         >
           {listaCompleta ? "Mostrar menos" : "Ver a lista completa"}
-        </Button>
+        </Botao>
       ) : null}
-    </div>
+    </Stack>
   );
 }
 
@@ -160,35 +211,47 @@ function ListaMovimentacoes({
   if (itens.length === 0) return <ResumoVazio texto="Nenhuma movimentação nesta semana." />;
   const visiveis = completa ? itens : itens.slice(0, LIMITE_MOVIMENTACOES);
   return (
-    <div className="flex flex-col gap-3">
-      <ul className="divide-y">
+    <Stack spacing={1.5}>
+      <List disablePadding>
         {visiveis.map((item) => (
-          <li key={item.id} className="flex flex-wrap items-baseline justify-between gap-2 py-2">
-            <div className="min-w-0">
-              <p className="text-sm font-medium break-words">{item.nome}</p>
-              <p className="text-muted-foreground text-xs">
+          <ListItem
+            key={item.id}
+            divider
+            sx={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: 1,
+              px: 0,
+              py: 1,
+            }}
+          >
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="body2" sx={{ fontWeight: 500, overflowWrap: "anywhere" }}>
+                {item.nome}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 {item.turma} · {rotuloData(item.dia)} · {item.momento}
                 {item.horario ? ` · ${item.horario}` : ""}
-              </p>
-            </div>
-            <span className="bg-secondary text-muted-foreground shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-medium">
-              {item.tipo}
-            </span>
-          </li>
+              </Typography>
+            </Box>
+            <Selo rotulo={item.tipo} tom="neutro" tamanho="pequeno" />
+          </ListItem>
         ))}
-      </ul>
+      </List>
       {itens.length > LIMITE_MOVIMENTACOES ? (
-        <Button
-          type="button"
-          variant="link"
-          className="min-h-11 self-start px-0"
+        <Botao
+          variante="texto"
+          tamanho="pequeno"
           aria-expanded={completa}
           onClick={() => setCompleta((valor) => !valor)}
+          sx={{ alignSelf: "flex-start", px: 0 }}
         >
           {completa ? "Mostrar menos" : "Ver a lista completa"}
-        </Button>
+        </Botao>
       ) : null}
-    </div>
+    </Stack>
   );
 }
 
@@ -371,7 +434,7 @@ export function VistaResumoSemana({
         (a.horario ?? "").localeCompare(b.horario ?? "") ||
         a.nome.localeCompare(b.nome, "pt-BR"),
     );
-  }, [alunos, dados, mostrarSaidas, turmas]);
+  }, [alunos, dados, mostrarSaidas]);
 
   const movimentacoesPorDia = useMemo(
     () =>
@@ -406,7 +469,14 @@ export function VistaResumoSemana({
   );
 
   return (
-    <section aria-label="Resumo da semana" aria-busy={!pronto} className="superficie flex flex-col">
+    <Paper
+      component="section"
+      aria-label="Resumo da semana"
+      aria-busy={!pronto}
+      variant="outlined"
+      elevation={0}
+      sx={{ display: "flex", flexDirection: "column", overflow: "hidden" }}
+    >
       <CabecalhoResumo
         dias={dias}
         domingo={domingo}
@@ -419,11 +489,11 @@ export function VistaResumoSemana({
         }
       />
       <CorpoResumo>
-        <p className="sr-only" role="status" aria-live="polite">
+        <Typography component="p" role="status" aria-live="polite" sx={VISUALMENTE_OCULTO}>
           {resumo.anuncio}
-        </p>
+        </Typography>
         {resumo.erro && pronto ? (
-          <AvisoCompacto
+          <AlertaCompacto
             variante="indisponivel"
             descricao={resumo.erro}
             tamanho="linha"
@@ -431,21 +501,26 @@ export function VistaResumoSemana({
           />
         ) : null}
         {avisos.length > 0 ? (
-          <p className="text-muted-foreground text-xs">
+          <Typography variant="caption" sx={{ color: "text.secondary" }}>
             Alguns dados não puderam ser carregados. As seções afetadas mostram o aviso.
-          </p>
+          </Typography>
         ) : null}
         {!pronto && !resumo.erro ? (
-          <p
-            role="status"
-            className="text-muted-foreground flex items-center justify-center gap-2 py-8 text-sm"
-          >
-            <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
-            Carregando resumo da semana...
-          </p>
+          <Stack spacing={1} sx={{ py: 4 }}>
+            <Typography
+              component="p"
+              role="status"
+              variant="body2"
+              sx={{ color: "text.secondary", textAlign: "center" }}
+            >
+              Carregando resumo da semana...
+            </Typography>
+            <Skeleton variant="rounded" height={96} />
+            <Skeleton variant="rounded" height={160} />
+          </Stack>
         ) : null}
         {!pronto && resumo.erro ? (
-          <AvisoCompacto
+          <AlertaCompacto
             variante="indisponivel"
             descricao={resumo.erro}
             tamanho="linha"
@@ -453,7 +528,9 @@ export function VistaResumoSemana({
           />
         ) : null}
         {pronto && turmas.length === 0 ? (
-          <p className="text-muted-foreground text-sm">Nenhuma turma disponível para o resumo.</p>
+          <Typography variant="body2" sx={{ color: "text.secondary" }}>
+            Nenhuma turma disponível para o resumo.
+          </Typography>
         ) : null}
 
         {resumos.map((item) => {
@@ -470,98 +547,161 @@ export function VistaResumoSemana({
             };
           });
           return (
-            <article
+            <Box
+              component="article"
               key={item.turmaId}
               aria-labelledby={`resumo-turma-${item.turmaId}`}
-              className="flex flex-col gap-3"
+              sx={{ display: "flex", flexDirection: "column", gap: 2 }}
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 id={`resumo-turma-${item.turmaId}`} className="font-semibold">
+              <Box
+                sx={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 1,
+                }}
+              >
+                <Box>
+                  <Typography
+                    id={`resumo-turma-${item.turmaId}`}
+                    component="h3"
+                    variant="subtitle1"
+                    sx={{ fontWeight: 600 }}
+                  >
                     {item.rotulo}
-                  </h3>
-                  <p className="text-muted-foreground text-xs">
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: "text.secondary" }}>
                     {dias[0] ? `${rotuloDataCurta(dias[0])} a ${rotuloDataCurta(ate)}` : ""}
-                  </p>
-                </div>
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                    totalPendencias === 0
-                      ? "border-primary/30 bg-primary/10 text-primary"
-                      : "border-alerta/40 bg-alerta-fraca text-alerta-texto"
-                  }`}
-                >
-                  {totalPendencias === 0 ? (
-                    <CheckCircle2 size={12} aria-hidden="true" />
-                  ) : (
-                    <TriangleAlert size={12} aria-hidden="true" />
-                  )}
-                  {totalPendencias === 0
-                    ? "Sem pendências"
-                    : `${totalPendencias} ${totalPendencias === 1 ? "pendência" : "pendências"}`}
-                </span>
-              </div>
+                  </Typography>
+                </Box>
+                <Selo
+                  tom={totalPendencias === 0 ? "sucesso" : "atencao"}
+                  tamanho="pequeno"
+                  rotulo={
+                    <Box
+                      component="span"
+                      sx={{ display: "inline-flex", alignItems: "center", gap: 0.5 }}
+                    >
+                      {totalPendencias === 0 ? (
+                        <CheckCircleRoundedIcon aria-hidden="true" sx={{ fontSize: 14 }} />
+                      ) : (
+                        <WarningAmberRoundedIcon aria-hidden="true" sx={{ fontSize: 14 }} />
+                      )}
+                      <span>
+                        {totalPendencias === 0
+                          ? "Sem pendências"
+                          : `${totalPendencias} ${totalPendencias === 1 ? "pendência" : "pendências"}`}
+                      </span>
+                    </Box>
+                  }
+                />
+              </Box>
 
               <SecaoResumo
                 id={`${item.turmaId}-visao`}
                 titulo="Visão geral"
                 descricao="Totais, evolução e dias da semana."
-                icone={CalendarDays}
+                icone={CalendarMonthRoundedIcon}
                 aberto={aberta(`${item.turmaId}:visao`)}
                 onAbertoChange={(valor) => alternar(`${item.turmaId}:visao`, valor)}
                 resumo={
                   <>
-                    <Selo>{item.totais.faltas} faltas</Selo>
-                    <Selo>{item.totais.justificadas} justificadas</Selo>
-                    <Selo>{item.totais.presentes} presentes</Selo>
+                    <Selo component="span" rotulo={`${item.totais.faltas} faltas`} tom="neutro" />
+                    <Selo
+                      component="span"
+                      rotulo={`${item.totais.justificadas} justificadas`}
+                      tom="neutro"
+                    />
+                    <Selo
+                      component="span"
+                      rotulo={`${item.totais.presentes} presentes`}
+                      tom="neutro"
+                    />
                   </>
                 }
               >
-                <dl className="bg-card grid grid-cols-3 divide-x rounded-[14px] border">
-                  {[
-                    ["Faltas", item.totais.faltas, "text-falta-texto"],
-                    ["Justificadas", item.totais.justificadas, "text-justificada-texto"],
-                    ["Presentes", item.totais.presentes, "text-primary"],
-                  ].map(([rotulo, valor, classe]) => (
-                    <div key={rotulo} className="flex flex-col items-center gap-0.5 px-2 py-3">
-                      <dt className="text-muted-foreground text-xs font-medium">{rotulo}</dt>
-                      <dd className={`numerais-tabulares text-xl font-semibold ${classe}`}>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+                    border: 1,
+                    borderColor: "divider",
+                    borderRadius: 2,
+                    backgroundColor: "background.paper",
+                  }}
+                >
+                  {(
+                    [
+                      ["Faltas", item.totais.faltas, "falta.texto"],
+                      ["Justificadas", item.totais.justificadas, "justificada.texto"],
+                      ["Presentes", item.totais.presentes, "primary.main"],
+                    ] as const
+                  ).map(([rotulo, valor, cor], indice) => (
+                    <Stack
+                      key={rotulo}
+                      spacing={0.25}
+                      sx={{
+                        alignItems: "center",
+                        px: 1,
+                        py: 1.5,
+                        ...(indice > 0 ? { borderLeft: 1, borderColor: "divider" } : {}),
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{ color: "text.secondary", fontWeight: 500 }}
+                      >
+                        {rotulo}
+                      </Typography>
+                      <Typography
+                        variant="h6"
+                        sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums", color: cor }}
+                      >
                         {valor}
-                      </dd>
-                    </div>
+                      </Typography>
+                    </Stack>
                   ))}
-                </dl>
-                <p className="text-muted-foreground text-xs">Somente chamadas salvas.</p>
+                </Box>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                  Somente chamadas salvas.
+                </Typography>
                 {(() => {
                   const previstos = item.dias.filter((dia) => dia.previsto).length;
                   const salvos = item.dias.filter((dia) => dia.previsto && dia.salva).length;
                   const cobertura = previstos > 0 ? Math.round((salvos / previstos) * 100) : 100;
                   return (
-                    <div className="flex flex-col gap-1.5">
-                      <div className="flex items-center justify-between gap-2 text-xs">
-                        <span className="text-muted-foreground">Cobertura da semana</span>
-                        <span className="numerais-tabulares font-medium">
-                          {salvos} de {previstos} dias com chamada
-                        </span>
-                      </div>
-                      <div
-                        role="progressbar"
-                        aria-label="Cobertura de chamadas da semana"
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={cobertura}
-                        className="bg-secondary h-2 w-full overflow-hidden rounded-full"
+                    <Stack spacing={0.5}>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{ alignItems: "center", justifyContent: "space-between" }}
                       >
-                        <div
-                          aria-hidden="true"
-                          className="bg-primary h-full rounded-full"
-                          style={{ width: `${cobertura}%` }}
-                        />
-                      </div>
-                    </div>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          Cobertura da semana
+                        </Typography>
+                        <Typography
+                          variant="caption"
+                          sx={{ fontWeight: 500, fontVariantNumeric: "tabular-nums" }}
+                        >
+                          {salvos} de {previstos} dias com chamada
+                        </Typography>
+                      </Stack>
+                      <BarraProgresso
+                        valor={cobertura}
+                        rotulo="Cobertura de chamadas da semana"
+                        descricao={`${salvos} de ${previstos} dias com chamada`}
+                      />
+                    </Stack>
                   );
                 })()}
-                <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,24rem),1fr))] gap-4">
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 24rem), 1fr))",
+                    gap: 2,
+                  }}
+                >
                   <GraficoRosca
                     tomValores="falta"
                     titulo={`Faltas, justificadas e presentes de ${item.rotulo}: ${totalMarcas} ${totalMarcas === 1 ? "registro" : "registros"} (F + FJ + P)`}
@@ -592,8 +732,18 @@ export function VistaResumoSemana({
                     limiares={limiaresDoPainel(configuracoes)}
                     rotuloAcessivel={`Infrequência diária de ${item.rotulo}. Os valores também aparecem nos cartões de dia.`}
                   />
-                </div>
-                <ul className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,7rem),1fr))] gap-2">
+                </Box>
+                <Box
+                  component="ul"
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 7rem), 1fr))",
+                    gap: 1,
+                    listStyle: "none",
+                    m: 0,
+                    p: 0,
+                  }}
+                >
                   {item.dias.map((dia) => {
                     const situacao = horarioDoDia(dia);
                     const abre = Boolean(dia.salva || dia.previsto);
@@ -621,7 +771,7 @@ export function VistaResumoSemana({
                         }
                         contagens={
                           dia.salva ? (
-                            <div className="flex w-full flex-col gap-1.5">
+                            <Stack spacing={0.75} sx={{ width: "100%" }}>
                               <CirculosAcumulado
                                 faltas={dia.faltas}
                                 justificadas={dia.justificadas}
@@ -631,73 +781,97 @@ export function VistaResumoSemana({
                                     : undefined
                                 }
                               />
-                              <div aria-hidden="true" className="flex w-full gap-0.5">
+                              <Box
+                                aria-hidden="true"
+                                sx={{ display: "flex", width: "100%", gap: 0.5 }}
+                              >
                                 {dia.faltas > 0 ? (
-                                  <span
-                                    className="bg-falta h-1 rounded-full"
-                                    style={{ flexGrow: dia.faltas }}
+                                  <Box
+                                    sx={{
+                                      height: 4,
+                                      flexGrow: dia.faltas,
+                                      borderRadius: "999px",
+                                      backgroundColor: "falta.main",
+                                    }}
                                   />
                                 ) : null}
                                 {dia.justificadas > 0 ? (
-                                  <span
-                                    className="bg-justificada h-1 rounded-full"
-                                    style={{ flexGrow: dia.justificadas }}
+                                  <Box
+                                    sx={{
+                                      height: 4,
+                                      flexGrow: dia.justificadas,
+                                      borderRadius: "999px",
+                                      backgroundColor: "justificada.main",
+                                    }}
                                   />
                                 ) : null}
                                 {dia.presentes > 0 ? (
-                                  <span
-                                    className="bg-primary h-1 rounded-full"
-                                    style={{ flexGrow: dia.presentes }}
+                                  <Box
+                                    sx={{
+                                      height: 4,
+                                      flexGrow: dia.presentes,
+                                      borderRadius: "999px",
+                                      backgroundColor: "primary.main",
+                                    }}
                                   />
                                 ) : null}
-                              </div>
-                            </div>
+                              </Box>
+                            </Stack>
                           ) : undefined
                         }
                         detalhe={detalhe || undefined}
                       />
                     );
                   })}
-                </ul>
+                </Box>
               </SecaoResumo>
 
               <SecaoResumo
                 id={`${item.turmaId}-pendencias`}
                 titulo="Pendências"
                 descricao="Dias letivos sem chamada nesta semana."
-                icone={TriangleAlert}
+                icone={WarningAmberRoundedIcon}
                 aberto={aberta(`${item.turmaId}:pendencias`)}
                 onAbertoChange={(valor) => alternar(`${item.turmaId}:pendencias`, valor)}
                 resumo={
-                  <Selo>
-                    {totalPendencias} {totalPendencias === 1 ? "dia" : "dias"}
-                  </Selo>
+                  <Selo
+                    rotulo={`${totalPendencias} ${totalPendencias === 1 ? "dia" : "dias"}`}
+                    tom={totalPendencias === 0 ? "sucesso" : "atencao"}
+                    component="span"
+                  />
                 }
               >
                 {item.pendencias.length === 0 ? (
                   <ResumoVazio texto="Nenhuma pendência nesta semana." />
                 ) : (
-                  <ul className="divide-y">
+                  <List disablePadding>
                     {item.pendencias.map((dia) => (
-                      <li
+                      <ListItem
                         key={dia}
-                        className="flex flex-wrap items-center justify-between gap-2 py-2"
+                        divider
+                        sx={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          gap: 1,
+                          px: 0,
+                          py: 1,
+                        }}
                       >
-                        <span className="text-sm">
+                        <Typography variant="body2">
                           {rotuloDiaSemana(dia).replace("-feira", "")}, {rotuloData(dia)}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="min-h-11"
+                        </Typography>
+                        <Botao
+                          variante="contorno"
+                          tamanho="pequeno"
                           onClick={() => onAbrirDia(dia)}
                         >
                           Abrir {rotuloDataCurta(dia)}
-                        </Button>
-                      </li>
+                        </Botao>
+                      </ListItem>
                     ))}
-                  </ul>
+                  </List>
                 )}
               </SecaoResumo>
 
@@ -705,10 +879,12 @@ export function VistaResumoSemana({
                 id={`${item.turmaId}-alunos`}
                 titulo="Alunos"
                 descricao="Ranking de faltas e faltas justificadas."
-                icone={Users}
+                icone={AssignmentRoundedIcon}
                 aberto={aberta(`${item.turmaId}:alunos`)}
                 onAbertoChange={(valor) => alternar(`${item.turmaId}:alunos`, valor)}
-                resumo={<Selo>{item.alunos.length} alunos</Selo>}
+                resumo={
+                  <Selo component="span" rotulo={`${item.alunos.length} alunos`} tom="neutro" />
+                }
               >
                 <RankingAlunos resumo={item} />
               </SecaoResumo>
@@ -718,34 +894,42 @@ export function VistaResumoSemana({
                   id={`${item.turmaId}-saidas`}
                   titulo="Saídas"
                   descricao="Saídas antecipadas da semana."
-                  icone={Clock3}
+                  icone={ScheduleRoundedIcon}
                   aberto={aberta(`${item.turmaId}:saidas`)}
                   onAbertoChange={(valor) => alternar(`${item.turmaId}:saidas`, valor)}
-                  resumo={<Selo>{item.saidas.length} saídas</Selo>}
+                  resumo={
+                    <Selo component="span" rotulo={`${item.saidas.length} saídas`} tom="neutro" />
+                  }
                 >
                   {dados?.avisoSaidas ? (
-                    <p role="alert" className="text-muted-foreground text-xs">
-                      {dados.avisoSaidas}
-                    </p>
+                    <AlertaCompacto
+                      variante="indisponivel"
+                      descricao={dados.avisoSaidas}
+                      tamanho="linha"
+                    />
                   ) : null}
                   {item.saidas.length === 0 ? (
                     <ResumoVazio texto="Nenhuma saída antecipada nesta semana." />
                   ) : (
-                    <ul className="divide-y">
+                    <List disablePadding>
                       {item.saidas.map((saida) => (
-                        <li key={saida.id} className="py-2 text-sm">
-                          <span className="font-medium">{saida.nome}</span>
-                          <span className="text-muted-foreground">
-                            {` · ${rotuloData(saida.dia)} · ${rotuloMomento(saida.momento)}`}
-                            {saida.horario ? ` · ${saida.horario}` : ""}
-                          </span>
-                        </li>
+                        <ListItem key={saida.id} divider sx={{ px: 0, py: 1 }}>
+                          <Typography variant="body2">
+                            <Box component="span" sx={{ fontWeight: 500 }}>
+                              {saida.nome}
+                            </Box>
+                            <Box component="span" sx={{ color: "text.secondary" }}>
+                              {` · ${rotuloData(saida.dia)} · ${rotuloMomento(saida.momento)}`}
+                              {saida.horario ? ` · ${saida.horario}` : ""}
+                            </Box>
+                          </Typography>
+                        </ListItem>
                       ))}
-                    </ul>
+                    </List>
                   )}
                 </SecaoResumo>
               ) : null}
-            </article>
+            </Box>
           );
         })}
 
@@ -754,37 +938,68 @@ export function VistaResumoSemana({
             id="movimentacoes"
             titulo="Movimentações"
             descricao="Saídas e entradas da semana, com a turma gravada em cada registro."
-            icone={Clock3}
+            icone={ScheduleRoundedIcon}
             aberto={aberta("movimentacoes")}
             onAbertoChange={(valor) => alternar("movimentacoes", valor)}
-            resumo={<Selo>{movimentacoes.length} registros</Selo>}
+            resumo={
+              <Selo component="span" rotulo={`${movimentacoes.length} registros`} tom="neutro" />
+            }
           >
             {dados?.avisoSaidas ? (
-              <p role="alert" className="text-muted-foreground text-xs">
-                {dados.avisoSaidas}
-              </p>
+              <AlertaCompacto
+                variante="indisponivel"
+                descricao={dados.avisoSaidas}
+                tamanho="linha"
+              />
             ) : null}
             {dados?.avisoEntradas ? (
-              <p role="alert" className="text-muted-foreground text-xs">
-                {dados.avisoEntradas}
-              </p>
+              <AlertaCompacto
+                variante="indisponivel"
+                descricao={dados.avisoEntradas}
+                tamanho="linha"
+              />
             ) : null}
-            <ul
+            <Box
+              component="ul"
               aria-label="Movimentações por dia"
-              className="grid grid-cols-3 gap-1 sm:grid-cols-6"
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "repeat(3, minmax(0, 1fr))",
+                  sm: "repeat(6, minmax(0, 1fr))",
+                },
+                gap: 0.5,
+                listStyle: "none",
+                m: 0,
+                p: 0,
+              }}
             >
               {movimentacoesPorDia.map((item) => (
-                <li
+                <Stack
+                  component="li"
                   key={item.dia}
-                  className="bg-secondary/40 flex flex-col items-center gap-0.5 rounded-lg border px-2 py-1.5"
+                  spacing={0.25}
+                  sx={(theme) => ({
+                    alignItems: "center",
+                    borderRadius: 1.5,
+                    border: `1px solid ${theme.vars.palette.divider}`,
+                    backgroundColor: theme.vars.palette.action.hover,
+                    px: 1,
+                    py: 0.75,
+                  })}
                 >
-                  <span className="text-muted-foreground text-[11px]">
+                  <Typography variant="caption" sx={{ color: "text.secondary", fontSize: 11 }}>
                     {rotuloCurtoDoDia(item.dia)}
-                  </span>
-                  <span className="numerais-tabulares text-sm font-semibold">{item.total}</span>
-                </li>
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{ fontWeight: 600, fontVariantNumeric: "tabular-nums" }}
+                  >
+                    {item.total}
+                  </Typography>
+                </Stack>
               ))}
-            </ul>
+            </Box>
             <ListaMovimentacoes itens={movimentacoes} />
           </SecaoResumo>
         ) : null}
@@ -794,38 +1009,53 @@ export function VistaResumoSemana({
             id="pendenciasSeduc"
             titulo="Pendentes na Seduc"
             descricao="Registros efetivos que exigem conferência na Seduc."
-            icone={ClipboardList}
+            icone={AssignmentRoundedIcon}
             aberto={aberta("pendenciasSeduc")}
             onAbertoChange={(valor) => alternar("pendenciasSeduc", valor)}
-            resumo={<Selo>{pendenciasSeduc.length} pendentes</Selo>}
+            resumo={
+              <Selo
+                component="span"
+                rotulo={`${pendenciasSeduc.length} pendentes`}
+                tom={pendenciasSeduc.length === 0 ? "sucesso" : "atencao"}
+              />
+            }
           >
             {dados?.avisoParciais ? (
-              <p role="alert" className="text-muted-foreground text-xs">
-                {dados.avisoParciais}
-              </p>
+              <AlertaCompacto
+                variante="indisponivel"
+                descricao={dados.avisoParciais}
+                tamanho="linha"
+              />
             ) : null}
             {pendenciasSeduc.length === 0 ? (
               <ResumoVazio texto="Nenhuma pendência na Seduc nesta semana." />
             ) : (
               <>
-                <ul className="divide-y">
+                <List disablePadding>
                   {pendenciasSeduc.map((item) => (
-                    <li key={item.id} className="py-2 text-sm">
-                      <p className="font-medium break-words">{item.nome}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {item.turma} · {rotuloData(item.dia)} · {item.tipo}
-                      </p>
-                    </li>
+                    <ListItem key={item.id} divider sx={{ px: 0, py: 1 }}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Typography
+                          variant="body2"
+                          sx={{ fontWeight: 500, overflowWrap: "anywhere" }}
+                        >
+                          {item.nome}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                          {item.turma} · {rotuloData(item.dia)} · {item.tipo}
+                        </Typography>
+                      </Box>
+                    </ListItem>
                   ))}
-                </ul>
-                <p className="text-muted-foreground text-xs">
+                </List>
+                <Typography variant="caption" sx={{ color: "text.secondary" }}>
                   A conferência e a confirmação ficam na Chamada Parcial.
-                </p>
+                </Typography>
               </>
             )}
           </SecaoResumo>
         ) : null}
       </CorpoResumo>
-    </section>
+    </Paper>
   );
 }

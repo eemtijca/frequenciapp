@@ -51,20 +51,18 @@ test.describe("menu lateral", () => {
         await expect(abrir).toHaveAttribute("aria-expanded", "false");
         if (visivel) {
           await expect(abrir).toHaveCSS("outline-style", "solid");
-          await expect(abrir).toHaveCSS("outline-width", "2px");
+          await expect(abrir).toHaveCSS("outline-width", "3px");
         } else {
           await expect.poll(indicadores).toEqual(semFoco);
         }
       };
 
-      for (const destino of ["botao", "veu", "secao"] as const) {
+      for (const destino of ["botao", "veu"] as const) {
         await acionar(abrir);
         await expect(menu).toBeVisible();
         if (destino === "botao") await acionar(fechar);
-        else if (destino === "veu") {
-          await acionar(page.locator('[data-slot="dialog-veu"]'), { x: 387, y: 422 });
-        } else {
-          await acionar(menu.getByRole("button", { name: "Chamada", exact: true }));
+        else {
+          await acionar(page.locator(".MuiDrawer-root .MuiBackdrop-root"), { x: 387, y: 422 });
         }
         await conferirRetorno(false);
       }
@@ -89,7 +87,14 @@ test.describe("menu lateral", () => {
       const atualizar = page.getByRole("banner").getByRole("button", { name: "Atualizar tela" });
       await expect(atualizar).toBeFocused();
       await expect(atualizar).toHaveCSS("outline-style", "solid");
-      await expect(atualizar).toHaveCSS("outline-width", "2px");
+      await expect(atualizar).toHaveCSS("outline-width", "3px");
+
+      await acionar(abrir);
+      await acionar(menu.getByRole("button", { name: "Chamada", exact: true }));
+      await expect(menu).toBeHidden();
+      await expect(
+        page.getByRole("heading", { name: "Chamada", level: 1, exact: true, includeHidden: true }),
+      ).toBeFocused();
     });
   }
 
@@ -134,9 +139,35 @@ test.describe("menu lateral", () => {
 
     await abrir.click();
     await expect(menu).toBeVisible();
-    await page.locator('[data-slot="dialog-veu"]').click({ position: { x: 387, y: 422 } });
+    await page.locator(".MuiDrawer-root .MuiBackdrop-root").click({ position: { x: 387, y: 422 } });
     await expect(menu).toBeHidden();
     await expect(abrir).toBeFocused();
+  });
+
+  test("percorre Gestão no mesmo modal e foca o cadastro ao escolher um destino", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/");
+    const nav = await abrirNavegacao(page);
+    await nav.getByRole("button", { name: "Gestão", exact: true }).press("Enter");
+    const voltar = nav.getByRole("button", { name: "Voltar ao menu principal", exact: true });
+    await expect(voltar).toBeFocused();
+    await expect(nav.getByRole("button", { name: "Séries", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await nav.getByRole("button", { name: "Turmas", exact: true }).press("Space");
+    await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
+    const titulo = page.getByRole("heading", { name: "Turmas", level: 1, exact: true });
+    await expect(titulo).toBeFocused();
+    await abrirNavegacao(page);
+    await voltar.press("Enter");
+    const gestao = nav.getByRole("button", { name: "Gestão", exact: true });
+    await expect(gestao).toBeFocused();
+    await page.keyboard.press("Escape");
+    await expect(titulo).toBeVisible();
+    await expect(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
   });
 
   test("abre e fecha sem trava de rolagem, desfoque ou bloqueio herdado pela tela", async ({
@@ -145,30 +176,37 @@ test.describe("menu lateral", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     await aguardarHidratacao(page);
-    const raiz = page.locator("main").locator("xpath=ancestor::div[contains(@class, 'h-dvh')]");
+    const raiz = page.locator('[data-raiz="aplicacao"]');
     await abrirNavegacao(page);
     const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
-    await expect(page.locator('[data-slot="dialog-veu"]')).toBeVisible();
+    await expect(page.locator(".MuiDrawer-root .MuiBackdrop-root")).toBeVisible();
     // Cada uma dessas mudanças obrigaria o navegador a recalcular o estilo do app inteiro.
-    const estado = await menu.evaluate((gaveta) => ({
-      desfoque: getComputedStyle(gaveta).backdropFilter,
-      travaDeRolagem: document.body.hasAttribute("data-scroll-locked"),
-      variavelHerdada: getComputedStyle(document.body)
-        .getPropertyValue("--removed-body-scroll-bar-size")
-        .trim(),
-    }));
-    expect(estado).toEqual({ desfoque: "none", travaDeRolagem: false, variavelHerdada: "" });
+    const estado = await menu.evaluate((gaveta) => {
+      const corpo = getComputedStyle(document.body);
+      const raizDocumento = getComputedStyle(document.documentElement);
+      return {
+        desfoque: getComputedStyle(gaveta).backdropFilter,
+        travaDeRolagem: corpo.overflow === "hidden" || raizDocumento.overflow === "hidden",
+        variavelHerdada: document.body.style
+          .getPropertyValue("--removed-body-scroll-bar-size")
+          .trim(),
+      };
+    });
+    expect(estado).toEqual({ desfoque: "none", travaDeRolagem: true, variavelHerdada: "" });
     await expect(raiz).toHaveAttribute("data-gaveta-aberta", "");
     await expect(raiz).toHaveCSS("pointer-events", "auto");
 
     // O véu continua recebendo o toque fora da gaveta e fechando o menu.
-    await page.locator('[data-slot="dialog-veu"]').click({ position: { x: 387, y: 422 } });
+    await page.locator(".MuiDrawer-root .MuiBackdrop-root").click({ position: { x: 387, y: 422 } });
     await expect(menu).toBeHidden();
     await expect(raiz).not.toHaveAttribute("data-gaveta-aberta");
     expect(await page.evaluate(() => document.body.style.pointerEvents)).toBe("");
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.body).overflow))
+      .not.toBe("hidden");
   });
 
-  test("usa as seções do desktop e fecha ao ampliar a tela para 1024 px", async ({ page }) => {
+  test("usa as seções do desktop e fecha ao ampliar a tela para 905 px", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/");
     let navegacao = await abrirNavegacao(page);
@@ -176,15 +214,16 @@ test.describe("menu lateral", () => {
     await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
 
-    await page.setViewportSize({ width: 1023, height: 800 });
+    await page.setViewportSize({ width: 904, height: 800 });
     navegacao = await abrirNavegacao(page);
     expect(await navegacao.getByRole("button").allTextContents()).toEqual(secoes);
     await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toBeVisible();
-    await page.setViewportSize({ width: 1024, height: 800 });
+    await page.setViewportSize({ width: 905, height: 800 });
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
-    await expect(page.locator("main")).toBeFocused();
-    await expect(page.locator("aside")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Painel", level: 1, exact: true }),
+    ).toBeFocused();
     await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
 
     await page.setViewportSize({ width: 390, height: 844 });
@@ -204,7 +243,7 @@ test.describe("menu lateral", () => {
     await expect(menu.getByText("Administração", { exact: true })).toBeVisible();
     let conta = await abrirMenuConta(page, menu);
     await conta.getByRole("menuitem", { name: "Trocar senha", exact: true }).click();
-    const senha = page.getByRole("dialog", { name: "Trocar minha senha", exact: true });
+    const senha = page.getByRole("dialog", { name: /Trocar minha senha/ });
     await expect(menu).toBeHidden();
     await expect(senha).toBeVisible();
     await conferirFocoNoDialogo(senha);
@@ -215,7 +254,7 @@ test.describe("menu lateral", () => {
     await abrirNavegacao(page);
     conta = await abrirMenuConta(page, menu);
     await conta.getByRole("menuitem", { name: "Notificações", exact: true }).click();
-    const notificacoes = page.getByRole("dialog", { name: "Notificações", exact: true });
+    const notificacoes = page.getByRole("dialog", { name: /Notificações/ });
     await expect(menu).toBeHidden();
     await expect(notificacoes).toBeVisible();
     await conferirFocoNoDialogo(notificacoes);
@@ -268,7 +307,7 @@ test.describe("menu lateral", () => {
       await confirmar.getByRole("button", { name: "Continuar aqui", exact: true }).click();
       await expect(confirmar).toBeHidden();
       await expect(page.getByRole("button", { name: "Abrir menu" })).toBeFocused();
-      await expect(page.locator("main")).toHaveAttribute("data-visao", "chamada");
+      await expect(page.locator("main").first()).toHaveAttribute("data-visao", "chamada");
       await expect(aluno).toHaveAttribute("aria-pressed", "true");
 
       await abrirNavegacao(page);

@@ -1,77 +1,82 @@
 "use client";
 
-// Evolução mensal isolada para carregar a biblioteca somente perto da área visível.
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ReferenceLine,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { ESTILO_TOOLTIP } from "@/components/graficos/estilo-graficos";
-const EIXO = { fontSize: 11, fill: "var(--muted-foreground)" };
+// Evolução da infrequência em MUI X, carregada sob demanda e com limites visuais.
+import Box from "@mui/material/Box";
+import { useTheme } from "@mui/material/styles";
+import { ChartsReferenceLine } from "@mui/x-charts/ChartsReferenceLine";
+import { LineChart } from "@mui/x-charts/LineChart";
+
 interface Props {
   evolucao: { rotulo: string; valor: number | null }[];
   limiares?: { atencao: number; critica: number };
   rotuloAcessivel?: string;
 }
+
 export default function GraficoEvolucao({
   evolucao,
   limiares,
   rotuloAcessivel = "Infrequência por dia, em porcentagem. Valores disponíveis em Ver dados diários.",
 }: Props) {
+  const tema = useTheme();
+  const rotulos = evolucao.map((item) => item.rotulo);
+  const valores = evolucao.map((item) => item.valor);
+  const estiloEixo = { fontSize: 11, fill: tema.vars.palette.text.secondary };
+
   return (
-    <div role="img" aria-label={rotuloAcessivel} className="h-64 min-w-0">
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={evolucao} margin={{ top: 12, right: 12, bottom: 0, left: -12 }}>
-          <CartesianGrid vertical={false} stroke="var(--border)" />
-          {limiares && (
-            <>
-              <ReferenceLine
-                y={limiares.atencao * 100}
-                stroke="var(--alerta)"
-                strokeDasharray="4 4"
-                ifOverflow="extendDomain"
-              />
-              <ReferenceLine
-                y={limiares.critica * 100}
-                stroke="var(--falta)"
-                strokeDasharray="4 4"
-                ifOverflow="extendDomain"
-              />
-            </>
-          )}
-          <XAxis dataKey="rotulo" tick={EIXO} minTickGap={24} axisLine={false} tickLine={false} />
-          <YAxis
-            domain={[0, 100]}
-            tickFormatter={(valor: number) => `${valor}%`}
-            tick={EIXO}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip
-            {...ESTILO_TOOLTIP}
-            formatter={(valor: unknown) => [
-              `${Number(valor).toLocaleString("pt-BR")}%`,
-              "Infrequência",
-            ]}
-          />
-          <Line
-            dataKey="valor"
-            name="Infrequência"
-            type="linear"
-            connectNulls={false}
-            stroke="var(--chart-3)"
-            strokeWidth={2}
-            dot={{ r: 3 }}
-            activeDot={{ r: 5 }}
-            isAnimationActive={false}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <Box role="img" aria-label={rotuloAcessivel} sx={{ width: "100%", minWidth: 0 }}>
+      <LineChart
+        height={256}
+        hideLegend
+        skipAnimation
+        grid={{ horizontal: true }}
+        margin={{ top: 12, right: 36, bottom: 0, left: 0 }}
+        series={[
+          {
+            data: valores,
+            label: "Infrequência",
+            color: tema.vars.palette.text.secondary,
+            connectNulls: false,
+            curve: "linear",
+            valueFormatter: (valor) =>
+              valor === null ? "Sem registro" : `${valor.toLocaleString("pt-BR")}%`,
+          },
+        ]}
+        xAxis={[
+          {
+            scaleType: "point",
+            data: rotulos,
+            tickLabelStyle: estiloEixo,
+          },
+        ]}
+        yAxis={[
+          {
+            min: 0,
+            max: 100,
+            valueFormatter: (valor: number) => `${valor}%`,
+            tickLabelStyle: estiloEixo,
+          },
+        ]}
+        sx={{ width: "100%" }}
+      >
+        {limiares ? (
+          <>
+            <ChartsReferenceLine
+              y={limiares.atencao * 100}
+              lineStyle={{
+                stroke: tema.vars.palette.alerta.main,
+                strokeDasharray: "4 4",
+              }}
+            />
+            <ChartsReferenceLine
+              y={limiares.critica * 100}
+              lineStyle={{
+                stroke: tema.vars.palette.falta.main,
+                strokeDasharray: "4 4",
+              }}
+            />
+          </>
+        ) : null}
+      </LineChart>
+    </Box>
   );
 }
