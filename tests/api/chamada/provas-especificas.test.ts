@@ -1,0 +1,278 @@
+// Contrato das provas específicas: acesso da administração e da coordenação, validação, inscrição de alunos,
+// frequência (presente, ausente, sem registro) e remoção em cascata.
+import { afterAll, beforeAll, expect, it } from "vitest";
+import pg from "pg";
+
+const url = process.env.APP_URL ?? "http://localhost:3000";
+const banco = new pg.Client({ connectionString: process.env.DATABASE_URL });
+let cookieAdmin = "";
+let cookieCoordenacao = "";
+let serieId = "";
+let turmaId = "";
+const alunos: string[] = [];
+let alunoInativo = "";
+const provasCriadas: string[] = [];
+
+interface Prova {
+  id: string;
+  nome: string;
+  local: string | null;
+  dia: string;
+  total: number;
+  presentes: number;
+  ausentes: number;
+}
+
+interface Participante {
+  alunoId: string;
+  nome: string;
+  presente: boolean | null;
+}
+
+async function entrar(email: string, senha: string): Promise<string> {
+  const resposta = await fetch(`${url}/api/auth/entrar`, {
+    method: "POST",
+    headers: { Origin: url, "Content-Type": "application/json" },
+    body: JSON.stringify({ email, senha }),
+  });
+  expect(resposta.status).toBe(200);
+  return resposta.headers
+    .getSetCookie()
+    .map((c) => c.split(";")[0])
+    .join("; ");
+}
+
+function chamar(caminho: string, metodo: string, cookie: string, corpo?: unknown, origem = url) {
+  return fetch(`${url}${caminho}`, {
+    method: metodo,
+    headers: { Cookie: cookie, Origin: origem, "Content-Type": "application/json" },
+    ...(corpo === undefined ? {} : { body: JSON.stringify(corpo) }),
+  });
+}
+
+async function criar(corpo: unknown, cookie = cookieCoordenacao): Promise<Prova> {
+  const resposta = await chamar("/api/provas", "POST", cookie, corpo);
+  expect(resposta.status).toBe(201);
+  const prova = ((await resposta.json()) as { prova: Prova }).prova;
+  provasCriadas.push(prova.id);
+  return prova;
+}
+
+async function ler(id: string): Promise<{ prova: Prova; participantes: Participante[] }> {
+  const resposta = await chamar(`/api/provas/${id}`, "GET", cookieCoordenacao);
+  expect(resposta.status).toBe(200);
+  return (await resposta.json()) as { prova: Prova; participantes: Participante[] };
+}
+
+beforeAll(async () => {
+  await banco.connect();
+  cookieAdmin = await entrar("direcao@escola.exemplo", "DirecaoFrequencia2026");
+  cookieCoordenacao = await entrar("demo@escola.exemplo", "DemoFrequencia2026");
+  serieId =
+    (
+      await banco.query<{ id: string }>(
+        "insert into series (nome, ordem) values ('QA Provas Especificas', 93) returning id",
+      )
+    ).rows[0]?.id ?? "";
+  turmaId =
+    (
+      await banco.query<{ id: string }>(
+        "insert into turmas (nome, serie_id) values ('A', $1) returning id",
+        [serieId],
+      )
+    ).rows[0]?.id ?? "";
+  for (const [indice, nome] of ["QA Beatriz", "QA Caio", "QA Ana"].entries()) {
+    alunos.push(
+      (
+        await banco.query<{ id: string }>(
+          "insert into alunos (nome, turma_id, turma_original_id, ordem) values ($1, $2, $2, $3) returning id",
+          [nome, turmaId, indice + 1],
+        )
+      ).rows[0]?.id ?? "",
+    );
+  }
+  alunoInativo =
+    (
+      await banco.query<{ id: string }>(
+        "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo) values ('QA Inativo', $1, $1, 4, false) returning id",
+        [turmaId],
+      )
+    ).rows[0]?.id ?? "";
+});
+
+afterAll(async () => {
+  await banco.query("delete from provas_especificas where id = any($1::uuid[])", [provasCriadas]);
+  await banco.query("delete from alunos where turma_id = $1", [turmaId]);
+  await banco.query("delete from turmas where id = $1", [turmaId]);
+  await banco.query("delete from series where id = $1", [serieId]);
+  await banco.end();
+});
+
+it("recusa sem sessão e de origem desconhecida", async () => {
+  expect((await fetch(`${url}/api/provas`)).status).toBe(401);
+  expect((await chamar("/api/provas", "POST", "", { nome: "QA", dia: "2026-11-08" })).status).toBe(
+    401,
+  );
+  const origemInvalida = await chamar(
+    "/api/provas",
+    "POST",
+    cookieAdmin,
+    { nome: "QA", dia: "2026-11-08" },
+    "https://origem-invalida.exemplo",
+  );
+  expect(origemInvalida.status).toBe(403);
+});
+
+it.each([
+  ["sem nome", { nome: "  ", dia: "2026-11-08" }, "Informe o nome da prova."],
+  ["data inexistente", { nome: "QA Enem", dia: "2026-02-30" }, "Data da prova inválida."],
+  ["sem data", { nome: "QA Enem" }, "Informe a data da prova."],
+  ["campo desconhecido", { nome: "QA Enem", dia: "2026-11-08", x: 1 }, ""],
+])("recusa o cadastro %s com 400", async (_rotulo, corpo, mensagem) => {
+  const resposta = await chamar("/api/provas", "POST", cookieCoordenacao, corpo);
+  expect(resposta.status).toBe(400);
+  expect(((await resposta.json()) as { error: string }).error).toContain(mensagem);
+});
+
+it("a administração e a coordenação cadastram prova, inclusive no domingo e com data passada", async () => {
+  const doEnem = await criar({ nome: "  QA Enem  ", local: " Escola Central ", dia: "2026-11-08" });
+  expect(doEnem).toMatchObject({ nome: "QA Enem", local: "Escola Central", dia: "2026-11-08" });
+  const semLocal = await criar(
+    { nome: "QA Vestibular", local: "  ", dia: "2020-12-01" },
+    cookieAdmin,
+  );
+  expect(semLocal.local).toBeNull();
+  const resposta = await chamar("/api/provas", "GET", cookieAdmin);
+  const lista = ((await resposta.json()) as { provas: Prova[] }).provas.filter((prova) =>
+    provasCriadas.includes(prova.id),
+  );
+  expect(lista.map((prova) => prova.nome)).toEqual(["QA Enem", "QA Vestibular"]);
+});
+
+it("inscreve alunos, mantém marcas ao reenviar a lista e recusa aluno inativo ou desconhecido", async () => {
+  const prova = await criar({ nome: "QA Inscrição", dia: "2026-11-09" });
+  const caminho = `/api/provas/${prova.id}/participantes`;
+
+  const inscrita = await chamar(caminho, "PUT", cookieCoordenacao, {
+    alunoIds: [alunos[0], alunos[1]],
+  });
+  expect(inscrita.status).toBe(200);
+  const aposInscrever = (await inscrita.json()) as { participantes: Participante[] };
+  expect(aposInscrever.participantes.map((p) => p.nome)).toEqual(["QA Beatriz", "QA Caio"]);
+
+  await chamar(`/api/provas/${prova.id}/frequencia`, "PUT", cookieCoordenacao, {
+    marcas: [{ alunoId: alunos[0], presente: true }],
+  });
+  const troca = await chamar(caminho, "PUT", cookieCoordenacao, {
+    alunoIds: [alunos[0], alunos[2]],
+  });
+  expect(troca.status).toBe(200);
+  const aposTroca = (await troca.json()) as { participantes: Participante[] };
+  expect(aposTroca.participantes).toEqual([
+    expect.objectContaining({ nome: "QA Ana", presente: null }),
+    expect.objectContaining({ nome: "QA Beatriz", presente: true }),
+  ]);
+
+  const inativo = await chamar(caminho, "PUT", cookieCoordenacao, { alunoIds: [alunoInativo] });
+  expect(inativo.status).toBe(400);
+  const inexistente = await chamar(caminho, "PUT", cookieCoordenacao, {
+    alunoIds: ["00000000-0000-4000-8000-000000000000"],
+  });
+  expect(inexistente.status).toBe(400);
+  const repetidos = await chamar(caminho, "PUT", cookieCoordenacao, {
+    alunoIds: [alunos[0], alunos[0]],
+  });
+  expect(repetidos.status).toBe(400);
+  expect((await ler(prova.id)).participantes).toHaveLength(2);
+});
+
+it("registra presente, ausente e sem registro, recusa quem não está inscrito e conta na lista", async () => {
+  const prova = await criar({ nome: "QA Frequência", local: "Sala 3", dia: "2026-11-10" });
+  await chamar(`/api/provas/${prova.id}/participantes`, "PUT", cookieCoordenacao, {
+    alunoIds: alunos,
+  });
+  const caminho = `/api/provas/${prova.id}/frequencia`;
+
+  const marcada = await chamar(caminho, "PUT", cookieCoordenacao, {
+    marcas: [
+      { alunoId: alunos[0], presente: true },
+      { alunoId: alunos[1], presente: false },
+    ],
+  });
+  expect(marcada.status).toBe(200);
+  expect(((await marcada.json()) as { prova: Prova }).prova).toMatchObject({
+    total: 3,
+    presentes: 1,
+    ausentes: 1,
+  });
+
+  const desfeita = await chamar(caminho, "PUT", cookieAdmin, {
+    marcas: [{ alunoId: alunos[1], presente: null }],
+  });
+  expect(((await desfeita.json()) as { prova: Prova }).prova).toMatchObject({
+    presentes: 1,
+    ausentes: 0,
+  });
+
+  const forasteiro = await chamar(caminho, "PUT", cookieCoordenacao, {
+    marcas: [{ alunoId: alunoInativo, presente: true }],
+  });
+  expect(forasteiro.status).toBe(400);
+  const semMarcas = await chamar(caminho, "PUT", cookieCoordenacao, { marcas: [] });
+  expect(semMarcas.status).toBe(400);
+
+  const lista = (
+    (await (await chamar("/api/provas", "GET", cookieCoordenacao)).json()) as { provas: Prova[] }
+  ).provas.find((item) => item.id === prova.id);
+  expect(lista).toMatchObject({ total: 3, presentes: 1, ausentes: 0 });
+});
+
+it("edita nome, local e data sem perder alunos nem marcas", async () => {
+  const prova = await criar({ nome: "QA Edição", dia: "2026-11-11" });
+  await chamar(`/api/provas/${prova.id}/participantes`, "PUT", cookieCoordenacao, {
+    alunoIds: [alunos[0]],
+  });
+  await chamar(`/api/provas/${prova.id}/frequencia`, "PUT", cookieCoordenacao, {
+    marcas: [{ alunoId: alunos[0], presente: false }],
+  });
+  const resposta = await chamar(`/api/provas/${prova.id}`, "PATCH", cookieCoordenacao, {
+    nome: "QA Edição 2",
+    local: "Auditório",
+    dia: "2026-11-12",
+  });
+  expect(resposta.status).toBe(200);
+  const dados = (await resposta.json()) as { prova: Prova; participantes: Participante[] };
+  expect(dados.prova).toMatchObject({ nome: "QA Edição 2", local: "Auditório", dia: "2026-11-12" });
+  expect(dados.participantes).toEqual([expect.objectContaining({ presente: false })]);
+});
+
+it("remove a prova com as inscrições e responde 404 para prova inexistente ou id inválido", async () => {
+  const prova = await criar({ nome: "QA Remoção", dia: "2026-11-13" });
+  await chamar(`/api/provas/${prova.id}/participantes`, "PUT", cookieCoordenacao, {
+    alunoIds: [alunos[0]],
+  });
+  expect((await chamar(`/api/provas/${prova.id}`, "DELETE", cookieAdmin)).status).toBe(200);
+  expect((await chamar(`/api/provas/${prova.id}`, "GET", cookieCoordenacao)).status).toBe(404);
+  expect((await chamar(`/api/provas/${prova.id}`, "DELETE", cookieAdmin)).status).toBe(404);
+  expect((await chamar("/api/provas/nao-e-uuid", "GET", cookieAdmin)).status).toBe(404);
+  const restantes = await banco.query("select 1 from participantes_prova where prova_id = $1", [
+    prova.id,
+  ]);
+  expect(restantes.rowCount).toBe(0);
+});
+
+it("excluir o aluno remove a inscrição dele nas provas", async () => {
+  const prova = await criar({ nome: "QA Aluno excluído", dia: "2026-11-14" });
+  const temporario = (
+    await banco.query<{ id: string }>(
+      "insert into alunos (nome, turma_id, turma_original_id, ordem) values ('QA Temporário', $1, $1, 9) returning id",
+      [turmaId],
+    )
+  ).rows[0]?.id;
+  await chamar(`/api/provas/${prova.id}/participantes`, "PUT", cookieCoordenacao, {
+    alunoIds: [temporario],
+  });
+  expect((await ler(prova.id)).prova.total).toBe(1);
+  await banco.query("delete from alunos where id = $1", [temporario]);
+  expect((await ler(prova.id)).prova.total).toBe(0);
+});
