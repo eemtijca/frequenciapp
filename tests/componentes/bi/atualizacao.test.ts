@@ -10,6 +10,7 @@ import {
   type Browser,
   type BrowserContextOptions,
   type Page,
+  type Request as RequisicaoPlaywright,
 } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import { observarDobraBi, observarEditorBi, observarPortaoBi } from "../../helpers/bloco-visual-bi";
@@ -594,7 +595,13 @@ it.each([503, 500])(
 it.each([200, 401])(
   "não deixa uma comparação anterior com resposta %s sobrescrever a atualização mais recente no cache",
   async (statusAnterior) => {
-    const page = await abrir();
+    const page = await abrir(false, "UTC", {
+      antesDaNavegacao: async (pagina) => {
+        await pagina.addInitScript(() => {
+          Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
+        });
+      },
+    });
     let liberarAnterior: () => void = () => {};
     const respostaAnterior = new Promise<void>((resolve) => {
       liberarAnterior = resolve;
@@ -605,6 +612,7 @@ it.each([200, 401])(
         .toBe(1);
       let inicioComparacao = "";
       let comparacoes = 0;
+      let requisicaoAnterior: RequisicaoPlaywright | undefined;
       await page.route("**/api/bi?*", async (rota) => {
         const parametros = new URL(rota.request().url()).searchParams;
         const recurso = parametros.get("recurso");
@@ -613,7 +621,10 @@ it.each([200, 401])(
         const comparativa = recurso === "chamadas" && parametros.get("inicio") === inicioComparacao;
         if (comparativa) comparacoes += 1;
         const antiga = comparativa && comparacoes === 1;
-        if (antiga) await respostaAnterior;
+        if (antiga) {
+          requisicaoAnterior = rota.request();
+          await respostaAnterior;
+        }
         if (antiga && statusAnterior === 401) {
           await rota.fulfill({ status: 401, json: { error: "Resposta antiga" } });
           return;
@@ -630,10 +641,39 @@ it.each([200, 401])(
           },
         });
       });
+      await page.evaluate(() => {
+        const fetchOriginal = window.fetch.bind(window);
+        let primeiraComparacao = true;
+        window.fetch = (entrada, opcoes) => {
+          const url = new URL(entrada instanceof Request ? entrada.url : entrada, location.href);
+          if (
+            !primeiraComparacao ||
+            url.origin !== location.origin ||
+            url.pathname !== "/api/bi" ||
+            url.searchParams.get("recurso") !== "chamadas"
+          ) {
+            return fetchOriginal(entrada, opcoes);
+          }
+          primeiraComparacao = false;
+          opcoes?.signal?.addEventListener(
+            "abort",
+            () => {
+              document.documentElement.dataset.comparacaoAnteriorCancelada = "true";
+            },
+            { once: true },
+          );
+          // Só o transporte antigo ignora o cancelamento para entregar a resposta atrasada.
+          return fetchOriginal(entrada, { ...opcoes, signal: null });
+        };
+      });
       await page.getByRole("combobox", { name: "Comparar infrequência" }).click();
       await page.getByRole("option", { name: "Período anterior" }).click();
       await expect.poll(() => comparacoes).toBe(1);
       await page.getByRole("button", { name: "Atualizar dados", exact: true }).click();
+      await expectUi(page.locator("html")).toHaveAttribute(
+        "data-comparacao-anterior-cancelada",
+        "true",
+      );
       await expect.poll(() => comparacoes, { timeout: 10000 }).toBeGreaterThan(1);
       await expect
         .poll(
@@ -641,11 +681,11 @@ it.each([200, 401])(
           { timeout: 10000 },
         )
         .toBe(1);
-      const redeAntiga = page.waitForResponse((resposta) =>
-        resposta.url().includes(`inicio=${inicioComparacao}`),
+      const redeAntiga = page.waitForResponse(
+        (resposta) => resposta.request() === requisicaoAnterior,
       );
       liberarAnterior();
-      await redeAntiga;
+      expect((await redeAntiga).status()).toBe(statusAnterior);
       await page.waitForTimeout(800);
       const dataGuardada = await page.evaluate(
         (inicio) =>
