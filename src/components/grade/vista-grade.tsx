@@ -283,10 +283,15 @@ export default function VistaGrade({
   async function prepararRelatorio() {
     const primeiro = grade.dias[0] ?? hoje;
     const ultimo = grade.dias[grade.dias.length - 1] ?? hoje;
+    if (primeiro > hoje) {
+      throw new ErroApi("O período ainda não começou. Escolha um período até hoje.", 400);
+    }
+    // O relatório cobre o período exibido, mas nunca dias futuros.
+    const ate = ultimo > hoje ? hoje : ultimo;
     const parametros = new URLSearchParams({
       turmaOriginalId: turmaEfetiva,
       de: primeiro,
-      ate: ultimo,
+      ate,
     });
     const resposta = await pedir<RetratoGrade>(
       `/api/relatorios/grade/retrato?${parametros.toString()}`,
@@ -1024,6 +1029,7 @@ export default function VistaGrade({
                   <Typography variant="caption">
                     Baixar planilha e PDF: todos os alunos ativos da turma de origem.
                   </Typography>
+                  <Typography variant="caption">O PDF cobre o período exibido até hoje.</Typography>
                 </Stack>
               </Box>
             </Stack>

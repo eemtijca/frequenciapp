@@ -136,7 +136,8 @@ function desenharCabecalhoERodape(
     doc.setFontSize(7.5);
     doc.setTextColor(...COR_SECUNDARIA);
     doc.text(`Página ${pagina} de ${total}`, MARGEM_LATERAL, 288);
-    doc.text(`FrequenciApp · ${retrato.hash.slice(0, 12)}`, LARGURA_A4 - MARGEM_LATERAL, 288, {
+    doc.setFontSize(6.5);
+    doc.text(`FrequenciApp · ${retrato.hash}`, LARGURA_A4 - MARGEM_LATERAL, 288, {
       align: "right",
     });
   }

@@ -41,6 +41,15 @@ const relatorio: RelatorioGrade = {
           justificativas: ["Doente"],
           referenciaAulas: "retrato",
         },
+        {
+          dia: "2026-09-03",
+          marca: "S",
+          aulasPrevistas: 3,
+          aulasFaltadas: 2,
+          aulasFaltadasRotulos: ["1ª aula · 07:00 às 07:50", "2ª aula · 07:50 às 08:40"],
+          justificativas: [],
+          referenciaAulas: "retrato",
+        },
       ],
     },
     {
@@ -73,5 +82,10 @@ describe("gerarRelatorioGradePdf", () => {
     const bytes = new Uint8Array(await blob.arrayBuffer());
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe("%PDF-");
     expect(bytes.byteLength).toBeGreaterThan(1000);
+    const texto = new TextDecoder("latin1").decode(bytes);
+    expect(texto).toContain("Aluno Ação");
+    expect(texto).toContain("2 de 3");
+    expect(texto).toContain(retrato.hash);
+    expect(texto).toContain("FrequenciApp");
   });
 });
