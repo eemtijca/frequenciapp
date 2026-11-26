@@ -202,7 +202,7 @@ test("agrupa duas turmas, filtra os registros e mantém os destinos legíveis no
   await expect(grupoA).toHaveCount(0);
   await expect(grupoB).toBeVisible();
   await page.screenshot({
-    path: `docs/imagens/locais/relatorio-movimentacoes-${info.project.name}.png`,
+    path: info.outputPath(`relatorio-movimentacoes-${info.project.name}.png`),
   });
 });
 
@@ -270,6 +270,8 @@ test("consulta dia, semana completa entre meses e período personalizado com fin
 test("oculta dados antigos na falha, permite tentar novamente e distingue o período vazio", async ({
   page,
 }) => {
+  // As respostas são interceptadas: este cenário cobre erro HTTP e recuperação online.
+  await page.addInitScript(() => Object.defineProperty(navigator, "onLine", { get: () => true }));
   const turmas = await turmasDoTeste(page);
   let estado: "dados" | "erro" | "vazio" = "dados";
   await page.route(ENDERECO, (rota) => {
@@ -286,7 +288,13 @@ test("oculta dados antigos na falha, permite tentar novamente e distingue o per�
   await expect(totais(painel)).toHaveCount(0);
   await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
   estado = "dados";
+  const resposta = page.waitForResponse(
+    (item) =>
+      item.request().method() === "GET" &&
+      new URL(item.url()).pathname === "/api/relatorios/movimentacoes",
+  );
   await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
+  expect((await resposta).status()).toBe(200);
   await expect(totais(painel)).toHaveText(["2", "1"]);
   await expect(painel.getByText("E2E Falha temporária do relatório.", { exact: true })).toHaveCount(
     0,
