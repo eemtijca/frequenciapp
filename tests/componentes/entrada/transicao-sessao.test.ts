@@ -159,6 +159,17 @@ it.each([
           await esperar(pagina.locator("html")).toHaveAttribute("data-primeiro-quadro", "completo");
           const esqueleto = pagina.locator("[data-primeiro-esqueleto]");
           await esperar(esqueleto).toBeVisible();
+          if (largura < 905) {
+            const faixa = esqueleto.locator('[aria-label="Navegação em carregamento"]');
+            await esperar(faixa).toHaveCSS("border-bottom-width", "0px");
+          }
+          await esperar(
+            pagina.getByRole("status").filter({ hasText: /^Entrando\.\.\.$/ }),
+          ).toHaveText("Entrando...");
+          await esperar(pagina.getByText("Entrando...", { exact: true })).toHaveCSS(
+            "clip-path",
+            "inset(50%)",
+          );
           await esperar(pagina.getByLabel("Senha", { exact: true })).toBeHidden();
           await esperar(pagina.getByRole("button", { name: "Sair da conta" })).toHaveCount(0);
           await esperar(toast).toHaveCount(0);
@@ -168,8 +179,12 @@ it.each([
           await esperar(toast).toHaveCount(0);
           await esperar(pagina.getByLabel("Senha", { exact: true })).toHaveCount(0);
           await esperar(
-            pagina.getByRole("status").filter({ hasText: "Abrindo o aplicativo..." }),
-          ).toBeVisible();
+            pagina.getByRole("status").filter({ hasText: /^Abrindo o aplicativo\.\.\.$/ }),
+          ).toHaveText("Abrindo o aplicativo...");
+          await esperar(pagina.getByText("Abrindo o aplicativo...", { exact: true })).toHaveCSS(
+            "clip-path",
+            "inset(50%)",
+          );
           await esperar(esqueleto).toBeVisible();
           await esperar(pagina.getByRole("dialog")).toHaveCount(0);
           await pagina.evaluate(() => window.dispatchEvent(new Event("fixture-painel")));
@@ -208,7 +223,12 @@ it("saída retira o painel após o POST, mesmo com o BI e a entrada retidos", as
       await sair.click({ clickCount: 2 });
       await esperar.poll(post.pedidos).toBe(1);
       await esperar(painel).toBeVisible();
-      await esperar(pagina.getByRole("status").filter({ hasText: "Saindo..." })).toBeVisible();
+      const saida = pagina.getByRole("status").filter({ hasText: "Saindo..." });
+      await esperar(saida.getByText("Saindo...", { exact: true })).toHaveCSS(
+        "clip-path",
+        "inset(50%)",
+      );
+      await esperar(sair.locator('[role="progressbar"]')).toBeVisible();
       await esperar(toast).toHaveCount(0);
       post.liberar();
       await esperar(pagina.locator("html")).toHaveAttribute("data-expurgo", "iniciado");
@@ -431,7 +451,10 @@ it("falha na revogação mantém o diretor operável e não inicia o expurgo", a
       await pagina.evaluate(() => localStorage.setItem("frequencibi:chave", "chave-sintetica"));
       const sair = pagina.getByRole("button", { name: "Sair da conta" });
       await sair.click();
-      await esperar(pagina.getByText("Saindo...", { exact: true })).toBeVisible();
+      await esperar(pagina.getByText("Saindo...", { exact: true })).toHaveCSS(
+        "clip-path",
+        "inset(50%)",
+      );
       post.liberar();
       await esperar(pagina.getByText(mensagem, { exact: true })).toBeVisible();
       await esperar(sair).toBeEnabled();
@@ -503,8 +526,12 @@ it.each([null, "diretor-teste"])("reconcilia saída incerta em modal (sessão: %
       await esperar.poll(() => leituras).toBe(2);
       await esperar(tentar).toBeDisabled();
       await tentar.press("Enter");
-      await esperar(modal.getByRole("status")).toHaveText(
-        "Verificando se a sessão foi encerrada...",
+      const espera = modal.getByRole("status");
+      await esperar(espera).toHaveText("Verificando se a sessão foi encerrada...");
+      await esperar(espera.locator('[role="progressbar"]')).toBeVisible();
+      await esperar(espera.getByText(/Verificando se a sessão/)).toHaveCSS(
+        "clip-path",
+        "inset(50%)",
       );
       await esperar(painel).toBeHidden();
       repetir.resolve();

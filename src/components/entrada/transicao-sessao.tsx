@@ -30,6 +30,10 @@ import {
 } from "@/components/ui/mui/avisos";
 import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import { EsqueletoAplicacao } from "./esqueleto-aplicacao";
+import {
+  IndicadorDeCarregamento,
+  TextoDeCarregamento,
+} from "@/components/ui/mui/texto-de-carregamento";
 
 const ATRASO_ESQUELETO_SAIDA = 200;
 const PRAZO_DESTINO = 10_000;
@@ -295,22 +299,26 @@ export function ProvedorTransicaoSessao({ children }: { children: ReactNode }) {
                 </Botao>
               }
             >
-              {repetindo ? <Box role="status">{mensagens.verificando}</Box> : null}
+              {repetindo ? <IndicadorDeCarregamento texto={mensagens.verificando} /> : null}
             </Dialogo>
-          ) : (
+          ) : falha ? (
             <Stack spacing={1} sx={{ px: { xs: 2, sm: 3 }, pt: 2, alignItems: "flex-start" }}>
               <Box role="status">{mensagens[etapa]}</Box>
-              {falha ? (
-                <Botao variante="contorno" onClick={() => void repetir()}>
-                  Tentar novamente
-                </Botao>
-              ) : null}
+              <Botao variante="contorno" onClick={() => void repetir()}>
+                Tentar novamente
+              </Botao>
               {podeReabrir ? (
                 <Botao variante="texto" onClick={() => window.location.reload()}>
                   Reabrir página
                 </Botao>
               ) : null}
             </Stack>
+          ) : esperandoEntrada || exibirEsqueleto ? (
+            <TextoDeCarregamento anunciar>{mensagens[etapa]}</TextoDeCarregamento>
+          ) : (
+            <Box sx={{ px: { xs: 2, sm: 3 }, pt: 2 }}>
+              <IndicadorDeCarregamento texto={mensagens[etapa]} />
+            </Box>
           )}
           {!falha && etapa !== "falha-sessao" && (esperandoEntrada || exibirEsqueleto) ? (
             esperandoEntrada || abrindoApp ? (

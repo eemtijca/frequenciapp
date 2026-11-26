@@ -6,6 +6,7 @@ import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import Box from "@mui/material/Box";
+import CircularProgress from "@mui/material/CircularProgress";
 import Grid from "@mui/material/Grid";
 import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
@@ -41,6 +42,7 @@ import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 import { GraficoEvolucao } from "@/components/graficos/graficos-sob-demanda";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
@@ -263,9 +265,8 @@ export default function ResumoRelatorios({
 
       {ocupado ? (
         <Box role="status" sx={{ py: 4, textAlign: "center" }}>
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Carregando resumo...
-          </Typography>
+          <CircularProgress size={18} aria-hidden="true" />
+          <TextoDeCarregamento>Carregando resumo...</TextoDeCarregamento>
         </Box>
       ) : erro ? (
         <AlertaCompacto variante="erro_interno" descricao={erro} tamanho="linha" />

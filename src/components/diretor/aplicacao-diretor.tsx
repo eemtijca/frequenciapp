@@ -29,6 +29,7 @@ import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import DialogoSobre from "@/components/dialogo-sobre";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
@@ -153,11 +154,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
               onClick={() => void sair()}
               sx={ALVO_ACAO}
             />
-            {saindo ? (
-              <Typography role="status" variant="caption">
-                Saindo...
-              </Typography>
-            ) : null}
+            {saindo ? <TextoDeCarregamento anunciar>Saindo...</TextoDeCarregamento> : null}
           </Stack>
         </Toolbar>
       </AppBar>

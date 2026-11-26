@@ -110,6 +110,7 @@ import {
   NiveisGaveta,
   type PassoGaveta,
 } from "@/components/layout/niveis-gaveta";
+import { IndicadorDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { LimiteLeituraDaVisao, QuadroDasVisoes } from "@/components/layout/quadro-das-visoes";
 
 export type Visao =
@@ -1544,9 +1545,9 @@ export default function Aplicacao({
           >
             <Toolbar />
             {saindo ? (
-              <Typography role="status" variant="body2" sx={{ px: 2, py: 0.5 }}>
-                Saindo...
-              </Typography>
+              <Box sx={{ px: 2 }}>
+                <IndicadorDeCarregamento texto="Saindo..." />
+              </Box>
             ) : null}
             {offline ? (
               <Alert

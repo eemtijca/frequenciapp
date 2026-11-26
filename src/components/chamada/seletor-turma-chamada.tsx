@@ -502,7 +502,11 @@ export function SeletorTurmaChamada({
                           type="button"
                           aria-label={opcao.rotulo}
                           aria-describedby={`${id}-turma-${opcao.id}`}
-                          title={`${opcao.rotulo}: ${ROTULOS[situacao]}`}
+                          title={
+                            situacao === "carregando"
+                              ? opcao.rotulo
+                              : `${opcao.rotulo}: ${ROTULOS[situacao]}`
+                          }
                           data-situacao={situacao}
                           aria-pressed={ativo}
                           disabled={travado}

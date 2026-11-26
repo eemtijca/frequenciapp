@@ -24,6 +24,7 @@ import { Botao } from "@/components/ui/mui/botao";
 import { Dialogo } from "@/components/ui/mui/dialogo";
 import { Interruptor } from "@/components/ui/mui/interruptor";
 import { Selo } from "@/components/ui/mui/selo";
+import { IndicadorDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { SeletorPlanilhaGoogle } from "./seletor-planilha-google";
 
 interface IntegracaoParcialAdmin {
@@ -238,9 +239,7 @@ export default function IntegracaoParcial({
               </Typography>
             </Stack>
             {carregando ? (
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Conferindo a integração...
-              </Typography>
+              <IndicadorDeCarregamento texto="Conferindo a integração..." />
             ) : integracao ? (
               <Abas<PainelParcial>
                 itens={[

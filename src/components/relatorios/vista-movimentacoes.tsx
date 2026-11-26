@@ -38,6 +38,7 @@ import { Cartao } from "@/components/ui/mui/cartao";
 import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { Selo } from "@/components/ui/mui/selo";
 
 type Modo = "dia" | "semana" | "periodo";
@@ -486,9 +487,7 @@ export default function VistaMovimentacoes({
           sx={{ alignItems: "center", justifyContent: "center", py: 4 }}
         >
           <CircularProgress size={18} aria-hidden="true" />
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Carregando saídas e entradas...
-          </Typography>
+          <TextoDeCarregamento>Carregando saídas e entradas...</TextoDeCarregamento>
         </Stack>
       ) : atual?.erro ? (
         <AlertaCompacto

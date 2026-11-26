@@ -17,7 +17,7 @@ import {
 import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
-import Typography from "@mui/material/Typography";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 
 type RegistrarLeitura = () => () => void;
@@ -128,15 +128,13 @@ function EsqueletoDaVisao({ rotulo }: { rotulo: string }) {
   const animacao = animacoesAtivas ? "pulse" : false;
 
   return (
-    <Stack role="status" spacing={2}>
-      <Typography component="p" variant="body2" color="text.secondary">
-        {rotulo}
-      </Typography>
+    <Box role="status">
+      <TextoDeCarregamento>{rotulo}</TextoDeCarregamento>
       <Stack aria-hidden="true" spacing={2}>
         <Skeleton animation={animacao} variant="text" width="40%" height={32} />
         <Skeleton animation={animacao} variant="rounded" height={48} />
         <Skeleton animation={animacao} variant="rounded" height={144} />
       </Stack>
-    </Stack>
+    </Box>
   );
 }

@@ -103,6 +103,7 @@ import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type { AlertaFrequenciaBeneficio } from "@/domain/beneficios-frequencia";
 import { AvisoBeneficioFrequencia } from "@/components/chamada/aviso-beneficio-frequencia";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 type FaseDaRevisao = "fechada" | "revisao" | "verificando" | "transicao" | "historica";
@@ -1367,7 +1368,13 @@ export default function VistaFrequencia({
           overflowWrap: "anywhere",
         }}
       >
-        {feriado ? "Feriado" : tituloEstado}
+        {feriado ? (
+          "Feriado"
+        ) : tituloEstado === "Carregando..." ? (
+          <TextoDeCarregamento>{tituloEstado}</TextoDeCarregamento>
+        ) : (
+          tituloEstado
+        )}
       </Typography>
       {sujo && (
         <BotaoIcone
@@ -2051,18 +2058,8 @@ export default function VistaFrequencia({
                   )}
 
                   {carregando ? (
-                    <Stack spacing={1} sx={{ minHeight: 160, p: 2 }}>
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        sx={{
-                          alignItems: "center",
-                          justifyContent: "center",
-                          color: "text.secondary",
-                        }}
-                      >
-                        <Typography variant="body2">Carregando chamada...</Typography>
-                      </Stack>
+                    <Stack role="status" spacing={1} sx={{ minHeight: 160, p: 2 }}>
+                      <TextoDeCarregamento>Carregando chamada...</TextoDeCarregamento>
                       {[0, 1, 2].map((linha) => (
                         <Skeleton
                           key={linha}

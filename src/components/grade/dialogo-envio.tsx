@@ -23,6 +23,7 @@ import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
 import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { Dialogo } from "@/components/ui/mui/dialogo";
 
 interface PlanoResumo {
@@ -456,9 +457,7 @@ export default function DialogoEnvio({
         {carregando ? (
           <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
             <CircularProgress size={16} aria-hidden="true" />
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Lendo a planilha e montando a prévia...
-            </Typography>
+            <TextoDeCarregamento>Lendo a planilha e montando a prévia...</TextoDeCarregamento>
           </Stack>
         ) : null}
 

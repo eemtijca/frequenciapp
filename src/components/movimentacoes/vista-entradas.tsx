@@ -43,6 +43,7 @@ import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo
 import { HistoricoDiarioMovimentacoes } from "@/components/movimentacoes/historico-diario-movimentacoes";
 import { useHistoricoDiario } from "@/components/movimentacoes/use-historico-movimentacoes";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { useMinutoCorrente } from "@/lib/use-relogio";
 
 interface Props {
@@ -85,7 +86,7 @@ function IndicadorCarregando({ texto }: { texto: string }) {
       sx={{ alignItems: "center", color: "text.secondary" }}
     >
       <CircularProgress size={16} aria-hidden="true" />
-      <Typography variant="body2">{texto}</Typography>
+      <TextoDeCarregamento>{texto}</TextoDeCarregamento>
     </Stack>
   );
 }

@@ -27,6 +27,7 @@ import {
   type TipoDeAviso,
   type PreferenciasNotificacoes,
 } from "@/domain/notificacoes";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
@@ -305,9 +306,7 @@ export default function DialogoNotificacoes({ aberto, onAbrir, onDevolverFoco }:
         {carregando ? (
           <Stack direction="row" spacing={1} role="status" sx={{ alignItems: "center" }}>
             <CircularProgress size={16} />
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Consultando notificações...
-            </Typography>
+            <TextoDeCarregamento>Consultando notificações...</TextoDeCarregamento>
           </Stack>
         ) : (
           <Stack spacing={2}>

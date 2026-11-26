@@ -6,6 +6,7 @@ import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import LaunchRoundedIcon from "@mui/icons-material/LaunchRounded";
 import Box from "@mui/material/Box";
 import Checkbox from "@mui/material/Checkbox";
+import CircularProgress from "@mui/material/CircularProgress";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
@@ -26,6 +27,7 @@ import { Botao } from "@/components/ui/mui/botao";
 import { Campo } from "@/components/ui/mui/campo";
 import { CampoSenha } from "@/components/ui/mui/campo-senha";
 import { Dialogo } from "@/components/ui/mui/dialogo";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 
 interface Catalogo {
@@ -271,9 +273,10 @@ export function DialogoMostrarMes({
       >
         <Stack spacing={2}>
           {!catalogo && ocupado ? (
-            <Typography role="status" variant="body2">
-              Carregando meses...
-            </Typography>
+            <Box role="status">
+              <CircularProgress size={16} aria-hidden="true" />
+              <TextoDeCarregamento>Carregando meses...</TextoDeCarregamento>
+            </Box>
           ) : null}
           {catalogo ? (
             <>

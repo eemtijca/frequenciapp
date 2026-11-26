@@ -23,7 +23,7 @@ export function EsqueletoAplicacao({ comNavegacao = false }: { comNavegacao?: bo
           width: { xs: comNavegacao ? "100%" : TOKENS_LAYOUT.gaveta, md: TOKENS_LAYOUT.gaveta },
           flexShrink: 0,
           borderRight: { xs: 0, md: 1 },
-          borderBottom: { xs: comNavegacao ? 1 : 0, md: 0 },
+
           borderColor: "divider",
         }}
       >

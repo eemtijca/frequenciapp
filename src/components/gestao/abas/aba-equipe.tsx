@@ -34,6 +34,7 @@ import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TabelaCadastrosAdministrativos } from "./tabela-cadastros-administrativos";
 
 interface Props {
@@ -196,7 +197,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
       >
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {usuarios === null
-            ? "Carregando..."
+            ? null
             : `${usuarios.filter((u) => u.papel === "COORDENACAO").length} coordenação · ${usuarios.filter((u) => u.papel === "ADMIN").length} administração`}
         </Typography>
         <Botao variante="principal" icone={<AddRoundedIcon />} onClick={abrirNovo}>
@@ -216,7 +217,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
           }}
         >
           <CircularProgress size={20} aria-hidden="true" />
-          <Typography variant="body2">Carregando contas...</Typography>
+          <TextoDeCarregamento>Carregando contas...</TextoDeCarregamento>
         </Stack>
       ) : (usuarios ?? []).length === 0 ? (
         <EstadoVazio

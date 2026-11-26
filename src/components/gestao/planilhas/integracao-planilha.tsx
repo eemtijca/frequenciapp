@@ -42,6 +42,7 @@ import { DialogoMostrarMes } from "./dialogo-mostrar-mes";
 import { DialogoPrepararMes } from "./dialogo-preparar-mes";
 import { OrganizarPlanilha } from "./dialogo-organizar-planilha";
 import { SeletorPlanilhaGoogle } from "./seletor-planilha-google";
+import { IndicadorDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import DialogoEnvio from "@/components/grade/dialogo-envio";
 
 interface Sugestao {
@@ -384,9 +385,7 @@ export default function IntegracaoPlanilha({
         <Typography component="h2" variant="subtitle1">
           Planilha de frequência
         </Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          Conferindo a integração...
-        </Typography>
+        <IndicadorDeCarregamento texto="Conferindo a integração..." />
       </Box>
     );
   }

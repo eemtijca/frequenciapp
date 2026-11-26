@@ -22,6 +22,7 @@ import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-es
 import { Botao } from "@/components/ui/mui/botao";
 import { Campo } from "@/components/ui/mui/campo";
 import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { Dialogo } from "@/components/ui/mui/dialogo";
 
 interface Props {
@@ -233,7 +234,7 @@ export default function ControleSincronizarFeriados({
           type="button"
           variante="primario"
           disabled={!podeSincronizar}
-          carregando={executando}
+          carregando={executando || (anoValido && carregando)}
           icone={<CloudDownloadRoundedIcon />}
           aria-describedby={ajudaId}
           onClick={() => void executar()}
@@ -280,7 +281,11 @@ export default function ControleSincronizarFeriados({
         ) : null}
       </Stack>
       <Typography id={ajudaId} variant="caption" sx={{ color: "text.secondary" }}>
-        {ajuda}
+        {anoValido && carregando ? (
+          <TextoDeCarregamento anunciar>{ajuda}</TextoDeCarregamento>
+        ) : (
+          ajuda
+        )}
       </Typography>
       {erro ? (
         <AlertaCompacto

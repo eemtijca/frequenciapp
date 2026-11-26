@@ -71,6 +71,7 @@ import {
   edicaoDoRegistro,
   type EdicaoParcial,
 } from "./dialogo-frequencia-parcial";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { DialogoEnviarParciais } from "./dialogo-enviar-parciais";
 
 interface Props {
@@ -1015,7 +1016,7 @@ export default function VistaFrequenciaParcial({
               }}
             >
               <CircularProgress size={18} aria-hidden="true" />
-              <Typography variant="body2">Carregando chamada parcial...</Typography>
+              <TextoDeCarregamento>Carregando chamada parcial...</TextoDeCarregamento>
             </Paper>
           ) : alunosFiltrados.length === 0 ? (
             <Paper variant="outlined" sx={{ px: 3, py: 4, textAlign: "center" }}>

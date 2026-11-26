@@ -84,7 +84,7 @@ export function HistoricoDiarioMovimentacoes({
           role="status"
           aria-live="polite"
           aria-atomic="true"
-          sx={carregando ? { color: "text.secondary", mb: 1 } : ESTILO_LEITOR}
+          sx={ESTILO_LEITOR}
         >
           {carregando ? textoCarregando : leituraConcluida ? `${titulo}: ${rotuloTotal}.` : ""}
         </Typography>

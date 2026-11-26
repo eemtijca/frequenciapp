@@ -43,6 +43,7 @@ import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { Rotulo } from "@/components/ui/mui/rotulo";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 
 interface Props {
@@ -452,9 +453,7 @@ export default function VistaGrade({
                 sx={{ alignItems: "center", justifyContent: "center", minHeight: 160 }}
               >
                 <CircularProgress size={18} aria-hidden="true" />
-                <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                  Buscando o período...
-                </Typography>
+                <TextoDeCarregamento>Buscando o período...</TextoDeCarregamento>
               </Stack>
             ) : linhas.length === 0 ? (
               <Box sx={{ py: 5, textAlign: "center" }}>

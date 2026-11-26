@@ -204,6 +204,138 @@ it("considera a data da comparação enquanto ela estiver visível", async () =>
   }
 });
 
+it("mostra indicador de comparação e explica uma pausa por limite de consultas", async () => {
+  const page = await abrir(false, "UTC", {
+    antesDaNavegacao: async (pagina) => {
+      await pagina.addInitScript(() => {
+        // O HTTP também é simulado: o caso não depende do sinal de rede do executor.
+        Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
+      });
+    },
+  });
+  const resposta = Promise.withResolvers<void>();
+  try {
+    await expectUi(
+      page.getByText("Atualizado em 09/10/2026 às 12:00", { exact: true }),
+    ).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.clock.install();
+    await page.evaluate(() => {
+      const fetchOriginal = window.fetch.bind(window);
+      document.documentElement.dataset.consultasBi = "0";
+      window.fetch = (entrada, init) => {
+        const url = new URL(entrada instanceof Request ? entrada.url : entrada, location.href);
+        if (url.origin === location.origin && url.pathname === "/api/bi") {
+          const { dataset } = document.documentElement;
+          dataset.consultasBi = String(Number(dataset.consultasBi) + 1);
+        }
+        return fetchOriginal(entrada, init);
+      };
+    });
+    let consultas = 0;
+    await page.route("**/api/bi?*", async (rota) => {
+      consultas++;
+      await resposta.promise;
+      await rota.fulfill({ status: 429, json: { error: "Limite no teste" } });
+    });
+    await page.getByRole("combobox", { name: "Comparar infrequência" }).click();
+    await page.getByRole("option", { name: "Período anterior" }).click();
+    const espera = page.getByRole("status").filter({ hasText: "Preparando comparação..." });
+    await expectUi(espera.locator('[role="progressbar"]')).toBeVisible();
+    await expectUi(espera.getByText("Preparando comparação...", { exact: true })).toHaveCSS(
+      "clip-path",
+      "inset(50%)",
+    );
+    resposta.resolve();
+    const pausa = page.getByText(/Pausa de um minuto para respeitar o limite de consultas/);
+    await expectUi(pausa).toBeVisible();
+    expect(consultas).toBe(1);
+    await page.getByRole("combobox", { name: "Comparar infrequência" }).click();
+    await page.getByRole("option", { name: "Sem comparação" }).click();
+    await expectUi.soft(pausa).toHaveCount(0, { timeout: 1500 });
+    await page.clock.fastForward(61_000);
+    await expectUi(page.getByRole("combobox", { name: "Comparar infrequência" })).toHaveText(
+      "Sem comparação",
+    );
+    await expectUi(page.locator("html")).toHaveAttribute("data-consultas-bi", "1");
+    expect(consultas).toBe(1);
+  } finally {
+    resposta.resolve();
+    await page.close();
+  }
+});
+
+it("atualiza a comparação mesmo quando o período principal termina primeiro", async () => {
+  const page = await abrir(false, "UTC", {
+    antesDaNavegacao: async (pagina) => {
+      await pagina.addInitScript(() => {
+        Object.defineProperty(navigator, "onLine", { configurable: true, get: () => true });
+      });
+    },
+  });
+  const renovarComparacao = Promise.withResolvers<void>();
+  const liberarComparacao = Promise.withResolvers<void>();
+  let inicioAnterior: string | null = null;
+  let atualizando = false;
+  let consultasComparacao = 0;
+  try {
+    await expectUi(
+      page.getByText("Atualizado em 09/10/2026 às 12:00", { exact: true }),
+    ).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.route("**/api/bi?*", async (rota) => {
+      const p = new URL(rota.request().url()).searchParams;
+      const recurso = p.get("recurso");
+      if (!atualizando) inicioAnterior = p.get("inicio");
+      const comparada = recurso === "chamadas" && p.get("inicio") === inicioAnterior;
+      if (comparada) consultasComparacao++;
+      if (comparada && atualizando) {
+        renovarComparacao.resolve();
+        await liberarComparacao.promise;
+      }
+      await rota.fulfill({
+        json: {
+          recurso,
+          linhas: [],
+          pagina: 1,
+          proximaPagina: null,
+          consultadoEm: !atualizando
+            ? "2026-10-08T12:00:00Z"
+            : comparada
+              ? "2026-10-10T12:00:00Z"
+              : "2026-10-11T12:00:00Z",
+          escopo: {},
+          recursos: RECURSOS_BI,
+        },
+      });
+    });
+    const seletor = page.getByRole("combobox", { name: "Comparar infrequência" });
+    await seletor.click();
+    await page.getByRole("option", { name: "Período anterior" }).click();
+    await expectUi(
+      page.getByText("Atualizado em 08/10/2026 às 12:00", { exact: true }),
+    ).toBeVisible();
+    expect(inicioAnterior).not.toBeNull();
+    expect(consultasComparacao).toBe(1);
+    atualizando = true;
+    await page.getByRole("button", { name: "Atualizar dados", exact: true }).click();
+    await renovarComparacao.promise;
+    // O seletor reaparece só quando a leitura principal termina.
+    await expectUi(seletor).toBeVisible();
+    await expectUi(page.getByText("Preparando comparação...", { exact: true })).toHaveCount(1);
+    liberarComparacao.resolve();
+    await expectUi(
+      page.getByText("Atualizado em 10/10/2026 às 12:00", { exact: true }),
+    ).toBeVisible();
+    expect(consultasComparacao).toBe(2);
+  } finally {
+    liberarComparacao.resolve();
+    await page.close();
+  }
+});
+
 it("não atribui horário confiável a cache antigo sem datas de todas as páginas", async () => {
   const page = await abrir();
   try {

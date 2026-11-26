@@ -44,6 +44,7 @@ import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TabelaCadastrosAdministrativos } from "./tabela-cadastros-administrativos";
 
 interface Props {
@@ -289,7 +290,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
       >
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {diretores === null
-            ? "Carregando..."
+            ? null
             : `${diretores.filter((diretor) => diretor.ativo).length} ${
                 diretores.filter((diretor) => diretor.ativo).length === 1
                   ? "diretor ativo"
@@ -313,7 +314,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
           }}
         >
           <CircularProgress size={20} aria-hidden="true" />
-          <Typography variant="body2">Carregando diretores...</Typography>
+          <TextoDeCarregamento>Carregando diretores...</TextoDeCarregamento>
         </Stack>
       ) : (diretores ?? []).length === 0 ? (
         <EstadoVazio

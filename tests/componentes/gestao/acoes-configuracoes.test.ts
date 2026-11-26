@@ -829,6 +829,11 @@ it.each([
       const titulo = conteudo.getByRole("heading", { name: "Planilhas", exact: true });
       const cartao = conteudo.getByRole("button", { name: new RegExp(nome) });
       await verificarTela(espera).toBeVisible({ timeout: 1500 });
+      await verificarTela(espera.getByText("Carregando a tela...", { exact: true })).toHaveCSS(
+        "clip-path",
+        "inset(50%)",
+      );
+      await verificarTela(espera.locator('[aria-hidden="true"] > span').first()).toBeVisible();
       await verificarTela(cartao).toHaveCount(0);
       await verificarTela(gatilhoGaveta(page)).toBeEnabled();
 
@@ -1429,11 +1434,18 @@ it("a saída do shell mantém a tela durante a API e a oculta assim que a sessã
     await page.getByRole("menuitem", { name: "Sair da conta", exact: true }).click();
     await verificarTela.poll(() => pedidos).toBe(1);
     const estadoSaida = painel.getByRole("status").filter({ hasText: /^Saindo\.\.\.$/ });
-    await verificarTela(estadoSaida).toBeVisible();
+    await verificarTela(estadoSaida.getByText("Saindo...", { exact: true })).toHaveCSS(
+      "clip-path",
+      "inset(50%)",
+    );
+    await verificarTela(estadoSaida.locator('[role="progressbar"]')).toBeVisible();
     await verificarTela(painel).toBeVisible();
     liberarSaida();
     await verificarTela(painel).not.toBeAttached();
-    await verificarTela(page.getByText("Abrindo a entrada...", { exact: true })).toBeVisible();
+    await verificarTela(page.getByText("Abrindo a entrada...", { exact: true })).toHaveCSS(
+      "clip-path",
+      "inset(50%)",
+    );
     await verificarTela(page.getByText("Sessão encerrada.", { exact: true })).toHaveCount(0);
     expect(pedidos).toBe(1);
   } finally {
@@ -1494,7 +1506,10 @@ it("confirmar a mesma sessão depois de falhar a saída preserva o rascunho de C
     await revisar.click();
     await verificarTela(revisao).toContainText("Justificativas");
     saida.resolve();
-    await verificarTela(page.getByText("Verificando se a sessão foi encerrada...")).toBeVisible();
+    await verificarTela(page.getByText("Verificando se a sessão foi encerrada...")).toHaveCSS(
+      "clip-path",
+      "inset(50%)",
+    );
     await verificarTela(rascunho).toBeHidden();
     await verificarTela(revisar).toBeHidden();
     await verificarTela(portal).toBeHidden();

@@ -359,7 +359,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
                 fullWidth
                 sx={{ mt: 0.5, height: TOKENS_LAYOUT.alvoToque }}
               >
-                {enviando ? "Entrando..." : "Entrar"}
+                Entrar
               </Botao>
             </Box>
 

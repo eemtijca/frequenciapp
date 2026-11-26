@@ -22,6 +22,7 @@ import { Botao } from "@/components/ui/mui/botao";
 import { Dialogo } from "@/components/ui/mui/dialogo";
 import { Selo } from "@/components/ui/mui/selo";
 import { diasDoMes, rotuloMes } from "@/domain/frequencia";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
 interface ResumoEnvioSaidas {
@@ -98,7 +99,7 @@ function IndicadorLeitura() {
       sx={{ alignItems: "center", color: "text.secondary" }}
     >
       <CircularProgress size={16} aria-hidden="true" />
-      <Typography variant="body2">Lendo a planilha e montando a prévia...</Typography>
+      <TextoDeCarregamento>Lendo a planilha e montando a prévia...</TextoDeCarregamento>
     </Stack>
   );
 }

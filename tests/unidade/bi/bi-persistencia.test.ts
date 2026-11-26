@@ -20,9 +20,10 @@ const h = vi.hoisted(() => ({
 vi.mock("react", () => ({
   useState: (inicial: unknown) => {
     const i = h.estados.length;
-    h.estados.push(inicial);
+    const valor = typeof inicial === "function" ? inicial() : inicial;
+    h.estados.push(valor);
     return [
-      inicial,
+      valor,
       (v: unknown) => {
         h.estados[i] = typeof v === "function" ? v(h.estados[i]) : v;
       },
@@ -155,7 +156,7 @@ describe("contratos já existentes de acesso do BI", () => {
     const fonte = useDadosBi();
     await fonte.entrar("atual", true);
     expect(h.estados[0]).toMatchObject({ chave: "atual", pagina });
-    expect(h.estados[6]).toBe(true);
+    expect(h.estados[7]).toBe(true);
   });
   it("redução de escopo apaga os retratos anteriores da mesma chave", async () => {
     h.guardados.set("id-atual:acesso", pagina);
@@ -181,7 +182,7 @@ describe("reconexão automática", () => {
     const retratosAntes = h.estados[1];
     h.rede.mockRejectedValueOnce(new ErroApi("Muitas consultas. Aguarde um minuto.", 429));
     janela.dispatchEvent(new Event("online"));
-    await vi.waitFor(() => expect(h.estados[4]).toBe("Muitas consultas. Aguarde um minuto."));
+    await vi.waitFor(() => expect(h.estados[5]).toBe("Muitas consultas. Aguarde um minuto."));
     expect(h.estados[0]).toBe(acessoAntes);
     expect(h.estados[1]).toBe(retratosAntes);
     expect(h.estados[1]).toEqual({ turmas: retrato });
@@ -394,7 +395,7 @@ describe("esquecimento do BI", () => {
     await fonte.esquecer();
     expect(h.guardados.size).toBe(0);
     expect(h.estados[0]).toBeNull();
-    expect(h.estados[5]).toContain("armazenamento");
+    expect(h.estados[6]).toContain("armazenamento");
   });
   it("401 antigo não apaga acesso mais recente", async () => {
     const pausa = promessa<typeof pagina>();
@@ -568,7 +569,7 @@ describe("expurgo concorrente por chave no cache real", () => {
       h.rede.mockRejectedValueOnce(new ErroApi("Entrada recusada", 400));
       await fonte.entrar("chave-b", true);
       expect(h.estados[0]).toBeNull();
-      expect(h.estados[4]).toBe("Entrada recusada");
+      expect(h.estados[5]).toBe("Entrada recusada");
       expect(cache.dados.size).toBe(2);
       pausa.liberar();
       await expurgo;
@@ -578,7 +579,7 @@ describe("expurgo concorrente por chave no cache real", () => {
       expect(h.estados[0]).toBeNull();
       expect(h.estados[1]).toEqual({});
       expect(h.estados[2]).toBe(false);
-      expect(h.estados[4]).toBe("Entrada recusada");
+      expect(h.estados[5]).toBe("Entrada recusada");
     } finally {
       pausa.liberar();
       await expurgo;
@@ -631,7 +632,7 @@ describe("expurgo concorrente por chave no cache real", () => {
           expect(cache.local.has("frequencibi:chave")).toBe(false);
           expect(h.estados[0]).toBeNull();
           expect(h.estados[1]).toEqual({});
-          expect(h.estados[4]).toBe("Reentrada recusada");
+          expect(h.estados[5]).toBe("Reentrada recusada");
         }
       } finally {
         pausa.liberar();
