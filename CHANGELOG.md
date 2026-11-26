@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A gaveta da administração deixa de mostrar Alunos, que já existe como cadastro dentro de Gestão; a coordenação mantém a consulta. Um link antigo com `visao=alunos` aberto pela administração leva ao cadastro de Alunos na Gestão.
+
 - Abrir Gestão, Relatórios ou Configurações e voltar de nível atualiza apenas a gaveta. Ao escolher outro destino, a gaveta móvel fecha sem esperar, a de desktop continua operável e o esqueleto aparece imediatamente no conteúdo enquanto a nova visão é preparada.
 - A entrada exibe esqueleto da navegação e do conteúdo assim que o formulário válido é enviado. Se não for possível confirmar o encerramento, um diálogo oferece nova consulta; o painel e o rascunho só voltam se a mesma sessão continuar válida.
 - As telas mantêm apenas os indicadores visuais durante o carregamento. As descrições continuam disponíveis a leitores de tela, e o esqueleto da entrada não tem divisor horizontal entre as duas regiões no celular.
@@ -169,7 +171,9 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
-- A gaveta ganha o botão Provas para a administração e a coordenação registrarem a frequência em provas como o Enem e vestibulares. A equipe define o nome, o local opcional e a data (passada ou no domingo), escolhe os alunos por turma e marca Presente ou Ausente por aluno, com a contagem na lista. Novas rotas `GET` e `POST /api/provas`, `GET`, `PATCH` e `DELETE /api/provas/{id}`, `PUT /api/provas/{id}/participantes` e `PUT /api/provas/{id}/frequencia`, e as tabelas `provas_especificas` e `participantes_prova` ([ADR-084](docs/adr/084-provas-especificas.md)).
+- Relatórios, Grade: as colunas do período mostram F, FJ e S por aluno, a célula de presença parcial informa as aulas faltadas e a linha do aluno abre o detalhamento com datas, aulas e justificativas. O novo relatório em PDF reúne o resumo e o detalhamento das faltas da turma de origem até hoje, com retrato consistente do banco, hash completo no rodapé, download protegido e registro de auditoria com o hash do retrato.
+
+- A gaveta ganha o botão Provas para a administração e a coordenação registrarem a frequência em provas como o Enem e vestibulares. A equipe define o nome, o local opcional e a data (passada ou no domingo), escolhe os alunos por turma e marca Presente ou Ausente por aluno, com a contagem na lista. Novas rotas `GET` e `POST /api/provas`, `GET`, `PATCH` e `DELETE /api/provas/{id}`, `PUT /api/provas/{id}/participantes` e `PUT /api/provas/{id}/frequencia`, e as tabelas `provas_especificas` e `participantes_prova` ([ADR-085](docs/adr/085-provas-especificas.md)).
 
 - A página pública `/privacidade` descreve o tratamento de dados da EEMTI José Cláudio de Araújo, inclusive o escopo `drive.file` da integração Google, e abre sem sessão. `/politica-de-privacidade` redireciona para ela. A entrada e o diálogo Sobre apontam para a página.
 

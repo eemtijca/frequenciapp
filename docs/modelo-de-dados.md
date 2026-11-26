@@ -157,7 +157,7 @@ O horário de provas é temporário. A administração cadastra a mesma prova pa
 | criadoEm     | data     |                                                              |
 | atualizadoEm | data     |                                                              |
 
-Só aluno ativo e sem desistência entra na prova; quem já está inscrito continua se depois for desativado. A frequência da prova é independente da Chamada e das planilhas, e as provas específicas não entram na cópia JSON ([ADR-084](adr/084-provas-especificas.md)).
+Só aluno ativo e sem desistência entra na prova; quem já está inscrito continua se depois for desativado. A frequência da prova é independente da Chamada e das planilhas, e as provas específicas não entram na cópia JSON ([ADR-085](adr/085-provas-especificas.md)).
 
 ## Frequência (frequencia)
 
@@ -321,7 +321,7 @@ A implementação pura está em `src/domain/frequencia.ts` e é compartilhada pe
 
 ## Grade por turma de origem
 
-A consulta de grade monta linhas com os alunos ativos da turma de origem escolhida, ordenados pela ordem de apresentação, e colunas com os dias do período: um dia, uma semana de aula (segunda a sexta), um período personalizado ou o mês, com limite de 366 dias. Cada linha carrega o total de dias com falta, com falta justificada, com presença parcial e com frequência, além do acumulado de F + FJ de todo o histórico. A primeira coluna fica fixa durante a rolagem horizontal. Uma saída antecipada no dia fica registrada no relatório por aluno e nas estatísticas da área de saídas, sem alterar a marca.
+A consulta de grade monta linhas com os alunos ativos da turma de origem escolhida, ordenados pela ordem de apresentação, e colunas com os dias do período: um dia, uma semana de aula (segunda a sexta), um período personalizado ou o mês, com limite de 366 dias. Cada linha carrega o total de dias com falta, com falta justificada, com presença parcial e com frequência, além do acumulado de F + FJ de todo o histórico. A tela mostra esses totais do período, a proporção de aulas faltadas na célula S e o detalhamento expansível por aluno. O relatório em PDF usa o mesmo modelo, lido em uma única transação RepeatableRead, com instante e hash do retrato. A primeira coluna fica fixa durante a rolagem horizontal. Uma saída antecipada no dia fica registrada no relatório por aluno e nas estatísticas da área de saídas, sem alterar a marca. O modelo `FaltaAluno` colapsa múltiplos códigos de justificativa do mesmo aluno e dia; o retrato do servidor lê as linhas cruas de `faltas` para o PDF não perder esses códigos.
 
 ## Entrada atrasada (entrada_atrasada)
 

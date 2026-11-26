@@ -274,7 +274,7 @@ Excluir uma turma remove as provas dela. As provas são temporárias e não entr
 
 ## Provas
 
-Provas específicas, como o Enem e vestibulares. Todas as rotas exigem sessão com a capacidade de operação (administração e coordenação); as escritas pedem origem confiável e geram auditoria. Ver [ADR-084](adr/084-provas-especificas.md).
+Provas específicas, como o Enem e vestibulares. Todas as rotas exigem sessão com a capacidade de operação (administração e coordenação); as escritas pedem origem confiável e geram auditoria. Ver [ADR-085](adr/085-provas-especificas.md).
 
 ### GET /api/provas
 
@@ -628,6 +628,14 @@ Exige capacidade `operar` (administração ou coordenação). Consulta somente o
 Retorna `{ de, ate, totais: { saidas, entradas, total }, turmas }`. Cada grupo traz `turmaId`, `turmaRotulo`, `saidas`, `entradas`, `total` e `movimentacoes`. Cada movimentação traz `id`, `tipo` (`SAIDA` ou `ENTRADA`), `alunoId`, `alunoNome`, `dia`, `horario`, `momento`, `motivo` e `responsavel`; horário, momento e responsável podem ser nulos. Motivos incluem complementos e os rótulos dos catálogos, mesmo desativados. Entradas usam o responsável pelo registro, com fallback para a autoria legada; saídas usam o nome do liberador, com fallback para o usuário que liberou.
 
 Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pela turma histórica gravada no registro. O agrupamento considera o identificador e o rótulo da turma para preservar renomeações históricas. Inclui alunos inativos e registros sem chamada no dia. Grupos seguem a ordem natural do rótulo; registros seguem data, horário (ausentes por último), nome, tipo e identificador. Sem registros, retorna totais zerados e `turmas: []`. Parâmetros inválidos retornam 400; sem sessão, 401; diretor de turma, 403.
+
+### GET /api/relatorios/grade/retrato?turmaOriginalId=uuid&de=YYYY-MM-DD&ate=YYYY-MM-DD
+
+Exige capacidade `operar` (administração ou coordenação). Lê alunos, frequências, faltas, aulas, justificativas e o resumo histórico em uma única transação `RepeatableRead`, sem escrever registros. `de` e `ate` são obrigatórios, inclusivos e aceitam fins de semana; o período tem no máximo 366 dias e pode terminar no último dia do mês corrente, mesmo com dias futuros sem registro. O resumo histórico usa o dia corrente do fuso da aplicação.
+
+Retorna `{ versao, retrato: { em, emTexto, fuso, hash }, relatorio }`. O `relatorio` traz `turmaOriginalId`, `turmaOriginal`, `de`, `ate`, `dias`, `alunos` e `totais`. Cada aluno traz `alunoId`, `nome`, `turmaAtual`, `desistente`, `faltas`, `justificadas`, `parciais`, `diasComRegistro`, `totalHistorico` e `ocorrencias`. Cada ocorrência traz `dia`, `marca` (`F`, `FJ` ou `S`), `aulasPrevistas`, `aulasFaltadas`, `aulasFaltadasRotulos`, `justificativas` e `referenciaAulas` (`retrato`, `grade_atual` ou `indisponivel`).
+
+O hash é SHA-256 do modelo, sem o instante do retrato, e serve como recibo na auditoria do download. Parâmetros inválidos retornam 400; sem sessão, 401; diretor de turma, 403; turma inexistente, 404. A resposta usa `Cache-Control: no-store` e não grava auditoria nem qualquer linha.
 
 ## Configurações
 
@@ -1093,11 +1101,11 @@ Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 
 ### POST /api/exportacoes/registro
 
-Corpo estrito: `{ "tipo": "grade" | "relacao", "formato": "original" | "zip" }`.
+Corpo estrito: `{ "tipo": "grade" | "relacao" | "relatorio", "formato": "original" | "zip", "retrato"?: string }`.
 
-- 200 `{"ok": true}` após registrar `download.preparar` com alvo do tipo `grade:zip`, conta e data. O registro indica preparação, sem comprovar que o navegador salvou o arquivo. Não recebe nomes, conteúdo nem senhas.
-- Grade disponível à administração e coordenação; relação restrita à administração. Diretores não têm acesso. Exige sessão e origem válida, com 400 para corpo inválido e 403 para escopo não permitido.
-- A interface registra depois de preparar o CSV ou ZIP e antes de iniciar o download. Falha no registro permite tentar novamente e não inicia download.
+- 200 `{"ok": true}` após registrar `download.preparar` com alvo do tipo `grade:zip`, conta e data. No relatório, o alvo inclui o hash do retrato (`relatorio:zip:<hash>`) e o campo `retrato` é obrigatório; nos demais tipos, é proibido. O registro indica preparação, sem comprovar que o navegador salvou o arquivo. Não recebe nomes, conteúdo nem senhas.
+- Grade e relatório da Grade disponíveis à administração e coordenação; relação restrita à administração. Diretores não têm acesso. Exige sessão e origem válida, com 400 para corpo inválido e 403 para escopo não permitido.
+- A interface registra depois de preparar o CSV, PDF ou ZIP e antes de iniciar o download. Falha no registro permite tentar novamente e não inicia download.
 
 ## Saúde
 

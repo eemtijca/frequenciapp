@@ -57,9 +57,11 @@ Ações administrativas (criar, atualizar e excluir entidades escolares, gerenci
 
 ## Exportações
 
-Grade, relação e cópia oferecem ZIP AES-256 com senha confirmada, gerado no navegador. A senha do ZIP não é transmitida nem persistida, e o app nunca baixa o formato original como alternativa automática a uma falha de criptografia. Nomes do ZIP são genéricos, sem turma ou aluno. O formato original permanece uma escolha explícita.
+Grade, relação, PDF da Grade e cópia oferecem ZIP AES-256 com senha confirmada, gerado no navegador. A senha do ZIP não é transmitida nem persistida, e o app nunca baixa o formato original como alternativa automática a uma falha de criptografia. Nomes do ZIP são genéricos, sem turma ou aluno. O formato original permanece uma escolha explícita.
 
-A cópia completa exige novamente a senha atual da administração por `POST /api/backup/exportar`, com CSRF, corpo estrito e até cinco tentativas em 15 minutos por conta. O antigo GET não exporta dados. CSV registra preparação com conta, tipo e formato, sem conteúdo nem senha. O registro indica preparação, não confirmação de salvamento pelo navegador. Detalhes em [downloads.md](downloads.md) e [ADR-031](adr/031-downloads-protegidos.md).
+O PDF da Grade cobre o período exibido até hoje e é desenhado no navegador a partir de um retrato JSON do servidor. O retrato lê turma, horários, alunos, frequências, faltas, aulas, justificativas e o resumo histórico em uma única transação `RepeatableRead`, com `SELECT now()` no mesmo `tx`; a transação é somente de leitura e não bloqueia gravadores. O servidor não desenha PDF, não devolve PDF em base64 e não recebe a senha do ZIP.
+
+A cópia completa exige novamente a senha atual da administração por `POST /api/backup/exportar`, com CSRF, corpo estrito e até cinco tentativas em 15 minutos por conta. O antigo GET não exporta dados. CSV e PDF da Grade registram `download.preparar` com conta, tipo, formato e, no relatório, o hash do retrato, sem nomes de alunos, conteúdo ou senha. O registro indica preparação, não confirmação de salvamento pelo navegador. Detalhes em [downloads.md](downloads.md) e [ADR-031](adr/031-downloads-protegidos.md).
 
 ## Entrada e erros
 

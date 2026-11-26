@@ -223,10 +223,8 @@ const ITEM_CHAMADA_PARCIAL: ItemNav = {
   icone: AssignmentRoundedIcon,
 };
 
-const ITENS_FIM: ItemNav[] = [
-  { visao: "alunos", rotulo: "Alunos", icone: PeopleRoundedIcon },
-  { visao: "gestao", rotulo: "Gestão", icone: SettingsRoundedIcon },
-];
+const ITEM_ALUNOS: ItemNav = { visao: "alunos", rotulo: "Alunos", icone: PeopleRoundedIcon };
+const ITEM_GESTAO: ItemNav = { visao: "gestao", rotulo: "Gestão", icone: SettingsRoundedIcon };
 
 function ListaGaveta({
   estado,
@@ -606,7 +604,10 @@ export default function Aplicacao({
   const referenciaSessao = useReferenciaDaSessao();
   const ehAdmin = temCapacidade(usuario.papel, "administrar");
   const podeOperar = temCapacidade(usuario.papel, "operar");
-  const pedida = visaoValida(visaoInicial);
+  // Para a administração, um link antigo para Alunos abre o cadastro na Gestão.
+  const visaoPedida = visaoValida(visaoInicial);
+  const alunosPelaGestao = ehAdmin && visaoPedida === "alunos";
+  const pedida = alunosPelaGestao ? "gestao" : visaoPedida;
   const inicial =
     pedida &&
     (pedida !== "gestao" || ehAdmin) &&
@@ -616,7 +617,7 @@ export default function Aplicacao({
       ? pedida
       : "painel";
   const [visao, setVisao] = useState<Visao>(inicial);
-  const [cadastro, setCadastro] = useState<CadastroGestao>("series");
+  const [cadastro, setCadastro] = useState<CadastroGestao>(alunosPelaGestao ? "alunos" : "series");
   const [emConfiguracoes, setEmConfiguracoes] = useState(
     Boolean(abaGestaoInicial || planilhaInicial),
   );
@@ -732,23 +733,16 @@ export default function Aplicacao({
     else if (destino === "dialogo") tentarFocarVisaoAtiva();
   }
 
-  const itemFinal = useMemo(
-    () => ITENS_FIM.find((item) => item.visao === (ehAdmin ? "gestao" : "alunos")),
-    [ehAdmin],
-  );
   const itens = useMemo<ItemNav[]>(() => {
     const lista = [...ITENS_INICIAIS];
     if (podeOperar) lista.splice(2, 0, ITEM_CHAMADA_PARCIAL);
     if (configuracoes.saidaAntecipada) lista.push(ITEM_SAIDAS);
     lista.push(ITEM_RELATORIOS);
     if (podeOperar) lista.push(ITEM_PROVAS);
-    if (ehAdmin) {
-      for (const item of ITENS_FIM) lista.push(item);
-    } else if (itemFinal) {
-      lista.push(itemFinal);
-    }
+    // A administração cadastra e consulta alunos dentro da Gestão; a consulta avulsa é da coordenação.
+    lista.push(ehAdmin ? ITEM_GESTAO : ITEM_ALUNOS);
     return lista;
-  }, [configuracoes.saidaAntecipada, ehAdmin, itemFinal, podeOperar]);
+  }, [configuracoes.saidaAntecipada, ehAdmin, podeOperar]);
   const indiceAtivo = itens.findIndex((item) => item.visao === visao);
   const tituloAtual = itens.find((item) => item.visao === visao)?.rotulo ?? "FrequenciApp";
 
@@ -1141,6 +1135,7 @@ export default function Aplicacao({
             frequencias={frequencias}
             saidas={saidas}
             resumo={resumo}
+            justificativas={justificativas}
             versao={versaoFrequencias}
             bloqueado={pendencias.includes("chamada")}
             rotuloTurma={rotuloTurma}
@@ -1152,7 +1147,7 @@ export default function Aplicacao({
         {alvoVisao === "provas" && podeOperar && (
           <VistaProvas alunos={alunos} turmas={turmas} diaCorrente={diaCorrente} fuso={fuso} />
         )}
-        {alvoVisao === "alunos" && (
+        {alvoVisao === "alunos" && !ehAdmin && (
           <VistaAlunos
             alunos={alunos}
             turmas={turmas}

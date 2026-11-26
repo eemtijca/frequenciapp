@@ -4617,6 +4617,72 @@
         }
       }
     },
+    "/api/relatorios/grade/retrato": {
+      "get": {
+        "operationId": "obterRetratoGrade",
+        "summary": "Consultar o retrato consistente da Grade",
+        "description": "Exige capacidade operar. Lê alunos, frequências, justificativas e histórico em uma única transação RepeatableRead, sem escrever. O período pode terminar no último dia do mês corrente e tem limite de 366 dias.",
+        "tags": ["relatorios"],
+        "parameters": [
+          {
+            "name": "turmaOriginalId",
+            "in": "query",
+            "description": "Turma de origem da Grade.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "de",
+            "in": "query",
+            "description": "Início do período inclusivo.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-11-01"
+          },
+          {
+            "name": "ate",
+            "in": "query",
+            "description": "Fim do período inclusivo, até o último dia do mês corrente.",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            },
+            "example": "2026-11-30"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Retrato imutável para o relatório em PDF, sem cache.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RetratoGrade"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          }
+        }
+      }
+    },
     "/api/configuracoes": {
       "get": {
         "operationId": "obterConfiguracoes",
@@ -16239,6 +16305,177 @@
           }
         }
       },
+      "RetratoGrade": {
+        "type": "object",
+        "title": "Retrato da Grade",
+        "description": "Leitura consistente do banco para o relatório em PDF, com instante e hash do conteúdo.",
+        "required": ["versao", "retrato", "relatorio"],
+        "properties": {
+          "versao": {
+            "type": "integer",
+            "enum": [1],
+            "example": 1
+          },
+          "retrato": {
+            "type": "object",
+            "required": ["em", "emTexto", "fuso", "hash"],
+            "properties": {
+              "em": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-11-26T17:32:00.000Z"
+              },
+              "emTexto": {
+                "type": "string",
+                "example": "26/11/2026, 14:32:00"
+              },
+              "fuso": {
+                "type": "string",
+                "example": "America/Fortaleza"
+              },
+              "hash": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$",
+                "description": "SHA-256 do modelo do relatório, sem nomes de alunos na auditoria."
+              }
+            }
+          },
+          "relatorio": {
+            "$ref": "#/components/schemas/RelatorioGrade"
+          }
+        }
+      },
+      "RelatorioGrade": {
+        "type": "object",
+        "title": "Relatório da Grade",
+        "required": [
+          "versao",
+          "turmaOriginalId",
+          "turmaOriginal",
+          "de",
+          "ate",
+          "dias",
+          "alunos",
+          "totais"
+        ],
+        "properties": {
+          "versao": {
+            "type": "integer",
+            "enum": [1],
+            "example": 1
+          },
+          "turmaOriginalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "turmaOriginal": {
+            "type": "string",
+            "example": "1º ano A"
+          },
+          "de": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-01"
+          },
+          "ate": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-30"
+          },
+          "dias": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          "alunos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AlunoRelatorioGrade"
+            }
+          },
+          "totais": {
+            "type": "object",
+            "required": ["alunos", "faltas", "justificadas", "parciais"],
+            "properties": {
+              "alunos": { "type": "integer", "example": 40 },
+              "faltas": { "type": "integer", "example": 12 },
+              "justificadas": { "type": "integer", "example": 4 },
+              "parciais": { "type": "integer", "example": 8 }
+            }
+          }
+        }
+      },
+      "AlunoRelatorioGrade": {
+        "type": "object",
+        "title": "Aluno no relatório da Grade",
+        "required": [
+          "alunoId",
+          "nome",
+          "turmaAtual",
+          "desistente",
+          "faltas",
+          "justificadas",
+          "parciais",
+          "diasComRegistro",
+          "totalHistorico",
+          "ocorrencias"
+        ],
+        "properties": {
+          "alunoId": { "type": "string", "format": "uuid" },
+          "nome": { "type": "string", "example": "Aluno Exemplo" },
+          "turmaAtual": { "type": "string", "example": "1º ano B" },
+          "desistente": { "type": "boolean", "example": false },
+          "faltas": { "type": "integer", "example": 2 },
+          "justificadas": { "type": "integer", "example": 1 },
+          "parciais": { "type": "integer", "example": 3 },
+          "diasComRegistro": { "type": "integer", "example": 20 },
+          "totalHistorico": { "type": "integer", "example": 12 },
+          "ocorrencias": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OcorrenciaGrade"
+            }
+          }
+        }
+      },
+      "OcorrenciaGrade": {
+        "type": "object",
+        "title": "Ocorrência de falta na Grade",
+        "required": [
+          "dia",
+          "marca",
+          "aulasPrevistas",
+          "aulasFaltadas",
+          "aulasFaltadasRotulos",
+          "justificativas",
+          "referenciaAulas"
+        ],
+        "properties": {
+          "dia": { "type": "string", "format": "date", "example": "2026-11-05" },
+          "marca": { "type": "string", "enum": ["F", "FJ", "S"] },
+          "aulasPrevistas": {
+            "oneOf": [{ "type": "integer" }, { "type": "null" }],
+            "example": 5
+          },
+          "aulasFaltadas": { "type": "integer", "example": 2 },
+          "aulasFaltadasRotulos": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["2ª aula · 07:50 às 08:40"]
+          },
+          "justificativas": {
+            "type": "array",
+            "items": { "type": "string" },
+            "example": ["Doente"]
+          },
+          "referenciaAulas": {
+            "type": "string",
+            "enum": ["retrato", "grade_atual", "indisponivel"]
+          }
+        }
+      },
       "RelatorioMovimentacoes": {
         "type": "object",
         "title": "Relatório de movimentações",
@@ -18982,18 +19219,23 @@
       "ExportacaoRegistro": {
         "type": "object",
         "title": "Registro de exportação",
-        "description": "Tipo e formato do arquivo preparado pelo navegador.",
+        "description": "Tipo, formato e, no relatório da Grade, o hash do retrato preparado pelo navegador.",
         "required": ["tipo", "formato"],
         "properties": {
           "tipo": {
             "type": "string",
-            "enum": ["grade", "relacao"],
+            "enum": ["grade", "relacao", "relatorio"],
             "example": "grade"
           },
           "formato": {
             "type": "string",
             "enum": ["original", "zip"],
             "example": "zip"
+          },
+          "retrato": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "Obrigatório quando tipo é relatorio; proibido nos demais tipos."
           }
         }
       },

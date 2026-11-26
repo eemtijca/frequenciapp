@@ -61,6 +61,10 @@
       "permitido": false,
       "motivo": "Telemetria transitiva do Redocly, dispensável para o build."
     },
+    "core-js": {
+      "permitido": false,
+      "motivo": "Aviso de financiamento do core-js, dependência opcional do jsPDF, dispensável para o build."
+    },
     "@swc/core": {
       "permitido": true,
       "motivo": "Instala o binário nativo usado pela compilação do Next."
