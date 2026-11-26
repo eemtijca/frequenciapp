@@ -518,6 +518,8 @@ Antes de aplicar:
 8. A aplicação sobe com `--wait` e a saúde pública é conferida quando configurada.
 9. Em falha, a imagem e o commit anteriores são restaurados.
 
+No modo `main`, o Dockerfile ajusta as permissões dos arquivos copiados para execução. A imagem precisa passar na verificação de acesso como usuário `node`, mesmo quando a worktree é criada com `umask 077`. Essa verificação ocorre durante o build, antes de substituir o contêiner, e não altera as permissões de credenciais ou backups no host. A saúde do aplicativo e a conexão com o banco continuam sendo verificadas após a partida.
+
 O backup de planilhas é opcional. Quando `BACKUP_PLANILHAS_HABILITADO=false`, a imagem `backup-planilhas` não é baixada nem construída.
 
 A atualização automática pelo cron não é instalada por padrão. `ATUALIZAR_HABILITADO=false` mantém a rotina fora do cron; defina `true` somente depois de revisar a agenda e o rollback.

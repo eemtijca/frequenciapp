@@ -141,6 +141,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- A imagem da aplicação inicia como `node` mesmo quando a atualização automática cria o contexto de build com `umask 077`. A construção verifica o acesso aos arquivos de execução antes que o atualizador substitua o contêiner ativo.
 - Nos avisos flutuantes, o ícone e o botão Fechar se alinham à mensagem mesmo com uma ação abaixo dela. Fechar, Tentar novamente e Atualizar no aviso da PWA têm alvos de pelo menos 48 × 48 px.
 - Na Grade, os calendários dos modos diário, semanal e personalizado ocupam a largura disponível no celular. No calendário compartilhado, PageUp e PageDown mantêm o mês de destino mesmo quando o dia equivalente não pode ser selecionado.
 - A gaveta móvel fecha mais rápido ao escolher um destino. As telas só montam na primeira visita e mantêm seu estado nas visitas seguintes.
