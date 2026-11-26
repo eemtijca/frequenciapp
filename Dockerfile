@@ -65,8 +65,36 @@ COPY --from=compilacao /app/generated ./generated
 COPY --from=compilacao /app/docker ./docker
 COPY --from=compilacao /app/scripts ./scripts
 COPY --from=compilacao /app/src/infra/schema-postgres.mjs ./src/infra/schema-postgres.mjs
-RUN chmod +x ./docker/app/entrypoint.sh
+# A atualização pode construir de uma worktree com umask 077. Ajusta apenas
+# os artefatos copiados da fonte, sem seguir links ou dar escrita a node.
+# A imagem de backup de planilhas também herda os scripts de execução.
+RUN chmod u=rwx,go=rx ./docker ./scripts ./scripts/backup ./scripts/servidor \
+  && find -P ./docker/app ./scripts/administracao ./prisma ./public ./docs \
+    -type d -exec chmod u=rwx,go=rx {} + \
+  && find -P ./docker/app ./scripts/administracao ./prisma ./public ./docs \
+    ./scripts/servidor/agenda.mjs ./scripts/servidor/backup-planilhas-interno.sh \
+    ./scripts/backup/backup-externo.mjs ./scripts/backup/pacote-backup.mjs \
+    ./src/infra/schema-postgres.mjs -type f -exec chmod a+rX,go-w {} + \
+  && chmod a+x ./docker/app/entrypoint.sh
 USER node
+# Recusa a imagem antes da troca de versão se o usuário efetivo não tiver acesso.
+RUN --network=none set -eu; \
+  test -x ./docker/app/entrypoint.sh \
+    || { printf '%s\n' 'Não executável por node: ./docker/app/entrypoint.sh' >&2; exit 1; }; \
+  exigir_leitura() { \
+    test -r "$1" || { printf 'Ilegível para node: %s\n' "$1" >&2; exit 1; }; \
+  }; \
+  for caminho in ./docker/app/entrypoint.sh ./docker/app/migrar.mjs \
+    ./scripts/administracao/criar-admin.mjs ./scripts/administracao/*.mjs \
+    ./scripts/servidor/agenda.mjs ./scripts/servidor/backup-planilhas-interno.sh \
+    ./scripts/backup/backup-externo.mjs ./scripts/backup/pacote-backup.mjs ./src/infra/schema-postgres.mjs \
+    ./prisma/migrations ./prisma/migrations/migration_lock.toml \
+    ./public/manifest.webmanifest ./docs/api.md ./server.js; do \
+    exigir_leitura "$caminho"; \
+  done; \
+  for pasta in ./prisma/migrations/*/; do \
+    exigir_leitura "${pasta}migration.sql"; \
+  done
 EXPOSE 3000
 ENV PORT=3000
 # Escuta em todas as interfaces: o healthcheck e o proxy interno usam 127.0.0.1.
