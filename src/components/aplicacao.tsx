@@ -1124,6 +1124,7 @@ export default function Aplicacao({
             frequencias={frequencias}
             saidas={saidas}
             resumo={resumo}
+            justificativas={justificativas}
             versao={versaoFrequencias}
             bloqueado={pendencias.includes("chamada")}
             rotuloTurma={rotuloTurma}

@@ -747,6 +747,19 @@ export function classificarFaltasPorAulas(
   return cobertas > 0 && cobertas < aulas.size ? "S" : integral;
 }
 
+/** Origem da referência de aulas usada para classificar o dia. */
+export type ReferenciaDasAulas = "retrato" | "grade_atual" | "indisponivel";
+
+/** Classificação detalhada de um aluno em um dia, usada pela Grade e pelo PDF. */
+export interface DetalheDiaAluno {
+  marca: Marca | null;
+  aulasPrevistas: number | null;
+  aulasFaltadas: number;
+  aulasFaltadasIds: string[];
+  justificativas: string[];
+  referenciaAulas: ReferenciaDasAulas;
+}
+
 /**
  * Marca de um aluno em um dia, a partir das frequências do mês e da grade de
  * aulas. Regra: falta em todas as aulas do dia vira F, ou FJ quando todas as
@@ -758,25 +771,38 @@ export function classificarFaltasPorAulas(
  * grade atual. A falta prevalece mesmo em aula que saiu da grade depois do
  * registro.
  */
-export function marcaDoAluno(
+export function classificarDiaDoAluno(
   aluno: Aluno,
   dia: string,
   frequenciasDoDia: Frequencia[],
   horarios: Horario[],
-): Marca | null {
-  if (alunoDesistenteNoDia(aluno, dia)) return null;
+): DetalheDiaAluno {
+  const semRegistro = (referencia: ReferenciaDasAulas = "indisponivel"): DetalheDiaAluno => ({
+    marca: null,
+    aulasPrevistas: null,
+    aulasFaltadas: 0,
+    aulasFaltadasIds: [],
+    justificativas: [],
+    referenciaAulas: referencia,
+  });
+
+  if (alunoDesistenteNoDia(aluno, dia)) return semRegistro();
+
   // Aula para situação de justificativa: todas as faltas da mesma aula
   // precisam estar justificadas para a marca ser FJ.
   const faltasDoAluno = new Map<string, boolean>();
+  const justificativas = new Set<string>();
   for (const frequencia of frequenciasDoDia) {
     for (const falta of frequencia.faltas) {
       if (falta.alunoId !== aluno.id) continue;
       const justificada = Boolean(falta.justificativa);
+      if (falta.justificativa) justificativas.add(falta.justificativa);
       for (const horarioId of falta.horarios) {
         faltasDoAluno.set(horarioId, (faltasDoAluno.get(horarioId) ?? true) && justificada);
       }
     }
   }
+
   // A chamada do aluno no dia é a que o tinha na lista, não a da turma
   // atual: mover de turma depois não reescreve os dias já salvos.
   const turmasDaChamada = new Set(
@@ -789,12 +815,35 @@ export function marcaDoAluno(
       .map((frequencia) => frequencia.turmaId),
   );
   const temFrequencia = turmasDaChamada.size > 0;
+  const codigos = [...justificativas].sort((a, b) => a.localeCompare(b, "pt-BR"));
 
-  if (faltasDoAluno.size === 0) return temFrequencia ? "P" : null;
+  if (faltasDoAluno.size === 0) {
+    return temFrequencia
+      ? {
+          marca: "P",
+          aulasPrevistas: null,
+          aulasFaltadas: 0,
+          aulasFaltadasIds: [],
+          justificativas: codigos,
+          referenciaAulas: "indisponivel",
+        }
+      : semRegistro();
+  }
+
   const tudoJustificado = [...faltasDoAluno.values()].every(Boolean);
   const marcaIntegral = tudoJustificado ? "FJ" : "F";
+  const idsFaltados = [...faltasDoAluno.keys()];
   // Sem frequência da turma no dia, a falta de outra turma prevalece.
-  if (!temFrequencia) return marcaIntegral;
+  if (!temFrequencia) {
+    return {
+      marca: marcaIntegral,
+      aulasPrevistas: null,
+      aulasFaltadas: idsFaltados.length,
+      aulasFaltadasIds: idsFaltados,
+      justificativas: codigos,
+      referenciaAulas: "indisponivel",
+    };
+  }
 
   // O retrato da chamada manda sobre a grade atual. Sem retrato, a derivação
   // volta ao comportamento antigo, pela grade vigente.
@@ -804,7 +853,17 @@ export function marcaDoAluno(
       .flatMap((frequencia) => frequencia.aulas ?? []),
   );
   if (retrato.size > 0) {
-    return classificarFaltasPorAulas(faltasDoAluno, retrato);
+    const marca = classificarFaltasPorAulas(faltasDoAluno, retrato);
+    const cobertas = idsFaltados.filter((id) => retrato.has(id));
+    const faltadas = marca === "S" ? cobertas : idsFaltados;
+    return {
+      marca,
+      aulasPrevistas: retrato.size,
+      aulasFaltadas: faltadas.length,
+      aulasFaltadasIds: faltadas,
+      justificativas: codigos,
+      referenciaAulas: "retrato",
+    };
   }
 
   const aulasDaTurma = [...turmasDaChamada].flatMap((turmaId) =>
@@ -814,10 +873,46 @@ export function marcaDoAluno(
       true,
     ),
   );
-  const faltando = aulasDaTurma.filter((aula) => faltasDoAluno.has(aula.id)).length;
-  if (aulasDaTurma.length === 0 || faltando >= aulasDaTurma.length) return marcaIntegral;
-  if (faltando > 0) return "S";
-  return marcaIntegral;
+  const faltandoNaGrade = aulasDaTurma.filter((aula) => faltasDoAluno.has(aula.id));
+  if (aulasDaTurma.length === 0 || faltandoNaGrade.length >= aulasDaTurma.length) {
+    return {
+      marca: marcaIntegral,
+      aulasPrevistas: aulasDaTurma.length > 0 ? aulasDaTurma.length : null,
+      aulasFaltadas: idsFaltados.length,
+      aulasFaltadasIds: idsFaltados,
+      justificativas: codigos,
+      referenciaAulas: aulasDaTurma.length > 0 ? "grade_atual" : "indisponivel",
+    };
+  }
+  if (faltandoNaGrade.length > 0) {
+    const ids = faltandoNaGrade.map((aula) => aula.id);
+    return {
+      marca: "S",
+      aulasPrevistas: aulasDaTurma.length,
+      aulasFaltadas: ids.length,
+      aulasFaltadasIds: ids,
+      justificativas: codigos,
+      referenciaAulas: "grade_atual",
+    };
+  }
+  return {
+    marca: marcaIntegral,
+    aulasPrevistas: aulasDaTurma.length,
+    aulasFaltadas: idsFaltados.length,
+    aulasFaltadasIds: idsFaltados,
+    justificativas: codigos,
+    referenciaAulas: "grade_atual",
+  };
+}
+
+/** Marca de um aluno em um dia, preservando a API histórica. */
+export function marcaDoAluno(
+  aluno: Aluno,
+  dia: string,
+  frequenciasDoDia: Frequencia[],
+  horarios: Horario[],
+): Marca | null {
+  return classificarDiaDoAluno(aluno, dia, frequenciasDoDia, horarios).marca;
 }
 
 /**
