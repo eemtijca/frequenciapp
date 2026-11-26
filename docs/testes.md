@@ -195,7 +195,7 @@ A cobertura protege o essencial do domínio (derivação de marcas e grade), a s
 
 ## FrequenciBI
 
-`bi-acesso.test.ts` verifica segredos, validação, expiração e interseção de escopos. `bi.test.ts` exercita o endpoint real com massa QA própria, autenticação independente do cookie, ausência do segredo no banco e listagem, permissões administrativas, CSRF, recortes históricos, paginação, rotação, revogação, expiração e limite por chave. `guardas-rotas.test.ts` exige a guarda exclusiva de chave no GET `/api/bi` e guardas administrativas na gestão. Nenhum teste usa dados escolares reais.
+`bi-acesso.test.ts` verifica segredos, validação, expiração e interseção de escopos. `bi.test.ts` exercita o endpoint real com massa QA própria, autenticação independente do cookie, ausência do segredo no banco e listagem, permissões administrativas, CSRF, recortes históricos, paginação, rotação, revogação, expiração, limite por chave e leituras paralelas da mesma chave, inclusive com a linha da chave bloqueada e com revogação ou mudança de escopo concorrente. `guardas-rotas.test.ts` exige a guarda exclusiva de chave no GET `/api/bi` e guardas administrativas na gestão. Nenhum teste usa dados escolares reais.
 
 ### Experiência do FrequenciBI
 

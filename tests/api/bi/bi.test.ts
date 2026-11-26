@@ -176,6 +176,91 @@ describe("FrequenciBI", () => {
     expect(uso?.usos).toBe(1);
     expect(uso?.primeiro_uso_em).toBeTruthy();
   });
+  it("não devolve conflito quando leituras da mesma chave se sobrepõem", async () => {
+    const c = await criar();
+    await db.query("BEGIN");
+    await db.query("select id from chaves_bi where id=$1 for update", [c.chave.id]);
+    let liberado = false;
+    try {
+      const leituras: Promise<Response>[] = [];
+      for (let i = 0; i < 8; i += 1) {
+        leituras.push(ler(c.segredo));
+        await new Promise((resolver) => setTimeout(resolver, 50));
+      }
+      await new Promise((resolver) => setTimeout(resolver, 200));
+      await db.query("ROLLBACK");
+      liberado = true;
+      const respostas = await Promise.all(leituras);
+      expect(respostas.map((resposta) => resposta.status)).toEqual(
+        Array.from({ length: 8 }, () => 200),
+      );
+    } finally {
+      if (!liberado) await db.query("ROLLBACK");
+    }
+    const uso = (
+      await db.query<{ usos: number; primeiro_uso_em: Date | null; ultimo_uso_em: Date | null }>(
+        "select usos,primeiro_uso_em,ultimo_uso_em from chaves_bi where id=$1",
+        [c.chave.id],
+      )
+    ).rows[0];
+    expect(uso?.usos).toBe(8);
+    expect(uso?.primeiro_uso_em).toBeTruthy();
+    expect(uso?.ultimo_uso_em).toBeTruthy();
+  });
+  it("carrega bases distintas em paralelo sem conflito", async () => {
+    const c = await criar({ turmas: [turmaA] });
+    const recursos = [
+      "turmas",
+      "alunos",
+      "chamadas",
+      "faltas",
+      "lista",
+      "saidas",
+      "entradas",
+      "parciais",
+    ] as const;
+    const respostas = await Promise.all(
+      recursos.map((recurso) =>
+        ler(c.segredo, `recurso=${recurso}&inicio=1991-05-01&fim=1991-05-31`),
+      ),
+    );
+    expect(respostas.map((resposta) => resposta.status)).toEqual(
+      Array.from({ length: recursos.length }, () => 200),
+    );
+    const uso = (
+      await db.query<{ usos: number }>("select usos from chaves_bi where id=$1", [c.chave.id])
+    ).rows[0];
+    expect(uso?.usos).toBe(recursos.length);
+  });
+  it("revogação concorrente não vira conflito e vale para as leituras seguintes", async () => {
+    const c = await criar();
+    const leituras = Array.from({ length: 6 }, () => ler(c.segredo));
+    const [respostas, revogacao] = await Promise.all([
+      Promise.all(leituras),
+      acao({ acao: "revogar", id: c.chave.id }),
+    ]);
+    expect(revogacao.status).toBe(200);
+    for (const resposta of respostas) expect([200, 401]).toContain(resposta.status);
+    expect((await ler(c.segredo)).status).toBe(401);
+  });
+  it("edição de escopo concorrente não vira conflito e vale para as leituras seguintes", async () => {
+    const c = await criar({ turmas: [turmaA] });
+    const leituras = Array.from({ length: 6 }, () => ler(c.segredo, "recurso=alunos"));
+    const [respostas, edicao] = await Promise.all([
+      Promise.all(leituras),
+      acao({
+        acao: "editar",
+        id: c.chave.id,
+        rotulo: `${prefixo} Escopo paralelo`,
+        escopo: { turmas: [turmaB] },
+        expiraEm: null,
+      }),
+    ]);
+    expect(edicao.status).toBe(200);
+    for (const resposta of respostas) expect(resposta.status).toBe(200);
+    const depois = await pagina(c.segredo, "recurso=alunos");
+    expect(depois.linhas.every((linha) => linha.turmaId === turmaB)).toBe(true);
+  });
   it("intersecta turma, série, período e recursos e não permite ampliar pela URL", async () => {
     const c = await criar({
       turmas: [turmaA],
