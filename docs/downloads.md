@@ -1,28 +1,29 @@
 # Downloads protegidos
 
-As exportações contêm dados escolares pessoais. O aplicativo oferece ZIP protegido por senha na grade de frequência, na relação de alunos e na cópia de segurança. A proteção do arquivo contribui para a segurança no armazenamento e compartilhamento, prevista no art. 46 da LGPD.
+As exportações contêm dados escolares pessoais. O aplicativo oferece ZIP protegido por senha na grade de frequência em CSV, no relatório da Grade em PDF, na relação de alunos e na cópia de segurança. A proteção do arquivo contribui para a segurança no armazenamento e compartilhamento, prevista no art. 46 da LGPD.
 
 ## Uso
 
-1. Acionar Baixar planilha, Exportar relação ou Baixar cópia.
+1. Acionar Baixar planilha, Emitir relatório, Exportar relação ou Baixar cópia.
 2. Manter ZIP protegido por senha selecionado, definir uma senha entre 12 e 128 caracteres e confirmar a mesma senha. Preferir frase longa e exclusiva, diferente da senha de acesso.
 3. Acionar Baixar ZIP protegido. O arquivo só é preparado após essa confirmação; cancelar não solicita a cópia de segurança nem gera download.
 4. Guardar a senha separada do arquivo. Ao compartilhar, encaminhar a senha por outro canal e somente a pessoas autorizadas.
-5. Abrir com um extrator compatível com ZIP AES, como 7-Zip ou Keka. Extrair o CSV ou JSON antes de importar uma relação ou cópia no aplicativo.
+5. Abrir com um extrator compatível com ZIP AES, como 7-Zip ou Keka. Extrair o CSV, PDF ou JSON antes de importar uma relação ou cópia no aplicativo.
 
-A opção Arquivo original sem senha mantém o CSV ou JSON existente. A interface avisa que qualquer pessoa com acesso ao arquivo poderá ler o conteúdo. A escolha não é lembrada: cada nova exportação começa na opção protegida.
+A opção Arquivo original sem senha mantém o CSV, PDF ou JSON existente. A interface avisa que qualquer pessoa com acesso ao arquivo poderá ler o conteúdo. A escolha não é lembrada: cada nova exportação começa na opção protegida.
 
-A cópia completa exige também a senha atual da administração, tanto no formato original quanto no ZIP. Essa senha de acesso é conferida pelo servidor, com até cinco tentativas incorretas em 15 minutos; a senha do ZIP continua somente no navegador. CSV de grade e relação registra preparação na auditoria com conta, tipo, formato e data, sem nome de aluno, conteúdo ou senha. O evento não comprova que o navegador salvou o arquivo. A cópia mantém o registro `backup.exportar`.
+A cópia completa exige também a senha atual da administração, tanto no formato original quanto no ZIP. Essa senha de acesso é conferida pelo servidor, com até cinco tentativas incorretas em 15 minutos; a senha do ZIP continua somente no navegador. CSV de grade, PDF da Grade e relação registram preparação na auditoria com conta, tipo, formato e, no relatório, o hash do retrato, sem nome de aluno, conteúdo ou senha. O evento não comprova que o navegador salvou o arquivo. A cópia mantém o registro `backup.exportar`.
 
 ## Conteúdo e permissões
 
 | Download            | Conteúdo interno do ZIP                                                                     | Permissão                    |
 | ------------------- | ------------------------------------------------------------------------------------------- | ---------------------------- |
 | Grade de frequência | `grade.csv`, com o mesmo período e alunos ativos da turma de origem da exportação original. | Administração e coordenação. |
+| Relatório da Grade  | `relatorio.pdf`, com resumo e detalhamento das faltas da turma de origem.                   | Administração e coordenação. |
 | Relação de alunos   | `relacao-alunos.csv`, no schema de importação, com alunos ativos.                           | Administração.               |
 | Cópia de segurança  | `copia.json`, com os mesmos dados escolares da cópia original.                              | Administração.               |
 
-Os arquivos externos são `frequenciapp-grade.zip`, `frequenciapp-relacao-alunos.zip` e `frequenciapp-copia.zip`. Os nomes são genéricos porque o diretório de um ZIP, incluindo nomes internos, fica visível mesmo quando o conteúdo está criptografado. A proteção não amplia acesso nem altera os dados exportados. A cópia continua sem contas, senhas de acesso, tokens ou configurações de notificações.
+Os arquivos externos são `frequenciapp-grade.zip`, `frequenciapp-relatorio.zip`, `frequenciapp-relacao-alunos.zip` e `frequenciapp-copia.zip`. Os nomes são genéricos porque o diretório de um ZIP, incluindo nomes internos, fica visível mesmo quando o conteúdo está criptografado. A proteção não amplia acesso nem altera os dados exportados. A cópia continua sem contas, senhas de acesso, tokens ou configurações de notificações.
 
 ## Tratamento da senha
 
