@@ -10,6 +10,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
+- A gaveta da administração deixa de mostrar Alunos, que já existe como cadastro dentro de Gestão; a coordenação mantém a consulta. Um link antigo com `visao=alunos` aberto pela administração leva ao cadastro de Alunos na Gestão.
+
 - Abrir Gestão, Relatórios ou Configurações e voltar de nível atualiza apenas a gaveta. Ao escolher outro destino, a gaveta móvel fecha sem esperar, a de desktop continua operável e o esqueleto aparece imediatamente no conteúdo enquanto a nova visão é preparada.
 - A entrada exibe esqueleto da navegação e do conteúdo assim que o formulário válido é enviado. Se não for possível confirmar o encerramento, um diálogo oferece nova consulta; o painel e o rascunho só voltam se a mesma sessão continuar válida.
 - As telas mantêm apenas os indicadores visuais durante o carregamento. As descrições continuam disponíveis a leitores de tela, e o esqueleto da entrada não tem divisor horizontal entre as duas regiões no celular.

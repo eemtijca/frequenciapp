@@ -131,6 +131,8 @@ interface AreaGaleria {
   tela: string;
   preparar: (page: Page) => Promise<void>;
   rota?: string;
+  /** Conta da captura; o padrão é a administração. */
+  conta?: "coordenacao";
   desktop?: readonly TemaCaptura[];
   mobile?: readonly TemaCaptura[];
 }
@@ -517,11 +519,13 @@ const AREAS: AreaGaleria[] = [
   {
     area: "Alunos",
     tela: "alunos-atual",
+    conta: "coordenacao",
     preparar: (page) => prepararAlunos(page, "Turma atual"),
   },
   {
     area: "Alunos",
     tela: "alunos-origem",
+    conta: "coordenacao",
     preparar: (page) => prepararAlunos(page, "Turma de origem"),
   },
   {
@@ -616,6 +620,7 @@ test.beforeEach(async () => {
 
 for (const area of AREAS) {
   test.describe(`${area.area}: ${area.tela}`, () => {
+    if (area.conta) test.use({ storageState: `tests/ponta-a-ponta/.auth/${area.conta}.json` });
     const variantes = [
       { viewport: DESKTOP, temas: area.desktop ?? TEMAS },
       { viewport: MOBILE, temas: area.mobile ?? TEMAS },
