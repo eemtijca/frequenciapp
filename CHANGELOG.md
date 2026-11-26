@@ -169,7 +169,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
-- Relatórios, Grade: as colunas do período mostram F, FJ e S por aluno, a célula de presença parcial informa as aulas faltadas e a linha do aluno abre o detalhamento com datas, aulas e justificativas. O novo relatório em PDF reúne o resumo e o detalhamento das faltas da turma de origem, com retrato consistente do banco, download protegido e registro de auditoria com o hash do retrato.
+- Relatórios, Grade: as colunas do período mostram F, FJ e S por aluno, a célula de presença parcial informa as aulas faltadas e a linha do aluno abre o detalhamento com datas, aulas e justificativas. O novo relatório em PDF reúne o resumo e o detalhamento das faltas da turma de origem até hoje, com retrato consistente do banco, hash completo no rodapé, download protegido e registro de auditoria com o hash do retrato.
 
 - A página pública `/privacidade` descreve o tratamento de dados da EEMTI José Cláudio de Araújo, inclusive o escopo `drive.file` da integração Google, e abre sem sessão. `/politica-de-privacidade` redireciona para ela. A entrada e o diálogo Sobre apontam para a página.
 

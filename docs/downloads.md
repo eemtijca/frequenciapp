@@ -14,12 +14,14 @@ A opção Arquivo original sem senha mantém o CSV, PDF ou JSON existente. A int
 
 A cópia completa exige também a senha atual da administração, tanto no formato original quanto no ZIP. Essa senha de acesso é conferida pelo servidor, com até cinco tentativas incorretas em 15 minutos; a senha do ZIP continua somente no navegador. CSV de grade, PDF da Grade e relação registram preparação na auditoria com conta, tipo, formato e, no relatório, o hash do retrato, sem nome de aluno, conteúdo ou senha. O evento não comprova que o navegador salvou o arquivo. A cópia mantém o registro `backup.exportar`.
 
+O relatório da Grade cobre o período exibido até hoje. A leitura vem de um retrato consistente do banco e o PDF é desenhado no navegador, com o código curto no cabeçalho e o hash completo no rodapé.
+
 ## Conteúdo e permissões
 
 | Download            | Conteúdo interno do ZIP                                                                     | Permissão                    |
 | ------------------- | ------------------------------------------------------------------------------------------- | ---------------------------- |
 | Grade de frequência | `grade.csv`, com o mesmo período e alunos ativos da turma de origem da exportação original. | Administração e coordenação. |
-| Relatório da Grade  | `relatorio.pdf`, com resumo e detalhamento das faltas da turma de origem.                   | Administração e coordenação. |
+| Relatório da Grade  | `relatorio.pdf`, com resumo e detalhamento das faltas da turma de origem até hoje.          | Administração e coordenação. |
 | Relação de alunos   | `relacao-alunos.csv`, no schema de importação, com alunos ativos.                           | Administração.               |
 | Cópia de segurança  | `copia.json`, com os mesmos dados escolares da cópia original.                              | Administração.               |
 

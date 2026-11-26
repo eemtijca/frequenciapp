@@ -15,7 +15,8 @@ O PDF poderia ser montado no navegador a partir das frequências do mês e do re
 - A célula S mostra a proporção de aulas faltadas, como 2/5, e a linha do aluno abre o detalhamento com datas, aulas e justificativas.
 - O PDF é montado no navegador com `jspdf` e `jspdf-autotable`, carregados sob demanda, a partir de um modelo imutável devolvido pelo servidor.
 - A rota `GET /api/relatorios/grade/retrato` lê turma, horários, alunos, frequências, faltas, aulas, justificativas e o resumo histórico em uma única transação `RepeatableRead`, com `SELECT now()` e todas as consultas no mesmo `tx`. O leitor não bloqueia o gravador e o gravador não bloqueia o leitor.
-- O retrato tem instante, fuso e hash SHA-256 do modelo. O PDF mostra o instante e um código curto; a auditoria do download registra o hash completo.
+- O retrato tem instante, fuso e hash SHA-256 do modelo. O PDF mostra o instante e o código curto no cabeçalho, e o hash completo no rodapé; a auditoria do download registra o hash completo.
+- O PDF cobre o período exibido até hoje. Um período inteiramente futuro é recusado na tela, e o endpoint continua validando o mês consultado.
 - O download reutiliza o diálogo protegido, com ZIP AES-256 por padrão e arquivo original por escolha explícita. O nome interno é `relatorio.pdf` e o externo é `frequenciapp-relatorio.zip`.
 - O relatório leva o resumo e o detalhamento das faltas da turma de origem. Não é um espelho da Grade e não inclui gráficos.
 - O CSV, a integração com o Google Planilhas, o schema Prisma e as variáveis de ambiente ficam inalterados.
@@ -24,6 +25,7 @@ O PDF poderia ser montado no navegador a partir das frequências do mês e do re
 
 - PDF a partir dos dados já carregados no cliente: rejeitado pelo risco de retrato costurado e desatualizado.
 - PDF no servidor: rejeitado pelo custo de CPU e memória, pela necessidade de uma rota binária e pelo trânsito adicional de dados pessoais.
+- Escritor próprio de PDF sem dependência (proposta do PR #542): preterido porque o relatório precisa de tabela, cabeçalho repetido, totais, detalhamento e rodapé. O jsPDF entrega esse layout com testes de conteúdo e impressão, e a rota de retrato em JSON mantém o servidor sem desenhar PDF e sem devolver PDF em base64.
 - `pdfmake`: rejeitado pelo tamanho do runtime e das fontes, apesar do bom suporte a tabelas e Unicode.
 - `pdf-lib`: rejeitado por não ter motor de tabelas e pela cadência de releases do pacote principal.
 - `@react-pdf/renderer`: rejeitado pelo tamanho, pelas fontes e pela necessidade de tabela manual.
@@ -35,6 +37,7 @@ O PDF poderia ser montado no navegador a partir das frequências do mês e do re
 - Há uma rota nova de leitura e duas dependências MIT carregadas sob demanda.
 - O PDF não é marcado para acessibilidade; a Grade continua sendo a via acessível.
 - Períodos longos geram muitas páginas; o CSV continua sendo o formato para grandes volumes.
+- O PDF do mês corrente é um recorte até hoje; dias futuros não entram no arquivo.
 - O PDF depende de rede para obter o retrato. O service worker não cacheia a rota.
 - Não há nome da escola no cadastro; o cabeçalho usa FrequenciApp, a turma e o período.
 - O hash é um recibo do retrato, não uma assinatura digital. A verificação posterior exigiria guardar o modelo ou assinar o arquivo.
