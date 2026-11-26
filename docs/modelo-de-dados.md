@@ -135,6 +135,30 @@ A administração define a ordem de cada dia em Gestão, Configurações, Horár
 
 O horário de provas é temporário. A administração cadastra a mesma prova para várias turmas de uma vez, e uma turma não pode ter duas provas em janelas que se cruzam no mesmo dia. A aba Horários mostra só as datas de hoje em diante; encerrar o período apaga todas as linhas, e as provas não entram na cópia JSON ([ADR-080](adr/080-horario-de-provas-bimestrais.md)).
 
+## Prova específica (prova_especifica)
+
+| Campo        | Tipo  | Observação                                       |
+| ------------ | ----- | ------------------------------------------------ |
+| id           | uuid  |                                                  |
+| nome         | texto | De 1 a 120 caracteres.                           |
+| local        | texto | Opcional, até 120 caracteres.                    |
+| dia          | data  | Data civil; pode ser passada ou cair no domingo. |
+| criadoEm     | data  |                                                  |
+| atualizadoEm | data  |                                                  |
+
+## Participante da prova (participante_prova)
+
+| Campo        | Tipo     | Observação                                                   |
+| ------------ | -------- | ------------------------------------------------------------ |
+| id           | uuid     |                                                              |
+| provaId      | uuid     | Prova. Excluir a prova remove a inscrição.                   |
+| alunoId      | uuid     | Aluno. Excluir o aluno remove a inscrição. Único por prova.  |
+| presente     | booleano | Nulo é sem registro, verdadeiro é presente, falso é ausente. |
+| criadoEm     | data     |                                                              |
+| atualizadoEm | data     |                                                              |
+
+Só aluno ativo e sem desistência entra na prova; quem já está inscrito continua se depois for desativado. A frequência da prova é independente da Chamada e das planilhas, e as provas específicas não entram na cópia JSON ([ADR-084](adr/084-provas-especificas.md)).
+
 ## Frequência (frequencia)
 
 | Campo           | Tipo    | Observação                                        |

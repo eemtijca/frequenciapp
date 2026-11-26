@@ -169,6 +169,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- A gaveta ganha o botão Provas para a administração e a coordenação registrarem a frequência em provas como o Enem e vestibulares. A equipe define o nome, o local opcional e a data (passada ou no domingo), escolhe os alunos por turma e marca Presente ou Ausente por aluno, com a contagem na lista. Novas rotas `GET` e `POST /api/provas`, `GET`, `PATCH` e `DELETE /api/provas/{id}`, `PUT /api/provas/{id}/participantes` e `PUT /api/provas/{id}/frequencia`, e as tabelas `provas_especificas` e `participantes_prova` ([ADR-084](docs/adr/084-provas-especificas.md)).
+
 - A página pública `/privacidade` descreve o tratamento de dados da EEMTI José Cláudio de Araújo, inclusive o escopo `drive.file` da integração Google, e abre sem sessão. `/politica-de-privacidade` redireciona para ela. A entrada e o diálogo Sobre apontam para a página.
 
 - O atualizador agendado da `main` aceita migrações novas apenas com autorização protegida, vinculada à revisão instalada, ao commit candidato, aos SHA-256 dos SQLs e a uma janela de uso único.
