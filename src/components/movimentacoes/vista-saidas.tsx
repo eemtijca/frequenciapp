@@ -17,6 +17,7 @@ import ListItem from "@mui/material/ListItem";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
@@ -216,6 +217,7 @@ export default function VistaSaidas({
     "Não foi possível carregar as saídas.",
   );
   const leitura = compartilhado ? leituraMensal : leituraDiaria;
+  useLeituraDaVisao(ativo && !nav.resumo && leitura.estado === "carregando");
   const duranteAula = ehMomentoDeAula(momento);
   const listaBloqueada = diaLiberado !== dia;
   const domingoBloqueado = diaLiberado !== nav.domingo;

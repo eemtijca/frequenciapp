@@ -183,7 +183,7 @@ export async function confirmarSalvarChamada(secao: Locator): Promise<void> {
     .page()
     .getByRole("alertdialog", { name: /^Salvar (chamada|correção da chamada)\?$/ });
   await expect(dialogo).toBeVisible();
-  await dialogo.getByRole("button", { name: "Salvar chamada", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 }
 

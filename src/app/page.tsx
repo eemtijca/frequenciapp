@@ -1,6 +1,6 @@
 // Página autenticada: carrega o escopo e encaminha o retorno da conexão Google.
 import { headers } from "next/headers";
-import { identidadeAtual } from "@/application/sessao";
+import { sessaoParaInterface } from "@/application/sessao";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarSeries } from "@/application/series";
@@ -31,20 +31,21 @@ export default async function Pagina({
     aba?: string;
   }>;
 }) {
-  const usuario = await identidadeAtual(ambiente.authSecret);
+  const sessao = await sessaoParaInterface(ambiente.authSecret);
   const urlIndiceAgentes = urlDoIndiceDeAgentes(await headers());
   const entrada = (
     <DestinoSessao>
       <TelaLogin urlIndiceAgentes={urlIndiceAgentes} />
     </DestinoSessao>
   );
-  if (!usuario) return entrada;
+  if (!sessao) return entrada;
+  const { usuario, referenciaSessao } = sessao;
   // Recusa por padrão: o aplicativo completo só abre para quem opera a
   // escola; o diretor de turma tem a própria tela, só de leitura.
   if (!temCapacidade(usuario.papel, "operar")) {
     if (temCapacidade(usuario.papel, "verEstatisticasDasTurmas")) {
       return (
-        <DestinoSessao usuarioId={usuario.id}>
+        <DestinoSessao usuarioId={usuario.id} referenciaSessao={referenciaSessao}>
           <AplicacaoDiretor
             usuario={usuario}
             contexto={await contextoDoDiretor(usuario.id)}
@@ -82,7 +83,7 @@ export default async function Pagina({
   ]);
   const carregadoEm = new Date().toISOString();
   return (
-    <DestinoSessao usuarioId={usuario.id}>
+    <DestinoSessao usuarioId={usuario.id} referenciaSessao={referenciaSessao}>
       <Aplicacao
         usuario={usuario}
         carregadoEm={carregadoEm}

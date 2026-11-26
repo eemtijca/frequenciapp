@@ -16,6 +16,7 @@ import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
 import { Campo } from "@/components/ui/mui/campo";
@@ -58,6 +59,7 @@ const ALVO_ACAO = {
 export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Props) {
   const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
+  useLeituraDaVisao(usuarios === null);
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<UsuarioDTO | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);

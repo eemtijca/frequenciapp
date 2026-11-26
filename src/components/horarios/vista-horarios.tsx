@@ -287,12 +287,20 @@ function AulasDoDia({
     );
   }
 
+  const primeiro = itens[0];
+  const ultimo = itens.at(-1);
+
   return (
     <List
       component="ol"
       aria-label={`Aulas de ${rotuloDia(dia)}${turno ? ` · ${turno}` : ""}`}
       disablePadding
-      sx={editavel ? undefined : { px: { xs: 0, sm: 1 } }}
+      sx={{
+        ...(!editavel && { px: { xs: 0, sm: 1 } }),
+        // Retira só a folga entre a faixa de almoço e a borda que ela encontra.
+        pt: primeiro?.tipo === "pausa" && primeiro.pausa.id === "almoco" ? 0 : undefined,
+        pb: ultimo?.tipo === "pausa" && ultimo.pausa.id === "almoco" ? 0 : undefined,
+      }}
     >
       {itens.map((item) => {
         if (item.tipo === "pausa")

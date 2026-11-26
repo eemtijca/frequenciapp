@@ -22,6 +22,7 @@ import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
 import { Campo } from "@/components/ui/mui/campo";
@@ -80,6 +81,7 @@ function dataCurta(iso: string | null): string {
 export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: Props) {
   const { avisarErro, avisarSucesso, publicarAviso } = useAvisosDaSessao();
   const [diretores, setDiretores] = useState<DiretorDTO[] | null>(null);
+  useLeituraDaVisao(diretores === null);
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<DiretorDTO | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);

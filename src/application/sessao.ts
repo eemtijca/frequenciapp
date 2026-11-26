@@ -1,7 +1,7 @@
 // Casos de uso de sessão: entrada, saída, identidade corrente e troca
 // da própria senha. A equipe entra por e-mail; o diretor de turma, pelo
 // identificador e pela palavra-chave, dentro do ciclo de vida da ADR-021.
-import { randomBytes } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { banco } from "@/infra/banco";
 import { conferirSenha, hashearSenha } from "@/infra/auth/hash";
@@ -183,6 +183,17 @@ export async function entrar(
 
 export async function sair(segredo: string, cookiesSeguros: boolean): Promise<void> {
   await encerrarSessao(segredo, cookiesSeguros);
+}
+
+/** Projeção para comparar sessões na interface, sem fornecer uma credencial. */
+export async function sessaoParaInterface(segredo: string) {
+  const sessao = await sessaoAtual(segredo);
+  if (!sessao) return null;
+  const referenciaSessao = createHmac("sha256", segredo)
+    .update("referencia-de-sessao:")
+    .update(sessao.id)
+    .digest("base64url");
+  return { usuario: sessao.usuario, referenciaSessao };
 }
 
 /** Identidade corrente ou null. */

@@ -1,5 +1,5 @@
 // Monta as telas reais; o adaptador de rota separa refresh e entrega do destino.
-import { StrictMode, useEffect, useState } from "react";
+import { lazy, StrictMode, Suspense, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { DestinoSessao, ProvedorTransicaoSessao } from "@/components/entrada/transicao-sessao";
@@ -9,7 +9,11 @@ import SecaoFilaPlanilha from "@/components/gestao/planilhas/secao-fila-planilha
 import RegistroPwa from "@/components/pwa/registro-pwa";
 import { ProvedorAvisos } from "@/components/ui/mui/avisos";
 import { useAvisosDaSessao } from "@/lib/avisos";
+import { CONFIGURACOES_PADRAO } from "@/domain/frequencia";
 import { ProvedorTema } from "@/theme/provedor-tema";
+
+// Somente a entrada de teste com Chamada precisa carregar o shell completo.
+const Aplicacao = lazy(() => import("@/components/aplicacao"));
 
 const raiz = document.getElementById("root");
 if (!raiz) throw new Error("Raiz da fixture ausente");
@@ -40,19 +44,82 @@ function AvisoPrivadoDaFixture() {
 }
 
 function RotaControlada() {
-  const [autenticada, setAutenticada] = useState(parametros.has("autenticada"));
+  const [geracao, setGeracao] = useState(
+    parametros.has("autenticada")
+      ? parametros.has("nova-sessao")
+        ? "nova"
+        : "original"
+      : "entrada",
+  );
   useEffect(() => {
-    const entrada = () => setAutenticada(false);
-    const painel = () => setAutenticada(true);
+    const entrada = () => setGeracao("entrada");
+    const painel = () => setGeracao("original");
+    const outroPainel = () => setGeracao("nova");
     window.addEventListener("fixture-entrada", entrada);
     window.addEventListener("fixture-painel", painel);
+    window.addEventListener("fixture-outro-painel", outroPainel);
     return () => {
       window.removeEventListener("fixture-entrada", entrada);
       window.removeEventListener("fixture-painel", painel);
+      window.removeEventListener("fixture-outro-painel", outroPainel);
     };
   }, []);
-  return autenticada ? (
-    <DestinoSessao usuarioId={diretor.id}>
+  if (geracao !== "entrada" && parametros.has("com-chamada")) {
+    const usuario = {
+      ...diretor,
+      papel: "ADMIN" as const,
+      id: parametros.has("outra-conta") ? "outra-conta" : "conta-chamada",
+    };
+    return (
+      <DestinoSessao
+        usuarioId={usuario.id}
+        referenciaSessao={
+          parametros.has("sem-referencia") ? undefined : (geracao === "nova" ? "N" : "O").repeat(43)
+        }
+      >
+        <Aplicacao
+          usuario={usuario}
+          carregadoEm="2026-11-23T12:00:00Z"
+          diaCorrente="2026-11-23"
+          fuso="America/Fortaleza"
+          visaoInicial={parametros.get("visao") ?? undefined}
+          seriesIniciais={[{ id: "serie", nome: "1º ano", ordem: 1 }]}
+          turmasIniciais={[
+            {
+              id: "turma",
+              nome: "A",
+              rotulo: "1º ano A",
+              serieId: "serie",
+              serieNome: "1º ano",
+              horarios: [],
+            },
+          ]}
+          alunosIniciais={[
+            {
+              id: "aluno",
+              nome: "Aluno sintético",
+              turmaId: "turma",
+              turmaOriginalId: "turma",
+              ordem: 1,
+              ativo: true,
+            },
+          ]}
+          frequenciasIniciais={[]}
+          saidasIniciais={[]}
+          justificativasIniciais={[]}
+          liberadoresIniciais={[]}
+          configuracoesIniciais={CONFIGURACOES_PADRAO}
+          resumoInicial={null}
+        />
+      </DestinoSessao>
+    );
+  }
+  return geracao !== "entrada" ? (
+    <DestinoSessao
+      usuarioId={diretor.id}
+      referenciaSessao={(geracao === "nova" ? "N" : "O").repeat(43)}
+    >
+      {geracao === "nova" && <p>Painel da nova sessão sintética</p>}
       <AvisoPrivadoDaFixture />
       <AplicacaoDiretor
         usuario={diretor}
@@ -93,7 +160,9 @@ const arvore = (
       }}
     >
       <ProvedorTransicaoSessao>
-        <RotaControlada />
+        <Suspense fallback={null}>
+          <RotaControlada />
+        </Suspense>
       </ProvedorTransicaoSessao>
       <ProvedorAvisos />
       {parametros.has("com-fila") && <RegistroPwa />}

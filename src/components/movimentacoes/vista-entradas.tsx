@@ -10,6 +10,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import type {
   Aluno,
   Turma,
@@ -139,6 +140,7 @@ export default function VistaEntradas({
     "Não foi possível carregar as entradas.",
   );
   const carregando = leitura.estado === "carregando";
+  useLeituraDaVisao(ativo && !nav.resumo && carregando);
   const entradas = leitura.estado === "pronto" ? leitura.registros : [];
 
   useEffect(() => {

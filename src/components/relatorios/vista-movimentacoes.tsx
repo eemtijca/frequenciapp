@@ -12,6 +12,7 @@ import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import {
   diaDaSemanaIso,
   diaSeguinte,
@@ -204,6 +205,7 @@ export default function VistaMovimentacoes({
   const chave = `${consulta}|${recarga}|${atualizacao}`;
   const atual = carga?.chave === chave ? carga : null;
   const carregando = ativa && !erroPeriodo && !atual;
+  useLeituraDaVisao(carregando);
   const dados = !erroPeriodo ? atual?.dados : null;
 
   useEffect(() => {

@@ -16,6 +16,7 @@ import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useRascunhoConfiguracoes } from "@/components/gestao/configuracoes/rascunho-configuracoes";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { Abas } from "@/components/ui/mui/abas";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
@@ -47,6 +48,7 @@ export default function IntegracaoParcial({
   const [integracao, setIntegracao] = useState<IntegracaoParcialAdmin | null>(null);
   const [erro, setErro] = useState("");
   const [carregando, setCarregando] = useState(true);
+  useLeituraDaVisao(carregando);
   const [aberto, setAberto] = useState(abertoInicial);
   const [painel, setPainel] = useState<PainelParcial | null>(abertoInicial ? "configuracao" : null);
   const [confirmacao, setConfirmacao] = useState(false);
@@ -123,19 +125,21 @@ export default function IntegracaoParcial({
     });
   }
 
+  const atalhoParcial = onAbrirParcial ? (
+    <Botao
+      type="button"
+      variante="primario"
+      onClick={onAbrirParcial}
+      icone={<AssignmentRoundedIcon />}
+      sx={{ alignSelf: "flex-start" }}
+    >
+      Abrir Chamada Parcial
+    </Botao>
+  ) : null;
+
   const conteudoEnvio = (
     <Stack spacing={2}>
-      {onAbrirParcial ? (
-        <Botao
-          type="button"
-          variante="primario"
-          onClick={onAbrirParcial}
-          icone={<AssignmentRoundedIcon />}
-          sx={{ alignSelf: "flex-start" }}
-        >
-          Abrir Chamada Parcial
-        </Botao>
-      ) : null}
+      {atalhoParcial}
       <Typography variant="caption" sx={{ color: "text.secondary" }}>
         Confira a prévia e confirme o registro na Seduc pela Chamada Parcial.
       </Typography>
@@ -189,24 +193,28 @@ export default function IntegracaoParcial({
         <Acordeao
           titulo="Planilha de chamada parcial"
           resumo={
-            <>
-              <Selo tom={ativaRascunho ? "sucesso" : "neutro"}>
-                {ativaRascunho ? "Ligada" : "Desligada"}
-              </Selo>
-              <Selo
-                tom={
-                  integracao?.preparada && integracao.contaGoogle && integracao.googlePlanilha
-                    ? "sucesso"
-                    : "atencao"
-                }
-              >
-                {!integracao?.contaGoogle || !integracao.googlePlanilha
-                  ? "Sem conexão"
-                  : integracao.preparada
-                    ? "Configurada"
-                    : "Preparar aba"}
-              </Selo>
-            </>
+            carregando ? undefined : !integracao ? (
+              <Selo tom="atencao">Leitura indisponível</Selo>
+            ) : (
+              <>
+                <Selo tom={ativaRascunho ? "sucesso" : "neutro"}>
+                  {ativaRascunho ? "Ligada" : "Desligada"}
+                </Selo>
+                <Selo
+                  tom={
+                    integracao.preparada && integracao.contaGoogle && integracao.googlePlanilha
+                      ? "sucesso"
+                      : "atencao"
+                  }
+                >
+                  {!integracao.contaGoogle || !integracao.googlePlanilha
+                    ? "Sem conexão"
+                    : integracao.preparada
+                      ? "Configurada"
+                      : "Preparar aba"}
+                </Selo>
+              </>
+            )
           }
           aberto={aberto}
           onChange={setAberto}
@@ -233,7 +241,7 @@ export default function IntegracaoParcial({
               <Typography variant="body2" sx={{ color: "text.secondary" }}>
                 Conferindo a integração...
               </Typography>
-            ) : (
+            ) : integracao ? (
               <Abas<PainelParcial>
                 itens={[
                   {
@@ -254,10 +262,11 @@ export default function IntegracaoParcial({
                 rotuloAcessivel="Ações da planilha de chamada parcial"
                 variant="scrollable"
               />
-            )}
+            ) : null}
             {erro ? (
               <AlertaCompacto variante="indisponivel" descricao={erro} tamanho="linha" />
             ) : null}
+            {!carregando && !integracao && erro ? atalhoParcial : null}
           </Stack>
         </Acordeao>
       </Box>

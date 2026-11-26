@@ -48,7 +48,7 @@ import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
 import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
 import { useAvisosDaSessao } from "@/lib/avisos";
-import { useSaidaSessao } from "@/components/entrada/transicao-sessao";
+import { useReferenciaDaSessao, useSaidaSessao } from "@/components/entrada/transicao-sessao";
 import type {
   Aluno,
   Configuracoes,
@@ -110,7 +110,7 @@ import {
   NiveisGaveta,
   type PassoGaveta,
 } from "@/components/layout/niveis-gaveta";
-import { QuadroDasVisoes } from "@/components/layout/quadro-das-visoes";
+import { LimiteLeituraDaVisao, QuadroDasVisoes } from "@/components/layout/quadro-das-visoes";
 
 export type Visao =
   | "painel"
@@ -279,8 +279,10 @@ function ListaGaveta({
   );
 }
 
+type AlvoChamada = { dia: string; turmaId: string };
 type DestinoNavegacao = {
   visao: Visao;
+  alvoChamada?: AlvoChamada;
   relatorio?: DestinoRelatorios;
   cadastro?: CadastroGestao;
   configuracao?: DestinoConfiguracoes;
@@ -591,6 +593,7 @@ export default function Aplicacao({
   resumoInicial,
 }: Props) {
   const { avisarErro } = useAvisosDaSessao();
+  const referenciaSessao = useReferenciaDaSessao();
   const ehAdmin = temCapacidade(usuario.papel, "administrar");
   const podeOperar = temCapacidade(usuario.papel, "operar");
   const pedida = visaoValida(visaoInicial);
@@ -648,7 +651,7 @@ export default function Aplicacao({
   const [resumo, setResumo] = useState<ResumoAcumulado | null>(resumoInicial);
   const [versaoFrequencias, setVersaoFrequencias] = useState(0);
   const [mes, setMes] = useState(diaCorrente.slice(0, 7));
-  const [alvo, setAlvo] = useState<{ dia: string; turmaId: string } | null>(null);
+  const [alvo, setAlvo] = useState<AlvoChamada | null>(null);
   const [pendencias, setPendencias] = useState<Visao[]>([]);
   const [configuracaoPendente, setConfiguracaoPendente] = useState(false);
   const [saidaComPendencia, setSaidaComPendencia] = useState(false);
@@ -660,6 +663,7 @@ export default function Aplicacao({
   const origemDialogoRef = useRef<HTMLElement | null>(null);
   const destinoConfirmadoRef = useRef<DestinoNavegacao | null>(null);
   const destinoAguardadoRef = useRef<DestinoNavegacao | null>(null);
+  const destinoEmTrocaRef = useRef<DestinoNavegacao | null>(null);
   const conteudoRef = useRef<HTMLElement | null>(null);
   const raizRef = useRef<HTMLDivElement | null>(null);
   const [offline, setOffline] = useState(false);
@@ -676,23 +680,34 @@ export default function Aplicacao({
       ?.scrollTo({ top: 0 });
   }, [destinoRelatorios]);
 
-  // O fechamento do modal e o commit da visão e seção podem ocorrer em qualquer ordem.
+  const correspondeAoDestino = useCallback(
+    (destino: DestinoNavegacao) =>
+      visao === destino.visao &&
+      (destino.relatorio === undefined || destinoRelatorios === destino.relatorio) &&
+      (destino.cadastro === undefined || (!emConfiguracoes && cadastro === destino.cadastro)) &&
+      (destino.configuracao === undefined ||
+        (emConfiguracoes && destinoConfiguracoes === destino.configuracao)),
+    [visao, destinoRelatorios, cadastro, emConfiguracoes, destinoConfiguracoes],
+  );
+
+  // O fechamento do modal e a prontidão do destino podem ocorrer em qualquer ordem.
   const tentarFocarVisaoAtiva = useCallback(() => {
     const destino = destinoAguardadoRef.current;
     if (
       !destino ||
-      visao !== destino.visao ||
-      (destino.relatorio !== undefined && destinoRelatorios !== destino.relatorio) ||
-      (destino.cadastro !== undefined && (emConfiguracoes || cadastro !== destino.cadastro)) ||
-      (destino.configuracao !== undefined &&
-        (!emConfiguracoes || destinoConfiguracoes !== destino.configuracao)) ||
+      !correspondeAoDestino(destino) ||
+      pagerRef.current?.inert ||
       raizRef.current?.hasAttribute("data-gaveta-aberta")
     )
       return;
     destinoAguardadoRef.current = null;
     focarTituloAtivo(conteudoRef.current);
-  }, [visao, destinoRelatorios, cadastro, emConfiguracoes, destinoConfiguracoes]);
-  useLayoutEffect(tentarFocarVisaoAtiva, [tentarFocarVisaoAtiva]);
+  }, [correspondeAoDestino]);
+  const aoFinalizarTroca = useCallback(() => {
+    const emTroca = destinoEmTrocaRef.current;
+    if (emTroca && correspondeAoDestino(emTroca)) destinoEmTrocaRef.current = null;
+    tentarFocarVisaoAtiva();
+  }, [correspondeAoDestino, tentarFocarVisaoAtiva]);
 
   function focarDepoisDoFechamento(destino: DestinoNavegacao) {
     destinoAguardadoRef.current = destino;
@@ -702,7 +717,7 @@ export default function Aplicacao({
   function aoFecharMenu(destino: DestinoFocoMenu) {
     niveis.limparExploracaoMovel();
     if (typeof destino === "object") focarDepoisDoFechamento(destino);
-    else if (destino === "largura") focarTituloAtivo(conteudoRef.current);
+    else if (destino === "largura") focarDepoisDoFechamento(destinoEmTrocaRef.current ?? { visao });
     else if (destino === "dialogo") tentarFocarVisaoAtiva();
   }
 
@@ -827,48 +842,60 @@ export default function Aplicacao({
       (alvo === "gestao" && configuracaoPendente),
     [pendencias, configuracaoPendente],
   );
-  const trocarVisao = useCallback(
-    (proxima: Visao) => {
-      if (!itens.some((item) => item.visao === proxima) || proxima === visao) return;
-      if (visaoComRascunho(visao)) {
-        setNavegacaoPendente({ visao: proxima });
+  const iniciarTroca = useCallback(
+    (destino: DestinoNavegacao, focarAoConcluir = false) => {
+      const emTroca = destinoEmTrocaRef.current;
+      if (correspondeAoDestino(destino) && (!emTroca || correspondeAoDestino(emTroca))) return;
+      destinoEmTrocaRef.current = destino;
+      destinoAguardadoRef.current = focarAoConcluir ? destino : null;
+      (iniciarTrocaRef.current ?? startTransition)(() => {
+        ativarVisao(destino.visao);
+        if (destino.alvoChamada) setAlvo(destino.alvoChamada);
+        if (destino.relatorio !== undefined) setDestinoRelatorios(destino.relatorio);
+        if (destino.cadastro !== undefined) {
+          setCadastro(destino.cadastro);
+          setEmConfiguracoes(false);
+        }
+        if (destino.configuracao !== undefined) {
+          setDestinoConfiguracoes(destino.configuracao);
+          setEmConfiguracoes(true);
+        }
+      });
+    },
+    [ativarVisao, correspondeAoDestino],
+  );
+
+  const escolherDestino = useCallback(
+    (destino: DestinoNavegacao, fecharMenu?: FecharMenu, focarAoConcluir = false) => {
+      if (!itens.some((item) => item.visao === destino.visao)) return;
+      if (destino.visao !== visao && visaoComRascunho(visao)) {
+        origemDialogoRef.current = fecharMenu
+          ? gatilhoMenuRef.current
+          : document.activeElement instanceof HTMLElement
+            ? document.activeElement
+            : null;
+        fecharMenu?.("dialogo");
+        setNavegacaoPendente(destino);
         return;
       }
-      ativarVisao(proxima);
+      fecharMenu?.(destino);
+      iniciarTroca(destino, focarAoConcluir);
     },
-    [ativarVisao, itens, setNavegacaoPendente, visao, visaoComRascunho],
+    [iniciarTroca, itens, visao, visaoComRascunho],
   );
-  function aplicarDestino(destino: DestinoNavegacao) {
-    ativarVisao(destino.visao);
-    if (destino.relatorio !== undefined) setDestinoRelatorios(destino.relatorio);
-    if (destino.cadastro !== undefined) {
-      setCadastro(destino.cadastro);
-      setEmConfiguracoes(false);
-    }
-    if (destino.configuracao !== undefined) {
-      setDestinoConfiguracoes(destino.configuracao);
-      setEmConfiguracoes(true);
-    }
+
+  function abrirPeloAtalho(proxima: Visao) {
+    escolherDestino({ visao: proxima }, undefined, true);
   }
 
-  function iniciarTroca(acao: () => void) {
-    (iniciarTrocaRef.current ?? startTransition)(acao);
-  }
-
-  function escolherDestino(destino: DestinoNavegacao, fecharMenu?: FecharMenu) {
-    if (destino.visao !== visao && visaoComRascunho(visao)) {
-      origemDialogoRef.current = fecharMenu
-        ? gatilhoMenuRef.current
-        : document.activeElement instanceof HTMLElement
-          ? document.activeElement
-          : null;
-      fecharMenu?.("dialogo");
-      setNavegacaoPendente(destino);
-      return;
-    }
-    fecharMenu?.(destino);
-    iniciarTroca(() => aplicarDestino(destino));
-  }
+  const chaveDoDestino =
+    visao === "relatorios"
+      ? `relatorios:${destinoRelatorios}`
+      : visao === "gestao"
+        ? emConfiguracoes
+          ? `configuracoes:${destinoConfiguracoes}`
+          : `gestao:${cadastro}`
+        : visao;
 
   const nivelDaVisao =
     visao === "gestao"
@@ -937,18 +964,25 @@ export default function Aplicacao({
     if (itens.some((item) => item.visao === visao)) return;
     const alvo = itens[Math.min(Math.max(indiceAtivo, 0), itens.length - 1)];
     if (!alvo || alvo.visao === visao) return;
-    const quadro = window.requestAnimationFrame(() => trocarVisao(alvo.visao));
+    const quadro = window.requestAnimationFrame(() => escolherDestino({ visao: alvo.visao }));
     return () => window.cancelAnimationFrame(quadro);
-  }, [itens, visao, trocarVisao, indiceAtivo]);
+  }, [itens, visao, escolherDestino, indiceAtivo]);
 
   function abrirFrequencia(dia: string, turmaId: string) {
-    setAlvo({ dia, turmaId });
-    trocarVisao("chamada");
-    requestAnimationFrame(() => {
-      const painel = pagerRef.current?.querySelector('[aria-label="Chamada"]');
-      if (painel instanceof HTMLElement) painel.scrollTo({ top: 0 });
-    });
+    const alvoChamada = { dia, turmaId };
+    if (visao === "chamada") setAlvo(alvoChamada);
+    else escolherDestino({ visao: "chamada", alvoChamada }, undefined, true);
   }
+
+  useLayoutEffect(() => {
+    if (!alvo) return;
+    const painel = pagerRef.current?.querySelector<HTMLElement>(
+      'section[aria-label="Chamada"]:not([hidden])',
+    );
+    if (!painel) return;
+    posicoes.current.delete("chamada");
+    painel.scrollTo({ top: 0 });
+  }, [alvo]);
 
   useEffect(() => {
     const item = itens.find((i) => i.visao === visao);
@@ -969,7 +1003,11 @@ export default function Aplicacao({
 
   useEffect(() => {
     function avisarSaida(evento: BeforeUnloadEvent) {
-      if (pendencias.length > 0 || configuracaoPendente || temRascunhoChamada(usuario.id)) {
+      if (
+        pendencias.length > 0 ||
+        configuracaoPendente ||
+        temRascunhoChamada(usuario.id, referenciaSessao)
+      ) {
         evento.preventDefault();
         evento.returnValue = "";
       }
@@ -988,7 +1026,7 @@ export default function Aplicacao({
       window.removeEventListener("offline", aoFicarOffline);
       window.removeEventListener("online", aoFicarOnline);
     };
-  }, [pendencias, configuracaoPendente, usuario.id]);
+  }, [pendencias, configuracaoPendente, usuario.id, referenciaSessao]);
 
   const { saindo, sair: executarSaida } = useSaidaSessao();
 
@@ -1030,7 +1068,7 @@ export default function Aplicacao({
             versaoFrequencias={versaoFrequencias}
             onFrequenciasMudaram={recarregarFrequencias}
             onPendencia={registrarPendenciasChamada}
-            onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}
+            onAbrirGestao={ehAdmin ? () => abrirPeloAtalho("gestao") : undefined}
           />
         )}
         {alvoVisao === "chamada-parcial" && podeOperar && (
@@ -1072,7 +1110,7 @@ export default function Aplicacao({
             leituraMensal={leituraSaidasMensais}
             onSaidasMudaram={recarregarSaidas}
             ativo={ativo}
-            onAbrirGestao={ehAdmin ? () => trocarVisao("gestao") : undefined}
+            onAbrirGestao={ehAdmin ? () => abrirPeloAtalho("gestao") : undefined}
           />
         )}
         {alvoVisao === "relatorios" && (
@@ -1139,8 +1177,8 @@ export default function Aplicacao({
             onHorariosMudaram={recarregarEscopo}
             onPendenciaHorarios={registrarPendenciaHorarios}
             onPendenciaConfiguracoes={setConfiguracaoPendente}
-            onAbrirSaidas={() => trocarVisao("saidas")}
-            onAbrirParcial={() => trocarVisao("chamada-parcial")}
+            onAbrirSaidas={() => abrirPeloAtalho("saidas")}
+            onAbrirParcial={() => abrirPeloAtalho("chamada-parcial")}
           />
         )}
       </>
@@ -1151,7 +1189,9 @@ export default function Aplicacao({
     origemDialogoRef.current = fecharMenu ? gatilhoMenuRef.current : gatilho;
     if (acao === "sair") {
       const pedeConfirmacao =
-        pendencias.length > 0 || configuracaoPendente || temRascunhoChamada(usuario.id);
+        pendencias.length > 0 ||
+        configuracaoPendente ||
+        temRascunhoChamada(usuario.id, referenciaSessao);
       fecharMenu?.(pedeConfirmacao ? "dialogo" : "gatilho");
       if (pedeConfirmacao) setSaidaComPendencia(true);
       else void executarSaida();
@@ -1518,7 +1558,12 @@ export default function Aplicacao({
                 Sem conexão. As marcações continuam na tela e precisam de internet para salvar.
               </Alert>
             ) : null}
-            <QuadroDasVisoes pagerRef={pagerRef} iniciarTrocaRef={iniciarTrocaRef}>
+            <QuadroDasVisoes
+              pagerRef={pagerRef}
+              iniciarTrocaRef={iniciarTrocaRef}
+              destino={chaveDoDestino}
+              onPronto={aoFinalizarTroca}
+            >
               {itens.map((item, indice) => {
                 const ativo = item.visao === visao;
                 const distante = Math.abs(indice - indiceAtivo) > 1;
@@ -1548,11 +1593,13 @@ export default function Aplicacao({
                         : {}),
                     }}
                   >
-                    <ProvedorVisibilidadeGraficos visivel={ativo}>
-                      <LayoutConteudo largura={larguraDaVisao(item.visao)}>
-                        {renderizarVisao(item.visao, ativo)}
-                      </LayoutConteudo>
-                    </ProvedorVisibilidadeGraficos>
+                    <LimiteLeituraDaVisao ativo={ativo}>
+                      <ProvedorVisibilidadeGraficos visivel={ativo}>
+                        <LayoutConteudo largura={larguraDaVisao(item.visao)}>
+                          {renderizarVisao(item.visao, ativo)}
+                        </LayoutConteudo>
+                      </ProvedorVisibilidadeGraficos>
+                    </LimiteLeituraDaVisao>
                   </Box>
                 );
               })}
@@ -1589,7 +1636,7 @@ export default function Aplicacao({
             setNavegacaoPendente(null);
             if (!proxima) return;
             destinoConfirmadoRef.current = proxima;
-            iniciarTroca(() => aplicarDestino(proxima));
+            iniciarTroca(proxima);
           }}
           onFechado={() => {
             const destino = destinoConfirmadoRef.current;

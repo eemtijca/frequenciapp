@@ -100,37 +100,91 @@ async function reterPost(
   return { pedidos: () => pedidos, liberar: () => liberacao.resolve() };
 }
 
-it.each(["normal", "strict"])("confirma a entrada uma vez no destino (%s)", async (modo) => {
-  await comPagina(async (pagina, atualizacoes) => {
-    const post = await reterPost(pagina, "entrar", { json: { usuario: { id: "diretor-teste" } } });
-    try {
-      await pagina.goto(modo === "strict" ? `${url}?strict` : url);
-      await autenticar(pagina);
-      const toast = pagina.getByText("Entrada confirmada.", { exact: true });
-      await esperar(
-        pagina.getByRole("button", { name: "Entrando...", exact: true }),
-      ).toBeDisabled();
-      await esperar.poll(post.pedidos).toBe(1);
-      await esperar(toast).toHaveCount(0);
-      expect(atualizacoes()).toBe(0);
-      post.liberar();
-      await esperar.poll(atualizacoes).toBe(1);
-      await esperar(toast).toHaveCount(0);
-      await esperar(pagina.getByLabel("Senha", { exact: true })).toHaveCount(0);
-      await esperar(
-        pagina.getByRole("status").filter({ hasText: "Abrindo o aplicativo..." }),
-      ).toBeVisible();
-      await esperar(pagina.locator('[aria-busy="true"]')).toBeVisible();
-      await esperar(pagina.getByRole("dialog")).toHaveCount(0);
-      await pagina.evaluate(() => window.dispatchEvent(new Event("fixture-painel")));
-      await esperar(pagina.getByRole("button", { name: "Sair da conta" })).toBeVisible();
-      await esperar(toast).toHaveCount(1);
-      expect(post.pedidos()).toBe(1);
-    } finally {
-      post.liberar();
-    }
-  });
-});
+it.each([
+  { largura: 320, tema: "light", strict: false },
+  { largura: 390, tema: "dark", strict: false },
+  { largura: 1280, tema: "dark", strict: true },
+] as const)(
+  "confirma a entrada uma vez no destino ($largura px, $tema)",
+  async ({ largura, tema, strict }) => {
+    await comPagina(
+      async (pagina, atualizacoes) => {
+        const post = await reterPost(pagina, "entrar", {
+          json: { usuario: { id: "diretor-teste" } },
+        });
+        try {
+          await pagina.goto(strict ? `${url}?strict` : url);
+          await pagina.evaluate(() => {
+            document.addEventListener(
+              "submit",
+              () => {
+                requestAnimationFrame(() => {
+                  const regioes = ["Navegação em carregamento", "Conteúdo em carregamento"];
+                  const elementos = regioes.map((rotulo) =>
+                    document.querySelector(`[aria-label="${rotulo}"]`),
+                  );
+                  const navegacao = elementos[0]?.getBoundingClientRect();
+                  const conteudo = elementos[1]?.getBoundingClientRect();
+                  const alinhadas =
+                    navegacao &&
+                    conteudo &&
+                    (innerWidth < 905
+                      ? navegacao.width === innerWidth && navegacao.bottom === conteudo.top
+                      : navegacao.width === 256 && navegacao.right === conteudo.left);
+                  const preenchidas = elementos.every(
+                    (regiao) =>
+                      regiao?.getBoundingClientRect().width &&
+                      Array.from(regiao.querySelectorAll("span")).some((forma) => {
+                        const { width, height } = forma.getBoundingClientRect();
+                        return (
+                          width > 0 &&
+                          height > 0 &&
+                          getComputedStyle(forma).animationName === "none"
+                        );
+                      }),
+                  );
+                  document.documentElement.dataset.primeiroQuadro =
+                    preenchidas && alinhadas ? "completo" : "incompleto";
+                  elementos[0]
+                    ?.closest('[aria-busy="true"]')
+                    ?.setAttribute("data-primeiro-esqueleto", "");
+                });
+              },
+              { capture: true, once: true },
+            );
+          });
+          await autenticar(pagina);
+          const toast = pagina.getByText("Entrada confirmada.", { exact: true });
+          await esperar.poll(post.pedidos).toBe(1);
+          await esperar(pagina.locator("html")).toHaveAttribute("data-primeiro-quadro", "completo");
+          const esqueleto = pagina.locator("[data-primeiro-esqueleto]");
+          await esperar(esqueleto).toBeVisible();
+          await esperar(pagina.getByLabel("Senha", { exact: true })).toBeHidden();
+          await esperar(pagina.getByRole("button", { name: "Sair da conta" })).toHaveCount(0);
+          await esperar(toast).toHaveCount(0);
+          expect(atualizacoes()).toBe(0);
+          post.liberar();
+          await esperar.poll(atualizacoes).toBe(1);
+          await esperar(toast).toHaveCount(0);
+          await esperar(pagina.getByLabel("Senha", { exact: true })).toHaveCount(0);
+          await esperar(
+            pagina.getByRole("status").filter({ hasText: "Abrindo o aplicativo..." }),
+          ).toBeVisible();
+          await esperar(esqueleto).toBeVisible();
+          await esperar(pagina.getByRole("dialog")).toHaveCount(0);
+          await pagina.evaluate(() => window.dispatchEvent(new Event("fixture-painel")));
+          await esperar(pagina.getByRole("button", { name: "Sair da conta" })).toBeVisible();
+          await esperar(toast).toHaveCount(1);
+          await esperar(esqueleto).toHaveCount(0);
+          expect(post.pedidos()).toBe(1);
+        } finally {
+          post.liberar();
+        }
+      },
+      { viewport: { width: largura, height: 844 }, colorScheme: tema },
+    );
+  },
+);
 
 it("saída retira o painel após o POST, mesmo com o BI e a entrada retidos", async () => {
   await comPagina(async (pagina, atualizacoes) => {
@@ -238,6 +292,7 @@ it.each([
       await esperar(pagina.getByText(error, { exact: true })).toBeVisible();
       if (titulo) await esperar(pagina.getByText(titulo, { exact: true })).toBeVisible();
       await esperar(pagina.getByRole("button", { name: "Entrar", exact: true })).toBeEnabled();
+      await esperar(pagina.getByLabel("Senha", { exact: true })).toBeFocused();
       await esperar(pagina.getByText("Entrada confirmada.")).toHaveCount(0);
       await esperar(pagina.getByText("Sessão expirada", { exact: true })).toHaveCount(0);
       expect(atualizacoes()).toBe(0);
@@ -274,6 +329,92 @@ it("recupera entrada não reconhecida pelo refresh sem repetir autenticação", 
   );
 });
 
+it("só recupera e protege o rascunho da Chamada na sessão que o criou", async () => {
+  await comPagina(async (pagina) => {
+    const painel = `${url}?autenticada&com-chamada`;
+    const marca = pagina.getByRole("button", { name: /^Aluno sintético:/ });
+    const bloqueiaSaida = () =>
+      pagina.evaluate(() => !window.dispatchEvent(new Event("beforeunload", { cancelable: true })));
+    const abrirPainel = async (sufixo: string) => {
+      await pagina.goto(`${painel}${sufixo}`);
+      await esperar(pagina.getByRole("group", { name: "Painel", exact: true })).toBeVisible();
+      await esperar(marca).toHaveCount(0);
+    };
+    await pagina.route("**/api/frequencias?*", (rota) =>
+      rota.fulfill({ json: { frequencias: [] } }),
+    );
+    await pagina.goto(`${painel}&visao=chamada`);
+    await marca.click();
+    await esperar(marca).toHaveAttribute("aria-pressed", "true");
+    await esperar.poll(bloqueiaSaida).toBe(true);
+    await pagina.reload();
+    await esperar(marca).toHaveAttribute("aria-pressed", "true");
+
+    await abrirPainel("");
+    await esperar.poll(bloqueiaSaida).toBe(true);
+    for (const sufixo of ["&outra-conta", "&nova-sessao", "&sem-referencia"]) {
+      await abrirPainel(sufixo);
+      expect(await bloqueiaSaida()).toBe(false);
+      await pagina.goto(`${painel}${sufixo}&visao=chamada`);
+      await esperar(marca).toBeEnabled();
+      await esperar(marca).toHaveAttribute("aria-pressed", "false");
+    }
+
+    await pagina.evaluate(() => {
+      sessionStorage.setItem(
+        "frequencia:rascunho:conta-chamada:2026-11-23:turma",
+        JSON.stringify({ versao: 3, revisao: 0, faltas: [{ alunoId: "aluno", horarios: [] }] }),
+      );
+    });
+    await abrirPainel("&nova-sessao");
+    expect(await bloqueiaSaida()).toBe(false);
+    await pagina.goto(`${painel}&nova-sessao&visao=chamada`);
+    await esperar(marca).toBeEnabled();
+    await esperar(marca).toHaveAttribute("aria-pressed", "false");
+    await marca.click();
+    await esperar.poll(bloqueiaSaida).toBe(true);
+    await pagina.reload();
+    await esperar(marca).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+it("espera o destino de outra sessão da mesma conta depois de expurgar o BI", async () => {
+  await comPagina(async (pagina, atualizacoes) => {
+    const post = await reterPost(pagina, "sair", {
+      status: 503,
+      json: { error: "Falha ao sair." },
+    });
+    await pagina.route("**/api/auth/sessao", (rota) =>
+      rota.fulfill({
+        json: { usuario: { id: "diretor-teste" }, referenciaSessao: "N".repeat(43) },
+      }),
+    );
+    try {
+      await pagina.goto(`${url}?autenticada`);
+      await pagina.evaluate(() => localStorage.setItem("frequencibi:chave", "chave-sintetica"));
+      const sair = pagina.getByRole("button", { name: "Sair da conta" });
+      await sair.click();
+      post.liberar();
+      await esperar(
+        pagina.getByRole("status").filter({ hasText: /^Abrindo o aplicativo\.\.\.$/ }),
+      ).toBeVisible();
+      await esperar.poll(atualizacoes).toBe(1);
+      expect(await pagina.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBeNull();
+      await esperar(sair).toHaveCount(0);
+      await pagina.evaluate(() => window.dispatchEvent(new Event("fixture-painel")));
+      await esperar(sair).toHaveCount(0);
+      await pagina.evaluate(() => window.dispatchEvent(new Event("fixture-outro-painel")));
+      await esperar(pagina.getByText("Painel da nova sessão sintética")).toBeVisible();
+      await esperar(sair).toBeEnabled();
+      await esperar(pagina.getByText("Sessão encerrada.")).toHaveCount(0);
+      await esperar(pagina.getByText("Entrada confirmada.")).toHaveCount(0);
+      expect(post.pedidos()).toBe(1);
+    } finally {
+      post.liberar();
+    }
+  });
+});
+
 it("falha na revogação mantém o diretor operável e não inicia o expurgo", async () => {
   await comPagina(async (pagina, atualizacoes) => {
     const mensagem = "Não foi possível encerrar a sessão agora.";
@@ -281,7 +422,9 @@ it("falha na revogação mantém o diretor operável e não inicia o expurgo", a
     let leituras = 0;
     await pagina.route("**/api/auth/sessao", (rota) => {
       leituras += 1;
-      return rota.fulfill({ json: { usuario: { id: "diretor-teste" } } });
+      return rota.fulfill({
+        json: { usuario: { id: "diretor-teste" }, referenciaSessao: "O".repeat(43) },
+      });
     });
     try {
       await pagina.goto(`${url}?autenticada`);
@@ -305,32 +448,95 @@ it("falha na revogação mantém o diretor operável e não inicia o expurgo", a
   });
 });
 
-it("reconcilia uma saída incerta sem novo POST nem painel enquanto a sessão é desconhecida", async () => {
+it.each([null, "diretor-teste"])("reconcilia saída incerta em modal (sessão: %s)", async (id) => {
   await comPagina(async (pagina, atualizacoes) => {
     const post = await reterPost(pagina, "sair", {
       status: 503,
       json: { error: "Falha ao sair." },
     });
     let leituras = 0;
-    await pagina.route("**/api/auth/sessao", (rota) =>
-      ++leituras === 1 ? rota.abort() : rota.fulfill({ json: { usuario: null } }),
-    );
-    await pagina.goto(`${url}?autenticada`);
-    const painel = pagina.getByRole("heading", { name: "Minhas turmas" });
-    await pagina.getByRole("button", { name: "Sair da conta" }).click();
-    post.liberar();
-    const tentar = pagina.getByRole("button", { name: "Tentar novamente" });
-    await esperar(tentar).toBeVisible();
-    await esperar(pagina.getByRole("button", { name: "Reabrir página" })).toHaveCount(0);
-    await esperar(painel).toHaveCount(0);
-    await esperar(pagina.getByText("Sessão encerrada.")).toHaveCount(0);
-    expect(atualizacoes()).toBe(0);
-    await tentar.click({ clickCount: 2 });
-    await esperar.poll(atualizacoes).toBe(1);
-    await pagina.evaluate(() => window.dispatchEvent(new Event("fixture-entrada")));
-    await esperar(pagina.getByText("Sessão encerrada.")).toHaveCount(1);
-    expect(leituras).toBe(2);
-    expect(post.pedidos()).toBe(1);
+    const repetir = Promise.withResolvers<void>();
+    await pagina.route("**/api/auth/sessao", async (rota) => {
+      expect(rota.request().method()).toBe("GET");
+      if (++leituras === 1) return rota.abort();
+      if (leituras === 2) {
+        await repetir.promise;
+        // A conta pode estar presente sem que a sessão seja comprovada.
+        return rota.fulfill({
+          json: {
+            usuario: { id: "diretor-teste" },
+            ...(id ? { referenciaSessao: "malformada" } : {}),
+          },
+        });
+      }
+      return rota.fulfill({
+        json: id ? { usuario: { id }, referenciaSessao: "O".repeat(43) } : { usuario: null },
+      });
+    });
+    try {
+      await pagina.goto(`${url}?autenticada`);
+      await pagina.evaluate(() => localStorage.setItem("frequencibi:chave", "chave-sintetica"));
+      const painel = pagina.getByText("Minhas turmas", { exact: true });
+      const sair = pagina.getByRole("button", { name: "Sair da conta" });
+      const toast = pagina.getByText("Sessão encerrada.", { exact: true });
+      const modal = pagina.getByRole("dialog", {
+        name: "Não foi possível confirmar o encerramento",
+      });
+      const tentar = modal.getByRole("button", { name: "Tentar novamente" });
+      await sair.click();
+      post.liberar();
+      await esperar(modal).toBeVisible();
+      await esperar(tentar).toBeFocused();
+      await esperar(modal.getByRole("button", { name: "Fechar" })).toBeDisabled();
+      await pagina.keyboard.press("Tab");
+      await esperar(tentar).toBeFocused();
+      await pagina.keyboard.press("Escape");
+      await pagina.touchscreen.tap(5, 5);
+      await esperar(modal).toBeVisible();
+      await esperar(pagina.getByRole("button", { name: "Reabrir página" })).toHaveCount(0);
+      await esperar(painel).toBeHidden();
+      await esperar(toast).toHaveCount(0);
+      expect(leituras).toBe(1);
+      expect(atualizacoes()).toBe(0);
+
+      await tentar.press("Enter");
+      await esperar.poll(() => leituras).toBe(2);
+      await esperar(tentar).toBeDisabled();
+      await tentar.press("Enter");
+      await esperar(modal.getByRole("status")).toHaveText(
+        "Verificando se a sessão foi encerrada...",
+      );
+      await esperar(painel).toBeHidden();
+      repetir.resolve();
+      await esperar(tentar).toBeEnabled();
+      await esperar(tentar).toBeFocused();
+      await esperar(painel).toBeHidden();
+      expect(leituras).toBe(2);
+      await tentar.tap();
+
+      if (id) {
+        await esperar(pagina.getByText("Falha ao sair.", { exact: true })).toBeVisible();
+        await esperar(painel).toBeVisible();
+        await esperar(sair).toBeEnabled();
+        expect(atualizacoes()).toBe(0);
+        expect(await pagina.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBe(
+          "chave-sintetica",
+        );
+      } else {
+        await esperar.poll(atualizacoes).toBe(1);
+        await esperar(painel).toBeHidden();
+        expect(await pagina.evaluate(() => localStorage.getItem("frequencibi:chave"))).toBeNull();
+        await esperar(toast).toHaveCount(0);
+        await pagina.evaluate(() => window.dispatchEvent(new Event("fixture-entrada")));
+        await esperar(toast).toHaveCount(1);
+      }
+      await esperar(modal).toHaveCount(0);
+      expect(leituras).toBe(3);
+      expect(post.pedidos()).toBe(1);
+    } finally {
+      post.liberar();
+      repetir.resolve();
+    }
   });
 });
 

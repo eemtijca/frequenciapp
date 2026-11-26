@@ -366,6 +366,15 @@
         "description": "Devolve o usuário autenticado ou nulo. Usada na abertura do aplicativo.",
         "tags": ["autenticacao"],
         "security": [],
+        "parameters": [
+          {
+            "name": "X-Frequenciapp-Referencia-Sessao",
+            "in": "header",
+            "required": false,
+            "description": "Envie 1 para incluir a referência opaca da sessão válida. Ela serve para comparação na interface, não para autenticação.",
+            "schema": { "type": "string", "const": "1" }
+          }
+        ],
         "responses": {
           "200": {
             "description": "Sessão corrente ou nula.",
@@ -387,6 +396,16 @@
                       }
                     }
                   }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha inesperada ao consultar a sessão; resposta sem cache.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
                 }
               }
             }
@@ -2900,7 +2919,7 @@
       "get": {
         "operationId": "listarFrequencias",
         "summary": "Consultar frequências por dia, mês ou período",
-        "description": "Qualquer sessão da operação. Com dia e turma devolve a chamada e o feriado; com mês, com período ou com dia sem turma devolve as frequências.",
+        "description": "Qualquer sessão da operação. Com dia e turma devolve a chamada e o feriado; com mês, com período ou com dia sem turma devolve as frequências. Com verificarHistorico=true, dia e turmaId, devolve apenas se a confirmação histórica é necessária, sem gravar nem acionar a fila.",
         "tags": ["frequencias"],
         "parameters": [
           {
@@ -2968,11 +2987,20 @@
               "format": "uuid"
             },
             "example": "9d2f5b1a-3f70-4c8e-9c1d-2a6e7b4c5d30"
+          },
+          {
+            "name": "verificarHistorico",
+            "in": "query",
+            "description": "Ativa a verificação com o valor true. Exige dia e turmaId e não aceita mes, de, ate ou registradoPor.",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Frequências conforme os parâmetros.",
+            "description": "Frequências ou resultado da verificação histórica, conforme os parâmetros.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2984,6 +3012,12 @@
                     "value": {
                       "frequencia": null,
                       "feriado": null
+                    }
+                  },
+                  "VerificacaoHistorica": {
+                    "summary": "Primeira chamada com composição não comprovada",
+                    "value": {
+                      "requerConfirmacaoHistorica": true
                     }
                   }
                 }
@@ -2998,6 +3032,9 @@
           },
           "403": {
             "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
@@ -3100,7 +3137,7 @@
             "$ref": "#/components/responses/Erro404"
           },
           "409": {
-            "description": "Revisão obsoleta com a versão vigente, propostas alteradas com codigo JUSTIFICATIVAS_ALTERADAS ou composição histórica não comprovada com codigo CONFIRMACAO_HISTORICA_NECESSARIA, sem gravação.",
+            "description": "Revisão obsoleta com a versão vigente, propostas alteradas (JUSTIFICATIVAS_ALTERADAS), composição histórica sem confirmação (CONFIRMACAO_HISTORICA_NECESSARIA) ou lista histórica divergente da revisão (LISTA_HISTORICA_ALTERADA). Não grava.",
             "content": {
               "application/json": {
                 "schema": {
@@ -3126,7 +3163,7 @@
                   "Confirmacao historica": {
                     "summary": "Confirmacao historica necessaria",
                     "value": {
-                      "error": "A composição desta turma na data não pode ser comprovada. Confirme o lançamento histórico e informe o motivo.",
+                      "error": "Não foi possível comprovar a composição desta turma na data. Confirme o lançamento histórico.",
                       "codigo": "CONFIRMACAO_HISTORICA_NECESSARIA"
                     }
                   }
@@ -13010,6 +13047,11 @@
               }
             ],
             "description": "Usuário autenticado ou null."
+          },
+          "referenciaSessao": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "description": "Referência opaca, presente somente quando solicitada pelo cabeçalho e há sessão válida. Não é uma credencial."
           }
         }
       },
@@ -14478,16 +14520,20 @@
             "description": "Libera o sábado com aula. Só é aceito no sábado.",
             "example": false
           },
+          "listaRevisada": {
+            "type": "array",
+            "description": "Identificadores dos alunos exibidos na revisão do primeiro lançamento histórico. Quando enviada, a lista deve coincidir, sem considerar a ordem e sem duplicatas, com a lista gravada pela transação.",
+            "items": { "type": "string", "format": "uuid" }
+          },
           "confirmarHistorico": {
             "type": "boolean",
-            "description": "Confirma a chamada em data passada quando a composição da turma não pode ser comprovada. Exige motivo.",
+            "description": "Confirma a chamada em data passada quando a composição da turma não pode ser comprovada. A confirmação da primeira gravação é auditada mesmo sem motivo.",
             "example": true
           },
           "motivo": {
             "type": "string",
-            "minLength": 3,
-            "maxLength": 200,
-            "description": "Motivo da confirmação histórica. Obrigatório com confirmarHistorico.",
+            "pattern": "^\\s*(?:\\S[\\s\\S]{1,198}\\S)?\\s*$",
+            "description": "Motivo opcional, aceito apenas com confirmarHistorico: true. Após remover espaços das extremidades, deve estar vazio ou ter de 3 a 200 caracteres.",
             "example": "Chamada do diário de papel"
           },
           "faltas": {
@@ -18860,10 +18906,21 @@
           },
           {
             "$ref": "#/components/schemas/FrequenciasComFeriado"
+          },
+          {
+            "type": "object",
+            "required": ["requerConfirmacaoHistorica"],
+            "additionalProperties": false,
+            "properties": {
+              "requerConfirmacaoHistorica": {
+                "type": "boolean",
+                "description": "Indica se a primeira chamada para a turma e o dia passado exige confirmação explícita."
+              }
+            }
           }
         ],
         "title": "Resposta da consulta de frequências",
-        "description": "A forma depende dos parâmetros: com dia e turma vem frequencia e feriado; com mês ou período vem frequencias; com dia sem turma vem frequencias e feriado."
+        "description": "A forma depende dos parâmetros: a verificação histórica devolve requerConfirmacaoHistorica; com dia e turma vem frequencia e feriado; com mês ou período vem frequencias; com dia sem turma vem frequencias e feriado."
       },
       "SincronizacaoResultado": {
         "type": "object",

@@ -12,6 +12,7 @@ import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import Fade from "@mui/material/Fade";
 import Stack from "@mui/material/Stack";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { ESPACO_COMPOSICAO } from "@/theme/layout";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
@@ -95,6 +96,7 @@ export default function VistaGrade({
   const [diaBase, setDiaBase] = useState(hoje);
   const [diaFim, setDiaFim] = useState(hoje);
   const [doPeriodo, setDoPeriodo] = useState<Frequencia[] | null>(null);
+  useLeituraDaVisao(aberto && modo !== "mes" && doPeriodo === null && !erro);
   const [carregandoPeriodo, setCarregandoPeriodo] = useState(false);
   const [envioAberto, setEnvioAberto] = useState(false);
   const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilha();

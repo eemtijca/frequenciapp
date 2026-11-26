@@ -62,6 +62,7 @@ import { Selecionar } from "@/components/ui/mui/selecionar";
 import { Selo, type TomSelo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 import {
@@ -324,6 +325,7 @@ export default function VistaFrequenciaParcial({
     carga.chave === chaveCarga && carga.feriado !== undefined ? carga.feriado : feriadoCadastrado;
   const registros = carga.chave === chaveCarga ? carga.registros : REGISTROS_VAZIOS;
   const carregando = !nav.resumo && turmaId !== "" && carga.chave !== chaveCarga;
+  useLeituraDaVisao(carregando);
   const erro = carga.chave === chaveCarga ? carga.erro : "";
   const [editorAberto, setEditorAberto] = useState(false);
   const [baseEdicao, setBaseEdicao] = useState<FrequenciaDaChamada | null>(null);

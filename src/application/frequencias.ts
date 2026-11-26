@@ -7,7 +7,7 @@ import { z } from "zod";
 import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
-import { comTransacao } from "@/infra/transacoes";
+import { comTransacao, type Transacao } from "@/infra/transacoes";
 import { ErroHttp, ehConflitoDeSerializacao, ehDuplicidade } from "@/infra/erros";
 import {
   diaDaSemanaIso,
@@ -50,6 +50,8 @@ export const esquemaSalvarFrequencia = z
     ]),
     revisao: z.number().int().min(0, "Revisão inválida.").max(999999),
     sabadoLetivo: z.boolean().optional(),
+    // Precondição dos clientes com revisão, não uma fonte de matrícula.
+    listaRevisada: z.array(z.uuid("Aluno inválido na lista revisada.")).optional(),
     justificativasAntecipadas: z
       .array(z.object({ id: z.uuid(), revisao: z.number().int().min(1) }).strict())
       .max(500)
@@ -60,19 +62,14 @@ export const esquemaSalvarFrequencia = z
     motivo: z
       .string()
       .trim()
-      .min(3, "Informe o motivo da confirmação histórica.")
+      .refine((motivo) => motivo.length === 0 || motivo.length >= 3, {
+        message: "O motivo deve ter pelo menos 3 caracteres.",
+      })
       .max(200, "O motivo deve ter no máximo 200 caracteres.")
       .optional(),
   })
   .superRefine((dados, contexto) => {
-    if (dados.confirmarHistorico && !dados.motivo) {
-      contexto.addIssue({
-        code: "custom",
-        path: ["motivo"],
-        message: "Informe o motivo da confirmação histórica.",
-      });
-    }
-    if (!dados.confirmarHistorico && dados.motivo) {
+    if (!dados.confirmarHistorico && dados.motivo !== undefined) {
       contexto.addIssue({
         code: "custom",
         path: ["motivo"],
@@ -189,6 +186,51 @@ export async function carregarFrequencia(turmaId: string, dia: string): Promise<
     ...COMPLEMENTO,
   });
   return linha ? paraFrequencia(linha) : null;
+}
+
+async function composicaoHistoricaIncerta(
+  tx: Parameters<Transacao<unknown>>[0],
+  turma: { id: string; criadoEm: Date },
+  dia: string,
+): Promise<boolean> {
+  const turmaId = turma.id;
+  const candidatos = await tx.aluno.findMany({
+    where: { OR: [{ turmaId }, { turmaOriginalId: turmaId }] },
+    select: {
+      id: true,
+      turmaId: true,
+      turmaOriginalId: true,
+      ativo: true,
+      criadoEm: true,
+      desistenteEm: true,
+    },
+  });
+  return !avaliarComposicaoHistorica(
+    { id: turma.id, criadoEm: diaLocal(turma.criadoEm, ambiente.fuso) },
+    candidatos.map((aluno) => ({
+      ...aluno,
+      criadoEm: diaLocal(aluno.criadoEm, ambiente.fuso),
+      desistenteEm: aluno.desistenteEm?.toISOString().slice(0, 10) ?? null,
+    })),
+    dia,
+  ).compativel;
+}
+
+/** Consulta só a necessidade de confirmação; o POST repete a decisão. */
+export async function requerConfirmacaoHistorica(turmaId: string, dia: string): Promise<boolean> {
+  return comTransacao(async (tx) => {
+    const turma = await tx.turma.findUnique({
+      where: { id: turmaId },
+      select: { id: true, criadoEm: true },
+    });
+    if (!turma) throw new ErroHttp("Turma não encontrada.", 404);
+    if (dia >= diaLocal(new Date(), ambiente.fuso)) return false;
+    const existente = await tx.frequencia.findUnique({
+      where: { turmaId_dia: { turmaId, dia: new Date(`${dia}T12:00:00Z`) } },
+      select: { id: true },
+    });
+    return !existente && (await composicaoHistoricaIncerta(tx, turma, dia));
+  });
 }
 
 /** Todas as frequências de um mês, com filtros opcionais de turma e autoria. */
@@ -309,7 +351,6 @@ export async function salvarFrequencia(
   }
   const { dia, turmaId, revisao } = dados.data;
   const confirmarHistorico = dados.data.confirmarHistorico === true;
-  const motivoHistorico = dados.data.motivo ?? null;
 
   if (ehDomingo(dia)) {
     throw new ErroHttp("Domingo não tem aula nem chamada.", 400);
@@ -426,33 +467,31 @@ export async function salvarFrequencia(
         where: { turmaId_dia: filtroFrequencia },
         ...COMPLEMENTO,
       });
+      const alunosDaTurma = await tx.aluno.findMany({
+        where: { turmaId, ativo: true },
+        select: { id: true },
+      });
 
       // A chamada existente manda: sua lista gravada é o retrato da data.
       // Sem retrato, só uma composição atual compatível dispensa confirmação.
       if (!existente && dia < hoje) {
-        const candidatos = await tx.aluno.findMany({
-          where: { OR: [{ turmaId }, { turmaOriginalId: turmaId }] },
-          select: {
-            id: true,
-            turmaId: true,
-            turmaOriginalId: true,
-            ativo: true,
-            criadoEm: true,
-            desistenteEm: true,
-          },
-        });
-        const composicao = avaliarComposicaoHistorica(
-          { id: turma.id, criadoEm: diaLocal(turma.criadoEm, ambiente.fuso) },
-          candidatos.map((aluno) => ({
-            ...aluno,
-            criadoEm: diaLocal(aluno.criadoEm, ambiente.fuso),
-            desistenteEm: aluno.desistenteEm?.toISOString().slice(0, 10) ?? null,
-          })),
-          dia,
-        );
-        if (!composicao.compativel && !confirmarHistorico) {
+        if (revisao === 0 && dados.data.listaRevisada) {
+          const revisada = new Set(dados.data.listaRevisada);
+          if (
+            revisada.size !== dados.data.listaRevisada.length ||
+            revisada.size !== alunosDaTurma.length ||
+            alunosDaTurma.some(({ id }) => !revisada.has(id))
+          ) {
+            throw new ErroHttp(
+              "A lista desta chamada histórica mudou. Atualize a página e confira as marcações antes de salvar de novo.",
+              409,
+              "LISTA_HISTORICA_ALTERADA",
+            );
+          }
+        }
+        if ((await composicaoHistoricaIncerta(tx, turma, dia)) && !confirmarHistorico) {
           throw new ErroHttp(
-            "A composição desta turma na data não pode ser comprovada. Confirme o lançamento histórico e informe o motivo.",
+            "Não foi possível comprovar a composição desta turma na data. Confirme o lançamento histórico.",
             409,
             "CONFIRMACAO_HISTORICA_NECESSARIA",
           );
@@ -524,10 +563,6 @@ export async function salvarFrequencia(
           })),
         ),
       ];
-      const alunosDaTurma = await tx.aluno.findMany({
-        where: { turmaId, ativo: true },
-        select: { id: true },
-      });
       const listaGravada = existente?.alunos.map((item) => item.alunoId) ?? [];
       const idsValidos = new Set([
         ...alunosDaTurma.map((aluno) => aluno.id),
@@ -547,6 +582,7 @@ export async function salvarFrequencia(
       // Lista da chamada: na primeira vez, os ativos da turma atual. Depois,
       // a lista gravada continua; só o dia corrente recebe quem entrou na
       // turma, para um aluno movido não aparecer em chamadas antigas.
+      // Sem registro existente, a validação de faltas já limita os ausentes aos ativos.
       const ausentes = ausencias.map((ausencia) => ausencia.alunoId);
       const lista = new Set(
         existente
@@ -614,7 +650,7 @@ export async function salvarFrequencia(
           turmaId,
           autorId: identidade.id,
         });
-        if (dia < hoje && confirmarHistorico && motivoHistorico) {
+        if (dia < hoje && confirmarHistorico) {
           await tx.confirmacaoHistorica.create({
             data: {
               frequenciaId: criada.id,
@@ -623,7 +659,7 @@ export async function salvarFrequencia(
               turmaId,
               autorId: identidade.id,
               autorNome: identidade.nome,
-              motivo: motivoHistorico,
+              motivo: dados.data.motivo ?? "",
               alunosSnapshot: [...lista].sort(),
             },
           });

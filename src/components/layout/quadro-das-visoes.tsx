@@ -2,8 +2,12 @@
 
 // A espera da troca ocupa só o conteúdo, sem deslocar a navegação.
 import {
-  useEffect,
+  createContext,
+  useCallback,
+  useContext,
   useImperativeHandle,
+  useLayoutEffect,
+  useRef,
   useState,
   useTransition,
   type ReactNode,
@@ -16,19 +20,72 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 
+type RegistrarLeitura = () => () => void;
+const ContextoLeitura = createContext<RegistrarLeitura | null>(null);
+
+export function LimiteLeituraDaVisao({ ativo, children }: { ativo: boolean; children: ReactNode }) {
+  const registrar = useContext(ContextoLeitura);
+  return <ContextoLeitura value={ativo ? registrar : null}>{children}</ContextoLeitura>;
+}
+
+// Sinaliza uma leitura que impede o primeiro uso do destino, não uma carga secundária.
+export function useLeituraDaVisao(pendente: boolean) {
+  const registrar = useContext(ContextoLeitura);
+  useLayoutEffect(() => {
+    if (pendente) return registrar?.();
+  }, [pendente, registrar]);
+}
+
 export function QuadroDasVisoes({
   iniciarTrocaRef,
   pagerRef,
+  destino,
+  onPronto,
   children,
 }: {
   iniciarTrocaRef: Ref<(acao: () => void) => void>;
   pagerRef: RefObject<HTMLDivElement | null>;
+  destino: string;
+  onPronto: () => void;
   children: ReactNode;
 }) {
   // A atualização urgente de pendência não passa pelo shell nem pelas visões.
   const [pendente, iniciarTroca] = useTransition();
   useImperativeHandle(iniciarTrocaRef, () => iniciarTroca, [iniciarTroca]);
-  const mostrar = useEsperaProlongada(pendente);
+  const [ciclo, setCiclo] = useState({ destino, pronto: true });
+  if (ciclo.destino !== destino) setCiclo({ destino, pronto: false });
+  const leituras = useRef(0);
+  const concluirRef = useRef<(() => void) | null>(null);
+  const registrar = useCallback(() => {
+    leituras.current++;
+    return () => {
+      if (--leituras.current === 0) {
+        // No mesmo commit, o próximo painel ainda pode registrar sua leitura.
+        queueMicrotask(() => concluirRef.current?.());
+      }
+    };
+  }, []);
+  const concluir = useCallback(() => {
+    if (!pendente && leituras.current === 0) {
+      setCiclo((atual) =>
+        atual.destino === destino && !atual.pronto ? { destino, pronto: true } : atual,
+      );
+    }
+  }, [destino, pendente]);
+
+  useLayoutEffect(() => {
+    concluirRef.current = concluir;
+    concluir();
+    return () => {
+      concluirRef.current = null;
+    };
+  }, [concluir]);
+
+  // A troca e a leitura usam o mesmo indicador, sem uma pintura entre as fases.
+  const mostrar = pendente || !ciclo.pronto;
+  useLayoutEffect(() => {
+    if (!mostrar) onPronto();
+  }, [mostrar, onPronto]);
 
   return (
     <Box sx={{ position: "relative", flex: 1, minHeight: 0, overflow: "hidden" }}>
@@ -37,15 +94,17 @@ export function QuadroDasVisoes({
         data-pager="principal"
         aria-busy={mostrar || undefined}
         inert={mostrar}
-        sx={{ height: "100%", overflow: "hidden" }}
+        aria-hidden={mostrar || undefined}
+        sx={{ position: "relative", zIndex: 0, height: "100%", overflow: "hidden" }}
       >
-        {children}
+        <ContextoLeitura value={registrar}>{children}</ContextoLeitura>
       </Box>
       {mostrar ? (
         <Box
           sx={{
             position: "absolute",
             inset: 0,
+            zIndex: 1,
             bgcolor: "background.default",
             px: { xs: 2, md: 4 },
             pt: 2,
@@ -58,20 +117,10 @@ export function QuadroDasVisoes({
   );
 }
 
-function useEsperaProlongada(pendente: boolean) {
-  const [ciclo, setCiclo] = useState({ pendente, mostrar: false });
-  if (ciclo.pendente !== pendente) setCiclo({ pendente, mostrar: false });
-  useEffect(() => {
-    if (!pendente) return;
-    const timer = window.setTimeout(() => setCiclo({ pendente: true, mostrar: true }), 200);
-    return () => window.clearTimeout(timer);
-  }, [pendente]);
-  return pendente && ciclo.mostrar;
-}
-
 // Para leituras indispensáveis iniciadas depois que a visão já montou.
 export function EsperaDaVisao({ rotulo }: { rotulo: string }) {
-  return useEsperaProlongada(true) ? <EsqueletoDaVisao rotulo={rotulo} /> : null;
+  useLeituraDaVisao(true);
+  return <EsqueletoDaVisao rotulo={rotulo} />;
 }
 
 function EsqueletoDaVisao({ rotulo }: { rotulo: string }) {

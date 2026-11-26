@@ -43,7 +43,21 @@ const tela = (
     seriesIniciais={[{ id: "serie-1", nome: "1º ano", ordem: 1 }]}
     turmasIniciais={turmas}
     alunosIniciais={[]}
-    frequenciasIniciais={[]}
+    frequenciasIniciais={
+      parametros.has("historico-com-frequencia")
+        ? [
+            {
+              dia: "2026-03-09",
+              turmaId: "turma-1",
+              revisao: 1,
+              atualizadoEm: "2026-03-09T12:00:00.000Z",
+              atualizadoPorNome: null,
+              faltas: [],
+              alunos: [],
+            },
+          ]
+        : []
+    }
     saidasIniciais={[]}
     resumoInicial={null}
   />
@@ -53,7 +67,9 @@ createRoot(root).render(
     <Suspense fallback={<p>Carregando tela de teste</p>}>
       {parametros.has("sessao-teste") ? (
         <ProvedorTransicaoSessao>
-          <DestinoSessao usuarioId="teste">{tela}</DestinoSessao>
+          <DestinoSessao usuarioId="teste" referenciaSessao={"G".repeat(43)}>
+            {tela}
+          </DestinoSessao>
         </ProvedorTransicaoSessao>
       ) : (
         <EscopoAvisosDaSessao autenticado>{tela}</EscopoAvisosDaSessao>

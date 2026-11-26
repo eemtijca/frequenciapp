@@ -1,6 +1,7 @@
 // Visões reais, com dados sintéticos e rede controlada pelo teste.
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
+import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import Box from "@mui/material/Box";
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
@@ -12,6 +13,11 @@ import VistaGrade from "@/components/grade/vista-grade";
 import VistaMovimentacoes from "@/components/relatorios/vista-movimentacoes";
 import VistaPainel from "@/components/painel/vista-painel";
 import VistaFrequencia from "@/components/chamada/vista-frequencia";
+import {
+  DestinoSessao,
+  ProvedorTransicaoSessao,
+  useSaidaSessao,
+} from "@/components/entrada/transicao-sessao";
 import VistaFrequenciaParcial from "@/components/chamada-parcial/vista-frequencia-parcial";
 import VistaEntradas from "@/components/movimentacoes/vista-entradas";
 import VistaSaidas from "@/components/movimentacoes/vista-saidas";
@@ -116,7 +122,17 @@ function AvisosESobre() {
   );
 }
 
-function ChamadaComMarcas({ aoSalvar = vazio }: { aoSalvar?: typeof vazio }) {
+const alvoHistorico = { dia: "2026-11-24", turmaId: turma.id };
+
+function ChamadaComMarcas({
+  aoSalvar = vazio,
+  historica = false,
+  ativo = true,
+}: {
+  aoSalvar?: typeof vazio;
+  historica?: boolean;
+  ativo?: boolean;
+}) {
   return (
     <VistaFrequencia
       {...comum}
@@ -139,14 +155,63 @@ function ChamadaComMarcas({ aoSalvar = vazio }: { aoSalvar?: typeof vazio }) {
         papel: "ADMIN",
         ativo: true,
       }}
-      ativo
-      alvo={null}
+      ativo={ativo}
+      alvo={historica ? alvoHistorico : null}
       configuracoes={CONFIGURACOES_PADRAO}
       catalogoJustificativas={[{ codigo: "At", rotulo: "Atestado", ativo: true }]}
       versaoFrequencias={0}
       onFrequenciasMudaram={aoSalvar}
       onPendencia={() => {}}
     />
+  );
+}
+
+function ChamadaComTrocaDeAtividade() {
+  const [ativa, setAtiva] = useState(true);
+  return (
+    <DestinoSessao usuarioId="teste" referenciaSessao={"R".repeat(43)}>
+      <button type="button" onClick={() => setAtiva(!ativa)}>
+        {ativa ? "Sair da Chamada" : "Voltar à Chamada"}
+      </button>
+      <ChamadaComMarcas ativo={ativa} />
+      <ProvedorAvisos />
+    </DestinoSessao>
+  );
+}
+
+function AcaoDeSaida() {
+  const { sair, saindo } = useSaidaSessao();
+  return (
+    <button type="button" disabled={saindo} onClick={() => void sair()}>
+      Sair da conta
+    </button>
+  );
+}
+
+function ChamadaComRetomadaDeSessao() {
+  const navegacaoInesperada = () => {
+    throw new Error("A confirmação da mesma sessão não deve navegar.");
+  };
+  return (
+    <AppRouterContext.Provider
+      value={{
+        bfcacheId: "fixture-chamada",
+        back: navegacaoInesperada,
+        forward: navegacaoInesperada,
+        push: navegacaoInesperada,
+        replace: navegacaoInesperada,
+        prefetch: navegacaoInesperada,
+        refresh: navegacaoInesperada,
+      }}
+    >
+      <ProvedorTransicaoSessao>
+        <DestinoSessao usuarioId="teste" referenciaSessao={"R".repeat(43)}>
+          <AcaoDeSaida />
+          <ChamadaComMarcas />
+        </DestinoSessao>
+      </ProvedorTransicaoSessao>
+      <ProvedorAvisos />
+    </AppRouterContext.Provider>
   );
 }
 
@@ -176,7 +241,10 @@ const telas = {
   ),
   "aviso-pwa": <RegistroPwa />,
   "chamada-marcas": <ChamadaComMarcas />,
+  "chamada-historica": <ChamadaComMarcas historica />,
   "chamada-avisos": <ChamadaComTrocaDeSessao />,
+  "chamada-troca-atividade": <ChamadaComTrocaDeAtividade />,
+  "chamada-retomada-sessao": <ChamadaComRetomadaDeSessao />,
   "calendario-limitado": (
     <SeletorPeriodo
       id="limitado"

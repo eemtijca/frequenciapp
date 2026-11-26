@@ -11,6 +11,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -52,8 +53,8 @@ import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { chaveRascunho } from "@/lib/rascunho-chamada";
+import { useReferenciaDaSessao } from "@/components/entrada/transicao-sessao";
 import { ouvirBeneficiosMudaram } from "@/lib/eventos-beneficios";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
 import type {
   AcumuladoAluno,
   Aluno,
@@ -93,14 +94,18 @@ import { Selo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { ESPACAMENTO_LATERAL_CONTEUDO, LayoutConteudo } from "@/components/layout/layout-conteudo";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { VistaResumoSemana } from "@/components/chamada/resumo-semana";
 import { SeletorTurmaChamada } from "@/components/chamada/seletor-turma-chamada";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
+import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { feriadoNaData, type Feriado } from "@/domain/calendario-letivo";
 import type { AlertaFrequenciaBeneficio } from "@/domain/beneficios-frequencia";
 import { AvisoBeneficioFrequencia } from "@/components/chamada/aviso-beneficio-frequencia";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+
+type FaseDaRevisao = "fechada" | "revisao" | "verificando" | "transicao" | "historica";
 
 type Filtro = "todos" | "faltas" | "justificadas" | "presentes";
 
@@ -239,6 +244,7 @@ export default function VistaFrequencia({
   onAbrirGestao,
 }: Props) {
   const { avisarSucesso, publicarAviso } = useAvisosDaSessao();
+  const referenciaSessao = useReferenciaDaSessao();
   const podeAdministrar = temCapacidade(usuario.papel, "administrar");
   const temTurmas = turmas.length > 0;
   const [turmaId, setTurmaId] = useState(() => alvo?.turmaId ?? turmas[0]?.id ?? "");
@@ -283,7 +289,9 @@ export default function VistaFrequencia({
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado>("indisponivel");
   const [conflito, setConflito] = useState(false);
-  const [confirmarSalvamento, setConfirmarSalvamento] = useState(false);
+  const [faseDaRevisao, setFaseDaRevisao] = useState<FaseDaRevisao>("fechada");
+  const [listaRevisada, setListaRevisada] = useState<string[] | null>(null);
+  const [erroVerificacao, setErroVerificacao] = useState("");
   const [descartarAberto, setDescartarAberto] = useState(false);
   const [desbloqueio, setDesbloqueio] = useState<"chamada" | "sabado" | null>(null);
   const [filtro, setFiltro] = useState<Filtro>("todos");
@@ -291,11 +299,6 @@ export default function VistaFrequencia({
   const [recarregar, setRecarregar] = useState(0);
   const chaveCarregada = useRef("");
   const falhaRascunho = useRef("");
-  const confirmacaoHistoricaRef = useRef<{ confirmar: boolean; motivo: string }>({
-    confirmar: false,
-    motivo: "",
-  });
-  const [confirmacaoHistoricaAberta, setConfirmacaoHistoricaAberta] = useState(false);
   const [motivoHistorico, setMotivoHistorico] = useState("");
   const [erroHistorico, setErroHistorico] = useState("");
   const semMovimento = !useAnimacoesDaInterface().animacoesAtivas;
@@ -461,8 +464,48 @@ export default function VistaFrequencia({
   const turma = turmas.find((t) => t.id === turmaId);
   const turmasDoResumo = useMemo(() => (turma ? [turma] : []), [turma]);
   const chave = `${dia}|${turmaId}`;
+  const chaveDoRascunho = chaveRascunho(usuario.id, referenciaSessao, dia, turmaId);
+  // A decisão não pode sobreviver à troca da turma, do dia, da visão ou da sessão.
+  const escopoRevisao = useMemo(
+    () => ({
+      chave,
+      ativo,
+      resumo: nav.resumo,
+      usuarioId: usuario.id,
+      referenciaSessao,
+      recarregar,
+      publicarAviso,
+    }),
+    [chave, ativo, nav.resumo, usuario.id, referenciaSessao, recarregar, publicarAviso],
+  );
+  const controleRevisao = useRef<{ cancelamento: AbortController; geracao: number } | null>(null);
+  const { executar: executarRevisaoPorChave } = useAcoesPorChave();
+  useLayoutEffect(() => {
+    const cancelamento = new AbortController();
+    const geracao = (controleRevisao.current?.geracao ?? 0) + 1;
+    controleRevisao.current = { cancelamento, geracao };
+    return () => {
+      cancelamento.abort();
+      // Activity desconecta o efeito sem remover o estado da Chamada.
+      setSalvando(false);
+      setFaseDaRevisao("fechada");
+      setListaRevisada(null);
+      setErroVerificacao("");
+      setMotivoHistorico("");
+      setErroHistorico("");
+    };
+  }, [escopoRevisao]);
+
   const ehSabado = diaDaSemanaIso(dia) === 6;
   const leituraConfirmada = frequenciasDoDia?.chave === chave;
+  useLeituraDaVisao(
+    ativo &&
+      !nav.resumo &&
+      dia !== "" &&
+      turmaId !== "" &&
+      temTurmas &&
+      (carregando || (!leituraConfirmada && !erro)),
+  );
   const feriadoCadastrado = feriadoNaData(configuracoes.feriados, dia);
   const nomeFeriadoNoCadastro = feriadoCadastrado?.nome ?? "";
   const feriado =
@@ -483,10 +526,50 @@ export default function VistaFrequencia({
   // Carrega as chamadas do dia, seleciona a turma e recupera o rascunho local.
   // O reinício do estado e o aviso de carregando vêm antes da busca: nenhuma
   // marca do dia anterior pode aparecer enquanto a chamada nova não chega.
+  const escopoLeitura = useMemo(
+    () => ({
+      chave,
+      recarregar,
+      chaveDoRascunho,
+      dia,
+      turmaId,
+      turma,
+      nomeFeriadoNoCadastro,
+      resumo: nav.resumo,
+      marcarChamadaAtualizada,
+      publicarAviso,
+    }),
+    [
+      chave,
+      recarregar,
+      chaveDoRascunho,
+      dia,
+      turmaId,
+      turma,
+      nomeFeriadoNoCadastro,
+      nav.resumo,
+      marcarChamadaAtualizada,
+      publicarAviso,
+    ],
+  );
+  const leituraAplicada = useRef<typeof escopoLeitura | null>(null);
   // A regra set-state-in-effect não distingue esse caso, registrado no ADR 047.
   /* eslint-disable react-hooks/set-state-in-effect -- reinício do estado antes da busca da chamada (ADR 047) */
   useEffect(() => {
-    if (nav.resumo) return;
+    // Reconectar depois de ocultar a sessão não substitui a edição em memória.
+    if (leituraAplicada.current === escopoLeitura) return;
+    const {
+      chave,
+      chaveDoRascunho,
+      dia,
+      turmaId,
+      turma,
+      nomeFeriadoNoCadastro,
+      resumo,
+      marcarChamadaAtualizada,
+      publicarAviso,
+    } = escopoLeitura;
+    if (resumo) return;
     if (!dia || !turmaId) {
       setCarregando(false);
       setErro("");
@@ -521,6 +604,7 @@ export default function VistaFrequencia({
         if (!viva) return;
         const frequencias = dados.frequencias.filter((item) => item.dia === dia);
         const frequencia = frequencias.find((item) => item.turmaId === turmaId) ?? null;
+        leituraAplicada.current = escopoLeitura;
         setFrequenciasDoDia({ chave, frequencias, feriado: dados.feriado, nomeFeriadoNoCadastro });
         marcarChamadaAtualizada();
         const agendadas = frequencia
@@ -544,15 +628,16 @@ export default function VistaFrequencia({
         setListaGravada(frequencia?.alunos ?? null);
         setAtualizadoEm(frequencia?.atualizadoEm ?? "");
 
+        if (!chaveDoRascunho) return;
         try {
-          const bruto = sessionStorage.getItem(chaveRascunho(usuario.id, dia, turmaId));
+          const bruto = sessionStorage.getItem(chaveDoRascunho);
           if (bruto) {
             let rascunho: Rascunho;
             try {
               rascunho = JSON.parse(bruto) as Rascunho;
             } catch {
               // Apenas conteúdo comprovadamente inválido pode ser descartado.
-              sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
+              sessionStorage.removeItem(chaveDoRascunho);
               publicarAviso({
                 id: "chamada-rascunho-ilegivel",
                 severidade: "error",
@@ -561,7 +646,7 @@ export default function VistaFrequencia({
               return;
             }
             if (!rascunho || rascunho.versao !== 3 || !Array.isArray(rascunho.faltas)) {
-              sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
+              sessionStorage.removeItem(chaveDoRascunho);
             } else {
               setAusencias(paraAusencias(rascunho.faltas));
               setJustificativas(paraJustificativas(rascunho.faltas));
@@ -616,23 +701,12 @@ export default function VistaFrequencia({
     return () => {
       viva = false;
     };
-  }, [
-    chave,
-    recarregar,
-    usuario.id,
-    dia,
-    turmaId,
-    turma,
-    nomeFeriadoNoCadastro,
-    nav.resumo,
-    marcarChamadaAtualizada,
-    publicarAviso,
-  ]);
+  }, [escopoLeitura]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // Grava rascunho enquanto houver marcação não salva.
   useEffect(() => {
-    if (!sujo || !dia || !turmaId) return;
+    if (!sujo || !dia || !turmaId || !chaveDoRascunho) return;
     try {
       const rascunho: Rascunho = {
         versao: 3,
@@ -646,12 +720,11 @@ export default function VistaFrequencia({
         revisao: revisaoSalva,
         ...(sabadoLiberado ? { sabadoLetivo: true } : {}),
       };
-      sessionStorage.setItem(chaveRascunho(usuario.id, dia, turmaId), JSON.stringify(rascunho));
+      sessionStorage.setItem(chaveDoRascunho, JSON.stringify(rascunho));
       falhaRascunho.current = "";
     } catch {
-      const chave = chaveRascunho(usuario.id, dia, turmaId);
-      if (falhaRascunho.current !== chave) {
-        falhaRascunho.current = chave;
+      if (falhaRascunho.current !== chaveDoRascunho) {
+        falhaRascunho.current = chaveDoRascunho;
         publicarAviso({
           id: "chamada-rascunho-gravacao",
           severidade: "error",
@@ -666,7 +739,7 @@ export default function VistaFrequencia({
     justificativas,
     observacoes,
     revisaoSalva,
-    usuario.id,
+    chaveDoRascunho,
     dia,
     turmaId,
     sabadoLiberado,
@@ -828,7 +901,8 @@ export default function VistaFrequencia({
   );
 
   const chamadaBloqueada = revisaoSalva > 0 && !edicaoLiberada;
-  const ocupado = carregando || salvando || conflito;
+  const verificando = faseDaRevisao === "verificando";
+  const ocupado = carregando || salvando || verificando || conflito;
   const bloqueado =
     ocupado ||
     !leituraConfirmada ||
@@ -967,14 +1041,35 @@ export default function VistaFrequencia({
     setErro("");
   }
 
-  const { executar: salvar } = useAcaoUnica(async () => {
-    if (!podeSalvar || !dia || !turmaId) return;
+  function avisarListaAlterada(mensagem: string) {
+    setFaseDaRevisao("fechada");
+    setErro(mensagem);
+    setErroVariante("conflito");
+    publicarAviso({
+      id: "chamada-lista-historica-alterada",
+      severidade: "error",
+      titulo: mensagem,
+    });
+  }
+
+  function listaContinuaRevisada() {
+    if (listaRevisada === null) return true;
+    const revisada = new Set(listaRevisada);
+    if (revisada.size === ativosDaTurma.length && ativosDaTurma.every(({ id }) => revisada.has(id)))
+      return true;
+    avisarListaAlterada(
+      "A lista desta chamada histórica mudou. Confira as marcações antes de salvar de novo.",
+    );
+    return false;
+  }
+
+  async function salvar(sinal: AbortSignal, motivo?: string) {
+    if (sinal.aborted) return;
     setSalvando(true);
     setErro("");
     try {
-      const dados = await pedir<{ frequencia: Frequencia }>(
-        "/api/frequencias",
-        corpoJson({
+      const dados = await pedir<{ frequencia: Frequencia }>("/api/frequencias", {
+        ...corpoJson({
           dia,
           turmaId,
           faltas: [...ausencias.entries()].map(([alunoId, horarios]) => ({
@@ -988,15 +1083,16 @@ export default function VistaFrequencia({
           })),
           revisao: revisaoSalva,
           justificativasAntecipadas: justificativasAntecipadasRef.current,
+          ...(listaRevisada === null ? {} : { listaRevisada }),
           ...(sabadoLiberado ? { sabadoLetivo: true } : {}),
-          ...(confirmacaoHistoricaRef.current.confirmar
-            ? {
-                confirmarHistorico: true,
-                motivo: confirmacaoHistoricaRef.current.motivo,
-              }
+          ...(motivo !== undefined
+            ? { confirmarHistorico: true, ...(motivo ? { motivo } : {}) }
             : {}),
         }),
-      );
+        signal: sinal,
+      });
+      // Cancelar a espera não desfaz uma gravação que o servidor já concluiu.
+      if (sinal.aborted) return;
       setFrequenciasDoDia((atual) => {
         if (atual?.chave !== chave) return atual;
         return {
@@ -1017,11 +1113,10 @@ export default function VistaFrequencia({
       setAtualizadoEm(dados.frequencia.atualizadoEm);
       setSujo(false);
       setConflito(false);
-      confirmacaoHistoricaRef.current = { confirmar: false, motivo: "" };
       setMotivoHistorico("");
       setErroHistorico("");
       try {
-        sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
+        if (chaveDoRascunho) sessionStorage.removeItem(chaveDoRascunho);
       } catch {
         publicarAviso({
           id: "chamada-rascunho-salvo-remover",
@@ -1045,16 +1140,17 @@ export default function VistaFrequencia({
       await onFrequenciasMudaram(dia.slice(0, 7));
     } catch (excecao) {
       const falha = excecao instanceof ErroApi ? excecao : null;
-      const agendasMudaram =
-        (falha?.corpo as { codigo?: string } | undefined)?.codigo === "JUSTIFICATIVAS_ALTERADAS";
-      const precisaConfirmarHistorico =
-        (falha?.corpo as { codigo?: string } | undefined)?.codigo ===
-        "CONFIRMACAO_HISTORICA_NECESSARIA";
-      if (precisaConfirmarHistorico && !confirmacaoHistoricaRef.current.confirmar) {
-        setConfirmacaoHistoricaAberta(true);
+      if (sinal.aborted) return;
+      if (falha?.codigo === "LISTA_HISTORICA_ALTERADA") {
+        avisarListaAlterada(falha.message);
+        return;
+      }
+      const agendasMudaram = falha?.codigo === "JUSTIFICATIVAS_ALTERADAS";
+      if (falha?.codigo === "CONFIRMACAO_HISTORICA_NECESSARIA" && motivo === undefined) {
+        // A composição pode mudar depois do GET; esta recusa nunca repete o POST.
+        setMotivoHistorico("");
         setErroHistorico("");
-        setErro("");
-        setErroVariante("indisponivel");
+        setFaseDaRevisao("historica");
         return;
       }
       if (falha?.conflito || agendasMudaram) {
@@ -1079,13 +1175,76 @@ export default function VistaFrequencia({
         });
       }
     } finally {
-      setSalvando(false);
+      if (!sinal.aborted) setSalvando(false);
     }
-  });
+  }
+
+  // Uma ação por geração da revisão, sem prender a próxima ao POST anterior.
+  async function executarNaRevisao(acao: (sinal: AbortSignal) => Promise<void>) {
+    const controle = controleRevisao.current;
+    if (!controle || controle.cancelamento.signal.aborted) return;
+    await executarRevisaoPorChave(String(controle.geracao), () =>
+      acao(controle.cancelamento.signal),
+    );
+  }
+
+  const prepararSalvamento = () =>
+    executarNaRevisao(async (sinal) => {
+      if (!ativo || !podeSalvar || faseDaRevisao !== "revisao") return;
+      if (!listaContinuaRevisada()) return;
+      if (revisaoSalva === 0 && dia < diaCorrente) {
+        setFaseDaRevisao("verificando");
+        setErroVerificacao("");
+        const parametros = new URLSearchParams({ dia, turmaId, verificarHistorico: "true" });
+        try {
+          const decisao = await pedir<{ requerConfirmacaoHistorica: boolean }>(
+            `/api/frequencias?${parametros}`,
+            { signal: sinal },
+          );
+          if (sinal.aborted) return;
+          if (typeof decisao?.requerConfirmacaoHistorica !== "boolean") {
+            throw new Error("Resposta inesperada na verificação histórica.");
+          }
+          if (decisao.requerConfirmacaoHistorica) {
+            setFaseDaRevisao("transicao");
+            return;
+          }
+        } catch (excecao) {
+          if (sinal.aborted) return;
+          setFaseDaRevisao("revisao");
+          setErroVerificacao(
+            excecao instanceof ErroApi
+              ? excecao.message
+              : "Não foi possível verificar a chamada. Tente de novo.",
+          );
+          return;
+        }
+      }
+      setFaseDaRevisao("fechada");
+      await salvar(sinal);
+    });
+
+  const confirmarHistorico = () =>
+    executarNaRevisao(async (sinal) => {
+      if (!ativo || !podeSalvar || faseDaRevisao !== "historica") return;
+      if (!listaContinuaRevisada()) return;
+      const motivo = motivoHistorico.trim();
+      if (motivo && (motivo.length < 3 || motivo.length > 200)) {
+        setErroHistorico(
+          motivo.length < 3
+            ? "O motivo deve ter pelo menos 3 caracteres."
+            : "O motivo deve ter no máximo 200 caracteres.",
+        );
+        return;
+      }
+      setFaseDaRevisao("fechada");
+      setErroHistorico("");
+      await salvar(sinal, motivo);
+    });
 
   function descartar() {
     try {
-      sessionStorage.removeItem(chaveRascunho(usuario.id, dia, turmaId));
+      if (chaveDoRascunho) sessionStorage.removeItem(chaveDoRascunho);
     } catch {
       publicarAviso({
         id: "chamada-descartar-erro",
@@ -1104,9 +1263,10 @@ export default function VistaFrequencia({
   }
 
   function cancelarHistorico(): void {
-    confirmacaoHistoricaRef.current = { confirmar: false, motivo: "" };
+    setFaseDaRevisao("fechada");
     setMotivoHistorico("");
     setErroHistorico("");
+    restaurarFocoDaBarra("salvar");
   }
 
   function confirmarDesbloqueio(): void {
@@ -1234,7 +1394,11 @@ export default function VistaFrequencia({
         data-acao-barra="salvar"
         onClick={(evento) => {
           gatilhoDaRevisaoRef.current = evento.currentTarget;
-          setConfirmarSalvamento(true);
+          setErroVerificacao("");
+          setListaRevisada(
+            revisaoSalva === 0 && dia < diaCorrente ? ativosDaTurma.map(({ id }) => id) : null,
+          );
+          setFaseDaRevisao("revisao");
         }}
         disabled={!podeSalvar}
         carregando={salvando}
@@ -2154,7 +2318,7 @@ export default function VistaFrequencia({
                                     {estado === "FJ" && (
                                       <DescriptionRoundedIcon
                                         fontSize="small"
-                                        sx={{ color: "inherit" }}
+                                        sx={{ fill: "#fff" }}
                                       />
                                     )}
                                     {estado === "D"
@@ -2319,10 +2483,15 @@ export default function VistaFrequencia({
       </Box>
 
       <DialogoConfirmacao
-        aberto={confirmarSalvamento}
+        aberto={faseDaRevisao === "revisao" || verificando}
         titulo={correcao ? "Salvar correção da chamada?" : "Salvar chamada?"}
         descricao={
           <Stack spacing={1.5}>
+            {erroVerificacao && (
+              <Typography role="alert" color="error" variant="body2">
+                {erroVerificacao}
+              </Typography>
+            )}
             <Typography variant="body2">
               {correcao
                 ? `A versão salva de ${turma?.rotulo ?? "turma"} em ${rotuloDia} será substituída pelas marcações atuais e a chamada voltará a ficar bloqueada.`
@@ -2385,18 +2554,17 @@ export default function VistaFrequencia({
             )}
           </Stack>
         }
-        onConfirmar={() => {
-          setConfirmarSalvamento(false);
-          void salvar();
-        }}
-        onCancelar={() => setConfirmarSalvamento(false)}
+        onConfirmar={() => void prepararSalvamento()}
+        onCancelar={() => setFaseDaRevisao("fechada")}
         aposFechar={() => {
           restaurarGatilhoSeMoveu(gatilhoDaRevisaoRef.current);
           gatilhoDaRevisaoRef.current = null;
+          setFaseDaRevisao((fase) => (fase === "transicao" ? "historica" : fase));
         }}
-        rotuloConfirmar="Salvar chamada"
+        rotuloConfirmar={verificando ? "Verificando chamada..." : "Salvar"}
         rotuloCancelar="Continuar revisando"
-        operacaoEmAndamento={salvando}
+        acoesEmUmaLinhaQuandoCouberem
+        operacaoEmAndamento={verificando || salvando}
       />
 
       <DialogoConfirmacao
@@ -2431,48 +2599,22 @@ export default function VistaFrequencia({
       />
 
       <Dialogo
-        aberto={confirmacaoHistoricaAberta}
-        onFechar={() => {
-          setConfirmacaoHistoricaAberta(false);
-          cancelarHistorico();
-        }}
+        aberto={faseDaRevisao === "historica"}
+        onFechar={cancelarHistorico}
         titulo="Confirmar chamada histórica?"
-        descricao={`A composição desta turma em ${rotuloDia} não pôde ser comprovada. Confirme o lançamento e informe o motivo. A confirmação fica registrada na auditoria.`}
+        descricao={`Não foi possível comprovar a composição desta turma em ${rotuloDia}. A confirmação fica registrada na auditoria. Se selecionar Cancelar, a chamada não será salva.`}
         acoes={
           <>
-            <Botao
-              variante="texto"
-              onClick={() => {
-                setConfirmacaoHistoricaAberta(false);
-                cancelarHistorico();
-              }}
-            >
+            <Botao variante="texto" onClick={cancelarHistorico}>
               Cancelar
             </Botao>
-            <Botao
-              variante="secundario"
-              onClick={() => {
-                const motivo = motivoHistorico.trim();
-                if (motivo.length < 3 || motivo.length > 200) {
-                  setErroHistorico(
-                    motivo.length < 3
-                      ? "Informe um motivo com pelo menos 3 caracteres."
-                      : "O motivo deve ter no máximo 200 caracteres.",
-                  );
-                  return;
-                }
-                confirmacaoHistoricaRef.current = { confirmar: true, motivo };
-                setConfirmacaoHistoricaAberta(false);
-                setErroHistorico("");
-                void salvar();
-              }}
-            >
+            <Botao variante="secundario" onClick={() => void confirmarHistorico()}>
               Confirmar e salvar
             </Botao>
           </>
         }
       >
-        <Campo id="motivo-historico" rotulo="Motivo" erro={erroHistorico || undefined}>
+        <Campo id="motivo-historico" rotulo="Motivo (opcional)" erro={erroHistorico || undefined}>
           <CampoTexto
             id="motivo-historico"
             valor={motivoHistorico}

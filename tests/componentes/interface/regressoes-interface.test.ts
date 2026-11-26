@@ -304,6 +304,9 @@ it.each(["light", "dark"] as const)(
         page.getByRole("button", { name: /^Aluno teste: falta justificada/ }),
       ).toHaveAttribute("aria-pressed", "true");
       await conferirMarca("FJ");
+      const documento = page.locator('[data-estado="FJ"] svg');
+      await verificar(documento).toBeVisible();
+      await verificar(documento).toHaveCSS("fill", "rgb(255, 255, 255)");
     } finally {
       await page.close();
     }

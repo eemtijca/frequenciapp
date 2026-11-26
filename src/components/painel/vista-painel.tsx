@@ -7,6 +7,7 @@ import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
@@ -284,6 +285,7 @@ export default function VistaPainel({
   const rotuloDia = dia.split("-").reverse().join("/");
   const diaDaSemana = dia ? rotuloDiaSemana(dia) : "";
   const temDadosDoDia = compartilhado || doDia?.dia === dia;
+  useLeituraDaVisao(ativo && !nav.resumo && !temDadosDoDia && !erro);
   const carregandoPainel = carregando && !temDadosDoDia;
   const atualizando = carregando && temDadosDoDia;
 

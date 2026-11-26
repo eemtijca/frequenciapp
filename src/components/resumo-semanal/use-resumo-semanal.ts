@@ -3,6 +3,7 @@
 // Carga e atualização silenciosa do resumo semanal, compartilhada pelas telas.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useContextoAtualizacao } from "@/components/atualizacao/contexto-atualizacao";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { horaNoFuso } from "@/domain/frequencia";
 
 export interface CargaResumo<T> {
@@ -119,12 +120,14 @@ export function useResumoSemanal<T>({
   }, [ativo, pausado]);
 
   const tentarNovamente = useCallback(() => setTentativa((valor) => valor + 1), []);
+  const carregando = !carga || carga.periodo !== periodo;
+  useLeituraDaVisao(ativo && carregando && !erro);
   return {
     dados: carga?.periodo === periodo ? carga.dados : null,
     atualizadoEm,
     anuncio,
     erro,
-    carregando: !carga || carga.periodo !== periodo,
+    carregando,
     tentarNovamente,
   };
 }

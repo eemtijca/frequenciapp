@@ -12,6 +12,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { afterAll, beforeAll, expect, it } from "vitest";
+import type { Frequencia } from "../../../src/domain/frequencia";
 import { TOKENS_LAYOUT } from "../../../src/theme/layout";
 
 const requireVitest = createRequire(import.meta.url);
@@ -59,9 +60,40 @@ afterAll(async () => {
   rmSync(cache, { recursive: true, force: true });
 });
 
+// Retém o corpo já recebido, mesmo se o transporte implementar cancelamento.
+async function reterPrimeiraRespostaDeGravacao(page: Page) {
+  await page.addInitScript(() => {
+    const ler = Response.prototype.json;
+    Response.prototype.json = async function () {
+      const dados = await ler.call(this);
+      if (
+        (this.ok && dados?.frequencia?.atualizadoPorNome === "Resposta anterior") ||
+        dados?.error === "Gravação anterior recusada."
+      ) {
+        document.documentElement.dataset.gravacao = "retida";
+        await new Promise<void>((resolver) => {
+          window.addEventListener("liberar-gravacao-teste", () => resolver(), { once: true });
+        });
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => (document.documentElement.dataset.gravacao = "entregue"));
+        });
+      }
+      return dados;
+    };
+  });
+  const estado = page.locator("html");
+  return {
+    aguardar: () => esperar(estado).toHaveAttribute("data-gravacao", "retida"),
+    liberar: async () => {
+      await page.evaluate(() => window.dispatchEvent(new Event("liberar-gravacao-teste")));
+      await esperar(estado).toHaveAttribute("data-gravacao", "entregue");
+    },
+  };
+}
+
 it("só exibe a confirmação da Chamada na sessão que iniciou o salvamento", async () => {
   const page = await browser.newPage({ serviceWorkers: "block" });
-  const liberar = Promise.withResolvers<void>();
+  const anterior = await reterPrimeiraRespostaDeGravacao(page);
   let salvamentos = 0;
   try {
     await page.route("**/*", (rota) => {
@@ -75,7 +107,7 @@ it("só exibe a confirmação da Chamada na sessão que iniciou o salvamento", a
       async (rota) => {
         if (rota.request().method() === "GET") return rota.fulfill({ json: { frequencias: [] } });
         expect(rota.request().method()).toBe("POST");
-        if (++salvamentos === 1) await liberar.promise;
+        salvamentos++;
         await rota.fulfill({
           json: {
             frequencia: {
@@ -83,7 +115,7 @@ it("só exibe a confirmação da Chamada na sessão que iniciou o salvamento", a
               turmaId: "turma",
               revisao: 1,
               atualizadoEm: "2026-11-25T12:00:00Z",
-              atualizadoPorNome: "Conta sintética",
+              atualizadoPorNome: salvamentos === 1 ? "Resposta anterior" : "Conta sintética",
               faltas: [],
               alunos: ["aluno"],
             },
@@ -93,26 +125,311 @@ it("só exibe a confirmação da Chamada na sessão que iniciou o salvamento", a
     );
     const salvar = async () => {
       await page.getByRole("button", { name: "Salvar", exact: true }).click();
-      await page.getByRole("button", { name: "Salvar chamada", exact: true }).click();
+      await page
+        .getByRole("alertdialog", { name: "Salvar chamada?", exact: true })
+        .getByRole("button", { name: "Salvar", exact: true })
+        .click();
     };
     await page.goto(`${url}?tela=chamada-avisos`);
     await salvar();
-    await esperar.poll(() => salvamentos).toBe(1);
+    await anterior.aguardar();
     await page.getByRole("button", { name: "Iniciar outra sessão da mesma conta" }).click();
     await esperar(page.getByLabel("Sessão da fixture")).toHaveText("2");
     await esperar(page.getByRole("button", { name: "Salvar", exact: true })).toBeEnabled();
-    liberar.resolve();
+    await anterior.liberar();
     const concluidos = page.getByLabel("Salvamentos concluídos");
-    await esperar(concluidos).toHaveText("1");
+    await esperar(concluidos).toHaveText("0");
     const confirmacao = page.getByText("Chamada salva. Todos presentes.", { exact: true });
     await esperar(confirmacao).toHaveCount(0);
 
     await salvar();
-    await esperar(concluidos).toHaveText("2");
+    await esperar(concluidos).toHaveText("1");
     await esperar(confirmacao).toBeVisible();
     expect(salvamentos).toBe(2);
   } finally {
+    await page.close();
+  }
+});
+
+it.each([
+  { caso: "troca de visão sem gravação prévia", sessao: false, gravacaoPrevia: false },
+  { caso: "mesma sessão sem gravação prévia", sessao: true, gravacaoPrevia: false },
+  { caso: "mesma sessão com gravação prévia", sessao: true, gravacaoPrevia: true },
+])("preserva o rascunho e a revisão ao retomar: $caso", async ({ sessao, gravacaoPrevia }) => {
+  const page = await browser.newPage({ reducedMotion: "reduce", serviceWorkers: "block" });
+  const anterior = await reterPrimeiraRespostaDeGravacao(page);
+  const responderSaida = Promise.withResolvers<void>();
+  const confirmarSessao = Promise.withResolvers<void>();
+  const responderSegundoEnvio = Promise.withResolvers<void>();
+  const envios: { revisao: number; faltas: Frequencia["faltas"] }[] = [];
+  const respostas: number[] = [];
+  const errosDaPagina: string[] = [];
+  page.on("pageerror", (erro) => errosDaPagina.push(erro.message));
+  let vigente: Frequencia | null = null;
+  let leiturasDaChamada = 0;
+  let saidas = 0;
+  let consultasDeSessao = 0;
+  try {
+    await page.route("**/api/**", async (rota) => {
+      const pedido = rota.request();
+      const endereco = new URL(pedido.url());
+      if (endereco.pathname === "/api/auth/sair" && pedido.method() === "POST") {
+        saidas++;
+        await responderSaida.promise;
+        return rota.fulfill({ status: 503, json: { error: "Saída não confirmada." } });
+      }
+      if (endereco.pathname === "/api/auth/sessao" && pedido.method() === "GET") {
+        expect(await pedido.headerValue("X-Frequenciapp-Referencia-Sessao")).toBe("1");
+        consultasDeSessao++;
+        await confirmarSessao.promise;
+        return rota.fulfill({
+          status: 200,
+          json: { usuario: { id: "teste" }, referenciaSessao: "R".repeat(43) },
+        });
+      }
+      if (pedido.method() === "GET") {
+        if (endereco.pathname === "/api/frequencias" && endereco.searchParams.has("dia")) {
+          expect(endereco.searchParams.get("dia")).toBe("2026-11-25");
+          leiturasDaChamada++;
+        }
+        return rota.fulfill({
+          json: { frequencias: vigente ? [vigente] : [], alertas: [], resumo: null },
+        });
+      }
+      expect([endereco.pathname, pedido.method()]).toEqual(["/api/frequencias", "POST"]);
+      const envio = pedido.postDataJSON();
+      expect(envio).toMatchObject({ dia: "2026-11-25", turmaId: "turma" });
+      envios.push(envio);
+      const primeira = envios.length === 1;
+      const responder = (status: number, json: object) => {
+        respostas.push(status);
+        return rota.fulfill({ status, json });
+      };
+      if (primeira && !gravacaoPrevia) {
+        return responder(503, { error: "Gravação anterior recusada." });
+      }
+      if (!primeira) await responderSegundoEnvio.promise;
+      // A resposta anterior pode estar retida no cliente depois de a revisão já ter mudado.
+      if (envio.revisao !== (vigente?.revisao ?? 0)) {
+        return responder(409, {
+          error: "Esta frequência foi atualizada por outra pessoa.",
+          conflito: true,
+          frequencia: vigente,
+        });
+      }
+      vigente = {
+        dia: "2026-11-25",
+        turmaId: "turma",
+        revisao: (vigente?.revisao ?? 0) + 1,
+        alunos: ["aluno"],
+        atualizadoEm: "2026-11-25T12:00:00Z",
+        atualizadoPorNome: primeira ? "Resposta anterior" : "Conta sintética",
+        faltas: envio.faltas,
+      };
+      return responder(200, { frequencia: vigente });
+    });
+    const barra = page.locator('footer[aria-label="Barra de salvamento"]');
+    const botaoSalvar = barra.getByRole("button", { name: "Salvar", exact: true });
+    const salvar = async () => {
+      await botaoSalvar.click({ timeout: 5000 });
+      const confirmar = page
+        .getByRole("alertdialog", { name: "Salvar chamada?" })
+        .getByRole("button", { name: "Salvar", exact: true });
+      await esperar(confirmar).toBeEnabled();
+      // As duas ativações chegam no mesmo turno, antes que o DOM passe a desabilitar o botão.
+      await confirmar.evaluate((botao: HTMLButtonElement) => {
+        botao.click();
+        botao.click();
+      });
+    };
+    const tela = sessao ? "chamada-retomada-sessao" : "chamada-troca-atividade";
+    await page.goto(`${url}?tela=${tela}`);
+    const marca = page.getByRole("button", { name: /^Aluno teste:/ });
+    await marca.click();
+    await esperar(marca).toHaveAttribute("aria-pressed", "true");
+    await salvar();
+    await anterior.aguardar();
+    expect(envios).toHaveLength(1);
+    expect(envios[0]).toMatchObject({ revisao: 0, faltas: [{ alunoId: "aluno" }] });
+    const saida = page.getByRole("button", { name: "Sair da conta" });
+    if (sessao) {
+      await saida.click();
+      await esperar.poll(() => saidas).toBe(1);
+      await esperar(marca).toBeVisible();
+      expect(consultasDeSessao).toBe(0);
+      responderSaida.resolve();
+      await esperar.poll(() => consultasDeSessao).toBe(1);
+      await esperar(
+        page.getByRole("status").filter({ hasText: "Verificando se a sessão" }),
+      ).toBeVisible();
+      const marcaNoDom = page.locator('button[aria-label^="Aluno teste:"]');
+      await esperar(marcaNoDom).toHaveCount(1);
+      await esperar(marcaNoDom).toBeHidden();
+      expect(envios).toHaveLength(1);
+      confirmarSessao.resolve();
+      await esperar(saida).toBeEnabled();
+    } else {
+      await page.getByRole("button", { name: "Sair da Chamada" }).click();
+      await page.getByRole("button", { name: "Voltar à Chamada" }).click();
+    }
+    await esperar(marca).toBeEnabled({ timeout: 3000 });
+    await esperar(marca).toHaveAttribute("aria-pressed", "true");
+    await esperar(botaoSalvar).toBeEnabled();
+    expect(leiturasDaChamada).toBe(1);
+    expect(envios).toHaveLength(1);
+    await marca.click();
+    await esperar(marca).toHaveAttribute("aria-pressed", "false");
+    await salvar();
+    await esperar.poll(() => envios.length).toBe(2);
+    expect(envios[1]).toMatchObject({ revisao: 0, faltas: [] });
+    await anterior.liberar();
+    await esperar(barra.getByRole("button", { name: "Salvando..." })).toBeDisabled();
+    await esperar(marca).toHaveAttribute("aria-pressed", "false");
+    await esperar(page.getByText("Chamada salva com 1 falta.")).toHaveCount(0);
+    await esperar(page.getByText("Gravação anterior recusada.", { exact: true })).toHaveCount(0);
+    const lerRascunho = () =>
+      page.evaluate(() =>
+        Object.entries(sessionStorage)
+          .filter(([chave]) => chave.startsWith("frequencia:rascunho:"))
+          .map(([, valor]) => JSON.parse(valor).faltas),
+      );
+    expect(await lerRascunho()).toEqual([[]]);
+    responderSegundoEnvio.resolve();
+    if (gravacaoPrevia) {
+      await esperar(page.getByText("A chamada foi salva em outro aparelho")).toBeVisible();
+      await esperar(botaoSalvar).toBeDisabled();
+      await esperar(marca).toHaveAttribute("aria-pressed", "false");
+      expect(await lerRascunho()).toEqual([[]]);
+      await page.getByRole("button", { name: "Recarregar versão salva" }).click();
+      await esperar(marca).toHaveAttribute("aria-pressed", "true");
+      expect(leiturasDaChamada).toBe(2);
+    } else {
+      await esperar(page.getByRole("button", { name: /^Desbloquear chamada/ })).toBeVisible();
+    }
+    expect(await lerRascunho()).toEqual([]);
+    expect(respostas).toEqual(gravacaoPrevia ? [200, 409] : [503, 200]);
+    expect(vigente).toMatchObject({
+      revisao: 1,
+      faltas: gravacaoPrevia ? [{ alunoId: "aluno" }] : [],
+    });
+    expect(envios).toHaveLength(2);
+    expect([saidas, consultasDeSessao]).toEqual(sessao ? [1, 1] : [0, 0]);
+    expect(errosDaPagina).toEqual([]);
+  } finally {
+    responderSaida.resolve();
+    confirmarSessao.resolve();
+    responderSegundoEnvio.resolve();
+    await page.close();
+  }
+});
+
+it("verifica antes de gravar, mantém o rascunho ao cancelar e confirma sem motivo", async () => {
+  const page = await browser.newPage({
+    viewport: { width: 320, height: 800 },
+    reducedMotion: "reduce",
+    serviceWorkers: "block",
+  });
+  const liberar = Promise.withResolvers<void>();
+  const gravar = Promise.withResolvers<void>();
+  const envios: unknown[] = [];
+  let verificacoes = 0;
+  try {
+    await page.route("**/api/**", async (rota) => {
+      const pedido = rota.request();
+      const endereco = new URL(pedido.url());
+      if (endereco.pathname === "/api/frequencias" && pedido.method() === "POST") {
+        envios.push(pedido.postDataJSON());
+        await gravar.promise;
+        return rota.fulfill({
+          json: {
+            frequencia: {
+              dia: "2026-11-24",
+              turmaId: "turma",
+              revisao: 1,
+              alunos: ["aluno"],
+              atualizadoEm: "2026-11-25T12:00:00Z",
+              faltas: [{ alunoId: "aluno", horarios: [] }],
+            },
+          },
+        });
+      }
+      if (endereco.searchParams.get("verificarHistorico") === "true") {
+        expect(pedido.method()).toBe("GET");
+        expect(endereco.searchParams.get("dia")).toBe("2026-11-24");
+        expect(endereco.searchParams.get("turmaId")).toBe("turma");
+        verificacoes++;
+        await liberar.promise;
+        return rota.fulfill({ json: { requerConfirmacaoHistorica: true } });
+      }
+      return rota.fulfill({ json: { frequencias: [], alertas: [], resumo: null } });
+    });
+    await page.goto(`${url}?tela=chamada-historica`);
+    const marca = page.getByRole("button", { name: /^Aluno teste:/ });
+    await marca.click();
+    await esperar(marca).toHaveAttribute("aria-pressed", "true");
+    const barra = page.locator('footer[aria-label="Barra de salvamento"]');
+    const salvar = barra.getByRole("button", { name: "Salvar", exact: true });
+    const revisao = page.getByRole("alertdialog", { name: "Salvar chamada?" });
+    const historica = page.getByRole("dialog", { name: "Confirmar chamada histórica?" });
+    const iniciar = async () => {
+      await salvar.click({ timeout: 5000 });
+      const continuar = revisao.getByRole("button", { name: "Continuar revisando" });
+      await esperar(continuar).toBeFocused();
+      const geometria = await continuar.evaluate((botao) => {
+        const range = document.createRange();
+        range.selectNodeContents(botao);
+        const limites = botao.getBoundingClientRect();
+        const dialogo = botao.closest(".MuiDialog-paper")?.getBoundingClientRect();
+        if (!dialogo) throw new Error("Revisão ausente");
+        const caixas = Array.from(range.getClientRects());
+        return {
+          linhas: new Set(caixas.map((caixa) => caixa.top)).size,
+          cabe:
+            caixas.every((caixa) => caixa.left >= limites.left && caixa.right <= limites.right) &&
+            limites.left >= dialogo.left &&
+            limites.right <= dialogo.right,
+        };
+      });
+      expect(geometria).toEqual({ linhas: 1, cabe: true });
+      await revisao.getByRole("button", { name: "Salvar", exact: true }).click({ timeout: 2000 });
+    };
+    await iniciar();
+    await esperar.poll(() => verificacoes).toBe(1);
+    await esperar(revisao.getByRole("button", { name: "Verificando chamada..." })).toBeDisabled();
+    await esperar(page.getByText("Salvando...", { exact: true })).toHaveCount(0);
+    expect(envios).toEqual([]);
     liberar.resolve();
+    for (const cancelar of [
+      () => historica.getByRole("button", { name: "Cancelar", exact: true }).click(),
+      () => page.keyboard.press("Escape"),
+      () => historica.getByRole("button", { name: "Fechar", exact: true }).click(),
+    ]) {
+      await esperar(historica).toBeVisible();
+      expect(envios).toEqual([]);
+      await cancelar();
+      await esperar(salvar).toBeFocused();
+      await esperar(marca).toHaveAttribute("aria-pressed", "true");
+      await iniciar();
+    }
+    await esperar(historica).toBeVisible();
+    expect(verificacoes).toBe(4);
+    expect(envios).toEqual([]);
+    await historica.getByLabel("Motivo (opcional)").fill("  ");
+    await historica.getByRole("button", { name: "Confirmar e salvar" }).click();
+    await esperar.poll(() => envios.length).toBe(1);
+    await esperar(barra.getByRole("button", { name: "Salvando..." })).toBeDisabled();
+    expect(envios[0]).toMatchObject({
+      confirmarHistorico: true,
+      listaRevisada: ["aluno"],
+      faltas: [{ alunoId: "aluno" }],
+    });
+    expect(envios[0]).not.toHaveProperty("motivo");
+    gravar.resolve();
+    await esperar(page.getByRole("button", { name: /^Desbloquear chamada/ })).toBeVisible();
+    expect(envios).toHaveLength(1);
+  } finally {
+    liberar.resolve();
+    gravar.resolve();
     await page.close();
   }
 });

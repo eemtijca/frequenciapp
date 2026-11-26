@@ -1,7 +1,7 @@
 "use client";
 
 // Entrada no layout sign-in-side: marca e destaques no desktop, formulário único no celular.
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
 import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
@@ -25,7 +25,7 @@ import { CampoTexto } from "@/components/ui/mui/text-field";
 import DialogoSobre from "@/components/dialogo-sobre";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { useAvisoDeExpiracao, useConfirmarEntrada } from "./transicao-sessao";
+import { useAvisoDeExpiracao, useTransicaoDeEntrada } from "./transicao-sessao";
 import { ROTA_PRIVACIDADE } from "@/lib/rotas-publicas";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
@@ -68,7 +68,8 @@ interface Props {
 }
 
 export default function TelaLogin({ urlIndiceAgentes }: Props) {
-  const confirmarEntrada = useConfirmarEntrada();
+  const { prepararEntrada, autenticando } = useTransicaoDeEntrada();
+  const formulario = useRef<HTMLFormElement>(null);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [lembrar, setLembrar] = useState(true);
@@ -109,21 +110,26 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
   }, []);
 
   const { executando: enviando, executar: entrar } = useAcaoUnica(async () => {
+    const finalizarEntrada = prepararEntrada?.();
+    if (prepararEntrada && !finalizarEntrada) return;
     setErro("");
     setErroVariante(null);
     try {
-      const { usuario } = await pedir<{ usuario: { id: string } }>(
+      const { usuario } = await pedir<{ usuario?: { id?: unknown } }>(
         "/api/auth/entrar",
         corpoJson({ login: email, senha, lembrar }),
       );
+      if (typeof usuario?.id !== "string" || !usuario.id)
+        throw new Error("Identidade não confirmada.");
       try {
         if (lembrar) window.localStorage.setItem(CHAVE_EMAIL, email.trim().toLowerCase());
         else window.localStorage.removeItem(CHAVE_EMAIL);
       } catch {
         // Sem armazenamento local: o login continua.
       }
-      confirmarEntrada(usuario.id);
+      finalizarEntrada?.(usuario.id);
     } catch (excecao) {
+      finalizarEntrada?.();
       const mensagem =
         excecao instanceof ErroApi ? excecao.message : "Não foi possível entrar. Tente novamente.";
       setErro(mensagem);
@@ -132,10 +138,18 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
     }
   });
 
+  useLayoutEffect(() => {
+    if (!erro || enviando) return;
+    const campo = formulario.current?.elements.namedItem("password");
+    if (campo instanceof HTMLInputElement) campo.focus();
+  }, [erro, enviando]);
+
   function submeter(evento: FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     void entrar();
   }
+
+  if (autenticando) return null;
 
   return (
     <Box
@@ -275,8 +289,8 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
 
             <Box
               component="form"
+              ref={formulario}
               onSubmit={submeter}
-              noValidate
               sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
             >
               <Campo id="email" rotulo="E-mail ou identificador">

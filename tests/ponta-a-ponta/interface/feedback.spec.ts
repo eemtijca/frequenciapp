@@ -31,7 +31,7 @@ test.describe("toasts e toque duplo", () => {
     const confirmar = page.getByRole("alertdialog", { name: /^Salvar chamada\?$/ });
     await expect(confirmar).toBeVisible();
     await confirmar
-      .getByRole("button", { name: "Salvar chamada", exact: true })
+      .getByRole("button", { name: "Salvar", exact: true })
       .click({ clickCount: 2, delay: 30 });
     const avisos = page.locator(".MuiSnackbar-root .MuiAlert-root").filter({
       hasText: "Chamada salva",

@@ -10,8 +10,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Alterado
 
-- Abrir Gestão, Relatórios ou Configurações e voltar de nível atualiza apenas a gaveta. Ao escolher um destino, a gaveta móvel começa a fechar sem esperar pela visão, que exibe um esqueleto no conteúdo se a espera for perceptível.
-- A entrada e a saída confirmam sucesso somente na tela de destino. Após encerrar a sessão, o painel deixa de ser exibido enquanto a entrada é preparada.
+- Abrir Gestão, Relatórios ou Configurações e voltar de nível atualiza apenas a gaveta. Ao escolher outro destino, a gaveta móvel fecha sem esperar, a de desktop continua operável e o esqueleto aparece imediatamente no conteúdo enquanto a nova visão é preparada.
+- A entrada exibe esqueleto da navegação e do conteúdo assim que o formulário válido é enviado. Se não for possível confirmar o encerramento, um diálogo oferece nova consulta; o painel e o rascunho só voltam se a mesma sessão continuar válida.
+- A Chamada pede a confirmação histórica antes de gravar quando a composição não pode ser comprovada. Cancelar preserva o rascunho e o motivo é opcional, sem dispensar a auditoria. A primeira gravação histórica é recusada se a lista da turma tiver mudado desde a revisão.
+- A revisão da Chamada mantém Continuar revisando em uma linha e usa Salvar como ação principal. O ícone de documento da marcação FJ fica branco. Em Horários, a faixa de Almoço encosta na borda quando fecha o cartão e não tem folga extra quando abre a Tarde. O aviso Serviço indisponível alinha a nuvem ao título.
 
 - A página sem conexão e o erro global mantêm alvo de 48 px e foco de 3 px. O esqueleto de carregamento reserva a gaveta a partir de 905 px, junto com o shell. O contrato do tema registra o foco sólido de 3 px e o que foi reaproveitado dos ADRs 061 e 062, sem recuperar o CSS antigo.
 

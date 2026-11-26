@@ -287,7 +287,11 @@ it("gaveta de Relatórios: fecha com a Grade suspensa e foca só o título novo"
   try {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await abrirRelatoriosDeTeste(page, "relatorios&grade-lenta");
-    const origem = page.getByRole("heading", { name: "Resumo do mês", exact: true });
+    const origem = page.getByRole("heading", {
+      name: "Resumo do mês",
+      exact: true,
+      includeHidden: true,
+    });
     const destino = page.getByRole("heading", { name: "Grade", exact: true });
     await verificarTela(origem).toBeVisible();
     await origem.evaluate((cabecalho) => {
@@ -296,12 +300,49 @@ it("gaveta de Relatórios: fecha com a Grade suspensa e foca só o título novo"
     const nav = await exporNavegacao(page);
     await opcaoGaveta(nav, "Grade").press("Enter");
     await verificarTela(menuMovel(page)).not.toBeAttached({ timeout: 2000 });
+    // O painel anterior continua montado atrás do esqueleto, mas não pode receber foco.
     await verificarTela(origem).toBeVisible();
     await verificarTela(origem).not.toBeFocused();
     await verificarTela(destino).toBeHidden();
     await page.evaluate(() => window.dispatchEvent(new Event("liberar-grade-teste")));
     await verificarTela(destino).toBeFocused();
     await verificarTela(origem).toBeHidden();
+    await verificarTela(page.locator("[data-focado-no-teste]")).toHaveCount(0);
+  } finally {
+    await page.close();
+  }
+});
+
+it("ao ampliar com a gaveta reaberta durante a espera, foca só o destino pronto", async () => {
+  const page = await novaPagina(904);
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await abrirRelatoriosDeTeste(page, "relatorios&grade-lenta");
+    const origem = page.getByRole("heading", {
+      name: "Resumo do mês",
+      exact: true,
+      includeHidden: true,
+    });
+    await origem.evaluate((titulo) => {
+      titulo.addEventListener("focus", () => titulo.setAttribute("data-focado-no-teste", ""));
+    });
+    const nav = await exporNavegacao(page);
+    await opcaoGaveta(nav, "Grade").press("Enter");
+    await verificarTela(menuMovel(page)).not.toBeAttached();
+    await exporNavegacao(page);
+    await verificarTela(menuMovel(page)).toBeVisible();
+    await page.setViewportSize({ width: 905, height: 844 });
+    await verificarTela(menuMovel(page)).not.toBeAttached();
+    await verificarTela(nav).toBeVisible();
+    const espera = page.getByRole("status").filter({ hasText: "Carregando a tela..." });
+    await verificarTela(espera).toBeVisible();
+    await verificarTela(origem).not.toBeFocused();
+
+    await page.evaluate(() => window.dispatchEvent(new Event("liberar-grade-teste")));
+    await verificarTela(espera).not.toBeAttached();
+    await verificarTela(page.getByRole("heading", { name: "Grade", exact: true })).toBeFocused({
+      timeout: 1500,
+    });
     await verificarTela(page.locator("[data-focado-no-teste]")).toHaveCount(0);
   } finally {
     await page.close();
@@ -324,6 +365,46 @@ it("gaveta de Relatórios: atravessar 904/905 com o modal aberto não escolhe o 
     await verificarTela(page.getByRole("heading", { name: "Painel", exact: true })).toBeVisible();
     await opcaoGaveta(nav, "Resumo").press("Enter");
     await verificarTela(page.getByRole("heading", { name: "Resumo do mês" })).toBeVisible();
+  } finally {
+    await page.close();
+  }
+});
+
+it("o atalho do Histórico espera a Chamada da data e da turma escolhidas", async () => {
+  const page = await novaPagina(905);
+  const diasConsultados: string[] = [];
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.route("**/api/**", (rota) => {
+      const pedido = new URL(rota.request().url());
+      const dia = pedido.searchParams.get("dia");
+      if (pedido.pathname === "/api/frequencias" && dia) {
+        diasConsultados.push(dia);
+        return rota.fulfill({ json: { frequencias: [] } });
+      }
+      return rota.fulfill({ status: 503, json: { error: "Leitura de teste indisponível." } });
+    });
+    await page.goto(`${url}?visao=historico&historico-com-frequencia&chamada-lenta`);
+    const registro = page.getByRole("button", { name: /1º ano B.*Todos presentes/ });
+    await registro.press("Enter");
+
+    const espera = page.getByRole("status").filter({ hasText: "Carregando a tela..." });
+    const chamada = page.getByRole("group", { name: "Chamada", exact: true });
+    await verificarTela(espera).toBeVisible({ timeout: 1500 });
+    await verificarTela(chamada).toHaveCount(0);
+    await verificarTela(
+      page.getByRole("navigation", { name: "Seções do aplicativo" }),
+    ).toBeVisible();
+    expect(diasConsultados).toEqual([]);
+
+    await page.evaluate(() => window.dispatchEvent(new Event("liberar-chamada-teste")));
+    await verificarTela(espera).not.toBeAttached();
+    await verificarTela(chamada.getByRole("heading", { name: "Chamada", level: 1 })).toBeFocused();
+    await verificarTela(chamada.getByRole("button", { name: /Data da chamada/ })).toContainText(
+      "09/03/2026",
+    );
+    await verificarTela(chamada.getByText("1º ano B", { exact: true })).toBeVisible();
+    expect(diasConsultados).toEqual(["2026-03-09"]);
   } finally {
     await page.close();
   }
@@ -531,6 +612,7 @@ it("Relatórios: preserva busca, destino e atualização ao voltar e ao sair da 
     await verificarTela(busca).toHaveValue("Pessoa sintética");
     await escolher("Painel");
     await verificarTela(busca).toBeHidden();
+    await verificarTela(opcaoGaveta(nav, "Painel")).toHaveAttribute("aria-current", "page");
     await escolher("Relatórios");
     await verificarTela(nav.locator('[aria-current="page"]')).toHaveCount(0);
     await verificarTela(busca).toBeHidden();
@@ -585,6 +667,205 @@ it("Relatórios: cancelar a troca mantém o rascunho e confirmar não grava", as
     await page.close();
   }
 });
+
+it("Planilhas espera a primeira leitura de frequência, mas não a fila de envios", async () => {
+  const page = await novaPagina(390);
+  let liberarIntegracao = () => {};
+  let liberarFila = () => {};
+  const integracao = new Promise<void>((resolver) => {
+    liberarIntegracao = resolver;
+  });
+  const fila = new Promise<void>((resolver) => {
+    liberarFila = resolver;
+  });
+  let leituras = 0;
+  let consultasFila = 0;
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.route("**/api/**", async (rota) => {
+      const { pathname } = new URL(rota.request().url());
+      if (pathname === "/api/configuracoes/completo") return rota.fulfill({ json: completo });
+      if (pathname === "/api/planilha") {
+        leituras++;
+        await integracao;
+        return rota.fulfill({ status: 503, json: { error: "Integração de teste indisponível." } });
+      }
+      if (pathname === "/api/planilha/fila") {
+        consultasFila++;
+        await fila;
+      }
+      return rota.fulfill({ status: 503, json: { error: "Leitura de teste indisponível." } });
+    });
+    await page.goto(url);
+    const nav = await exporConfiguracoes(page);
+    await opcaoGaveta(nav, "Planilhas").press("Enter");
+    await verificarTela(menuMovel(page)).not.toBeAttached();
+    await verificarTela.poll(() => leituras).toBe(1);
+    await verificarTela.poll(() => consultasFila).toBe(1);
+
+    const espera = page.getByRole("status").filter({ hasText: "Carregando a tela..." });
+    const titulo = page.getByRole("heading", { name: "Planilhas", exact: true });
+    await verificarTela(espera).toBeVisible({ timeout: 1500 });
+    await verificarTela(titulo).toHaveCount(0);
+    await verificarTela(gatilhoGaveta(page)).toBeEnabled();
+
+    liberarIntegracao();
+    await verificarTela(espera).not.toBeAttached();
+    await verificarTela(titulo).toBeFocused();
+    await verificarTela(page.getByText("Integração de teste indisponível.")).toBeVisible();
+  } finally {
+    liberarIntegracao();
+    liberarFila();
+    await page.close();
+  }
+});
+
+it("reparo R3: atalho da planilha espera a Chamada Parcial e foca o destino", async () => {
+  const page = await novaPagina(390);
+  const leitura = Promise.withResolvers<void>();
+  let pedidos = 0;
+  try {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.route("**/api/**", async (rota) => {
+      const { pathname } = new URL(rota.request().url());
+      if (pathname === "/api/configuracoes/completo") return rota.fulfill({ json: completo });
+      if (pathname === "/api/planilha-parcial") {
+        return rota.fulfill({
+          json: {
+            integracao: {
+              ativa: true,
+              contaGoogle: true,
+              googlePlanilha: { id: "parcial-teste", nome: "Planilha sintética" },
+              aba: "Chamada Parcial",
+              preparada: true,
+              podeEnviar: true,
+            },
+          },
+        });
+      }
+      if (pathname === "/api/frequencias-personalizadas") {
+        pedidos++;
+        await leitura.promise;
+      }
+      return rota.fulfill({ status: 503, json: { error: "Leitura de teste indisponível." } });
+    });
+    await page.goto(url);
+    await selecionarCategoriaConfiguracoes(page, "Planilhas");
+    await page.getByRole("button", { name: /Planilha de chamada parcial/ }).click();
+    await page.getByRole("button", { name: "Abrir Chamada Parcial", exact: true }).press("Enter");
+    await verificarTela.poll(() => pedidos).toBe(1);
+
+    const espera = page.getByRole("status").filter({ hasText: "Carregando a tela..." });
+    const destino = page.getByRole("heading", { name: "Chamada parcial", exact: true });
+    await verificarTela(espera).toBeVisible({ timeout: 1500 });
+    await verificarTela(destino).toHaveCount(0);
+    await verificarTela(gatilhoGaveta(page)).toBeEnabled();
+
+    leitura.resolve();
+    await verificarTela(espera).not.toBeAttached();
+    await verificarTela(destino).toBeFocused();
+  } finally {
+    leitura.resolve();
+    await page.close();
+  }
+});
+
+it.each([
+  {
+    nome: "Planilha de entradas e saídas",
+    caminho: "/api/planilha-saidas",
+    resposta: { status: 503, json: { error: "Integração de saídas indisponível no teste." } },
+    resultado: "Integração de saídas indisponível no teste.",
+  },
+  {
+    nome: "Planilha de chamada parcial",
+    caminho: "/api/planilha-parcial",
+    resposta: {
+      json: {
+        integracao: {
+          ativa: false,
+          contaGoogle: false,
+          googlePlanilha: null,
+          aba: "Chamada Parcial",
+          preparada: false,
+          podeEnviar: false,
+        },
+      },
+    },
+    resultado: "Sem conexão",
+  },
+  {
+    nome: "Planilha de chamada parcial",
+    caminho: "/api/planilha-parcial",
+    resposta: { status: 503, json: { error: "Integração parcial indisponível no teste." } },
+    resultado: "Integração parcial indisponível no teste.",
+  },
+])(
+  "reparo R3: Planilhas espera a primeira leitura de $nome ($resultado)",
+  async ({ nome, caminho, resposta, resultado }) => {
+    const page = await novaPagina(390);
+    const leitura = Promise.withResolvers<void>();
+    let pedidos = 0;
+    try {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.route("**/api/**", async (rota) => {
+        const { pathname } = new URL(rota.request().url());
+        if (pathname === "/api/configuracoes/completo") return rota.fulfill({ json: completo });
+        if (pathname === caminho) {
+          pedidos++;
+          await leitura.promise;
+          return rota.fulfill(resposta);
+        }
+        return rota.fulfill({ status: 503, json: { error: "Leitura de teste indisponível." } });
+      });
+      await page.goto(url);
+      const nav = await exporConfiguracoes(page);
+      await opcaoGaveta(nav, "Planilhas").press("Enter");
+      await verificarTela(menuMovel(page)).not.toBeAttached();
+      await verificarTela.poll(() => pedidos).toBe(1);
+
+      const conteudo = page.getByRole("main");
+      const espera = conteudo.getByRole("status").filter({ hasText: "Carregando a tela..." });
+      const titulo = conteudo.getByRole("heading", { name: "Planilhas", exact: true });
+      const cartao = conteudo.getByRole("button", { name: new RegExp(nome) });
+      await verificarTela(espera).toBeVisible({ timeout: 1500 });
+      await verificarTela(cartao).toHaveCount(0);
+      await verificarTela(gatilhoGaveta(page)).toBeEnabled();
+
+      leitura.resolve();
+      await verificarTela(espera).not.toBeAttached();
+      await verificarTela(titulo).toBeFocused();
+      await verificarTela(cartao).toBeVisible();
+      if (caminho === "/api/planilha-parcial" && resposta.status === 503) {
+        await cartao.click();
+        await verificarTela(conteudo.getByText(resultado, { exact: true })).toBeVisible();
+        await verificarTela(cartao.getByText("Sem conexão", { exact: true })).toHaveCount(0);
+        await verificarTela(
+          cartao.getByText("Leitura indisponível", { exact: true }),
+        ).toBeVisible();
+        await verificarTela(
+          conteudo.getByRole("tablist", { name: "Ações da planilha de chamada parcial" }),
+        ).toHaveCount(0);
+        const abrirParcial = conteudo.getByRole("button", {
+          name: "Abrir Chamada Parcial",
+          exact: true,
+        });
+        await verificarTela(abrirParcial).toBeVisible();
+        await abrirParcial.press("Enter");
+        await verificarTela(
+          conteudo.getByRole("heading", { name: "Chamada parcial", exact: true }),
+        ).toBeFocused();
+        return;
+      }
+      await verificarTela(
+        resultado === "Sem conexão" ? cartao.getByText(resultado) : conteudo.getByText(resultado),
+      ).toBeVisible();
+    } finally {
+      leitura.resolve();
+      await page.close();
+    }
+  },
+);
 
 it.each([320, 390, 1440])("separa os selos da planilha de frequência a %i px", async (largura) => {
   const page = await novaPagina(largura, 844);
@@ -898,7 +1179,12 @@ it("achados finais: fecha a gaveta antes de carregar a Chamada e só então foca
     await abrir(page, "light", false, undefined, null, true);
     const nav = await exporNavegacao(page);
     await nav.getByRole("button", { name: "Voltar ao menu principal" }).press("Enter");
-    const origem = page.getByRole("heading", { name: "Séries", level: 1, exact: true });
+    const origem = page.getByRole("heading", {
+      name: "Séries",
+      level: 1,
+      exact: true,
+      includeHidden: true,
+    });
     const destino = page.getByRole("heading", { name: "Chamada", level: 1, exact: true });
     const gatilho = page.locator('button[aria-label="Abrir menu"]');
     await verificarTela(gatilho).toHaveAttribute("aria-expanded", "true");
@@ -931,7 +1217,25 @@ it("revisão focal: fechar para a Chamada suspensa não renderiza novamente o Pa
       page.evaluate(() => performance.getEntriesByName("commit-painel-teste").length);
     expect(await commits()).toBeGreaterThan(0);
     await page.evaluate(() => performance.clearMarks("commit-painel-teste"));
-    await opcaoGaveta(nav, "Chamada").press("Enter");
+    const opcao = opcaoGaveta(nav, "Chamada");
+    const quadro = await opcao.evaluateHandle((botao) => ({
+      estado: new Promise<boolean>((resolver) => {
+        botao.addEventListener(
+          "click",
+          () => {
+            requestAnimationFrame(() => {
+              const status = [...document.querySelectorAll('main [role="status"]')].find(
+                (no) => no.textContent === "Carregando a tela...",
+              );
+              resolver(Boolean(status?.getClientRects().length));
+            });
+          },
+          { once: true },
+        );
+      }),
+    }));
+    await opcao.press("Enter");
+    expect(await quadro.evaluate(({ estado }) => estado)).toBe(true);
     await verificarTela(menuMovel(page)).not.toBeAttached();
     const espera = page.getByRole("status").filter({ hasText: "Carregando a tela..." });
     await verificarTela(espera).toBeVisible();
@@ -1006,8 +1310,9 @@ it("revisão focal: esqueleto espera a leitura de Configurações e permite tent
     await opcaoGaveta(nav, "Geral").press("Enter");
     await verificarTela.poll(() => leituras).toBe(1);
     const conteudo = page.getByRole("main");
-    const espera = conteudo.getByRole("status").filter({ hasText: "Carregando configurações..." });
+    const espera = conteudo.getByRole("status").filter({ hasText: "Carregando a tela..." });
     await verificarTela(espera).toBeVisible({ timeout: 1500 });
+    await verificarTela(conteudo.getByRole("heading", { name: "Configurações" })).toHaveCount(0);
     const voltar = opcaoGaveta(nav, "Voltar para Gestão");
     await voltar.press("Enter");
     await verificarTela(opcaoGaveta(nav, "Configurações")).toBeFocused();
@@ -1026,6 +1331,79 @@ it("revisão focal: esqueleto espera a leitura de Configurações e permite tent
     await page.close();
   }
 });
+
+it.each([
+  { origem: "gestao", menu: "Equipe", caminho: "/api/usuarios", titulo: "Equipe" },
+  { origem: "gestao", menu: "Diretores", caminho: "/api/diretores", titulo: "Diretores" },
+  { origem: "gestao", menu: "Chamada", caminho: "/api/frequencias", titulo: "Chamada" },
+  {
+    origem: "relatorios",
+    menu: "Saídas e Entradas",
+    caminho: "/api/relatorios/movimentacoes",
+    titulo: "Saídas e Entradas",
+  },
+  {
+    origem: "painel",
+    menu: "Chamada Parcial",
+    caminho: "/api/frequencias-personalizadas",
+    titulo: "Chamada parcial",
+  },
+  {
+    origem: "gestao",
+    menu: "Provas",
+    caminho: "/api/provas-bimestrais",
+    titulo: "Horários",
+  },
+])(
+  "mantém o esqueleto durante a leitura indispensável de $menu",
+  async ({ origem, menu, caminho, titulo }) => {
+    const page = await browser.newPage({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      serviceWorkers: "block",
+    });
+    let liberar = () => {};
+    const bloqueio = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+    let pedidos = 0;
+    try {
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      await page.route("**/api/**", async (rota) => {
+        const { pathname } = new URL(rota.request().url());
+        if (pathname === "/api/configuracoes/completo") return rota.fulfill({ json: completo });
+        if (pathname === caminho) {
+          pedidos++;
+          await bloqueio;
+        }
+        return rota.fulfill({ status: 503, json: { error: "Leitura de teste indisponível." } });
+      });
+      await page.goto(`${url}?visao=${origem}`);
+      const nav = await exporNavegacao(page);
+      if (menu === "Provas") {
+        await opcaoGaveta(nav, "Configurações").tap();
+        await opcaoGaveta(nav, "Horários").tap();
+      } else if (menu === "Chamada") {
+        await opcaoGaveta(nav, "Voltar ao menu principal").tap();
+      }
+      await opcaoGaveta(nav, menu).tap();
+      await verificarTela(menuMovel(page)).not.toBeAttached();
+      await verificarTela.poll(() => pedidos).toBe(1);
+      const conteudo = page.getByRole("main");
+      const espera = conteudo.getByRole("status").filter({ hasText: /^Carregando a tela\.\.\.$/ });
+      const destino = conteudo.getByRole("heading", { name: titulo, exact: true });
+      await verificarTela(espera).toBeVisible({ timeout: 1500 });
+      await verificarTela(destino).toHaveCount(0);
+      await verificarTela(gatilhoGaveta(page)).toBeEnabled();
+      liberar();
+      await verificarTela(espera).not.toBeAttached();
+      await verificarTela(destino).toBeFocused();
+    } finally {
+      liberar();
+      await page.close();
+    }
+  },
+);
 
 it("a saída do shell mantém a tela durante a API e a oculta assim que a sessão encerra", async () => {
   const page = await novaPagina(390);
@@ -1085,7 +1463,9 @@ it("confirmar a mesma sessão depois de falhar a saída preserva o rascunho de C
       }
       if (pathname === "/api/auth/sessao" && metodo === "GET") {
         await sessao.promise;
-        return rota.fulfill({ json: { usuario: { id: "teste" } } });
+        return rota.fulfill({
+          json: { usuario: { id: "teste" }, referenciaSessao: "G".repeat(43) },
+        });
       }
       return rota.fulfill({ status: 503, json: { error: "Indisponível no teste" } });
     });
@@ -1133,33 +1513,33 @@ it("confirmar a mesma sessão depois de falhar a saída preserva o rascunho de C
   }
 });
 
-it("protege o rascunho da conta antes de montar a Chamada", async () => {
+it("protege apenas o rascunho da sessão atual antes de montar a Chamada", async () => {
   const page = await novaPagina(390);
   try {
     await page.addInitScript(() => {
       sessionStorage.setItem(
-        "frequencia:rascunho:outro:2026-03-10:turma-0",
+        `frequencia:rascunho:sessao:teste:${"H".repeat(43)}:2026-03-10:turma-0`,
         '{"versao":3,"faltas":[]}',
       );
     });
-    await abrirRelatoriosDeTeste(page, "painel");
+    await abrirRelatoriosDeTeste(page, "painel&sessao-teste");
     await verificarTela(page.getByRole("group", { name: "Painel", exact: true })).toBeVisible();
     const resultado = await page.evaluate(() => {
       const bloqueiaSaida = () =>
         !window.dispatchEvent(new Event("beforeunload", { cancelable: true }));
-      const outraConta = bloqueiaSaida();
-      const chave = "frequencia:rascunho:teste:2026-03-10:turma-0";
+      const outraSessao = bloqueiaSaida();
+      const chave = `frequencia:rascunho:sessao:teste:${"G".repeat(43)}:2026-03-10:turma-0`;
       sessionStorage.setItem(chave, "inválido");
       const ilegivel = bloqueiaSaida();
       sessionStorage.setItem(chave, '{"versao":3,"faltas":[]}');
-      const propriaConta = bloqueiaSaida();
+      const propriaSessao = bloqueiaSaida();
       sessionStorage.removeItem(chave);
-      return { outraConta, ilegivel, propriaConta, aposRemover: bloqueiaSaida() };
+      return { outraSessao, ilegivel, propriaSessao, aposRemover: bloqueiaSaida() };
     });
     expect(resultado).toEqual({
-      outraConta: false,
+      outraSessao: false,
       ilegivel: false,
-      propriaConta: true,
+      propriaSessao: true,
       aposRemover: false,
     });
     await verificarTela(
@@ -1167,7 +1547,7 @@ it("protege o rascunho da conta antes de montar a Chamada", async () => {
     ).not.toBeAttached();
     await page.evaluate(() => {
       sessionStorage.setItem(
-        "frequencia:rascunho:teste:2026-03-10:turma-0",
+        `frequencia:rascunho:sessao:teste:${"G".repeat(43)}:2026-03-10:turma-0`,
         '{"versao":3,"faltas":[]}',
       );
     });

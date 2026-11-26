@@ -17,6 +17,7 @@ import Box from "@mui/material/Box";
 import Skeleton from "@mui/material/Skeleton";
 import Stack from "@mui/material/Stack";
 import { Botao } from "@/components/ui/mui/botao";
+import { Dialogo } from "@/components/ui/mui/dialogo";
 import { pedir } from "@/lib/api-cliente";
 import { prepararExpurgoBiNoLogout } from "@/lib/bi-armazenamento";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
@@ -30,23 +31,28 @@ import {
 import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import { EsqueletoAplicacao } from "./esqueleto-aplicacao";
 
-const ATRASO_ESQUELETO = 200;
+const ATRASO_ESQUELETO_SAIDA = 200;
 const PRAZO_DESTINO = 10_000;
 
 type Expurgo = ReturnType<typeof prepararExpurgoBiNoLogout>;
-type Encerramento = { tipo: "saida" | "expiracao" } | { tipo: "troca"; usuarioId: string };
-type Reconciliacao = { tipo: "reconciliar"; usuarioId: string; notificarFalha: () => void };
+type SessaoConfirmada = { usuarioId: string; referenciaSessao: string };
+type Encerramento = { tipo: "saida" | "expiracao" } | ({ tipo: "troca" } & SessaoConfirmada);
+type Reconciliacao = {
+  tipo: "reconciliar";
+  referenciaOriginal?: string;
+  notificarFalha: () => void;
+};
 type Operacao = { tipo: "entrada"; usuarioId: string } | Encerramento | Reconciliacao;
 type Etapa =
   "limpando" | "falha-expurgo" | "espera" | "recuperacao" | "verificando" | "falha-sessao";
-interface Transicao {
-  operacao: Operacao;
-  etapa: Etapa;
-}
+type Autenticacao = { tipo: "autenticacao" };
+type Transicao =
+  { operacao: Operacao; etapa: Etapa } | { operacao: Autenticacao; etapa: "autenticando" };
 
 interface SessaoNaInterface {
   transicao: Transicao | null;
-  iniciar: (operacao: Operacao, expurgar?: Expurgo) => void;
+  iniciar: (operacao: Encerramento | Reconciliacao, expurgar?: Expurgo) => void;
+  prepararEntrada: () => ((usuarioId?: string) => void) | undefined;
   confirmarDestino: (
     transicao: Transicao,
     avisarSucesso: ReturnType<typeof useAvisosDaSessao>["avisarSucesso"],
@@ -54,20 +60,32 @@ interface SessaoNaInterface {
 }
 
 const ContextoSessao = createContext<SessaoNaInterface | null>(null);
-const ContextoUsuario = createContext<string | undefined>(undefined);
+const ContextoReferenciaSessao = createContext<string | undefined>(undefined);
 
-async function consultarSessao(signal: AbortSignal) {
-  const { usuario } = await pedir<{ usuario?: { id?: unknown } | null }>("/api/auth/sessao", {
-    signal,
-  });
-  if (usuario === null) return null;
-  if (typeof usuario?.id === "string" && usuario.id) return usuario.id;
-  throw new Error("Identidade não confirmada.");
+export function useReferenciaDaSessao() {
+  return useContext(ContextoReferenciaSessao);
+}
+
+async function consultarSessao(signal: AbortSignal): Promise<SessaoConfirmada | null> {
+  const { usuario, referenciaSessao } = await pedir<{
+    usuario?: { id?: unknown } | null;
+    referenciaSessao?: unknown;
+  }>("/api/auth/sessao", { signal, headers: { "X-Frequenciapp-Referencia-Sessao": "1" } });
+  if (usuario === null && referenciaSessao === undefined) return null;
+  if (
+    typeof usuario?.id === "string" &&
+    usuario.id &&
+    typeof referenciaSessao === "string" &&
+    /^[A-Za-z0-9_-]{43}$/.test(referenciaSessao)
+  ) {
+    return { usuarioId: usuario.id, referenciaSessao };
+  }
+  throw new Error("Sessão não confirmada.");
 }
 
 export function ProvedorTransicaoSessao({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const operacaoAtiva = useRef<Operacao | null>(null);
+  const operacaoAtiva = useRef<Operacao | Autenticacao | null>(null);
   const expurgoAtivo = useRef<Expurgo | undefined>(undefined);
   const tarefaAtiva = useRef<AbortController | null>(null);
   const [transicao, setTransicao] = useState<Transicao | null>(null);
@@ -132,24 +150,23 @@ export function ProvedorTransicaoSessao({ children }: { children: ReactNode }) {
 
   const reconciliar = useCallback(
     async (operacao: Reconciliacao) => {
-      setTransicao({ operacao, etapa: "verificando" });
-      let usuarioId: string | null;
+      let sessao: SessaoConfirmada | null;
       try {
-        usuarioId = await executarComPrazo(consultarSessao);
+        sessao = await executarComPrazo(consultarSessao);
+        if (sessao && !operacao.referenciaOriginal)
+          throw new Error("Sessão de origem não confirmada.");
       } catch {
         if (operacaoAtiva.current === operacao) setTransicao({ operacao, etapa: "falha-sessao" });
         return;
       }
       if (operacaoAtiva.current !== operacao) return;
-      if (usuarioId === operacao.usuarioId) {
+      if (sessao && sessao.referenciaSessao === operacao.referenciaOriginal) {
         retomarAvisosDaSessao();
         concluir();
         operacao.notificarFalha();
         return;
       }
-      const encerramento: Encerramento = usuarioId
-        ? { tipo: "troca", usuarioId }
-        : { tipo: "saida" };
+      const encerramento: Encerramento = sessao ? { tipo: "troca", ...sessao } : { tipo: "saida" };
       encerrarAvisosDaSessao();
       operacaoAtiva.current = encerramento;
       await limparEAtualizar(encerramento);
@@ -158,21 +175,39 @@ export function ProvedorTransicaoSessao({ children }: { children: ReactNode }) {
   );
 
   const iniciar = useCallback(
-    (operacao: Operacao, expurgar?: Expurgo) => {
+    (operacao: Encerramento | Reconciliacao, expurgar?: Expurgo) => {
       if (operacaoAtiva.current) return;
       operacaoAtiva.current = operacao;
       expurgoAtivo.current = expurgar;
       if (operacao.tipo === "reconciliar") {
         pausarAvisosDaSessao();
+        setTransicao({ operacao, etapa: "verificando" });
         void reconciliar(operacao);
       } else {
         encerrarAvisosDaSessao();
-        if (operacao.tipo === "entrada") atualizar(operacao);
-        else void limparEAtualizar(operacao);
+        void limparEAtualizar(operacao);
       }
     },
-    [atualizar, limparEAtualizar, reconciliar],
+    [limparEAtualizar, reconciliar],
   );
+
+  const prepararEntrada = useCallback(() => {
+    if (operacaoAtiva.current) return;
+    const autenticacao: Autenticacao = { tipo: "autenticacao" };
+    operacaoAtiva.current = autenticacao;
+    setTransicao({ operacao: autenticacao, etapa: "autenticando" });
+    return (usuarioId?: string) => {
+      if (operacaoAtiva.current !== autenticacao) return;
+      if (usuarioId === undefined) {
+        concluir();
+        return;
+      }
+      const entrada: Operacao = { tipo: "entrada", usuarioId };
+      operacaoAtiva.current = entrada;
+      encerrarAvisosDaSessao();
+      atualizar(entrada);
+    };
+  }, [atualizar, concluir]);
 
   const confirmarDestino = useCallback<SessaoNaInterface["confirmarDestino"]>(
     ({ operacao }, avisarSucesso) => {
@@ -185,12 +220,15 @@ export function ProvedorTransicaoSessao({ children }: { children: ReactNode }) {
   );
 
   // Os prazos apenas mudam a apresentação. Nunca confirmam a sessão.
-  const temTransicao = transicao !== null;
+  const usaEsperaDeSaida =
+    transicao !== null &&
+    transicao.operacao.tipo !== "autenticacao" &&
+    transicao.operacao.tipo !== "entrada";
   useEffect(() => {
-    if (!temTransicao) return;
-    const atraso = window.setTimeout(() => setExibirEsqueleto(true), ATRASO_ESQUELETO);
+    if (!usaEsperaDeSaida) return;
+    const atraso = window.setTimeout(() => setExibirEsqueleto(true), ATRASO_ESQUELETO_SAIDA);
     return () => window.clearTimeout(atraso);
-  }, [temTransicao]);
+  }, [usaEsperaDeSaida]);
 
   useEffect(() => {
     if (transicao?.etapa !== "espera") return;
@@ -200,7 +238,7 @@ export function ProvedorTransicaoSessao({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(prazo);
   }, [transicao]);
 
-  const { executar: repetir } = useAcaoUnica(async () => {
+  const { executando: repetindo, executar: repetir } = useAcaoUnica(async () => {
     if (!transicao) return;
     if (transicao.operacao.tipo === "reconciliar") {
       if (transicao.etapa === "falha-sessao") await reconciliar(transicao.operacao);
@@ -213,14 +251,16 @@ export function ProvedorTransicaoSessao({ children }: { children: ReactNode }) {
 
   const abrindoApp = transicao?.operacao.tipo === "entrada" || transicao?.operacao.tipo === "troca";
   const etapa = transicao?.etapa;
+  const esperandoEntrada = etapa === "autenticando" || transicao?.operacao.tipo === "entrada";
   const falhaExpurgo = etapa === "falha-expurgo";
   // Durante a reconciliação, recarregar perderia o alvo ainda pendente do expurgo.
   const podeReabrir = etapa === "recuperacao";
-  const falha = falhaExpurgo || etapa === "falha-sessao" || podeReabrir;
+  const falha = falhaExpurgo || podeReabrir;
   const abrindo = abrindoApp ? "Abrindo o aplicativo..." : "Abrindo a entrada...";
-  const mensagens: Record<Etapa, string> = {
+  const mensagens: Record<Transicao["etapa"], string> = {
+    autenticando: "Entrando...",
     verificando: "Verificando se a sessão foi encerrada...",
-    "falha-sessao": "Não foi possível confirmar se a sessão foi encerrada.",
+    "falha-sessao": "Não foi possível confirmar o encerramento",
     "falha-expurgo":
       "Não foi possível remover todos os dados locais do BI. Feche outras abas do BI e confira as permissões do navegador. Se o erro continuar, limpe os dados deste site pelo navegador antes de tentar novamente. A limpeza do site também remove preferências e rascunhos locais.",
     limpando: abrindo,
@@ -231,26 +271,50 @@ export function ProvedorTransicaoSessao({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ContextoSessao.Provider value={{ transicao, iniciar, confirmarDestino }}>
+    <ContextoSessao.Provider value={{ transicao, iniciar, prepararEntrada, confirmarDestino }}>
       {children}
       {etapa ? (
         <Box sx={{ bgcolor: "background.default", minHeight: "100dvh" }}>
-          <Stack spacing={1} sx={{ px: { xs: 2, sm: 3 }, pt: 2, alignItems: "flex-start" }}>
-            <Box role="status">{mensagens[etapa]}</Box>
-            {falha ? (
-              <Botao variante="contorno" onClick={() => void repetir()}>
-                Tentar novamente
-              </Botao>
-            ) : null}
-            {podeReabrir ? (
-              <Botao variante="texto" onClick={() => window.location.reload()}>
-                Reabrir página
-              </Botao>
-            ) : null}
-          </Stack>
-          {!falha && exibirEsqueleto ? (
-            abrindoApp ? (
-              <EsqueletoAplicacao />
+          {etapa === "falha-sessao" ? (
+            <Dialogo
+              aberto
+              // Dispensar não confirma a sessão nem autoriza abandonar o expurgo.
+              onFechar={() => {}}
+              fecharDesabilitado
+              titulo={mensagens[etapa]}
+              descricao="O painel fica oculto até ser possível verificar a sessão."
+              tamanho="pequeno"
+              acoes={
+                <Botao
+                  variante="contorno"
+                  autoFocus
+                  aria-disabled={repetindo || undefined}
+                  onClick={() => void repetir()}
+                >
+                  Tentar novamente
+                </Botao>
+              }
+            >
+              {repetindo ? <Box role="status">{mensagens.verificando}</Box> : null}
+            </Dialogo>
+          ) : (
+            <Stack spacing={1} sx={{ px: { xs: 2, sm: 3 }, pt: 2, alignItems: "flex-start" }}>
+              <Box role="status">{mensagens[etapa]}</Box>
+              {falha ? (
+                <Botao variante="contorno" onClick={() => void repetir()}>
+                  Tentar novamente
+                </Botao>
+              ) : null}
+              {podeReabrir ? (
+                <Botao variante="texto" onClick={() => window.location.reload()}>
+                  Reabrir página
+                </Botao>
+              ) : null}
+            </Stack>
+          )}
+          {!falha && etapa !== "falha-sessao" && (esperandoEntrada || exibirEsqueleto) ? (
+            esperandoEntrada || abrindoApp ? (
+              <EsqueletoAplicacao comNavegacao={esperandoEntrada} />
             ) : (
               <EsqueletoEntrada />
             )
@@ -279,7 +343,7 @@ function EsqueletoEntrada() {
 /** O shell chama sair somente após sua confirmação de rascunho, se necessária. */
 export function useSaidaSessao() {
   const sessao = useContext(ContextoSessao);
-  const usuarioId = useContext(ContextoUsuario);
+  const referenciaOriginal = useReferenciaDaSessao();
   const { avisarErro } = useAvisosDaSessao();
   const router = useRouter();
   const iniciar = sessao?.iniciar;
@@ -301,10 +365,10 @@ export function useSaidaSessao() {
       try {
         // O evento é compartilhado e uma resposta antiga pode chegar após nova entrada.
         const expurgar = prepararExpurgoBiNoLogout();
-        const id = await consultarSessao(
+        const sessaoAtual = await consultarSessao(
           AbortSignal.any([controle.signal, AbortSignal.timeout(PRAZO_DESTINO)]),
         );
-        if (!controle.signal.aborted && id === null) {
+        if (!controle.signal.aborted && sessaoAtual === null) {
           iniciar?.({ tipo: "expiracao" }, expurgar);
         }
       } catch {
@@ -329,8 +393,7 @@ export function useSaidaSessao() {
       if (!montado.current) return;
       const notificarFalha = () =>
         avisarErro(excecao, { contexto: "Não foi possível sair. Tente novamente." });
-      if (iniciar && usuarioId)
-        iniciar({ tipo: "reconciliar", usuarioId, notificarFalha }, expurgar);
+      if (iniciar) iniciar({ tipo: "reconciliar", referenciaOriginal, notificarFalha }, expurgar);
       else notificarFalha();
       return;
     }
@@ -346,17 +409,11 @@ export function useSaidaSessao() {
   return { saindo, sair };
 }
 
-export function useConfirmarEntrada() {
-  const iniciar = useContext(ContextoSessao)?.iniciar;
-  const montado = useRef(false);
-  useLayoutEffect(() => {
-    montado.current = true;
-    return () => {
-      montado.current = false;
-    };
-  }, []);
-  return (usuarioId: string) => {
-    if (montado.current) iniciar?.({ tipo: "entrada", usuarioId });
+export function useTransicaoDeEntrada() {
+  const sessao = useContext(ContextoSessao);
+  return {
+    prepararEntrada: sessao?.prepararEntrada,
+    autenticando: sessao?.transicao?.etapa === "autenticando",
   };
 }
 
@@ -372,9 +429,11 @@ export function useAtualizacaoDeSessaoEmCurso() {
 export function DestinoSessao({
   children,
   usuarioId,
+  referenciaSessao,
 }: {
   children: ReactNode;
   usuarioId?: string;
+  referenciaSessao?: string;
 }) {
   const sessao = useContext(ContextoSessao);
   const transicao = sessao?.transicao;
@@ -383,18 +442,27 @@ export function DestinoSessao({
     transicao &&
     operacao &&
     (transicao.etapa === "espera" || transicao.etapa === "recuperacao") &&
-    (operacao.tipo === "entrada" || operacao.tipo === "troca"
-      ? operacao.usuarioId === usuarioId
-      : operacao.tipo !== "reconciliar" && usuarioId === undefined);
-  const preservar = operacao?.tipo === "reconciliar" && operacao.usuarioId === usuarioId;
-  if (transicao && !pronto && !preservar) return null;
+    (operacao.tipo === "troca"
+      ? operacao.usuarioId === usuarioId && operacao.referenciaSessao === referenciaSessao
+      : operacao.tipo === "entrada"
+        ? operacao.usuarioId === usuarioId
+        : operacao.tipo !== "reconciliar" && usuarioId === undefined);
+  const preservar =
+    operacao?.tipo === "reconciliar" &&
+    referenciaSessao !== undefined &&
+    operacao.referenciaOriginal === referenciaSessao;
+  const formularioAguardando = transicao?.etapa === "autenticando" && usuarioId === undefined;
+  if (transicao && !pronto && !preservar && !formularioAguardando) return null;
   return (
-    <ContextoUsuario.Provider value={usuarioId}>
-      <EscopoAvisosDaSessao autenticado={usuarioId !== undefined} key={usuarioId ?? "entrada"}>
+    <ContextoReferenciaSessao.Provider value={referenciaSessao}>
+      <EscopoAvisosDaSessao
+        autenticado={usuarioId !== undefined}
+        key={referenciaSessao ?? usuarioId ?? "entrada"}
+      >
         {pronto && transicao ? <ConfirmacaoDoDestino transicao={transicao} /> : null}
         <Activity mode={preservar ? "hidden" : "visible"}>{children}</Activity>
       </EscopoAvisosDaSessao>
-    </ContextoUsuario.Provider>
+    </ContextoReferenciaSessao.Provider>
   );
 }
 

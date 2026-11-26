@@ -221,7 +221,7 @@ for (const [largura, altura, tema, faltasFiltradas] of [
     }
     await chamada.getByRole("button", { name: "Salvar", exact: true }).click();
     const confirmar = page.getByRole("alertdialog", { name: "Salvar chamada?", exact: true });
-    await confirmar.getByRole("button", { name: "Salvar chamada", exact: true }).click();
+    await confirmar.getByRole("button", { name: "Salvar", exact: true }).click();
     const aviso = page.getByRole("alert").filter({
       hasText: mensagem,
       has: page.getByRole("button", { name: "Fechar aviso", exact: true }),

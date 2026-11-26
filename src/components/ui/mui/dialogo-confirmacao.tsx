@@ -20,6 +20,7 @@ interface DialogoConfirmacaoProps {
   aposFechar?: () => void;
   rotuloConfirmar?: string;
   rotuloCancelar?: string;
+  acoesEmUmaLinhaQuandoCouberem?: boolean;
   destrutivo?: boolean;
   operacaoEmAndamento?: boolean;
 }
@@ -34,6 +35,7 @@ export function DialogoConfirmacao({
   aposFechar,
   rotuloConfirmar = "Confirmar",
   rotuloCancelar = "Cancelar",
+  acoesEmUmaLinhaQuandoCouberem = false,
   destrutivo = false,
   operacaoEmAndamento = false,
 }: DialogoConfirmacaoProps) {
@@ -79,8 +81,20 @@ export function DialogoConfirmacao({
           </DialogContentText>
         ) : null}
       </DialogContent>
-      <DialogActions sx={{ padding, paddingTop: 0 }}>
-        <Button autoFocus onClick={onCancelar} disabled={operacaoEmAndamento}>
+      <DialogActions
+        disableSpacing={acoesEmUmaLinhaQuandoCouberem}
+        sx={{
+          padding,
+          paddingTop: 0,
+          ...(acoesEmUmaLinhaQuandoCouberem && { flexWrap: "wrap", gap: 1 }),
+        }}
+      >
+        <Button
+          autoFocus
+          onClick={onCancelar}
+          disabled={operacaoEmAndamento}
+          sx={acoesEmUmaLinhaQuandoCouberem ? { whiteSpace: "nowrap" } : undefined}
+        >
           {rotuloCancelar}
         </Button>
         <Button

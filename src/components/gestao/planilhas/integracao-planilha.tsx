@@ -18,6 +18,7 @@ import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useRascunhoConfiguracoes } from "@/components/gestao/configuracoes/rascunho-configuracoes";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { rotuloInstante, type AbaEsquema } from "@/domain/planilha";
 import { diasDoMes, rotuloData, rotuloMes } from "@/domain/frequencia";
 import { mesValido } from "@/domain/planilha-mensal";
@@ -125,6 +126,7 @@ export default function IntegracaoPlanilha({
   const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [integracao, setIntegracao] = useState<IntegracaoAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
+  useLeituraDaVisao(carregando);
   const [aberto, setAberto] = useState(abertoInicial);
   const [acao, setAcao] = useState<PainelFrequencia | null>(abertoInicial ? "configurar" : null);
   const [erro, setErro] = useState("");

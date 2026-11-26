@@ -7,7 +7,7 @@ import Stack from "@mui/material/Stack";
 import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
-export function EsqueletoAplicacao() {
+export function EsqueletoAplicacao({ comNavegacao = false }: { comNavegacao?: boolean } = {}) {
   const { animacoesAtivas } = useAnimacoesDaInterface();
   const animacao = animacoesAtivas ? "pulse" : false;
   return (
@@ -16,15 +16,36 @@ export function EsqueletoAplicacao() {
       sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, minHeight: "100dvh" }}
     >
       <Box
+        aria-hidden="true"
+        aria-label={comNavegacao ? "Navegação em carregamento" : undefined}
         sx={{
-          display: { xs: "none", md: "block" },
-          width: TOKENS_LAYOUT.gaveta,
+          display: { xs: comNavegacao ? "block" : "none", md: "block" },
+          width: { xs: comNavegacao ? "100%" : TOKENS_LAYOUT.gaveta, md: TOKENS_LAYOUT.gaveta },
           flexShrink: 0,
-          borderRight: 1,
+          borderRight: { xs: 0, md: 1 },
+          borderBottom: { xs: comNavegacao ? 1 : 0, md: 0 },
           borderColor: "divider",
         }}
-      />
-      <Box sx={{ display: "flex", flex: 1, minWidth: 0, flexDirection: "column" }}>
+      >
+        {comNavegacao ? (
+          <Stack spacing={2} sx={{ p: 2 }}>
+            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+              <Skeleton animation={animacao} variant="rounded" width={40} height={40} />
+              <Skeleton animation={animacao} variant="text" width={128} height={24} />
+            </Stack>
+            <Stack spacing={1} sx={{ display: { xs: "none", md: "flex" } }}>
+              {[1, 2, 3, 4, 5].map((linha) => (
+                <Skeleton key={linha} animation={animacao} variant="rounded" height={40} />
+              ))}
+            </Stack>
+          </Stack>
+        ) : null}
+      </Box>
+      <Box
+        aria-hidden="true"
+        aria-label={comNavegacao ? "Conteúdo em carregamento" : undefined}
+        sx={{ display: "flex", flex: 1, minWidth: 0, flexDirection: "column" }}
+      >
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
           <Stack
             direction="row"
