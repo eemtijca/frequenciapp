@@ -297,7 +297,7 @@ A implementação pura está em `src/domain/frequencia.ts` e é compartilhada pe
 
 ## Grade por turma de origem
 
-A consulta de grade monta linhas com os alunos ativos da turma de origem escolhida, ordenados pela ordem de apresentação, e colunas com os dias do período: um dia, uma semana de aula (segunda a sexta), um período personalizado ou o mês, com limite de 366 dias. Cada linha carrega o total de dias com falta, com falta justificada, com presença parcial e com frequência, além do acumulado de F + FJ de todo o histórico. A primeira coluna fica fixa durante a rolagem horizontal. Uma saída antecipada no dia fica registrada no relatório por aluno e nas estatísticas da área de saídas, sem alterar a marca.
+A consulta de grade monta linhas com os alunos ativos da turma de origem escolhida, ordenados pela ordem de apresentação, e colunas com os dias do período: um dia, uma semana de aula (segunda a sexta), um período personalizado ou o mês, com limite de 366 dias. Cada linha carrega o total de dias com falta, com falta justificada, com presença parcial e com frequência. A tela mostra esses três totais do período e o acumulado de F + FJ de todo o histórico. Na presença parcial, a célula informa quantas aulas foram faltadas sobre as previstas. A linha pode abrir data, aula e justificativa. O PDF da turma de origem sai de uma transação Repeatable Read, com instante e hash dessa leitura, sem tabela nova. A primeira coluna fica fixa durante a rolagem horizontal. Uma saída antecipada no dia fica registrada no relatório por aluno e nas estatísticas da área de saídas, sem alterar a marca.
 
 ## Entrada atrasada (entrada_atrasada)
 

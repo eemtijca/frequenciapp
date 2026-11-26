@@ -595,6 +595,16 @@ Retorna `{ de, ate, totais: { saidas, entradas, total }, turmas }`. Cada grupo t
 
 Entradas são agrupadas e filtradas pela turma registrada no evento; saídas, pela turma histórica gravada no registro. O agrupamento considera o identificador e o rótulo da turma para preservar renomeações históricas. Inclui alunos inativos e registros sem chamada no dia. Grupos seguem a ordem natural do rótulo; registros seguem data, horário (ausentes por último), nome, tipo e identificador. Sem registros, retorna totais zerados e `turmas: []`. Parâmetros inválidos retornam 400; sem sessão, 401; diretor de turma, 403.
 
+### POST /api/relatorios/grade
+
+Exige capacidade `operar` e origem confiável. Corpo estrito `{ "turmaOriginalId": uuid, "de": "YYYY-MM-DD", "ate": "YYYY-MM-DD" }`. O período é inclusivo, não passa de hoje e tem no máximo 366 dias.
+
+A rota lê a turma de origem, os alunos ativos, as chamadas do período, os horários, as justificativas e o histórico numa transação Repeatable Read. Na tela, o mês em curso pede o PDF só até hoje. O PDF sai dessa leitura. A resposta traz o arquivo em base64, o instante do banco, o hash SHA-256 do retrato e um código curto derivado do hash. A auditoria guarda `relatorio-grade.preparar` e `sha256:` seguido do hash, sem nome de aluno, conteúdo ou senha. O CSV e o envio à planilha não usam esta rota.
+
+- 200 `{ "nome": "relatorio-grade.pdf", "pdf": "<base64>", "retrato": { "instante", "hash", "codigo" } }`, sem cache.
+- 400 corpo inválido, período invertido, data futura ou intervalo acima de 366 dias.
+- 401 sem sessão; 403 sem permissão de operação ou origem de outro site; 404 turma inexistente.
+
 ## Configurações
 
 ### GET /api/configuracoes

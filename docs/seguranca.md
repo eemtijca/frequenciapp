@@ -57,9 +57,9 @@ Ações administrativas (criar, atualizar e excluir entidades escolares, gerenci
 
 ## Exportações
 
-Grade, relação e cópia oferecem ZIP AES-256 com senha confirmada, gerado no navegador. A senha do ZIP não é transmitida nem persistida, e o app nunca baixa o formato original como alternativa automática a uma falha de criptografia. Nomes do ZIP são genéricos, sem turma ou aluno. O formato original permanece uma escolha explícita.
+Grade, relação, cópia e o PDF da Grade oferecem ZIP AES-256 com senha confirmada, gerado no navegador. A senha do ZIP não é transmitida nem persistida, e o app nunca baixa o formato original como alternativa automática a uma falha de criptografia. Nomes do ZIP são genéricos, sem turma ou aluno. O formato original permanece uma escolha explícita. O PDF é montado numa única leitura do banco e a auditoria guarda o hash dessa leitura, sem nome de aluno nem conteúdo.
 
-A cópia completa exige novamente a senha atual da administração por `POST /api/backup/exportar`, com CSRF, corpo estrito e até cinco tentativas em 15 minutos por conta. O antigo GET não exporta dados. CSV registra preparação com conta, tipo e formato, sem conteúdo nem senha. O registro indica preparação, não confirmação de salvamento pelo navegador. Detalhes em [downloads.md](downloads.md) e [ADR-031](adr/031-downloads-protegidos.md).
+A cópia completa exige novamente a senha atual da administração por `POST /api/backup/exportar`, com CSRF, corpo estrito e até cinco tentativas em 15 minutos por conta. O antigo GET não exporta dados. CSV registra preparação com conta, tipo e formato, sem conteúdo nem senha. O PDF da Grade registra `relatorio-grade.preparar` com o hash do retrato. O registro indica preparação, não confirmação de salvamento pelo navegador. Detalhes em [downloads.md](downloads.md) e [ADR-031](adr/031-downloads-protegidos.md).
 
 ## Entrada e erros
 

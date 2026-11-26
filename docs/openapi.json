@@ -4613,6 +4613,106 @@
         }
       }
     },
+    "/api/relatorios/grade": {
+      "post": {
+        "operationId": "prepararPdfDaGrade",
+        "summary": "Gerar o PDF da Grade",
+        "description": "Exige capacidade operar e origem confiável. Lê a turma de origem numa única transação e devolve o PDF com o instante e o hash dessa leitura.",
+        "tags": ["relatorios"],
+        "requestBody": {
+          "required": true,
+          "description": "Turma de origem e período inclusivo.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RelatorioGradePedido"
+              },
+              "examples": {
+                "Pedido": {
+                  "summary": "Pedido",
+                  "value": {
+                    "turmaOriginalId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                    "de": "2026-11-02",
+                    "ate": "2026-11-06"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "PDF da leitura, em base64, com o retrato.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelatorioGradePdf"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "nome": "relatorio-grade.pdf",
+                      "pdf": "JVBERi0xLjQK",
+                      "retrato": {
+                        "instante": "2026-11-26T14:00:00.000Z",
+                        "hash": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                        "codigo": "0123-4567"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Período ou corpo inválido.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "error": "O período não pode passar de hoje."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "description": "Turma não encontrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "error": "Turma não encontrada."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
     "/api/configuracoes": {
       "get": {
         "operationId": "obterConfiguracoes",
@@ -15757,6 +15857,68 @@
                     "$ref": "#/components/schemas/Movimentacao"
                   }
                 }
+              }
+            }
+          }
+        }
+      },
+      "RelatorioGradePedido": {
+        "type": "object",
+        "title": "Pedido do PDF da Grade",
+        "description": "Turma de origem e período inclusivo, sem campos adicionais.",
+        "additionalProperties": false,
+        "required": ["turmaOriginalId", "de", "ate"],
+        "properties": {
+          "turmaOriginalId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+          },
+          "de": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-02"
+          },
+          "ate": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-06"
+          }
+        }
+      },
+      "RelatorioGradePdf": {
+        "type": "object",
+        "title": "PDF da Grade",
+        "description": "Arquivo da turma de origem e o retrato da leitura que o produziu.",
+        "required": ["nome", "pdf", "retrato"],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "example": "relatorio-grade.pdf"
+          },
+          "pdf": {
+            "type": "string",
+            "format": "byte",
+            "description": "Conteúdo do PDF em base64.",
+            "example": "JVBERi0xLjQK"
+          },
+          "retrato": {
+            "type": "object",
+            "required": ["instante", "hash", "codigo"],
+            "properties": {
+              "instante": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-11-26T14:00:00.000Z"
+              },
+              "hash": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$",
+                "example": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+              },
+              "codigo": {
+                "type": "string",
+                "example": "0123-4567"
               }
             }
           }

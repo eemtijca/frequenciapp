@@ -116,9 +116,14 @@ async function grade(pagina: Page, semana = false) {
 
 async function medirTotal(tabela: Locator) {
   return tabela.evaluate((el) => {
-    const cabecalho = el.querySelector("thead th:last-child");
+    const cabecalhos = [...el.querySelectorAll("thead th")];
+    const resumo = new Set(["F", "FJ", "S", "Histórico"]);
+    const cabecalho = cabecalhos.find((item) => item.textContent?.trim() === "Histórico");
     const numero = el.querySelector("tbody tr:first-child td:last-child");
-    const dias = [...el.querySelectorAll("thead th")].slice(1, -1);
+    const dias = cabecalhos.filter((item) => {
+      const texto = item.textContent?.trim() ?? "";
+      return texto !== "Aluno" && !resumo.has(texto);
+    });
     const aluno = el.querySelector("tbody th");
     const nome = aluno?.firstElementChild;
     const regiao = el.parentElement;
@@ -171,9 +176,10 @@ for (const tema of ["light", "dark"] as const) {
       expect(medidas.inicioPrimeiroDia - inicio.aluno).toBeLessThanOrEqual(213);
       expect(medidas.larguraPainel - medidas.larguraTabela).toBeGreaterThan(900);
       expect(medidas.menorDia).toBeGreaterThanOrEqual(30);
-      expect(medidas.largura, "Total semanal ocupa espaço além do necessário").toBeLessThanOrEqual(
-        64,
-      );
+      expect(
+        medidas.largura,
+        "Histórico semanal ocupa espaço além do necessário",
+      ).toBeLessThanOrEqual(96);
     });
   });
 
@@ -224,7 +230,7 @@ for (const tema of ["light", "dark"] as const) {
       await pagina.mouse.move(x, y, { steps: 12 });
       await pagina.mouse.up();
       expect((await mover(regiao)).x).toBe(0);
-      expect(medidas.largura).toBeLessThanOrEqual(64);
+      expect(medidas.largura).toBeLessThanOrEqual(96);
       const busca = pagina.getByPlaceholder("Buscar aluno");
       await busca.focus();
       await pagina.keyboard.press("Tab");

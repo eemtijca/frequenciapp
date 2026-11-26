@@ -169,6 +169,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Em Relatórios, Grade, cada aluno passa a mostrar os totais de F, FJ e S do período, além do Histórico. A célula S mostra a proporção de aulas faltadas, como 2/5, e a linha abre as datas, as aulas e as justificativas. O botão Baixar relatório gera o PDF da turma de origem com resumo, detalhamento, instante e hash de uma única leitura do banco. O download segue a proteção por senha já usada no CSV, e a auditoria guarda o hash, sem nome de aluno. O CSV, a planilha e o schema permanecem iguais ([ADR-084](docs/adr/084-relatorio-pdf-da-grade.md)).
+
 - A página pública `/privacidade` descreve o tratamento de dados da EEMTI José Cláudio de Araújo, inclusive o escopo `drive.file` da integração Google, e abre sem sessão. `/politica-de-privacidade` redireciona para ela. A entrada e o diálogo Sobre apontam para a página.
 
 - O atualizador agendado da `main` aceita migrações novas apenas com autorização protegida, vinculada à revisão instalada, ao commit candidato, aos SHA-256 dos SQLs e a uma janela de uso único.

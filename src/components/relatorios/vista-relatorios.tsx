@@ -6,6 +6,7 @@ import Box from "@mui/material/Box";
 import type {
   Aluno,
   Frequencia,
+  Justificativa,
   ResumoAcumulado,
   SaidaAntecipada,
   Serie,
@@ -33,6 +34,7 @@ interface Props {
   turmas: Turma[];
   alunos: Aluno[];
   frequencias: Frequencia[];
+  justificativas?: readonly Justificativa[];
   saidas: SaidaAntecipada[];
   resumo: ResumoAcumulado | null;
   versao: number;
@@ -56,6 +58,7 @@ export default function VistaRelatorios({
   turmas,
   alunos,
   frequencias,
+  justificativas,
   saidas,
   resumo,
   versao,
@@ -128,6 +131,7 @@ export default function VistaRelatorios({
             versao={versao}
             atualizacao={atualizacao}
             origens={turmas}
+            justificativas={justificativas}
             onMes={onMes}
           />
         </ProvedorVisibilidadeGraficos>

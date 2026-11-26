@@ -1128,6 +1128,7 @@ export default function Aplicacao({
             turmas={turmas}
             alunos={alunos}
             frequencias={frequencias}
+            justificativas={justificativas}
             saidas={saidas}
             resumo={resumo}
             versao={versaoFrequencias}

@@ -747,6 +747,31 @@ export function classificarFaltasPorAulas(
   return cobertas > 0 && cobertas < aulas.size ? "S" : integral;
 }
 
+/** Aula faltada no dia, com a justificativa que todas as linhas dela concordam. */
+export interface AulaFaltada {
+  horarioId: string;
+  justificativa: string | null;
+  observacao: string | null;
+}
+
+/**
+ * Leitura de um aluno em um dia. A marca segue a regra histórica. A proporção
+ * só existe na presença parcial: aulas faltadas dentro do retrato, ou da grade
+ * vigente quando a chamada não guardou retrato, sobre as aulas previstas.
+ */
+export interface AnaliseDoDia {
+  marca: Marca | null;
+  previstas: number;
+  faltadas: number;
+  aulas: AulaFaltada[];
+}
+
+interface RegistroDeFalta {
+  justificada: boolean;
+  justificativa: string | null;
+  observacao: string | null;
+}
+
 /**
  * Marca de um aluno em um dia, a partir das frequências do mês e da grade de
  * aulas. Regra: falta em todas as aulas do dia vira F, ou FJ quando todas as
@@ -758,22 +783,43 @@ export function classificarFaltasPorAulas(
  * grade atual. A falta prevalece mesmo em aula que saiu da grade depois do
  * registro.
  */
-export function marcaDoAluno(
+export function analisarDiaDoAluno(
   aluno: Aluno,
   dia: string,
   frequenciasDoDia: Frequencia[],
   horarios: Horario[],
-): Marca | null {
-  if (alunoDesistenteNoDia(aluno, dia)) return null;
+): AnaliseDoDia {
+  const vazio = (marca: Marca | null): AnaliseDoDia => ({
+    marca,
+    previstas: 0,
+    faltadas: 0,
+    aulas: [],
+  });
+  if (alunoDesistenteNoDia(aluno, dia)) return vazio(null);
   // Aula para situação de justificativa: todas as faltas da mesma aula
   // precisam estar justificadas para a marca ser FJ.
-  const faltasDoAluno = new Map<string, boolean>();
+  const faltasDoAluno = new Map<string, RegistroDeFalta>();
   for (const frequencia of frequenciasDoDia) {
     for (const falta of frequencia.faltas) {
       if (falta.alunoId !== aluno.id) continue;
-      const justificada = Boolean(falta.justificativa);
+      const codigo = falta.justificativa ?? null;
       for (const horarioId of falta.horarios) {
-        faltasDoAluno.set(horarioId, (faltasDoAluno.get(horarioId) ?? true) && justificada);
+        const atual = faltasDoAluno.get(horarioId);
+        const justificada = Boolean(codigo);
+        if (!atual) {
+          faltasDoAluno.set(horarioId, {
+            justificada,
+            justificativa: codigo,
+            observacao: codigo ? (falta.observacao ?? null) : null,
+          });
+          continue;
+        }
+        const mesmoCodigo = atual.justificativa === codigo;
+        faltasDoAluno.set(horarioId, {
+          justificada: atual.justificada && justificada,
+          justificativa: mesmoCodigo ? codigo : null,
+          observacao: atual.observacao ?? (codigo ? (falta.observacao ?? null) : null),
+        });
       }
     }
   }
@@ -789,12 +835,26 @@ export function marcaDoAluno(
       .map((frequencia) => frequencia.turmaId),
   );
   const temFrequencia = turmasDaChamada.size > 0;
+  const aulas = [...faltasDoAluno.entries()].map(([horarioId, registro]) => ({
+    horarioId,
+    justificativa: registro.justificada ? registro.justificativa : null,
+    observacao: registro.justificada ? registro.observacao : null,
+  }));
+  const cobertura = new Map(
+    [...faltasDoAluno.entries()].map(([id, registro]) => [id, registro.justificada]),
+  );
 
-  if (faltasDoAluno.size === 0) return temFrequencia ? "P" : null;
-  const tudoJustificado = [...faltasDoAluno.values()].every(Boolean);
+  if (faltasDoAluno.size === 0) return vazio(temFrequencia ? "P" : null);
+  const tudoJustificado = [...faltasDoAluno.values()].every((registro) => registro.justificada);
   const marcaIntegral = tudoJustificado ? "FJ" : "F";
+  const integral = (marca: Marca): AnaliseDoDia => ({
+    marca,
+    previstas: 0,
+    faltadas: 0,
+    aulas,
+  });
   // Sem frequência da turma no dia, a falta de outra turma prevalece.
-  if (!temFrequencia) return marcaIntegral;
+  if (!temFrequencia) return integral(marcaIntegral);
 
   // O retrato da chamada manda sobre a grade atual. Sem retrato, a derivação
   // volta ao comportamento antigo, pela grade vigente.
@@ -804,7 +864,10 @@ export function marcaDoAluno(
       .flatMap((frequencia) => frequencia.aulas ?? []),
   );
   if (retrato.size > 0) {
-    return classificarFaltasPorAulas(faltasDoAluno, retrato);
+    const marca = classificarFaltasPorAulas(cobertura, retrato);
+    if (marca !== "S") return integral(marca);
+    const cobertas = aulas.filter((aula) => retrato.has(aula.horarioId));
+    return { marca, previstas: retrato.size, faltadas: cobertas.length, aulas: cobertas };
   }
 
   const aulasDaTurma = [...turmasDaChamada].flatMap((turmaId) =>
@@ -814,10 +877,43 @@ export function marcaDoAluno(
       true,
     ),
   );
-  const faltando = aulasDaTurma.filter((aula) => faltasDoAluno.has(aula.id)).length;
-  if (aulasDaTurma.length === 0 || faltando >= aulasDaTurma.length) return marcaIntegral;
-  if (faltando > 0) return "S";
-  return marcaIntegral;
+  const faltando = aulasDaTurma.filter((aula) => faltasDoAluno.has(aula.id));
+  if (aulasDaTurma.length === 0 || faltando.length >= aulasDaTurma.length)
+    return integral(marcaIntegral);
+  if (faltando.length > 0) {
+    const ids = new Set(faltando.map((aula) => aula.id));
+    return {
+      marca: "S",
+      previstas: aulasDaTurma.length,
+      faltadas: faltando.length,
+      aulas: aulas.filter((aula) => ids.has(aula.horarioId)),
+    };
+  }
+  return integral(marcaIntegral);
+}
+
+/** Marca do dia. A proporção e as aulas ficam em analisarDiaDoAluno. */
+export function marcaDoAluno(
+  aluno: Aluno,
+  dia: string,
+  frequenciasDoDia: Frequencia[],
+  horarios: Horario[],
+): Marca | null {
+  return analisarDiaDoAluno(aluno, dia, frequenciasDoDia, horarios).marca;
+}
+
+/** Aulas faltadas sobre as previstas, só na presença parcial. */
+export interface ProporcaoAulas {
+  faltadas: number;
+  previstas: number;
+}
+
+/** Dia com falta, falta justificada ou presença parcial. */
+export interface DetalheDoDia {
+  dia: string;
+  marca: "F" | "FJ" | "S";
+  proporcao: ProporcaoAulas | null;
+  aulas: AulaFaltada[];
 }
 
 /**
@@ -827,6 +923,10 @@ export function marcaDoAluno(
 export interface LinhaGrade {
   aluno: Aluno;
   marcas: Record<string, Marca | undefined>;
+  /** Proporção da célula S. Os demais dias ficam de fora. */
+  proporcoes: Record<string, ProporcaoAulas | undefined>;
+  /** Faltas do período, com aulas e justificativas, em ordem de data. */
+  detalhes: DetalheDoDia[];
   faltas: number;
   justificadas: number;
   parciais: number;
@@ -851,21 +951,41 @@ export function montarGrade(
     .sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, "pt-BR"))
     .map((aluno) => {
       const marcas: Record<string, Marca | undefined> = {};
+      const proporcoes: Record<string, ProporcaoAulas | undefined> = {};
+      const detalhes: DetalheDoDia[] = [];
       let faltas = 0;
       let justificadas = 0;
       let parciais = 0;
       let frequencias = 0;
       for (const dia of dias) {
-        const marca = marcaDoAluno(aluno, dia, porDia.get(dia) ?? [], horarios);
+        const analise = analisarDiaDoAluno(aluno, dia, porDia.get(dia) ?? [], horarios);
+        const marca = analise.marca;
         if (marca === "F") faltas += 1;
         if (marca === "FJ") justificadas += 1;
         if (marca === "S") parciais += 1;
         if (marca !== null) frequencias += 1;
         marcas[dia] = marca ?? undefined;
+        const aulas = ordenarAulasFaltadas(analise.aulas, horarios);
+        if (marca === "S" && analise.previstas > 0) {
+          const proporcao = { faltadas: analise.faltadas, previstas: analise.previstas };
+          proporcoes[dia] = proporcao;
+          detalhes.push({ dia, marca, proporcao, aulas });
+        } else if (marca === "F" || marca === "FJ") {
+          detalhes.push({ dia, marca, proporcao: null, aulas });
+        }
       }
-      return { aluno, marcas, faltas, justificadas, parciais, frequencias };
+      return { aluno, marcas, proporcoes, detalhes, faltas, justificadas, parciais, frequencias };
     });
   return { dias, linhas };
+}
+
+/** Aulas faltadas na ordem da grade. Aula desconhecida fica no fim, por identificador. */
+function ordenarAulasFaltadas(aulas: AulaFaltada[], horarios: Horario[]): AulaFaltada[] {
+  const ordem = new Map(horarios.map((horario) => [horario.id, horario.ordem]));
+  return aulas.slice().sort((a, b) => {
+    const diferenca = (ordem.get(a.horarioId) ?? 999) - (ordem.get(b.horarioId) ?? 999);
+    return diferenca || a.horarioId.localeCompare(b.horarioId);
+  });
 }
 
 /** Normaliza texto para busca: remove acentos, ordinais e caixa. */

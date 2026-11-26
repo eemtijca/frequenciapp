@@ -5,6 +5,8 @@ import { mesmasJustificativasAntecipadas } from "@/domain/justificativas-antecip
 import { avaliarComposicaoHistorica } from "@/domain/listas-historicas";
 import { z } from "zod";
 import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
+import type { FrequenciaDoRetrato } from "@/domain/relatorio-grade";
+import { Prisma } from "../../generated/prisma/client";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { comTransacao, type Transacao } from "@/infra/transacoes";
@@ -258,6 +260,42 @@ export async function listarFrequenciasDoMes(
     ...COMPLEMENTO,
   });
   return linhas.map(paraFrequencia);
+}
+
+/** Chamadas do período e a forma bruta usada no retrato do PDF, na mesma leitura. */
+export async function lerChamadasParaRelatorio(
+  cliente: Prisma.TransactionClient,
+  de: string,
+  ate: string,
+): Promise<{ frequencias: Frequencia[]; brutas: FrequenciaDoRetrato[] }> {
+  const linhas = await cliente.frequencia.findMany({
+    where: {
+      dia: { gte: new Date(`${de}T12:00:00Z`), lte: new Date(`${ate}T12:00:00Z`) },
+    },
+    orderBy: [{ dia: "asc" }, { turmaId: "asc" }],
+    ...COMPLEMENTO,
+  });
+  return {
+    frequencias: linhas.map(paraFrequencia),
+    brutas: linhas.map((linha) => ({
+      dia: linha.dia.toISOString().slice(0, 10),
+      turmaId: linha.turmaId,
+      revisao: linha.revisao,
+      atualizadoEm: linha.atualizadoEm.toISOString(),
+      alunos: linha.alunos.map((item) => item.alunoId).sort(),
+      aulas: linha.aulas.map((item) => item.horarioId).sort(),
+      faltas: linha.faltas
+        .map((falta) => ({
+          alunoId: falta.alunoId,
+          horarioId: falta.horarioId,
+          justificativa: falta.justificativa,
+          observacao: falta.observacao,
+        }))
+        .sort(
+          (a, b) => a.alunoId.localeCompare(b.alunoId) || a.horarioId.localeCompare(b.horarioId),
+        ),
+    })),
+  };
 }
 
 /** Todas as frequências de um período inclusivo, com filtro opcional de turma. */
