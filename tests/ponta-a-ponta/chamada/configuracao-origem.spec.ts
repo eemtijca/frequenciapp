@@ -94,9 +94,12 @@ async function alterarControle(controle: Locator, marcado: boolean): Promise<voi
 async function alterar(page: Page, controle: Locator, marcado: boolean): Promise<void> {
   await alterarControle(controle, marcado);
   await salvarConfiguracoes(page);
-  // Aguarda o aviso real do lote antes de mover o ponteiro para os controles acima.
-  await page.mouse.move(0, 0);
-  await expect(page.getByText("Configurações salvas.", { exact: true })).toBeHidden();
+  const confirmacao = page.getByRole("status").filter({
+    has: page.getByText("Configurações salvas.", { exact: true }),
+  });
+  await expect(confirmacao).toBeVisible();
+  await confirmacao.getByRole("button", { name: "Fechar aviso", exact: true }).click();
+  await expect(confirmacao).toBeHidden();
 }
 
 async function conferir(

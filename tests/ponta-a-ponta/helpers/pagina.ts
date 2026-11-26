@@ -177,6 +177,14 @@ export async function painelAtivoDaVisao(page: Page): Promise<Locator> {
   return painel;
 }
 
+/** Confere as formas visíveis e o anúncio de carregamento apenas para leitores de tela. */
+export async function conferirEsqueletoDaVisao(conteudo: Locator): Promise<void> {
+  const rotulo = "Carregando a tela...";
+  const espera = conteudo.getByRole("status").filter({ hasText: rotulo });
+  await expect(espera.getByText(rotulo, { exact: true })).toHaveCSS("clip-path", "inset(50%)");
+  await expect(espera.locator('[aria-hidden="true"] > span').first()).toBeVisible();
+}
+
 /** Seleciona o destino pelo painel lateral e aguarda o conteúdo, não a animação da lista. */
 export async function selecionarRelatorio(page: Page, rotulo: Relatorio): Promise<Locator> {
   const nav = await exporRelatorios(page);

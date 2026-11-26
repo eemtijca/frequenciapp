@@ -1,4 +1,5 @@
 // Relatório de saídas e entradas: turmas, períodos civis, recuperação de rede e navegação móvel.
+import { menuMovel } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import type { Aluno, Turma } from "@/domain/frequencia";
 import type {
@@ -6,7 +7,12 @@ import type {
   RelatorioMovimentacoes,
 } from "@/domain/relatorio-movimentacoes";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, exporRelatorios, selecionarRelatorio } from "../helpers/pagina";
+import {
+  aguardarHidratacao,
+  conferirEsqueletoDaVisao,
+  exporRelatorios,
+  selecionarRelatorio,
+} from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(async () => {
@@ -349,6 +355,7 @@ test("uma resposta atrasada não substitui o dia escolhido depois", async ({ pag
 test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anterior", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const turmas = await turmasDoTeste(page);
   let consultas = 0;
   let repetir = false;
@@ -386,14 +393,16 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
     expect(consultas).toBe(iniciais);
     // A resposta fica retida até depois das asserções de carregamento.
     const nav = await exporRelatorios(page);
+    await expect(menuMovel(page)).toBeVisible();
     await nav.getByRole("button", { name: "Saídas e Entradas", exact: true }).click();
+    await expect(menuMovel(page)).not.toBeAttached();
     await expect.poll(() => consultas).toBe(iniciais + 1);
     const conteudo = page.locator('main#conteudo[data-visao="relatorios"]');
     const pager = conteudo.locator('[data-pager="principal"]');
     const alvo = pager.locator('section[aria-label="Relatório de saídas e entradas"]');
     await expect(pager).toHaveAttribute("aria-busy", "true");
     await expect(pager).toHaveAttribute("inert", "");
-    await expect(conteudo.getByText("Carregando a tela...", { exact: true })).toBeAttached();
+    await conferirEsqueletoDaVisao(conteudo);
     await expect(alvo).toHaveAttribute("aria-busy", "true");
     await expect(totais(alvo)).toHaveCount(0);
     await expect(alvo.locator('section[aria-label^="Turma "]')).toHaveCount(0);

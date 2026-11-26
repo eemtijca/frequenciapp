@@ -9,6 +9,7 @@ import { definirOrigem, lerOrigem, type ConfiguracaoOrigem } from "../helpers/co
 import {
   abrirDiaSeResumo,
   aguardarHidratacao,
+  conferirEsqueletoDaVisao,
   confirmarSalvarChamada,
   desbloquearChamada,
   liberarSabadoSeNecessario,
@@ -481,11 +482,13 @@ test("Chamada: carregamento e falha de leitura mostram estado neutro até a recu
     await expect.poll(() => consultas).toBeGreaterThan(0);
     await expect(pager).toHaveAttribute("aria-busy", "true");
     await expect(pager).toHaveAttribute("inert", "");
-    await expect(conteudo.getByText("Carregando a tela...", { exact: true })).toBeAttached();
+    await conferirEsqueletoDaVisao(conteudo);
     await expect(serie).toHaveCount(0);
-    await expect(pager.locator('button[data-situacao="carregando"] [data-progresso]')).toHaveCount(
-      0,
+    const botaoNaEspera = pager.locator(
+      '[role="group"][aria-label="Turma atual"] button[aria-label="Turmas"]',
     );
+    await expect(botaoNaEspera).toHaveAttribute("data-situacao", "carregando");
+    await expect(botaoNaEspera.locator("[data-progresso]")).toHaveCount(0);
     liberarLeitura?.();
     await expect(serie).toHaveAttribute("data-situacao", "indisponivel");
     await expect(serie.locator("[data-progresso]")).toHaveCount(0);
