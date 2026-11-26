@@ -96,9 +96,11 @@ test("migra a saída, confirma na Seduc e preserva a edição após remover a or
   await page.goto("/");
   await aguardarHidratacao(page);
   await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
-  await page.locator("#parcial-turma").click();
+  const parcial = page.getByRole("region", { name: "Chamada Parcial", exact: true });
+  const turma = parcial.getByRole("combobox", { name: "Turma", exact: true });
+  await turma.click();
   await page.getByRole("option", { name: `${prefixo} A`, exact: true }).click();
-  const linha = page.getByTestId(`parcial-aluno-${alunoId}`);
+  const linha = parcial.getByTestId(`parcial-aluno-${alunoId}`);
   await expect(linha.getByText("Presente · 1ª aula", { exact: true })).toBeVisible();
   const confirmar = linha.getByRole("switch", {
     name: `Registro na Seduc: ${prefixo} Um`,
@@ -124,7 +126,7 @@ test("migra a saída, confirma na Seduc e preserva a edição após remover a or
   await page.reload();
   await aguardarHidratacao(page);
   await trocarVisao(page, "Chamada Parcial", "chamada-parcial");
-  await page.locator("#parcial-turma").click();
+  await turma.click();
   await page.getByRole("option", { name: `${prefixo} A`, exact: true }).click();
   await expect(linha.getByText("Presente · 1ª à 2ª aula", { exact: true })).toBeVisible();
   await expect(

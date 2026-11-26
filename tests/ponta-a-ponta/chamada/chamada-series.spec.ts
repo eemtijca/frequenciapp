@@ -461,7 +461,9 @@ test("Chamada: carregamento e falha de leitura mostram estado neutro até a recu
     liberarLeitura = resolver;
   });
   let falhar = true;
+  let consultas = 0;
   await page.route("**/api/frequencias?dia=**", async (rota) => {
+    consultas += 1;
     await leituraPendente;
     await rota.fulfill(
       falhar
@@ -469,18 +471,31 @@ test("Chamada: carregamento e falha de leitura mostram estado neutro até a recu
         : { json: { frequencias: [] } },
     );
   });
-  const secao = await abrirChamada(page);
-  const grupo = secao.getByRole("group", { name: "Turma atual", exact: true });
-  const serie = grupo.getByRole("button", { name: "Turmas", exact: true });
-  await expect(serie).toHaveAttribute("data-situacao", "carregando");
-  await expect(serie.locator("[data-progresso]")).toHaveCount(0);
-  liberarLeitura?.();
-  await expect(serie).toHaveAttribute("data-situacao", "indisponivel");
-  await expect(serie.locator("[data-progresso]")).toHaveCount(0);
-  falhar = false;
-  await secao.getByRole("button", { name: "Tentar novamente", exact: true }).click();
-  await expect(serie).toHaveAttribute("data-situacao", "pendente");
-  await expect(serie.getByText("0%", { exact: true })).toBeVisible();
+  try {
+    const secao = await abrirChamada(page);
+    const serie = secao
+      .getByRole("group", { name: "Turma atual", exact: true })
+      .getByRole("button", { name: "Turmas", exact: true });
+    const conteudo = page.locator('main#conteudo[data-visao="chamada"]');
+    const pager = conteudo.locator('[data-pager="principal"]');
+    await expect.poll(() => consultas).toBeGreaterThan(0);
+    await expect(pager).toHaveAttribute("aria-busy", "true");
+    await expect(pager).toHaveAttribute("inert", "");
+    await expect(conteudo.getByText("Carregando a tela...", { exact: true })).toBeAttached();
+    await expect(serie).toHaveCount(0);
+    await expect(pager.locator('button[data-situacao="carregando"] [data-progresso]')).toHaveCount(
+      0,
+    );
+    liberarLeitura?.();
+    await expect(serie).toHaveAttribute("data-situacao", "indisponivel");
+    await expect(serie.locator("[data-progresso]")).toHaveCount(0);
+    falhar = false;
+    await secao.getByRole("button", { name: "Tentar novamente", exact: true }).click();
+    await expect(serie).toHaveAttribute("data-situacao", "pendente");
+    await expect(serie.getByText("0%", { exact: true })).toBeVisible();
+  } finally {
+    liberarLeitura?.();
+  }
 });
 
 test("Gestão: as turmas específicas da origem ficam numa seção recolhível", async ({ page }) => {

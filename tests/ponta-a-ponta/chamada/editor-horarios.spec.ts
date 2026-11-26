@@ -4,6 +4,7 @@ import {
   exporConfiguracoes,
   selecionarCadastroGestao,
   selecionarCategoriaConfiguracoes,
+  voltarAoMenuPrincipal,
 } from "../../helpers/categorias-configuracoes";
 import { expect, test, type Locator, type Page, type Request } from "@playwright/test";
 import { comBanco } from "../helpers/banco";
@@ -357,8 +358,7 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
   const disciplina = formulario.getByRole("textbox", { name: "Disciplina", exact: true });
   await disciplina.fill("Ciências");
   const navegacao = await abrirNavegacao(page);
-  await navegacao.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
-  await navegacao.getByRole("button", { name: "Voltar ao menu principal", exact: true }).click();
+  await voltarAoMenuPrincipal(navegacao);
   await navegacao.getByRole("button", { name: "Painel", exact: true }).click();
   const avisoSaida = page.getByRole("alertdialog", {
     name: "Há alterações não salvas nos Horários",
@@ -372,13 +372,12 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
   await abrirConfiguracoesDaGestao(page);
   await expect(disciplina).toHaveValue("Ciências");
   const menuRetomado = await abrirNavegacao(page);
-  await menuRetomado.getByRole("button", { name: "Voltar para Gestão", exact: true }).click();
-  await menuRetomado.getByRole("button", { name: "Voltar ao menu principal", exact: true }).click();
+  await voltarAoMenuPrincipal(menuRetomado);
   await menuRetomado.getByRole("button", { name: "Painel", exact: true }).click();
   await avisoSaida.getByRole("button", { name: "Mudar de tela", exact: true }).click();
   await expect(page.locator("main").first()).toHaveAttribute("data-visao", "painel");
   await trocarVisao(page, "Gestão", "gestao");
-  await abrirConfiguracoesDaGestao(page);
+  await selecionarCategoriaConfiguracoes(page, "Horários", "Aulas");
   await expect(formulario).toBeVisible();
   await selecionarCadastroGestao(page, "Turmas");
   await page.getByRole("button", { name: `Horários de ${origem}`, exact: true }).click();
@@ -390,7 +389,7 @@ test("a desativação em outra área mantém o rascunho acessível para descarta
     .click();
   await expect(page.getByText("Aula desativada.", { exact: true })).toBeVisible();
   await dialogo.getByRole("button", { name: "Fechar", exact: true }).click();
-  await abrirConfiguracoesDaGestao(page);
+  await selecionarCategoriaConfiguracoes(page, "Horários", "Aulas");
   await expect(
     vista.getByText("Esta aula não está mais disponível na grade.", { exact: true }),
   ).toBeVisible();

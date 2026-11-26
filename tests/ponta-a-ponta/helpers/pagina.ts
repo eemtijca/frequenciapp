@@ -166,6 +166,17 @@ export async function exporRelatorios(page: Page): Promise<Locator> {
   return nav;
 }
 
+/** Localiza a seção que está ativa no quadro, inclusive sob um diálogo modal. */
+export async function painelAtivoDaVisao(page: Page): Promise<Locator> {
+  const quadro = page.locator('main#conteudo [data-pager="principal"]');
+  await expect(quadro).toHaveCount(1);
+  await expect(quadro).not.toHaveAttribute("aria-busy", "true");
+  const painel = quadro.locator(":scope > section:not([hidden])");
+  await expect(painel).toHaveCount(1);
+  await expect(painel).toBeVisible();
+  return painel;
+}
+
 /** Seleciona o destino pelo painel lateral e aguarda o conteúdo, não a animação da lista. */
 export async function selecionarRelatorio(page: Page, rotulo: Relatorio): Promise<Locator> {
   const nav = await exporRelatorios(page);

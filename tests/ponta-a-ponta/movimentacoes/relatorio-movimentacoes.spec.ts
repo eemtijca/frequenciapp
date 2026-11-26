@@ -384,17 +384,29 @@ test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anter
         ),
     );
     expect(consultas).toBe(iniciais);
-    await selecionarRelatorio(page, "Saídas e Entradas");
+    // A resposta fica retida até depois das asserções de carregamento.
+    const nav = await exporRelatorios(page);
+    await nav.getByRole("button", { name: "Saídas e Entradas", exact: true }).click();
     await expect.poll(() => consultas).toBe(iniciais + 1);
-    await expect(painel).toHaveAttribute("aria-busy", "true");
-    await expect(totais(painel)).toHaveCount(0);
-    await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
+    const conteudo = page.locator('main#conteudo[data-visao="relatorios"]');
+    const pager = conteudo.locator('[data-pager="principal"]');
+    const alvo = pager.locator('section[aria-label="Relatório de saídas e entradas"]');
+    await expect(pager).toHaveAttribute("aria-busy", "true");
+    await expect(pager).toHaveAttribute("inert", "");
+    await expect(conteudo.getByText("Carregando a tela...", { exact: true })).toBeAttached();
+    await expect(alvo).toHaveAttribute("aria-busy", "true");
+    await expect(totais(alvo)).toHaveCount(0);
+    await expect(alvo.locator('section[aria-label^="Turma "]')).toHaveCount(0);
     liberar();
+    await expect(painel).toBeVisible();
     await expect(totais(painel)).toHaveText(["1", "0"]);
     await expect(painel).toHaveAttribute("aria-busy", "false");
     await expect(
       painel.getByRole("region", { name: "Turma E2E Ano B", exact: true }),
     ).toBeVisible();
+    await expect(painel.getByRole("region", { name: "Turma E2E Ano A", exact: true })).toHaveCount(
+      0,
+    );
   } finally {
     liberar();
   }
