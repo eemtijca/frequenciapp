@@ -18,12 +18,12 @@ test.afterAll(limparMassaE2E);
 
 async function abrirDownload(
   page: Page,
-  tipo: "grade" | "relacao" | "copia",
+  tipo: "grade" | "relatorio" | "relacao" | "copia",
   perfilImagem?: string,
 ) {
   await page.goto("/");
   await aguardarHidratacao(page);
-  if (tipo === "grade") {
+  if (tipo === "grade" || tipo === "relatorio") {
     await selecionarRelatorio(page, "Grade");
     const grade = page.locator('section[aria-label="Grade de frequência"]');
     const turma = grade.getByRole("button", { name: /E2E Ano A/ });
@@ -38,7 +38,16 @@ async function abrirDownload(
         path: `docs/imagens/locais/download-antes-${perfilImagem}.png`,
       });
     }
-    await grade.getByRole("button", { name: "Baixar planilha (CSV)" }).click();
+    if (tipo === "relatorio") {
+      await expect(
+        grade.getByRole("button", { name: "Emitir relatório em PDF da turma de origem" }),
+      ).toBeEnabled();
+      await grade
+        .getByRole("button", { name: "Emitir relatório em PDF da turma de origem" })
+        .click();
+    } else {
+      await grade.getByRole("button", { name: "Baixar planilha (CSV)" }).click();
+    }
   } else {
     await trocarVisao(page, "Gestão", "gestao");
     if (tipo === "relacao") await selecionarCadastroGestao(page, "Alunos");
@@ -135,6 +144,43 @@ for (const tipo of ["grade", "relacao", "copia"] as const) {
     await expect(proximo.getByLabel("ZIP protegido por senha")).toBeChecked();
   });
 }
+
+test("baixa o relatório da Grade em PDF, com retrato e auditoria", async ({ page }) => {
+  const pedidos: string[] = [];
+  page.on("request", (pedido) => pedidos.push(pedido.url() + (pedido.postData() ?? "")));
+  const dialogo = await abrirDownload(page, "relatorio");
+  await expect(dialogo.getByLabel("ZIP protegido por senha")).toBeChecked();
+  await dialogo.getByLabel("Senha do ZIP", { exact: true }).fill(SENHA);
+  await dialogo.getByLabel("Confirmar senha do ZIP").fill(SENHA);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    dialogo.getByRole("button", { name: "Baixar ZIP protegido" }).click(),
+  ]);
+  await expect(dialogo).toHaveCount(0);
+  expect(download.suggestedFilename()).toBe("frequenciapp-relatorio.zip");
+  const conteudo = await extrair(download, "relatorio.pdf");
+  expect(conteudo.subarray(0, 5).toString()).toBe("%PDF-");
+  expect(conteudo.toString("latin1")).toContain("E2E Aluno Um");
+  const chamadas = pedidos.join("\n");
+  expect(chamadas).toContain("/api/relatorios/grade/retrato?");
+  expect(chamadas).toContain("turmaOriginalId=");
+  expect(chamadas).toContain('"tipo":"relatorio"');
+  expect(chamadas).toMatch(/"retrato":"[a-f0-9]{64}"/);
+  expect(chamadas).not.toContain(SENHA);
+  const persistido = await page.evaluate(() => JSON.stringify([localStorage, sessionStorage]));
+  expect(persistido).not.toContain(SENHA);
+
+  const proximo = await abrirDownload(page, "relatorio");
+  await expect(proximo.getByLabel("ZIP protegido por senha")).toBeChecked();
+  await proximo.getByLabel("Arquivo original sem senha").check();
+  const [original] = await Promise.all([
+    page.waitForEvent("download"),
+    proximo.getByRole("button", { name: "Baixar arquivo original" }).click(),
+  ]);
+  expect(original.suggestedFilename()).toMatch(/^frequenciapp-relatorio-.*\.pdf$/);
+  const bytes = await readFile((await original.path()) ?? "");
+  expect(bytes.subarray(0, 5).toString()).toBe("%PDF-");
+});
 
 test("cancelar e senhas inválidas não solicitam a cópia nem geram download", async ({ page }) => {
   let consultas = 0;
