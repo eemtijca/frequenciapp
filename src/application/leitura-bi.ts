@@ -5,7 +5,7 @@ import { comTransacao } from "@/infra/transacoes";
 import { ErroHttp } from "@/infra/erros";
 import { limiteDeTentativas } from "@/infra/auth/limite";
 import { ipDoPedido } from "@/infra/http";
-import { hashChaveBi, recusarChaveBi } from "@/application/chaves-bi";
+import { hashChaveBi, recusarChaveBi, registrarUsoChaveBi } from "@/application/chaves-bi";
 import {
   RECURSOS_BI,
   esquemaDiaBi,
@@ -118,7 +118,7 @@ export async function lerDadosBi(hash: string, requisicao: Request): Promise<Pag
   const p = dados.data;
   if (!(await limiteDeTentativas(`bi-chave:${hash}`, 240, 60000)))
     throw new ErroHttp("Muitas consultas. Aguarde um minuto.", 429);
-  return comTransacao(async (tx) => {
+  const leitura = await comTransacao(async (tx) => {
     const chave = await tx.chaveBi.findUnique({ where: { segredoHash: hash } });
     const escopo = chave ? esquemaEscopoBi.safeParse(chave.escopo) : null;
     if (!chave || estadoChaveBi(chave) !== "ativa" || !escopo?.success)
@@ -161,24 +161,23 @@ export async function lerDadosBi(hash: string, requisicao: Request): Promise<Pag
         paginacao,
         escopo: escopo.data,
       });
-    await tx.chaveBi.update({
-      where: { id: chave.id },
-      data: {
-        primeiroUsoEm: chave.primeiroUsoEm ?? agora,
-        ultimoUsoEm: agora,
-        usos: { increment: 1 },
-      },
-    });
     return {
-      recurso: p.recurso,
-      linhas: linhas.slice(0, p.limite),
-      pagina: p.pagina,
-      proximaPagina: linhas.length > p.limite ? p.pagina + 1 : null,
-      consultadoEm: agora.toISOString(),
-      escopo: escopo.data,
-      recursos,
+      pagina: {
+        recurso: p.recurso,
+        linhas: linhas.slice(0, p.limite),
+        pagina: p.pagina,
+        proximaPagina: linhas.length > p.limite ? p.pagina + 1 : null,
+        consultadoEm: agora.toISOString(),
+        escopo: escopo.data,
+        recursos,
+      },
+      chaveId: chave.id,
+      consultadoEm: agora,
     };
   });
+  // Fora da transação, o uso não participa do conflito entre leituras.
+  await registrarUsoChaveBi(leitura.chaveId, leitura.consultadoEm);
+  return leitura.pagina;
 }
 interface Recorte {
   turmas: Prisma.TurmaGetPayload<{ select: typeof turmaSelect }>[];

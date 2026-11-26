@@ -1,7 +1,7 @@
 // Ciclo de vida das chaves: senha administrativa, segredo único e auditoria transacional.
 import { hashChaveBi, novaChaveBi } from "@/infra/chave-bi";
 export { hashChaveBi, novaChaveBi } from "@/infra/chave-bi";
-import { banco } from "@/infra/banco";
+import { banco, objetoDoBanco } from "@/infra/banco";
 import { comTransacao } from "@/infra/transacoes";
 import { ErroHttp } from "@/infra/erros";
 import { conferirSenhaDoAdmin } from "@/application/confirmacao-admin";
@@ -29,6 +29,17 @@ export async function listarChavesBi(): Promise<ChaveBi[]> {
   return (await banco().chaveBi.findMany({ orderBy: { criadaEm: "desc" }, take: 1000 })).map(
     paraChave,
   );
+}
+/** Registra o uso fora da transação de leitura, em um único UPDATE atômico. */
+export async function registrarUsoChaveBi(chaveId: string, usadoEm: Date): Promise<void> {
+  await banco().$executeRaw`
+    UPDATE ${objetoDoBanco("chaves_bi")}
+       SET "usos" = "usos" + 1,
+           "ultimo_uso_em" = ${usadoEm},
+           "primeiro_uso_em" = COALESCE("primeiro_uso_em", ${usadoEm}),
+           "atualizado_em" = ${usadoEm}
+     WHERE "id" = ${chaveId}::uuid
+  `;
 }
 export async function administrarChaveBi(admin: { id: string }, entrada: unknown) {
   const analise = esquemaAcaoChaveBi.safeParse(entrada);
