@@ -19,6 +19,7 @@ import { Cartao, CartaoCabecalho, CartaoConteudo, CartaoTitulo } from "@/compone
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { GraficoRosca } from "@/components/graficos/graficos-sob-demanda";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { categoriasDaSerie } from "@/components/painel/categorias-do-painel";
 
 interface Props {
@@ -208,9 +209,7 @@ export default function VistaPeriodo({ diaCorrente, series, turmas, alunos }: Pr
           </Alerta>
         ) : null}
         {executando ? (
-          <Alerta severity="info" role="status">
-            Carregando chamadas do período...
-          </Alerta>
+          <TextoDeCarregamento anunciar>Carregando chamadas do período...</TextoDeCarregamento>
         ) : null}
         {resultado !== null ? (
           <Box

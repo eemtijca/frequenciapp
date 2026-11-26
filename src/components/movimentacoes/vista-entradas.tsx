@@ -10,6 +10,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import type {
   Aluno,
   Turma,
@@ -27,7 +28,7 @@ import {
 import type { EntradaAtrasada } from "@/domain/entradas";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 
 import { FormularioPadrao } from "@/components/layout/formulario-padrao";
 import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
@@ -42,6 +43,7 @@ import { DialogoConfirmarMovimentacao } from "@/components/movimentacoes/dialogo
 import { HistoricoDiarioMovimentacoes } from "@/components/movimentacoes/historico-diario-movimentacoes";
 import { useHistoricoDiario } from "@/components/movimentacoes/use-historico-movimentacoes";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { useMinutoCorrente } from "@/lib/use-relogio";
 
 interface Props {
@@ -84,7 +86,7 @@ function IndicadorCarregando({ texto }: { texto: string }) {
       sx={{ alignItems: "center", color: "text.secondary" }}
     >
       <CircularProgress size={16} aria-hidden="true" />
-      <Typography variant="body2">{texto}</Typography>
+      <TextoDeCarregamento>{texto}</TextoDeCarregamento>
     </Stack>
   );
 }
@@ -104,6 +106,7 @@ export default function VistaEntradas({
   ativo = true,
   atualizacao = 0,
 }: Props) {
+  const { avisarSucesso } = useAvisosDaSessao();
   const nav = useNavegacaoDoDia({
     diaCorrente,
     max: diaCorrente,
@@ -138,6 +141,7 @@ export default function VistaEntradas({
     "Não foi possível carregar as entradas.",
   );
   const carregando = leitura.estado === "carregando";
+  useLeituraDaVisao(ativo && !nav.resumo && carregando);
   const entradas = leitura.estado === "pronto" ? leitura.registros : [];
 
   useEffect(() => {

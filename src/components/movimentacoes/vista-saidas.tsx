@@ -17,7 +17,8 @@ import ListItem from "@mui/material/ListItem";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
@@ -58,6 +59,7 @@ import {
   type LeituraMensalSaidas,
 } from "@/components/movimentacoes/use-historico-movimentacoes";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { useMinutoCorrente } from "@/lib/use-relogio";
 
 interface Props {
@@ -109,7 +111,7 @@ function IndicadorCarregando({ texto }: { texto: string }) {
       sx={{ alignItems: "center", color: "text.secondary" }}
     >
       <CircularProgress size={16} aria-hidden="true" />
-      <Typography variant="body2">{texto}</Typography>
+      <TextoDeCarregamento>{texto}</TextoDeCarregamento>
     </Stack>
   );
 }
@@ -134,6 +136,7 @@ export default function VistaSaidas({
   atualizacao = 0,
   onMesVisivel,
 }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const nav = useNavegacaoDoDia({
     diaCorrente,
     max: diaCorrente,
@@ -215,6 +218,7 @@ export default function VistaSaidas({
     "Não foi possível carregar as saídas.",
   );
   const leitura = compartilhado ? leituraMensal : leituraDiaria;
+  useLeituraDaVisao(ativo && !nav.resumo && leitura.estado === "carregando");
   const duranteAula = ehMomentoDeAula(momento);
   const listaBloqueada = diaLiberado !== dia;
   const domingoBloqueado = diaLiberado !== nav.domingo;

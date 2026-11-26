@@ -57,51 +57,47 @@ function leituraDeRascunho(contexto: Record<string, unknown>): () => void {
   return runInNewContext(js, contexto) as () => void;
 }
 
+const chaveLocal = `frequencia:rascunho:sessao:conta:${"R".repeat(43)}:2026-11-23:turma`;
+
 describe("leitura local da chamada", () => {
   it("não apaga cópia recuperável se a leitura é bloqueada", () => {
     const removeItem = vi.fn();
     const publicarAviso = vi.fn();
+    const getItem = vi.fn(() => {
+      throw new DOMException("Bloqueado", "SecurityError");
+    });
     const ler = leituraDeRascunho({
-      usuario: { id: "u" },
-      dia: "d",
-      turmaId: "t",
-      chaveRascunho: () => "u:d:t",
-      sessionStorage: {
-        getItem() {
-          throw new DOMException("Bloqueado", "SecurityError");
-        },
-        removeItem,
-      },
+      chaveDoRascunho: chaveLocal,
+      sessionStorage: { getItem, removeItem },
       publicarAviso,
     });
     expect(ler).not.toThrow();
+    expect(getItem).toHaveBeenCalledExactlyOnceWith(chaveLocal);
     expect(removeItem).not.toHaveBeenCalled();
     expect(publicarAviso).toHaveBeenCalledOnce();
   });
   it("falha ao remover conteúdo comprovadamente inválido não derruba a chamada", () => {
     const publicarAviso = vi.fn();
+    const getItem = vi.fn(() => "{");
+    const removeItem = vi.fn(() => {
+      throw new DOMException("Bloqueado", "SecurityError");
+    });
     const ler = leituraDeRascunho({
-      usuario: { id: "u" },
-      dia: "d",
-      turmaId: "t",
-      chaveRascunho: () => "u:d:t",
-      sessionStorage: {
-        getItem: () => "{",
-        removeItem() {
-          throw new DOMException("Bloqueado", "SecurityError");
-        },
-      },
+      chaveDoRascunho: chaveLocal,
+      sessionStorage: { getItem, removeItem },
       publicarAviso,
     });
     expect(ler).not.toThrow();
-    expect(publicarAviso).toHaveBeenCalled();
+    expect(getItem).toHaveBeenCalledExactlyOnceWith(chaveLocal);
+    expect(removeItem).toHaveBeenCalledExactlyOnceWith(chaveLocal);
+    expect(publicarAviso).toHaveBeenCalledOnce();
   });
 });
 
 describe("rascunho no efeito da chamada", () => {
   for (const nome of ["QuotaExceededError", "SecurityError"]) {
     it(`preserva cópia anterior e avisa uma vez por episódio de ${nome}`, () => {
-      const copias = new Map([["u:d:t", "cópia anterior"]]);
+      const copias = new Map([[chaveLocal, "cópia anterior"]]);
       let falhar = true;
       const removeItem = vi.fn((chave: string) => copias.delete(chave));
       const armazenamento = {
@@ -116,7 +112,6 @@ describe("rascunho no efeito da chamada", () => {
         sujo: true,
         dia: "d",
         turmaId: "t",
-        usuario: { id: "u" },
         ausencias: new Map([["aluno", new Set(["aula"])]]),
         justificativas: new Map(),
         observacoes: new Map(),
@@ -124,19 +119,19 @@ describe("rascunho no efeito da chamada", () => {
         sabadoLiberado: false,
         justificativasAntecipadasRef: { current: [] },
         falhaRascunho: { current: "" },
-        chaveRascunho: (u: string, d: string, t: string) => `${u}:${d}:${t}`,
+        chaveDoRascunho: chaveLocal,
         sessionStorage: armazenamento,
         publicarAviso,
       };
       const gravar = efeitoDeGravacao(estado);
       gravar();
       gravar();
-      expect(copias.get("u:d:t")).toBe("cópia anterior");
+      expect(copias.get(chaveLocal)).toBe("cópia anterior");
       expect(removeItem).not.toHaveBeenCalled();
       expect(publicarAviso).toHaveBeenCalledOnce();
       falhar = false;
       gravar();
-      expect(JSON.parse(copias.get("u:d:t") ?? "null")).toMatchObject({
+      expect(JSON.parse(copias.get(chaveLocal) ?? "null")).toMatchObject({
         revisao: 3,
         faltas: [{ alunoId: "aluno", horarios: ["aula"] }],
       });

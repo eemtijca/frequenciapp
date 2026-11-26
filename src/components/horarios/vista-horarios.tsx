@@ -40,7 +40,7 @@ import { corpoAlteracao, pedir } from "@/lib/api-cliente";
 import { ouvirOrdemAlmocoMudou } from "@/lib/eventos-ordem-almoco";
 import { ouvirProvasBimestraisMudaram } from "@/lib/eventos-provas-bimestrais";
 import type { ProvaBimestral } from "@/domain/provas-bimestrais";
-import { avisarErro, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
+import { mensagemAmigavel, useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
@@ -287,12 +287,20 @@ function AulasDoDia({
     );
   }
 
+  const primeiro = itens[0];
+  const ultimo = itens.at(-1);
+
   return (
     <List
       component="ol"
       aria-label={`Aulas de ${rotuloDia(dia)}${turno ? ` · ${turno}` : ""}`}
       disablePadding
-      sx={editavel ? undefined : { px: { xs: 0, sm: 1 } }}
+      sx={{
+        ...(!editavel && { px: { xs: 0, sm: 1 } }),
+        // Retira só a folga entre a faixa de almoço e a borda que ela encontra.
+        pt: primeiro?.tipo === "pausa" && primeiro.pausa.id === "almoco" ? 0 : undefined,
+        pb: ultimo?.tipo === "pausa" && ultimo.pausa.id === "almoco" ? 0 : undefined,
+      }}
     >
       {itens.map((item) => {
         if (item.tipo === "pausa")
@@ -493,6 +501,7 @@ export default function VistaHorarios({
   onMudanca,
   onPendencia,
 }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const base = useId();
   const [turmaId, setTurmaId] = useState(turmas[0]?.id ?? "");
   const [diaSelecionado, setDiaSelecionado] = useState(String(diaDaSemana(diaCorrente)));

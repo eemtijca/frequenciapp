@@ -91,7 +91,6 @@ export function SelecionarBuscavel({
       fullWidth
       disabled={desabilitado}
       noOptionsText="Nenhuma opção encontrada."
-      loadingText="Carregando opções"
       clearText="Limpar"
       closeText="Fechar"
       openText="Abrir"

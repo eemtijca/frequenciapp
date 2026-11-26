@@ -115,7 +115,7 @@ async function salvar(page: Page, secao: Locator) {
       (pedido) =>
         pedido.method() === "POST" && new URL(pedido.url()).pathname === "/api/frequencias",
     ),
-    dialogo.getByRole("button", { name: "Salvar chamada", exact: true }).click(),
+    dialogo.getByRole("button", { name: "Salvar", exact: true }).click(),
   ]);
   await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible();
   return requisicao.postDataJSON() as {

@@ -19,7 +19,7 @@ import Typography from "@mui/material/Typography";
 import type { Serie, Turma } from "@/domain/frequencia";
 import type { ChaveBiDesejada } from "@/domain/configuracoes";
 import { RECURSOS_BI, ROTULOS_RECURSOS_BI, type EscopoBi } from "@/domain/bi";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
@@ -96,6 +96,7 @@ export default function SecaoChavesBi({
   chaves: ChaveBiDesejada[];
   onMudar: (chaves: ChaveBiDesejada[]) => void;
 }) {
+  const { avisarSucesso } = useAvisosDaSessao();
   const [erro, setErro] = useState("");
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState("recentes");

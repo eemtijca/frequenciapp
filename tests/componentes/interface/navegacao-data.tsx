@@ -1,6 +1,7 @@
 // Visões reais, com dados sintéticos e rede controlada pelo teste.
 import { createRoot } from "react-dom/client";
 import { useState } from "react";
+import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import Box from "@mui/material/Box";
 import CssBaseline from "@mui/material/CssBaseline";
 import { ThemeProvider } from "@mui/material/styles";
@@ -12,6 +13,11 @@ import VistaGrade from "@/components/grade/vista-grade";
 import VistaMovimentacoes from "@/components/relatorios/vista-movimentacoes";
 import VistaPainel from "@/components/painel/vista-painel";
 import VistaFrequencia from "@/components/chamada/vista-frequencia";
+import {
+  DestinoSessao,
+  ProvedorTransicaoSessao,
+  useSaidaSessao,
+} from "@/components/entrada/transicao-sessao";
 import VistaFrequenciaParcial from "@/components/chamada-parcial/vista-frequencia-parcial";
 import VistaEntradas from "@/components/movimentacoes/vista-entradas";
 import VistaSaidas from "@/components/movimentacoes/vista-saidas";
@@ -19,6 +25,10 @@ import PorAluno from "@/components/relatorios/por-aluno";
 import ResumoRelatorios from "@/components/relatorios/vista-resumo-relatorios";
 import VistaHistorico from "@/components/relatorios/historico/vista-historico";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
+import DialogoSobre from "@/components/dialogo-sobre";
+import RegistroPwa from "@/components/pwa/registro-pwa";
+import { EscopoAvisosDaSessao, ProvedorAvisos } from "@/components/ui/mui/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { CONFIGURACOES_PADRAO } from "@/domain/frequencia";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { tema } from "@/theme/tema";
@@ -78,7 +88,177 @@ function MesFixture({ tela }: { tela: "por-aluno" | "resumo" | "historico" }) {
     />
   );
 }
+
+function AvisosESobre() {
+  const { publicarAviso } = useAvisosDaSessao();
+  const [aberto, setAberto] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setAberto(true)}>
+        Sobre
+      </button>
+      <button
+        type="button"
+        onClick={() => publicarAviso({ titulo: "Entrada confirmada.", severidade: "success" })}
+      >
+        Mostrar aviso
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          publicarAviso({
+            titulo: "Não foi possível carregar os registros.",
+            descricao: "As informações na tela podem estar desatualizadas.",
+            severidade: "error",
+            tentarDeNovo: () => publicarAviso({ titulo: "Carregado.", severidade: "info" }),
+          })
+        }
+      >
+        Mostrar erro
+      </button>
+      <ProvedorAvisos />
+      <DialogoSobre aberto={aberto} onAbrir={setAberto} />
+    </>
+  );
+}
+
+const alvoHistorico = { dia: "2026-11-24", turmaId: turma.id };
+
+function ChamadaComMarcas({
+  aoSalvar = vazio,
+  historica = false,
+  ativo = true,
+}: {
+  aoSalvar?: typeof vazio;
+  historica?: boolean;
+  ativo?: boolean;
+}) {
+  return (
+    <VistaFrequencia
+      {...comum}
+      diaCorrente="2026-11-25"
+      turmas={[turma]}
+      alunos={[
+        {
+          id: "aluno",
+          nome: "Aluno teste",
+          turmaId: turma.id,
+          turmaOriginalId: turma.id,
+          ordem: 1,
+          ativo: true,
+        },
+      ]}
+      usuario={{
+        id: "teste",
+        nome: "Teste",
+        email: "teste@example.org",
+        papel: "ADMIN",
+        ativo: true,
+      }}
+      ativo={ativo}
+      alvo={historica ? alvoHistorico : null}
+      configuracoes={CONFIGURACOES_PADRAO}
+      catalogoJustificativas={[{ codigo: "At", rotulo: "Atestado", ativo: true }]}
+      versaoFrequencias={0}
+      onFrequenciasMudaram={aoSalvar}
+      onPendencia={() => {}}
+    />
+  );
+}
+
+function ChamadaComTrocaDeAtividade() {
+  const [ativa, setAtiva] = useState(true);
+  return (
+    <DestinoSessao usuarioId="teste" referenciaSessao={"R".repeat(43)}>
+      <button type="button" onClick={() => setAtiva(!ativa)}>
+        {ativa ? "Sair da Chamada" : "Voltar à Chamada"}
+      </button>
+      <ChamadaComMarcas ativo={ativa} />
+      <ProvedorAvisos />
+    </DestinoSessao>
+  );
+}
+
+function AcaoDeSaida() {
+  const { sair, saindo } = useSaidaSessao();
+  return (
+    <button type="button" disabled={saindo} onClick={() => void sair()}>
+      Sair da conta
+    </button>
+  );
+}
+
+function ChamadaComRetomadaDeSessao() {
+  const navegacaoInesperada = () => {
+    throw new Error("A confirmação da mesma sessão não deve navegar.");
+  };
+  return (
+    <AppRouterContext.Provider
+      value={{
+        bfcacheId: "fixture-chamada",
+        back: navegacaoInesperada,
+        forward: navegacaoInesperada,
+        push: navegacaoInesperada,
+        replace: navegacaoInesperada,
+        prefetch: navegacaoInesperada,
+        refresh: navegacaoInesperada,
+      }}
+    >
+      <ProvedorTransicaoSessao>
+        <DestinoSessao usuarioId="teste" referenciaSessao={"R".repeat(43)}>
+          <AcaoDeSaida />
+          <ChamadaComMarcas />
+        </DestinoSessao>
+      </ProvedorTransicaoSessao>
+      <ProvedorAvisos />
+    </AppRouterContext.Provider>
+  );
+}
+
+function ChamadaComTrocaDeSessao() {
+  const [geracao, setGeracao] = useState(1);
+  const [concluidos, setConcluidos] = useState(0);
+  return (
+    <>
+      <button type="button" onClick={() => setGeracao((atual) => atual + 1)}>
+        Iniciar outra sessão da mesma conta
+      </button>
+      <output aria-label="Sessão da fixture">{geracao}</output>
+      <output aria-label="Salvamentos concluídos">{concluidos}</output>
+      <EscopoAvisosDaSessao autenticado key={geracao}>
+        <ChamadaComMarcas aoSalvar={async () => setConcluidos((total) => total + 1)} />
+      </EscopoAvisosDaSessao>
+      <ProvedorAvisos />
+    </>
+  );
+}
+
 const telas = {
+  "avisos-sobre": (
+    <EscopoAvisosDaSessao autenticado>
+      <AvisosESobre />
+    </EscopoAvisosDaSessao>
+  ),
+  "aviso-pwa": <RegistroPwa />,
+  "chamada-marcas": <ChamadaComMarcas />,
+  "chamada-historica": <ChamadaComMarcas historica />,
+  "chamada-avisos": <ChamadaComTrocaDeSessao />,
+  "chamada-troca-atividade": <ChamadaComTrocaDeAtividade />,
+  "chamada-retomada-sessao": <ChamadaComRetomadaDeSessao />,
+  "calendario-limitado": (
+    <SeletorPeriodo
+      id="limitado"
+      modo="dia"
+      valor="2026-10-30"
+      min="2026-11-01"
+      max="2026-11-25"
+      atual="2026-11-26"
+      semDomingo
+      rotuloAcessivel="Data limitada"
+      rotulo="30/10"
+      onValor={() => {}}
+    />
+  ),
   grade: <GradeFixture />,
   "por-aluno": <MesFixture tela="por-aluno" />,
   resumo: <MesFixture tela="resumo" />,

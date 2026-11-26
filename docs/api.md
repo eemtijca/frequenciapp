@@ -50,6 +50,8 @@ Encerra a sessão corrente e limpa o cookie.
 ### GET /api/auth/sessao
 
 - 200 `{"usuario": {...}}` ou `{"usuario": null}`.
+- Com `X-Frequenciapp-Referencia-Sessao: 1`, uma sessão válida inclui `referenciaSessao`, referência opaca usada pela interface para distinguir sessões da mesma conta ao confirmar a saída. Não é uma credencial e não autoriza requisições. Sem sessão válida, a resposta continua `{"usuario": null}`.
+- 500 para falha inesperada na consulta; 503 quando o banco estiver indisponível ou ocupado. As respostas de erro são JSON sem cache e não incluem detalhes internos.
 
 ## Notificações
 
@@ -377,6 +379,14 @@ Exclui a conta. As frequências da escola são preservadas e a autoria fica anul
 
 Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, alunos, aulas, confirmacoesSeduc }`, com `faltas` no formato `[{ alunoId, horarios: string[] }]`, `alunos` com os ids da lista da chamada e `aulas` com o retrato das aulas previstas no dia.
 
+### GET /api/frequencias?dia=YYYY-MM-DD&turmaId=uuid&verificarHistorico=true
+
+Uma sessão com permissão de operação pode verificar se a primeira chamada de uma data passada precisa de confirmação. A consulta não grava a frequência, não registra auditoria e não aciona a fila. A mesma regra é verificada novamente no POST.
+
+- 200 `{"requerConfirmacaoHistorica": boolean}`. Uma chamada existente ou data que não seja passada dispensa essa confirmação.
+- 400 se o dia ou a turma forem inválidos ou ausentes, ou se a consulta incluir `mes`, `de`, `ate` ou `registradoPor`.
+- 401/403 sem sessão ativa ou sem permissão de operação; 404 se a turma não existir.
+
 ### GET /api/frequencias?mes=YYYY-MM
 
 Parâmetros opcionais `turmaId` e `registradoPor`.
@@ -400,7 +410,7 @@ Período inclusivo, com `turmaId` opcional.
 
 ### POST /api/frequencias
 
-Corpo: `{ "dia": string, "turmaId": string, "faltas": [...], "revisao": number, "sabadoLetivo"?: boolean, "confirmarHistorico"?: boolean, "motivo"?: string }`.
+Corpo: `{ "dia": string, "turmaId": string, "faltas": [...], "revisao": number, "sabadoLetivo"?: boolean, "confirmarHistorico"?: boolean, "motivo"?: string, "listaRevisada"?: string[] }`.
 
 Três formas de faltas:
 
@@ -418,7 +428,9 @@ Domingo não tem aula nem chamada: a rota responde 400 ("Domingo não tem aula n
 
 Feriados cadastrados são recusados com 400 dentro da transação de salvamento, inclusive quando `sabadoLetivo` está ligado. A regra vale para todas as turmas e preserva a grade semanal e os registros existentes. O salvamento e o cadastro de feriado travam a tabela de feriados antes de ler, então, se os dois acontecem ao mesmo tempo para a mesma data, um deles sempre vê o outro: a chamada responde 400 ou o feriado responde 409, nunca os dois aceitos (ver `docs/banco.md`).
 
-Chamada em data passada: quando a composição da turma na data não pode ser comprovada, a rota responde 409 com `codigo: "CONFIRMACAO_HISTORICA_NECESSARIA"`. O cliente reenvia a mesma chamada com `confirmarHistorico: true` e `motivo` de 3 a 200 caracteres. A confirmação é gravada na mesma transação em `confirmacoes_historicas`, com autor, motivo e a lista usada ([ADR-066](adr/066-politica-retroativa.md)). Quando a composição é compatível, a gravação segue sem confirmação. A chamada existente prevalece e não consulta a composição atual.
+Chamada em data passada: quando a composição da turma não pode ser comprovada e não há confirmação explícita, o POST responde 409 com `codigo: "CONFIRMACAO_HISTORICA_NECESSARIA"`, sem gravar. Após confirmação, envie `confirmarHistorico: true`. O campo `motivo` é opcional; se preenchido, deve ter de 3 a 200 caracteres depois de remover espaços das extremidades. Não envie o campo sem confirmação. A mesma transação registra a frequência e a auditoria em `confirmacoes_historicas`, com autor, turma, dia e a lista usada, mesmo sem motivo ([ADR-083](adr/083-confirmacao-historica-da-chamada.md)). Quando a composição é compatível, a gravação segue sem confirmação. A chamada existente prevalece e não consulta a composição atual.
+
+A interface envia `listaRevisada` no primeiro lançamento histórico, com os identificadores dos alunos exibidos na revisão. A transação compara essa lista com a que usará para gravar, sem considerar a ordem. Uma diferença ou duplicata retorna 409 `LISTA_HISTORICA_ALTERADA`, sem gravação, auditoria ou enfileiramento. A interface mantém o rascunho e não reenvia automaticamente. Clientes que omitem o campo mantêm o contrato anterior.
 
 Semântica da `revisao`:
 
@@ -432,7 +444,7 @@ Validações: o dia não pode ser futuro (fuso da escola); as aulas precisam per
 Respostas:
 
 - 200 `{"frequencia": Frequencia}` com a revisão incrementada.
-- 409 `{"error", "conflito": true, "frequencia": Frequencia}` em duplicata ou revisão obsoleta; `{"error", "codigo": "JUSTIFICATIVAS_ALTERADAS"}` quando as propostas mudaram; `{"error", "codigo": "CONFIRMACAO_HISTORICA_NECESSARIA"}` quando a composição histórica não pode ser comprovada.
+- 409 `{"error", "conflito": true, "frequencia": Frequencia}` em duplicata ou revisão obsoleta; `{"error", "codigo": "JUSTIFICATIVAS_ALTERADAS"}` quando as propostas mudaram; `{"error", "codigo": "CONFIRMACAO_HISTORICA_NECESSARIA"}` quando a composição histórica não pode ser comprovada sem confirmação; `{"error", "codigo": "LISTA_HISTORICA_ALTERADA"}` quando a lista revisada diverge.
 - 400 quando faltas apontam alunos de outra turma, aulas de outra turma ou de outro dia, quando a justificativa não pertence ao catálogo, ou quando outra validação falha.
 - 401 sem sessão; 403 sem capacidade de operação; 404 turma inexistente.
 

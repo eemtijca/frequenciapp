@@ -16,6 +16,7 @@ import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
 import { Campo } from "@/components/ui/mui/campo";
@@ -28,11 +29,12 @@ import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-es
 import { Selo } from "@/components/ui/mui/selo";
 import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
 import { normalizar } from "@/domain/frequencia";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TabelaCadastrosAdministrativos } from "./tabela-cadastros-administrativos";
 
 interface Props {
@@ -56,7 +58,9 @@ const ALVO_ACAO = {
 } as const;
 
 export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [usuarios, setUsuarios] = useState<UsuarioDTO[] | null>(null);
+  useLeituraDaVisao(usuarios === null);
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<UsuarioDTO | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
@@ -193,7 +197,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
       >
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {usuarios === null
-            ? "Carregando..."
+            ? null
             : `${usuarios.filter((u) => u.papel === "COORDENACAO").length} coordenação · ${usuarios.filter((u) => u.papel === "ADMIN").length} administração`}
         </Typography>
         <Botao variante="principal" icone={<AddRoundedIcon />} onClick={abrirNovo}>
@@ -213,7 +217,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
           }}
         >
           <CircularProgress size={20} aria-hidden="true" />
-          <Typography variant="body2">Carregando contas...</Typography>
+          <TextoDeCarregamento>Carregando contas...</TextoDeCarregamento>
         </Stack>
       ) : (usuarios ?? []).length === 0 ? (
         <EstadoVazio

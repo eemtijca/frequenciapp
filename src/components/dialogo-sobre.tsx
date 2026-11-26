@@ -145,14 +145,14 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
 
       <DialogContent
         sx={{
-          pt: { xs: 2, sm: 3 },
           pb: {
             xs: "calc(16px + env(safe-area-inset-bottom, 0px))",
             sm: 3,
           },
+          "& a::before": { content: "none" },
         }}
       >
-        <Stack spacing={2}>
+        <Stack spacing={2} sx={{ pt: { xs: 2, sm: 3 } }}>
           <Paper
             component="section"
             variant="outlined"
@@ -196,7 +196,7 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
               <Typography variant="caption" color="text.secondary">
                 Solicitações de dados: gestão da escola.
               </Typography>
-              <Link href={ROTA_PRIVACIDADE} variant="body2" underline="hover" sx={ACAO}>
+              <Link href={ROTA_PRIVACIDADE} variant="body2" underline="none" sx={ACAO}>
                 Como os dados são tratados
               </Link>
             </Stack>
@@ -228,7 +228,7 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="body2"
-                underline="hover"
+                underline="none"
                 sx={ACAO}
               >
                 Repositório no GitHub
@@ -246,7 +246,7 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
                       target="_blank"
                       rel="noopener noreferrer"
                       variant="body2"
-                      underline="hover"
+                      underline="none"
                       sx={{
                         display: "inline-flex",
                         alignItems: "center",
@@ -318,7 +318,7 @@ export default function DialogoSobre({ aberto, onAbrir, onDevolverFoco }: Props)
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="body2"
-                underline="hover"
+                underline="none"
                 sx={ACAO}
               >
                 Ler a licença

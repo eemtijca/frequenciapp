@@ -127,14 +127,10 @@ export async function trocarVisao(
   const nome = rotulo.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const navegacao = await abrirNavegacao(page);
   if (visao === "gestao") {
-    const principal = navegacao.getByRole("button", {
-      name: /^Gestão(?: Alterações não salvas)?$/,
-    });
-    if (await navegacao.getByRole("button", { name: "Resumo", exact: true }).isVisible()) {
-      await voltarAoMenuPrincipal(navegacao);
-    }
-    if (await principal.isVisible()) await exporNivelGestao(page);
-    await fecharNavegacaoMovel(page);
+    if ((await page.locator("main").first().getAttribute("data-visao")) !== "gestao") {
+      const nav = await exporNivelGestao(page);
+      await nav.getByRole("button", { name: "Séries", exact: true }).click();
+    } else await fecharNavegacaoMovel(page);
   } else {
     await voltarAoMenuPrincipal(navegacao);
     await navegacao
@@ -170,6 +166,25 @@ export async function exporRelatorios(page: Page): Promise<Locator> {
   return nav;
 }
 
+/** Localiza a seção que está ativa no quadro, inclusive sob um diálogo modal. */
+export async function painelAtivoDaVisao(page: Page): Promise<Locator> {
+  const quadro = page.locator('main#conteudo [data-pager="principal"]');
+  await expect(quadro).toHaveCount(1);
+  await expect(quadro).not.toHaveAttribute("aria-busy", "true");
+  const painel = quadro.locator(":scope > section:not([hidden])");
+  await expect(painel).toHaveCount(1);
+  await expect(painel).toBeVisible();
+  return painel;
+}
+
+/** Confere as formas visíveis e o anúncio de carregamento apenas para leitores de tela. */
+export async function conferirEsqueletoDaVisao(conteudo: Locator): Promise<void> {
+  const rotulo = "Carregando a tela...";
+  const espera = conteudo.getByRole("status").filter({ hasText: rotulo });
+  await expect(espera.getByText(rotulo, { exact: true })).toHaveCSS("clip-path", "inset(50%)");
+  await expect(espera.locator('[aria-hidden="true"] > span').first()).toBeVisible();
+}
+
 /** Seleciona o destino pelo painel lateral e aguarda o conteúdo, não a animação da lista. */
 export async function selecionarRelatorio(page: Page, rotulo: Relatorio): Promise<Locator> {
   const nav = await exporRelatorios(page);
@@ -187,7 +202,7 @@ export async function confirmarSalvarChamada(secao: Locator): Promise<void> {
     .page()
     .getByRole("alertdialog", { name: /^Salvar (chamada|correção da chamada)\?$/ });
   await expect(dialogo).toBeVisible();
-  await dialogo.getByRole("button", { name: "Salvar chamada", exact: true }).click();
+  await dialogo.getByRole("button", { name: "Salvar", exact: true }).click();
   await expect(dialogo).toBeHidden();
 }
 

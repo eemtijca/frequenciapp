@@ -12,7 +12,7 @@ import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { ehAnoLetivoValido, type Feriado } from "@/domain/calendario-letivo";
 import { ehDiaValido, rotuloData } from "@/domain/frequencia";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
@@ -39,6 +39,7 @@ export default function SecaoCalendarioLetivo({
   onRemover,
   onSincronizar,
 }: Props) {
+  const { avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const [ano, setAno] = useState(diaCorrente.slice(0, 4));
   const [dia, setDia] = useState(diaCorrente);

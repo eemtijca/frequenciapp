@@ -26,7 +26,7 @@ import AbaAlunos from "@/components/gestao/abas/aba-alunos";
 import AbaEquipe from "@/components/gestao/abas/aba-equipe";
 import AbaDiretores from "@/components/gestao/abas/aba-diretores";
 import AbaConfiguracoes from "@/components/gestao/abas/aba-configuracoes";
-import { avisarInfo } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 
 interface Props {
@@ -80,6 +80,7 @@ export default function VistaGestao({
   onAbrirSaidas,
   onAbrirParcial,
 }: Props) {
+  const { avisarInfo } = useAvisosDaSessao();
   const [atualizacao, setAtualizacao] = useState(0);
   const [horariosPendentes, setHorariosPendentes] = useState(false);
   const [configPendente, setConfigPendente] = useState(false);

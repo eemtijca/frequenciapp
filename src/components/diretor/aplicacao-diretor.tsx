@@ -13,10 +13,7 @@ import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import KeyRoundedIcon from "@mui/icons-material/KeyRounded";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
-import { pedir } from "@/lib/api-cliente";
-import { expurgarBiNoLogout } from "@/lib/bi-armazenamento";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
-import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { useSaidaSessao } from "@/components/entrada/transicao-sessao";
 import { primeiroNome, rotuloDePapel, type Identidade } from "@/domain/usuarios";
 import type { ContextoDiretor } from "@/domain/estatisticas-diretor";
 import { LayoutConteudo } from "@/components/layout/layout-conteudo";
@@ -32,6 +29,7 @@ import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import DialogoSobre from "@/components/dialogo-sobre";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
@@ -51,21 +49,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
   const [atualizadoEm, setAtualizadoEm] = useState<string>();
   const marcarAtualizado = useCallback(() => setAtualizadoEm(new Date().toISOString()), []);
 
-  const { executando: saindo, executar: sair } = useAcaoUnica(async () => {
-    try {
-      await pedir<{ ok: boolean }>("/api/auth/sair", { method: "POST" });
-    } catch (excecao) {
-      avisarErro(excecao, { contexto: "Não foi possível sair. Tente novamente." });
-      return;
-    }
-    try {
-      await expurgarBiNoLogout();
-    } catch {
-      // A sessão encerra mesmo quando o navegador bloqueia o armazenamento local.
-    }
-    avisarSucesso("Sessão encerrada.");
-    router.refresh();
-  });
+  const { saindo, sair } = useSaidaSessao();
 
   return (
     <Box
@@ -170,6 +154,7 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
               onClick={() => void sair()}
               sx={ALVO_ACAO}
             />
+            {saindo ? <TextoDeCarregamento anunciar>Saindo...</TextoDeCarregamento> : null}
           </Stack>
         </Toolbar>
       </AppBar>

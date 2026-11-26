@@ -46,7 +46,7 @@ import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
-import { avisarInfo } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 const ALVO_MES = {
@@ -401,6 +401,7 @@ export default function PorAluno({
   mesCorrente,
   onMes,
 }: Props) {
+  const { avisarInfo } = useAvisosDaSessao();
   const [busca, setBusca] = useState("");
   const [seriesFechadas, setSeriesFechadas] = useState<ReadonlySet<string>>(new Set());
   const [turmasFechadas, setTurmasFechadas] = useState<ReadonlySet<string>>(new Set());

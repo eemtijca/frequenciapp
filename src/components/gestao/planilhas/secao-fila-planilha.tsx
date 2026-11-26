@@ -19,7 +19,7 @@ import type {
   TipoItemFila,
 } from "@/domain/fila-planilha";
 import { corpoJson, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
@@ -86,6 +86,7 @@ function partesDoItem(item: ItemDaFila): string[] {
 }
 
 export default function SecaoFilaPlanilha() {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const [estado, setEstado] = useState<EstadoDaFila | null>(null);
   const [erro, setErro] = useState("");

@@ -1,10 +1,18 @@
 "use client";
 
 // Avisos globais em Snackbar e Alert, com fila curta, repetição e leitura acessível.
-import { useEffect, useSyncExternalStore } from "react";
+import {
+  createContext,
+  useEffect,
+  useLayoutEffect,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
-import Alert from "@mui/material/Alert";
+import Alert, { alertClasses } from "@mui/material/Alert";
 import AlertTitle from "@mui/material/AlertTitle";
+import Box from "@mui/material/Box";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Snackbar from "@mui/material/Snackbar";
@@ -17,6 +25,7 @@ export type SeveridadeAviso = "success" | "info" | "error";
 export interface Aviso {
   id: string;
   chave: number;
+  publico?: boolean;
   severidade: SeveridadeAviso;
   titulo: string;
   descricao?: string;
@@ -45,19 +54,6 @@ export const LIMITE_AVISOS = 3;
 const DESLOCAMENTO_CELULAR = 84;
 const DESLOCAMENTO_DESKTOP = 96;
 
-const ALVO_TOQUE = {
-  position: "relative",
-  "&::after": {
-    content: '""',
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    width: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    height: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    transform: "translate(-50%, -50%)",
-  },
-} as const;
-
 const PAPEIS = {
   success: "status",
   info: "status",
@@ -75,6 +71,47 @@ const AVISOS_VAZIOS: readonly Aviso[] = [];
 let avisos: readonly Aviso[] = AVISOS_VAZIOS;
 let sequencia = 0;
 const ouvintes = new Set<() => void>();
+
+// Sem sessão ativa, inclusive em montagens isoladas, só avisos públicos entram na fila.
+let escopoAtivo: symbol | null = null;
+let pausado = false;
+export const ContextoEscopoAvisos = createContext<symbol | null>(null);
+
+export function pausarAvisosDaSessao() {
+  pausado = true;
+  const publicos = avisos.filter((aviso) => aviso.publico);
+  if (publicos.length === avisos.length) return;
+  avisos = publicos;
+  emitir();
+}
+
+export function retomarAvisosDaSessao() {
+  pausado = false;
+}
+
+export function encerrarAvisosDaSessao() {
+  escopoAtivo = null;
+  pausarAvisosDaSessao();
+}
+
+export function EscopoAvisosDaSessao({
+  autenticado,
+  children,
+}: {
+  autenticado: boolean;
+  children: ReactNode;
+}) {
+  const [identidade] = useState(() => Symbol("sessão"));
+  const escopo = autenticado ? identidade : null;
+  useLayoutEffect(() => {
+    escopoAtivo = escopo;
+    pausado = false;
+    return () => {
+      if (escopoAtivo === escopo) encerrarAvisosDaSessao();
+    };
+  }, [escopo]);
+  return <ContextoEscopoAvisos.Provider value={escopo}>{children}</ContextoEscopoAvisos.Provider>;
+}
 
 function emitir(): void {
   for (const ouvinte of ouvintes) ouvinte();
@@ -96,30 +133,46 @@ function obterAvisosNoServidor(): readonly Aviso[] {
   return AVISOS_VAZIOS;
 }
 
-/** Publica um aviso e devolve o identificador usado na fila. */
-export function publicarAviso(entrada: EntradaAviso): string {
-  sequencia += 1;
-  const id = entrada.id ?? `aviso-${sequencia}`;
+/** Publica um aviso privado apenas no escopo capturado pelo produtor. */
+export function publicarAviso(entrada: EntradaAviso, escopo: symbol | null): string {
+  return enfileirar(entrada, false, escopo);
+}
+
+export function publicarAvisoPublico(entrada: EntradaAviso): string {
+  return enfileirar(entrada, true);
+}
+
+function enfileirar(entrada: EntradaAviso, publico: boolean, escopo: symbol | null = null): string {
+  const chave = ++sequencia;
+  const id = entrada.id ?? `aviso-${chave}`;
+  if (!publico && (pausado || escopo === null || escopo !== escopoAtivo)) return id;
   const duracao = entrada.duracao ?? DURACOES_AVISO[entrada.severidade];
   const aviso: Aviso = {
     id,
-    chave: sequencia,
+    chave,
+    publico,
     severidade: entrada.severidade,
     titulo: entrada.titulo,
     descricao: entrada.descricao,
     duracao,
     expiraEm: Date.now() + duracao,
-    tentarDeNovo: entrada.tentarDeNovo,
+    tentarDeNovo:
+      entrada.tentarDeNovo &&
+      (() => {
+        if (avisos.some((atual) => atual.chave === chave)) entrada.tentarDeNovo?.();
+      }),
   };
-  const semRepetido = avisos.filter((atual) => atual.id !== id);
+  const semRepetido = avisos.filter((atual) => atual.id !== id || atual.publico !== publico);
   avisos = [...semRepetido, aviso].slice(-LIMITE_AVISOS);
   emitir();
   return id;
 }
 
 /** Remove um aviso pelo identificador, sem efeito quando ele já saiu da fila. */
-export function removerAviso(id: string): void {
-  const restantes = avisos.filter((atual) => atual.id !== id);
+export function removerAviso(id: string, chave?: number): void {
+  const restantes = avisos.filter(
+    (atual) => atual.id !== id || (chave !== undefined && atual.chave !== chave),
+  );
   if (restantes.length === avisos.length) return;
   avisos = restantes;
   emitir();
@@ -132,51 +185,88 @@ export function limparAvisos(): void {
   emitir();
 }
 
-/** Um alerta da fila, com título, descrição, fechamento e ação de repetir. */
-export function AvisoAlerta({ aviso, aoFechar }: { aviso: Aviso; aoFechar: () => void }) {
-  const repetir = () => {
-    aviso.tentarDeNovo?.();
-    aoFechar();
-  };
-
+/** Alinha ícone e fechamento à mensagem, com a ação em uma linha independente. */
+export function AvisoFlutuante({
+  severidade,
+  children,
+  aoFechar,
+  acao,
+  sombra = false,
+}: {
+  severidade: SeveridadeAviso;
+  children: ReactNode;
+  aoFechar: () => void;
+  acao?: { rotulo: string; executar: () => void };
+  sombra?: boolean;
+}) {
   return (
     <Alert
-      severity={aviso.severidade}
-      role={PAPEIS[aviso.severidade]}
-      aria-live={LEITURAS[aviso.severidade]}
+      severity={severidade}
+      role={PAPEIS[severidade]}
+      aria-live={LEITURAS[severidade]}
       aria-atomic="true"
       variant="standard"
-      sx={{ width: "100%", boxShadow: "var(--template-palette-baseShadow)" }}
+      sx={{
+        width: "100%",
+        display: "grid",
+        gridTemplateColumns: "auto minmax(0, 1fr) auto",
+        alignItems: "center",
+        rowGap: 0.5,
+        boxShadow: sombra ? "var(--template-palette-baseShadow)" : undefined,
+        [`& .${alertClasses.icon}`]: { gridArea: "1 / 1", p: 0 },
+        [`& .${alertClasses.message}`]: { display: "contents" },
+        [`& .${alertClasses.action}`]: { gridArea: "1 / 3", m: 0, py: 0, pl: 1 },
+      }}
       action={
-        <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-          {aviso.tentarDeNovo ? (
-            <Button color="inherit" size="small" onClick={repetir} sx={ALVO_TOQUE}>
-              Tentar novamente
-            </Button>
-          ) : null}
-          <IconButton
-            color="inherit"
-            size="small"
-            aria-label="Fechar aviso"
-            onClick={aoFechar}
-            sx={{
-              width: TOKENS_LAYOUT.botao.pequeno,
-              height: TOKENS_LAYOUT.botao.pequeno,
-              ...ALVO_TOQUE,
-            }}
-          >
-            <CloseRoundedIcon fontSize="small" />
-          </IconButton>
-        </Stack>
+        <IconButton
+          color="inherit"
+          aria-label="Fechar aviso"
+          onClick={aoFechar}
+          sx={{ width: TOKENS_LAYOUT.alvoToque, height: TOKENS_LAYOUT.alvoToque }}
+        >
+          <CloseRoundedIcon fontSize="small" />
+        </IconButton>
       }
     >
-      <AlertTitle>{aviso.titulo}</AlertTitle>
-      {aviso.descricao ? (
+      <Box sx={{ gridArea: "1 / 2", overflowWrap: "anywhere" }}>{children}</Box>
+      {acao && (
+        <Button
+          color="inherit"
+          size="small"
+          onClick={acao.executar}
+          sx={{
+            gridArea: "2 / 2 / 3 / 4",
+            justifySelf: "start",
+            minWidth: TOKENS_LAYOUT.alvoToque,
+            minHeight: TOKENS_LAYOUT.alvoToque,
+          }}
+        >
+          {acao.rotulo}
+        </Button>
+      )}
+    </Alert>
+  );
+}
+
+/** Um alerta da fila, com título, descrição, fechamento e ação de repetir. */
+export function AvisoAlerta({ aviso, aoFechar }: { aviso: Aviso; aoFechar: () => void }) {
+  const tentarDeNovo = aviso.tentarDeNovo;
+  const acao = tentarDeNovo && {
+    rotulo: "Tentar novamente",
+    executar: () => {
+      tentarDeNovo();
+      aoFechar();
+    },
+  };
+  return (
+    <AvisoFlutuante severidade={aviso.severidade} aoFechar={aoFechar} acao={acao} sombra>
+      <AlertTitle sx={{ mt: 0, mb: aviso.descricao ? 0.25 : 0 }}>{aviso.titulo}</AlertTitle>
+      {aviso.descricao && (
         <Typography component="p" variant="body2">
           {aviso.descricao}
         </Typography>
-      ) : null}
-    </Alert>
+      )}
+    </AvisoFlutuante>
   );
 }
 
@@ -194,7 +284,7 @@ export function ProvedorAvisos() {
     const temporizador = window.setTimeout(() => {
       const agora = Date.now();
       for (const aviso of avisosAtuais) {
-        if (aviso.expiraEm <= agora) removerAviso(aviso.id);
+        if (aviso.expiraEm <= agora) removerAviso(aviso.id, aviso.chave);
       }
     }, espera);
     return () => window.clearTimeout(temporizador);
@@ -207,7 +297,7 @@ export function ProvedorAvisos() {
       onClose={(_evento, motivo) => {
         if (motivo === "clickaway") return;
         const primeiro = avisosAtuais[0];
-        if (primeiro) removerAviso(primeiro.id);
+        if (primeiro) removerAviso(primeiro.id, primeiro.chave);
       }}
       sx={{
         bottom: {
@@ -218,7 +308,11 @@ export function ProvedorAvisos() {
     >
       <Stack spacing={1} sx={{ width: "100%", maxWidth: 480 }}>
         {avisosAtuais.map((aviso) => (
-          <AvisoAlerta key={aviso.chave} aviso={aviso} aoFechar={() => removerAviso(aviso.id)} />
+          <AvisoAlerta
+            key={aviso.chave}
+            aviso={aviso}
+            aoFechar={() => removerAviso(aviso.id, aviso.chave)}
+          />
         ))}
       </Stack>
     </Snackbar>

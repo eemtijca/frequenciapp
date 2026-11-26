@@ -7,6 +7,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { ptBR } from "@mui/x-date-pickers/locales";
 import "dayjs/locale/pt-br";
+import { DestinoSessao, ProvedorTransicaoSessao } from "@/components/entrada/transicao-sessao";
 import TelaLogin from "@/components/entrada/tela-login";
 import VistaFrequencia from "@/components/chamada/vista-frequencia";
 import { tema } from "@/theme/tema";
@@ -57,7 +58,11 @@ createRoot(raiz).render(
           />
         </Box>
       ) : (
-        <TelaLogin urlIndiceAgentes="/llms.txt" />
+        <ProvedorTransicaoSessao>
+          <DestinoSessao>
+            <TelaLogin urlIndiceAgentes="/llms.txt" />
+          </DestinoSessao>
+        </ProvedorTransicaoSessao>
       )}
     </LocalizationProvider>
   </ThemeProvider>,

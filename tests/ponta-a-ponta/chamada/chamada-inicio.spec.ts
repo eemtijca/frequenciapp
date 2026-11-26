@@ -161,7 +161,12 @@ test("aguarda uma leitura válida antes de anunciar que a chamada não foi inici
   });
   try {
     await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
-    await expect(secao.getByText("Carregando chamada...", { exact: true })).toBeVisible();
+    const espera = secao.getByRole("status").filter({ hasText: "Carregando chamada..." });
+    await expect(espera).toBeVisible();
+    await expect(espera.getByText("Carregando chamada...", { exact: true })).toHaveCSS(
+      "clip-path",
+      "inset(50%)",
+    );
     await expect(situacao(secao)).toHaveCount(0);
     liberarLeitura?.();
     await expect(

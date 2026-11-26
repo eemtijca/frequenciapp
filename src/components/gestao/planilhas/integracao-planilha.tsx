@@ -14,10 +14,11 @@ import Stack from "@mui/material/Stack";
 import PreferenciasPlanilha from "./preferencias-planilha";
 import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useRascunhoConfiguracoes } from "@/components/gestao/configuracoes/rascunho-configuracoes";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { rotuloInstante, type AbaEsquema } from "@/domain/planilha";
 import { diasDoMes, rotuloData, rotuloMes } from "@/domain/frequencia";
 import { mesValido } from "@/domain/planilha-mensal";
@@ -41,6 +42,7 @@ import { DialogoMostrarMes } from "./dialogo-mostrar-mes";
 import { DialogoPrepararMes } from "./dialogo-preparar-mes";
 import { OrganizarPlanilha } from "./dialogo-organizar-planilha";
 import { SeletorPlanilhaGoogle } from "./seletor-planilha-google";
+import { IndicadorDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import DialogoEnvio from "@/components/grade/dialogo-envio";
 
 interface Sugestao {
@@ -122,8 +124,10 @@ export default function IntegracaoPlanilha({
   diaCorrente: string;
   abertoInicial?: boolean;
 }) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [integracao, setIntegracao] = useState<IntegracaoAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
+  useLeituraDaVisao(carregando);
   const [aberto, setAberto] = useState(abertoInicial);
   const [acao, setAcao] = useState<PainelFrequencia | null>(abertoInicial ? "configurar" : null);
   const [erro, setErro] = useState("");
@@ -381,9 +385,7 @@ export default function IntegracaoPlanilha({
         <Typography component="h2" variant="subtitle1">
           Planilha de frequência
         </Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          Conferindo a integração...
-        </Typography>
+        <IndicadorDeCarregamento texto="Conferindo a integração..." />
       </Box>
     );
   }

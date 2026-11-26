@@ -185,7 +185,7 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
         <Divider component="li" role="separator" sx={{ my: alturaCurta ? 0.25 : 0.75 }} />
         <Item
           icone={<LogoutRoundedIcon fontSize="small" aria-hidden="true" />}
-          rotulo={saindo ? "Saindo..." : "Sair da conta"}
+          rotulo="Sair da conta"
           onClick={() => acionar("sair")}
           disabled={saindo}
         />

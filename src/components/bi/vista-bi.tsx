@@ -45,11 +45,17 @@ import { Selo } from "@/components/ui/mui/selo";
 import { Selecionar } from "@/components/ui/mui/selecionar";
 import { SeletorTema } from "@/components/ui/mui/seletor-tema";
 import RegistroPwa from "@/components/pwa/registro-pwa";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { EscopoAvisosDaSessao } from "@/components/ui/mui/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { useDadosBi } from "@/lib/use-dados-bi";
 import { useCalculosBi } from "@/lib/use-calculos-bi";
-import { guardarPersonalizacaoBi, lerPersonalizacaoBi, limparTudoBi } from "@/lib/bi-armazenamento";
+import {
+  guardarPersonalizacaoBi,
+  lerPersonalizacaoBi,
+  limparTudoBi,
+  type RetratoBi,
+} from "@/lib/bi-armazenamento";
 import { baixarBi } from "@/lib/bi-exportacao";
 import {
   exportarPersonalizacaoBi,
@@ -81,6 +87,10 @@ import { EditorGraficoBi } from "./editor-grafico";
 import { SeletorFiltrosBi } from "./seletor-filtros";
 import { GradePaineisBi } from "./grade-paineis";
 import { TabelaApoioBi } from "./tabela-apoio";
+import {
+  IndicadorDeCarregamento,
+  TextoDeCarregamento,
+} from "@/components/ui/mui/texto-de-carregamento";
 import { VistaAjudaBi } from "./vista-ajuda";
 const ABAS = [
   { id: "geral", nome: "Visão geral" },
@@ -107,6 +117,15 @@ function dataBr(valor: string): string {
 }
 
 export default function VistaBi({ fuso }: { fuso: string }) {
+  return (
+    <EscopoAvisosDaSessao autenticado>
+      <ConteudoBi fuso={fuso} />
+    </EscopoAvisosDaSessao>
+  );
+}
+
+function ConteudoBi({ fuso }: { fuso: string }) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const fonte = useDadosBi();
   const { acesso, carregar, entrar, esquecer, armazenamentoFalhou } = fonte;
   const [personalizacao, setPersonalizacao] = useState<PersonalizacaoBi>(personalizacaoVaziaBi);
@@ -136,11 +155,9 @@ export default function VistaBi({ fuso }: { fuso: string }) {
   const [ancoraAcoes, setAncoraAcoes] = useState<HTMLElement | null>(null);
   const [comparativo, setComparativo] = useState<{
     id: string;
-    valor: number | null;
-    inicio: string;
-    fim: string;
-    consultadoEm?: string;
-    falhaAtualizacao?: boolean;
+    base: "lista" | "chamadas";
+    filtros: FiltrosBi;
+    retrato?: RetratoBi;
     acesso: NonNullable<typeof acesso>;
     erro?: string;
   } | null>(null);
@@ -494,64 +511,45 @@ export default function VistaBi({ fuso }: { fuso: string }) {
   };
   const geracaoComparada = useRef(0);
   const idComparacao = JSON.stringify([assinatura, comparacao, filtros, atualizacao]);
-  const alunosComparacao = dados.alunos;
   useEffect(() => {
     if (comparacao === "nenhuma" || !acesso || aba !== "geral" || !recursos.includes("chamadas"))
       return;
-    let atual = true;
+    const consulta = new AbortController();
     const f = compararPeriodoBi(filtros, comparacao);
     const base = exigeListaBi("chamadas", f) ? "lista" : "chamadas";
     const renovar = atualizacao !== geracaoComparada.current;
-    geracaoComparada.current = atualizacao;
-    void carregar(base, { inicio: f.inicio, fim: f.fim }, renovar)
-      .then((r) => {
-        const recorte = resolverRecorteBi(
-          enriquecerBi({ [base]: r.linhas, alunos: alunosComparacao }),
+    const origem = { id: idComparacao, acesso, base, filtros: f } as const;
+    const concluir = (resultado: { retrato: RetratoBi } | { erro: string }) => {
+      if (consulta.signal.aborted) return;
+      geracaoComparada.current = atualizacao;
+      setComparativo({ ...origem, ...resultado });
+    };
+    void carregar(base, { inicio: f.inicio, fim: f.fim }, renovar, consulta.signal)
+      .then((retrato) => concluir({ retrato }))
+      .catch(() => concluir({ erro: "Comparação indisponível. Tente atualizar os dados." }));
+    return () => consulta.abort();
+  }, [comparacao, acesso, aba, recursos, carregar, filtros, atualizacao, idComparacao]);
+  const alunosComparacao = dados.alunos;
+  const comparacaoVisivel = useMemo(() => {
+    if (comparativo?.id !== idComparacao || comparativo.acesso !== acesso) return null;
+    const { retrato, filtros: f, base, erro } = comparativo;
+    // O cadastro principal pode chegar depois, sem cancelar ou repetir a leitura comparada.
+    const recorte = retrato
+      ? resolverRecorteBi(
+          enriquecerBi({ [base]: retrato.linhas, alunos: alunosComparacao }),
           "chamadas",
           f,
-        );
-        if (atual) {
-          setComparativo({
-            id: idComparacao,
-            valor: recorte.disponivel
-              ? totalBi(recorte.linhas, "infrequencia", recorte.filtros)
-              : null,
-            inicio: f.inicio,
-            fim: f.fim,
-            acesso,
-            consultadoEm: r.consultadoEm,
-            falhaAtualizacao: r.falhaAtualizacao,
-            erro: recorte.disponivel ? undefined : recorte.motivo,
-          });
-        }
-      })
-      .catch(() => {
-        if (atual)
-          setComparativo({
-            id: idComparacao,
-            valor: null,
-            inicio: f.inicio,
-            fim: f.fim,
-            acesso,
-            erro: "Comparação indisponível. Tente atualizar os dados.",
-          });
-      });
-    return () => {
-      atual = false;
+        )
+      : null;
+    return {
+      valor: recorte?.disponivel ? totalBi(recorte.linhas, "infrequencia", recorte.filtros) : null,
+      inicio: f.inicio,
+      fim: f.fim,
+      consultadoEm: retrato?.consultadoEm,
+      falhaAtualizacao: retrato?.falhaAtualizacao,
+      erro: recorte && !recorte.disponivel ? recorte.motivo : erro,
     };
-  }, [
-    comparacao,
-    acesso,
-    aba,
-    recursos,
-    carregar,
-    filtros,
-    atualizacao,
-    idComparacao,
-    alunosComparacao,
-  ]);
-  const comparacaoVisivel =
-    comparativo?.id === idComparacao && comparativo.acesso === acesso ? comparativo : null;
+  }, [comparativo, idComparacao, acesso, alunosComparacao]);
   const numero = (v: number | null) =>
     v === null ? "Sem dados" : v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   const chamadaRecortada = recortes.chamadas;
@@ -1104,11 +1102,16 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                       ? new Date(ultimaData).toLocaleString("pt-BR", { timeZone: fuso })
                       : "Ainda sem retrato completo"}
                   </Typography>
-                  {carregando && (
+                  {fonte.pausadoPorLimite ? (
                     <Typography variant="caption" sx={{ color: "text.secondary" }}>
-                      {fonte.progresso || "Carregando conjuntos..."}
+                      Pausa de um minuto para respeitar o limite de consultas. O recorte só aparece
+                      quando completo.
                     </Typography>
-                  )}
+                  ) : carregando ? (
+                    <TextoDeCarregamento>
+                      {fonte.progresso || "Carregando conjuntos..."}
+                    </TextoDeCarregamento>
+                  ) : null}
                 </Stack>
                 {fonte.erro && (
                   <AlertaCompacto
@@ -1128,7 +1131,6 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                 )}
                 {carregando ? (
                   <Box
-                    role="status"
                     sx={{
                       minHeight: 160,
                       display: "flex",
@@ -1137,8 +1139,7 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                       gap: 2,
                     }}
                   >
-                    <CircularProgress size={24} />
-                    Preparando o recorte
+                    <CircularProgress size={24} aria-hidden="true" />
                   </Box>
                 ) : (
                   <>
@@ -1186,14 +1187,15 @@ export default function VistaBi({ fuso }: { fuso: string }) {
                                 />
                               </Campo>
                             </Box>
-                            {comparacao !== "nenhuma" && (
-                              <Typography variant="body2">
-                                {comparacaoVisivel
-                                  ? (comparacaoVisivel.erro ??
-                                    `${comparacaoVisivel.inicio} a ${comparacaoVisivel.fim}: ${comparacaoVisivel.valor === null ? "sem base de cálculo" : `${numero(comparacaoVisivel.valor)}%`}${infrequencia === null || comparacaoVisivel.valor === null ? "" : ` | Variação: ${numero(infrequencia - comparacaoVisivel.valor)} pontos percentuais`}`)
-                                  : "Preparando comparação..."}
-                              </Typography>
-                            )}
+                            {comparacao !== "nenhuma" &&
+                              (comparacaoVisivel ? (
+                                <Typography variant="body2">
+                                  {comparacaoVisivel.erro ??
+                                    `${comparacaoVisivel.inicio} a ${comparacaoVisivel.fim}: ${comparacaoVisivel.valor === null ? "sem base de cálculo" : `${numero(comparacaoVisivel.valor)}%`}${infrequencia === null || comparacaoVisivel.valor === null ? "" : ` | Variação: ${numero(infrequencia - comparacaoVisivel.valor)} pontos percentuais`}`}
+                                </Typography>
+                              ) : (
+                                <IndicadorDeCarregamento texto="Preparando comparação..." />
+                              ))}
                           </Stack>
                         </SecaoConteudo>
                       </>

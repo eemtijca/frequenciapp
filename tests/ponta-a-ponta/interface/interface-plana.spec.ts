@@ -12,28 +12,25 @@ import {
   selecionarRelatorio,
   aguardarHidratacao,
   escolherTurmaNaChamada,
+  painelAtivoDaVisao,
   trocarVisao,
 } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block", actionTimeout: 15_000 });
 
-async function conferirEnquadramento(page: Page): Promise<void> {
-  expect(
-    await page.evaluate(() =>
-      [
-        document.documentElement,
-        document.body,
-        document.querySelector("main > div > section:not([hidden])"),
-      ]
-        .filter((elemento): elemento is HTMLElement => elemento instanceof HTMLElement)
-        .map((elemento) => ({
-          elemento: elemento.tagName,
-          largura: elemento.clientWidth,
-          conteudo: elemento.scrollWidth,
-        }))
-        .filter((elemento) => elemento.conteudo > elemento.largura + 1),
-    ),
-  ).toEqual([]);
+async function conferirEnquadramento(page: Page, autenticado: boolean): Promise<void> {
+  const alvos = [page.locator("html"), page.locator("body")];
+  if (autenticado) alvos.push(await painelAtivoDaVisao(page));
+  for (const alvo of alvos) {
+    const medidas = await alvo.evaluate((elemento) => ({
+      elemento: elemento.tagName,
+      largura: elemento.clientWidth,
+      conteudo: elemento.scrollWidth,
+    }));
+    expect(medidas.conteudo, `Rolagem horizontal em ${medidas.elemento}`).toBeLessThanOrEqual(
+      medidas.largura + 1,
+    );
+  }
 }
 
 async function conferirFonte(page: Page, elementos: Locator[]): Promise<void> {
@@ -57,8 +54,13 @@ async function conferirFonte(page: Page, elementos: Locator[]): Promise<void> {
   }
 }
 
-async function capturar(page: Page, info: TestInfo, nome: string): Promise<void> {
-  await conferirEnquadramento(page);
+async function capturar(
+  page: Page,
+  info: TestInfo,
+  nome: string,
+  autenticado = true,
+): Promise<void> {
+  await conferirEnquadramento(page, autenticado);
   const caminho = info.outputPath(`${nome}.png`);
   await page.screenshot({ path: caminho, animations: "disabled" });
   await info.attach(nome, { path: caminho, contentType: "image/png" });
@@ -217,7 +219,7 @@ test.describe("interface compartilhada", () => {
         page.getByLabel("E-mail ou identificador"),
         page.getByRole("button", { name: "Entrar", exact: true }),
       ]);
-      await capturar(page, info, `entrada-${tema}`);
+      await capturar(page, info, `entrada-${tema}`, false);
     });
   }
 

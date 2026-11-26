@@ -291,7 +291,7 @@ test.describe("diretores de turma na Gestão", () => {
 
     // Nada de navegação da equipe nem de edição.
     await expect(diretor.getByRole("navigation", { name: "Seções do aplicativo" })).toHaveCount(0);
-    await expect(diretor.getByRole("button", { name: /Salvar chamada|Registrar/ })).toHaveCount(0);
+    await expect(diretor.getByRole("button", { name: /^(Salvar|Registrar)/ })).toHaveCount(0);
     await contexto.close();
   });
 });

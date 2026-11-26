@@ -31,6 +31,7 @@ export function useDadosBi() {
   const [retratos, setRetratos] = useState<Partial<Record<RecursoBi, RetratoBi>>>({});
   const [ocupado, setOcupado] = useState(false);
   const [progresso, setProgresso] = useState("");
+  const [pausasPorLimite, setPausasPorLimite] = useState<ReadonlySet<object>>(() => new Set());
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [offline, setOffline] = useState(false);
@@ -67,6 +68,7 @@ export function useDadosBi() {
     tarefas.current.clear();
     geracoes.current.clear();
     setProgresso("");
+    setPausasPorLimite(new Set());
     try {
       esquecerSegredoBi(anterior?.chave);
     } catch {
@@ -274,7 +276,12 @@ export function useDadosBi() {
     };
   }, [entrar, esquecer, armazenamentoFalhou]);
   const carregar = useCallback(
-    (recurso: RecursoBi, consulta: ConsultaBi, atualizar = false): Promise<RetratoBi> => {
+    (
+      recurso: RecursoBi,
+      consulta: ConsultaBi,
+      atualizar = false,
+      sinalDaConsulta?: AbortSignal,
+    ): Promise<RetratoBi> => {
       const atual = acessoRef.current;
       if (!atual || !atual.pagina.recursos.includes(recurso))
         return Promise.reject(new Error("Este conjunto não está no escopo da chave."));
@@ -290,22 +297,38 @@ export function useDadosBi() {
       ].includes(recurso);
       const escopo: EscopoBi = atual.pagina.escopo;
       const id = `${atual.id}:${JSON.stringify(escopo)}:${recurso}:${temporal ? `${consulta.inicio}:${consulta.fim}` : "cadastro"}`;
-      const existente = tarefas.current.get(id);
+      // Uma consulta cancelável não toma a leitura compartilhada de outro painel.
+      const existente = sinalDaConsulta ? undefined : tarefas.current.get(id);
       if (!atualizar && existente) return existente;
       const geracao = {};
-      geracoes.current.set(id, geracao);
-      const signal = controlador.current?.signal;
+      if (!sinalDaConsulta) geracoes.current.set(id, geracao);
+      const sinalDoAcesso = controlador.current?.signal;
+      const signal =
+        sinalDaConsulta && sinalDoAcesso
+          ? AbortSignal.any([sinalDaConsulta, sinalDoAcesso])
+          : (sinalDaConsulta ?? sinalDoAcesso);
+      const vigente = () =>
+        acessoRef.current === atual &&
+        !signal?.aborted &&
+        (sinalDaConsulta !== undefined || geracoes.current.get(id) === geracao);
+      const conferirVigencia = () => {
+        if (!vigente()) throw new DOMException("Consulta interrompida", "AbortError");
+      };
       // Preserva a falha para leituras repetidas da mesma geração. Uma atualização
       // explícita ignora a tarefa anterior e tenta novamente.
       const tarefa: Promise<RetratoBi> = (async () => {
         let antigo: RetratoBi | undefined;
         try {
-          if (atual.persistir) antigo = await cacheBi<RetratoBi>("ler", id);
+          if (atual.persistir)
+            antigo = sinalDaConsulta
+              ? await cacheBi<RetratoBi>("ler", id, undefined, vigente, signal)
+              : await cacheBi<RetratoBi>("ler", id);
           // Retratos anteriores não registravam as datas de todas as páginas.
           if (antigo && !antigo.datasCompletas) antigo = { ...antigo, consultadoEm: "" };
         } catch {
-          armazenamentoFalhou();
+          if (vigente()) armazenamentoFalhou();
         }
+        conferirVigencia();
         if (!atualizar && antigo?.completo) return antigo;
         if (!navigator.onLine) {
           if (antigo?.completo) return atualizar ? { ...antigo, falhaAtualizacao: true } : antigo;
@@ -332,34 +355,39 @@ export function useDadosBi() {
             setProgresso(`Baixando ${recurso}: ${linhas.size} registros`);
             let tentativas = 0;
             for (;;) {
+              conferirVigencia();
               try {
                 ultima = await rede(atual.chave, parametros, signal);
                 break;
               } catch (e) {
                 if (!(e instanceof ErroApi) || e.status !== 429 || tentativas++ >= 2) throw e;
-                setProgresso(
-                  "Pausa de um minuto para respeitar o limite de consultas. O recorte só aparece quando completo.",
-                );
-                await new Promise<void>((resolve, reject) => {
-                  const abortar = () => {
-                    clearTimeout(timer);
-                    reject(new DOMException("Consulta interrompida", "AbortError"));
-                  };
-                  const timer = setTimeout(() => {
-                    signal?.removeEventListener("abort", abortar);
-                    resolve();
-                  }, 60_000);
-                  if (signal?.aborted) abortar();
-                  else signal?.addEventListener("abort", abortar, { once: true });
-                });
+                conferirVigencia();
+                const pausa = {};
+                setPausasPorLimite((atuais) => new Set(atuais).add(pausa));
+                try {
+                  await new Promise<void>((resolve, reject) => {
+                    const abortar = () => {
+                      clearTimeout(timer);
+                      reject(new DOMException("Consulta interrompida", "AbortError"));
+                    };
+                    const timer = setTimeout(() => {
+                      signal?.removeEventListener("abort", abortar);
+                      resolve();
+                    }, 60_000);
+                    if (signal?.aborted) abortar();
+                    else signal?.addEventListener("abort", abortar, { once: true });
+                  });
+                } finally {
+                  setPausasPorLimite((atuais) => {
+                    if (!atuais.has(pausa)) return atuais;
+                    const restantes = new Set(atuais);
+                    restantes.delete(pausa);
+                    return restantes;
+                  });
+                }
               }
             }
-            if (
-              geracoes.current.get(id) !== geracao ||
-              acessoRef.current !== atual ||
-              signal?.aborted
-            )
-              throw new DOMException("Consulta interrompida", "AbortError");
+            conferirVigencia();
             if (JSON.stringify(ultima.escopo) !== JSON.stringify(escopo)) {
               await esquecer();
               setErro("O escopo mudou. Peça a chave atualizada à Gestão.");
@@ -375,12 +403,7 @@ export function useDadosBi() {
             pagina = ultima.proximaPagina ?? 0;
           } while (pagina);
         } catch (e) {
-          if (
-            geracoes.current.get(id) !== geracao ||
-            acessoRef.current !== atual ||
-            signal?.aborted
-          )
-            throw e;
+          if (!vigente()) throw e;
           if (e instanceof ErroApi && (e.status === 401 || e.status === 403)) {
             await esquecer();
             setErro("O acesso foi encerrado. Peça uma chave à Gestão.");
@@ -409,26 +432,17 @@ export function useDadosBi() {
           datasCompletas: !dataInvalida && Boolean(consultadoEm),
         };
         try {
-          if (atual.persistir)
-            await cacheBi(
-              "gravar",
-              id,
-              retrato,
-              () =>
-                geracoes.current.get(id) === geracao &&
-                acessoRef.current === atual &&
-                !signal?.aborted,
-            );
+          if (atual.persistir) await cacheBi("gravar", id, retrato, vigente, signal);
         } catch {
-          armazenamentoFalhou();
+          if (vigente()) armazenamentoFalhou();
         }
+        conferirVigencia();
         return retrato;
       })().then((retrato) => {
-        if (geracoes.current.get(id) === geracao && acessoRef.current === atual && !signal?.aborted)
-          setRetratos((r) => ({ ...r, [recurso]: retrato }));
+        if (!sinalDaConsulta && vigente()) setRetratos((r) => ({ ...r, [recurso]: retrato }));
         return retrato;
       });
-      tarefas.current.set(id, tarefa);
+      if (!sinalDaConsulta) tarefas.current.set(id, tarefa);
       return tarefa;
     },
     [rede, esquecer, armazenamentoFalhou],
@@ -438,6 +452,7 @@ export function useDadosBi() {
     retratos,
     ocupado,
     progresso,
+    pausadoPorLimite: pausasPorLimite.size > 0,
     erro,
     aviso,
     offline,

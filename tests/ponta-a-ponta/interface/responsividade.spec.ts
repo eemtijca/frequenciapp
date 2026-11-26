@@ -2,7 +2,12 @@
 // centralizados em telas pequenas.
 import { expect, test } from "@playwright/test";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
+import {
+  abrirNavegacao,
+  aguardarHidratacao,
+  painelAtivoDaVisao,
+  trocarVisao,
+} from "../helpers/pagina";
 
 test.describe("responsividade", () => {
   test("no celular usa o menu lateral e centraliza os formulários", async ({ page }, info) => {
@@ -70,30 +75,36 @@ test.describe("responsividade", () => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto("/");
     await aguardarHidratacao(page);
-    await expect(page.locator("aside")).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
+    const barra = page.getByRole("complementary", {
+      name: "Navegação do aplicativo",
+      exact: true,
+    });
+    await expect(barra).toHaveCount(1);
+    await expect(barra).toBeVisible();
+    await expect(barra.getByRole("navigation", { name: "Seções do aplicativo" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toHaveCount(0);
 
     // As ações da conta cabem na barra lateral, sem estourar a largura.
-    const semEstouro = await page
-      .locator("aside")
-      .evaluate((elemento) => elemento.scrollWidth <= elemento.clientWidth + 1);
+    const semEstouro = await barra.evaluate(
+      (elemento) => elemento.scrollWidth <= elemento.clientWidth + 1,
+    );
     expect(semEstouro).toBe(true);
-    const asideCaixa = await page.locator("aside").boundingBox();
+    const asideCaixa = await barra.boundingBox();
     const conteudoCaixa = await page.getByRole("main").boundingBox();
     expect(asideCaixa).not.toBeNull();
     expect(conteudoCaixa).not.toBeNull();
     const fimDaGaveta = (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0);
     expect(Math.abs((conteudoCaixa?.x ?? 0) - fimDaGaveta)).toBeLessThanOrEqual(1);
-    const sairCaixa = await page.getByRole("button", { name: /^Conta de / }).boundingBox();
+    const sairCaixa = await barra.getByRole("button", { name: /^Conta de / }).boundingBox();
+    expect(sairCaixa).not.toBeNull();
     expect((sairCaixa?.x ?? 0) + (sairCaixa?.width ?? 0)).toBeLessThanOrEqual(
       (asideCaixa?.x ?? 0) + (asideCaixa?.width ?? 0) + 1,
     );
 
     // O símbolo acompanha a coluna dos ícones da navegação, sem deslocamento.
-    const marca = await page.locator('aside img[src$="icon.svg"]').first().boundingBox();
-    const primeiroIcone = await page.locator("aside nav button svg").first().boundingBox();
+    const marca = await barra.locator('img[src$="icon.svg"]').first().boundingBox();
+    const primeiroIcone = await barra.locator("nav button svg").first().boundingBox();
     expect(marca).not.toBeNull();
     expect(primeiroIcone).not.toBeNull();
     const centroMarca = (marca?.x ?? 0) + (marca?.width ?? 0) / 2;
@@ -232,8 +243,10 @@ test.describe("responsividade", () => {
         ["Gestão", "gestao", 1040],
       ] as const) {
         await trocarVisao(page, rotulo, visao);
-        const painel = page.locator("main > div > section:not([hidden])");
+        const painel = await painelAtivoDaVisao(page);
+        await expect(painel).toHaveAttribute("aria-label", rotulo);
         const caixaPainel = await painel.boundingBox();
+        expect(caixaPainel).not.toBeNull();
         const conteudo = await painel.locator(":scope > div").boundingBox();
         expect(conteudo).not.toBeNull();
         expect(conteudo?.width ?? Infinity).toBeLessThanOrEqual(largura);

@@ -6,7 +6,7 @@ import SortByAlphaRoundedIcon from "@mui/icons-material/SortByAlphaRounded";
 import { Botao } from "@/components/ui/mui/botao";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { corpoJson, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 
 export function DialogoOrdenarTurmas({
@@ -16,6 +16,7 @@ export function DialogoOrdenarTurmas({
   disabled?: boolean;
   onMudanca: () => Promise<void>;
 }) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const { executando, executar } = useAcaoUnica(async () => {
     try {

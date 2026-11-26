@@ -10,7 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { avisarErro, avisarInfo } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 
 type Atualizador = () => Promise<void> | void;
 
@@ -49,6 +49,7 @@ export function ProvedorAtualizacao({
   atualizadoEmInicial?: string;
   children: ReactNode;
 }) {
+  const { avisarErro, avisarInfo } = useAvisosDaSessao();
   const atualizadores = useRef(new Map<string, Atualizador>());
   const [ids, setIds] = useState<Set<string>>(() => new Set());
   const [ocupado, setOcupado] = useState(false);
@@ -102,7 +103,7 @@ export function ProvedorAtualizacao({
     } finally {
       setOcupado(false);
     }
-  }, [ativo, ocupado, online, marcarAtualizado]);
+  }, [ativo, ocupado, online, marcarAtualizado, avisarErro, avisarInfo]);
 
   useEffect(() => {
     atualizarRef.current = atualizar;

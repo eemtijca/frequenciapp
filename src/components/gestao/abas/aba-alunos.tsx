@@ -36,7 +36,7 @@ import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-es
 import type { Aluno, Turma } from "@/domain/frequencia";
 import { normalizar } from "@/domain/frequencia";
 import { relacaoParaCsv } from "@/domain/importacao-alunos";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
@@ -188,6 +188,7 @@ const LinhaAluno = memo(function LinhaAluno({
 });
 
 export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<Aluno | null>(null);
   const [formulario, setFormulario] = useState<Formulario>({
@@ -378,7 +379,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         }
       });
     },
-    [executarPorChave, onMudanca],
+    [executarPorChave, onMudanca, avisarErro, avisarSucesso],
   );
 
   function alternarDesistencia(aluno: Aluno) {
@@ -411,7 +412,7 @@ export default function AbaAlunos({ turmas, alunos, onMudanca }: Props) {
         }
       });
     },
-    [executarPorChave, onMudanca],
+    [executarPorChave, onMudanca, avisarErro, avisarSucesso],
   );
 
   // A relação sai no mesmo schema da importação: turmas na ordem do cadastro e

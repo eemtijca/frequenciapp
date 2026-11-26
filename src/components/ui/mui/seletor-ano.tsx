@@ -58,7 +58,6 @@ export function SeletorAno({
       fullWidth
       disabled={desabilitado}
       noOptionsText="Nenhum ano encontrado."
-      loadingText="Carregando anos"
       clearText="Limpar"
       closeText="Fechar"
       openText="Abrir"

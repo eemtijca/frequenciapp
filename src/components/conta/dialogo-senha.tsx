@@ -13,7 +13,7 @@ import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
 import IconButton from "@mui/material/IconButton";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
@@ -40,6 +40,7 @@ export default function DialogoSenha({
   onTrocada,
   onDevolverFoco,
 }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const termo = palavraChave ? "palavra-chave" : "senha";
   const Termo = palavraChave ? "Palavra-chave" : "Senha";
   const [senhaAtual, setSenhaAtual] = useState("");

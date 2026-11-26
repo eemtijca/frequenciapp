@@ -3,7 +3,7 @@
 // Limpeza das abas antigas de backup, com prévia, senha e proteção contra toque duplo.
 import { useState } from "react";
 import { pedir, corpoJson } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { FRASE_MODO_COMPLETO } from "@/domain/planilha";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import Box from "@mui/material/Box";
@@ -26,6 +26,7 @@ export function LimparCopiasPlanilha({
   onMudou: () => Promise<void> | void;
   acoes: ReturnType<typeof useAcoesPorChave>;
 }) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const [previa, setPrevia] = useState<Previa | null>(null);
   const [senha, setSenha] = useState("");
   const [frase, setFrase] = useState("");

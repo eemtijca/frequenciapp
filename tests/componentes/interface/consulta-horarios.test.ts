@@ -1,5 +1,6 @@
 // Verifica a consulta de Horários em Chromium com dados sintéticos e sem escritas HTTP.
 import { chromium, type Browser, type Locator, type Page } from "@playwright/test";
+import { join } from "node:path";
 import { afterAll, beforeAll, expect, it } from "vitest";
 import type { ProvaBimestral } from "@/domain/provas-bimestrais";
 import { criarServidorFixture, type ServidorFixture } from "../../apoio/vite";
@@ -121,6 +122,95 @@ async function escolher(page: Page, campo: Locator, opcao: string) {
   // O fundo invisível do menu intercepta o hit-test até a saída terminar.
   await page.getByRole("listbox", { includeHidden: true }).waitFor({ state: "detached" });
 }
+
+it.each([
+  [320, "light"],
+  [390, "dark"],
+  [1440, "light"],
+] as const)("encosta Almoço no limite do turno a %i px (%s)", async (largura, tema) => {
+  await consultar(largura, tema, async (page, vista) => {
+    const dia = vista.getByRole("combobox", { name: /^Dia da semana/ });
+    const destino = process.env.CAPTURAS_AJUSTES_UI;
+    for (const [turno, primeiraAula, ultimaAula] of [
+      ["Manhã", "Matemática", "Sem disciplina"],
+      ["Tarde", "Física", "Artes"],
+    ]) {
+      const nome = `Aulas de Segunda-feira · ${turno}`;
+      await vista.getByRole("tab", { name: turno, exact: true }).click();
+      const cartao = vista.getByRole("region", { name: nome, exact: true });
+      const itens = cartao.getByRole("list", { name: nome, exact: true }).getByRole("listitem");
+      const almoco = itens.filter({ has: page.getByText("Almoço", { exact: true }) });
+      await almoco.getByText("11:50 às 13:00", { exact: true }).waitFor();
+      expect(await itens.first().innerText()).toContain(
+        turno === "Manhã" ? primeiraAula : "Almoço",
+      );
+      expect(await itens.last().innerText()).toContain(turno === "Manhã" ? "Almoço" : ultimaAula);
+      if (turno === "Tarde") expect(await itens.nth(1).innerText()).toContain(primeiraAula);
+      const medidas = await almoco.evaluate((faixa) => {
+        const cartao = faixa.closest("section");
+        const cabecalho = cartao?.querySelector("h2")?.parentElement;
+        const vizinha = faixa.previousElementSibling ?? faixa.nextElementSibling;
+        if (!cartao || !cabecalho || !vizinha) throw new Error("Cartão de aulas incompleto");
+        const borda = getComputedStyle(cartao);
+        const caixa = cartao.getBoundingClientRect();
+        const faixaPintada = faixa.getBoundingClientRect();
+        const aula = vizinha.getBoundingClientRect();
+        return {
+          topo: faixa.parentElement?.firstElementChild?.getBoundingClientRect().top,
+          base: faixa.parentElement?.lastElementChild?.getBoundingClientRect().bottom,
+          cabecalho: cabecalho.getBoundingClientRect().bottom,
+          rodape: caixa.bottom - parseFloat(borda.borderBottomWidth),
+          faixaAula:
+            vizinha === faixa.previousElementSibling
+              ? faixaPintada.top - aula.bottom
+              : aula.top - faixaPintada.bottom,
+          recuoAula: aula.left - caixa.left - parseFloat(borda.borderLeftWidth),
+          fundoFaixa: getComputedStyle(faixa).backgroundColor,
+          borda: borda.borderBottomWidth,
+          raio: borda.borderBottomLeftRadius,
+        };
+      });
+      if (destino) {
+        await page.mouse.move(0, 0);
+        await cartao.screenshot({
+          path: join(
+            destino,
+            `almoco-${turno === "Manhã" ? "manha" : "tarde"}-${largura}-${tema}.png`,
+          ),
+        });
+      }
+      expect.soft(medidas.fundoFaixa).not.toBe("rgba(0, 0, 0, 0)");
+      expect.soft(medidas.borda).toBe("1px");
+      expect.soft(medidas.raio).toBe("16px");
+      expect.soft(medidas.faixaAula).toBeCloseTo(0, 0);
+      expect.soft(medidas.recuoAula).toBeCloseTo(8, 0);
+      expect
+        .soft(medidas.topo, `folga após cabeçalho de ${turno}`)
+        .toBeCloseTo(medidas.cabecalho + (turno === "Tarde" ? 0 : 8), 0);
+      expect
+        .soft(medidas.base, `folga antes do rodapé de ${turno}`)
+        .toBeCloseTo(medidas.rodape - (turno === "Manhã" ? 0 : 8), 0);
+    }
+    await escolher(page, dia, "Terça-feira");
+    const cartao = vista.getByRole("region", { name: "Aulas de Terça-feira · Tarde", exact: true });
+    await cartao.getByText("Tecnologia", { exact: true }).waitFor();
+    expect(await cartao.getByRole("listitem").count()).toBe(1);
+    expect(
+      await cartao.getByRole("listitem").evaluate((aula) => {
+        const cartao = aula.closest("section");
+        const cabecalho = cartao?.querySelector("h2")?.parentElement;
+        if (!cartao || !cabecalho) throw new Error("Cartão sem cabeçalho");
+        const faixa = aula.getBoundingClientRect();
+        return [
+          faixa.top - cabecalho.getBoundingClientRect().bottom,
+          cartao.getBoundingClientRect().bottom -
+            parseFloat(getComputedStyle(cartao).borderBottomWidth) -
+            faixa.bottom,
+        ];
+      }),
+    ).toEqual([8, 8]);
+  });
+});
 
 it.each(["light", "dark"] as const)(
   "alinha as faixas de pausa às bordas internas do cartão somente no celular (%s)",

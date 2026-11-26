@@ -33,6 +33,7 @@ import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { AtualizadoEm } from "@/components/ui/mui/atualizado-em";
 import { Botao } from "@/components/ui/mui/botao";
 import { Selo } from "@/components/ui/mui/selo";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { useResumoSemanal } from "@/components/resumo-semanal/use-resumo-semanal";
 
 interface Props {
@@ -444,9 +445,7 @@ export function VistaResumoMovimentacoes({
               sx={{ alignItems: "center", justifyContent: "center", py: 4 }}
             >
               <CircularProgress size={18} aria-hidden="true" />
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>
-                Carregando resumo da semana...
-              </Typography>
+              <TextoDeCarregamento>Carregando resumo da semana...</TextoDeCarregamento>
             </Stack>
           ) : null}
           {!carga.dados && carga.erro ? (

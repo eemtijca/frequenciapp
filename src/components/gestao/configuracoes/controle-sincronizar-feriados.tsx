@@ -15,13 +15,14 @@ import type {
   ResumoSincronizacaoFeriados,
 } from "@/domain/feriados-externos";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
 import { Campo } from "@/components/ui/mui/campo";
 import { CampoSenha } from "@/components/ui/mui/campo-senha";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { Dialogo } from "@/components/ui/mui/dialogo";
 
 interface Props {
@@ -63,6 +64,7 @@ export default function ControleSincronizarFeriados({
   onExecutandoChange,
   onAtualizar,
 }: Props) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const ajudaId = useId();
   const idBotao = useId();
   const senhaId = useId();
@@ -232,7 +234,7 @@ export default function ControleSincronizarFeriados({
           type="button"
           variante="primario"
           disabled={!podeSincronizar}
-          carregando={executando}
+          carregando={executando || (anoValido && carregando)}
           icone={<CloudDownloadRoundedIcon />}
           aria-describedby={ajudaId}
           onClick={() => void executar()}
@@ -279,7 +281,11 @@ export default function ControleSincronizarFeriados({
         ) : null}
       </Stack>
       <Typography id={ajudaId} variant="caption" sx={{ color: "text.secondary" }}>
-        {ajuda}
+        {anoValido && carregando ? (
+          <TextoDeCarregamento anunciar>{ajuda}</TextoDeCarregamento>
+        ) : (
+          ajuda
+        )}
       </Typography>
       {erro ? (
         <AlertaCompacto

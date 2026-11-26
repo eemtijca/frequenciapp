@@ -153,10 +153,11 @@ test.describe("menu lateral", () => {
     await nav.getByRole("button", { name: "Gestão", exact: true }).press("Enter");
     const voltar = nav.getByRole("button", { name: "Voltar ao menu principal", exact: true });
     await expect(voltar).toBeFocused();
-    await expect(nav.getByRole("button", { name: "Séries", exact: true })).toHaveAttribute(
+    await expect(nav.getByRole("button", { name: "Séries", exact: true })).not.toHaveAttribute(
       "aria-current",
       "page",
     );
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "painel");
     await nav.getByRole("button", { name: "Turmas", exact: true }).press("Space");
     await expect(page.getByRole("dialog", { name: "Menu do aplicativo" })).toBeHidden();
     const titulo = page.getByRole("heading", { name: "Turmas", level: 1, exact: true });

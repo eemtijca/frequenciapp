@@ -15,10 +15,11 @@ import Stack from "@mui/material/Stack";
 import PreferenciasPlanilha from "./preferencias-planilha";
 import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useRascunhoConfiguracoes } from "@/components/gestao/configuracoes/rascunho-configuracoes";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { CABECALHO_SAIDAS, type AbaSaidaEsquema } from "@/domain/planilha-saidas";
 import { rotuloInstante } from "@/domain/planilha";
 import { rotuloData } from "@/domain/frequencia";
@@ -36,6 +37,7 @@ import { Selo } from "@/components/ui/mui/selo";
 import { EtapaPlanilha } from "@/components/gestao/planilhas/planilha-etapa";
 import { SeletorPlanilhaGoogle } from "@/components/gestao/planilhas/seletor-planilha-google";
 import { OrganizarPlanilha } from "@/components/gestao/planilhas/dialogo-organizar-planilha";
+import { IndicadorDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import {
   BlocoModoCompletoPlanilha,
   BlocoRiscoPlanilha,
@@ -93,8 +95,10 @@ export default function IntegracaoSaidas({
   onAbrirSaidas?: () => void;
   abertoInicial?: boolean;
 }) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [integracao, setIntegracao] = useState<IntegracaoSaidasAdmin | null>(null);
   const [carregando, setCarregando] = useState(true);
+  useLeituraDaVisao(carregando);
   const [aberto, setAberto] = useState(abertoInicial);
   const [painel, setPainel] = useState<PainelSaidas | null>(abertoInicial ? "configuracao" : null);
   const [erro, setErro] = useState("");
@@ -309,9 +313,7 @@ export default function IntegracaoSaidas({
         <Typography component="h2" variant="subtitle1">
           Planilha de entradas e saídas
         </Typography>
-        <Typography variant="body2" sx={{ color: "text.secondary" }}>
-          Conferindo a integração...
-        </Typography>
+        <IndicadorDeCarregamento texto="Conferindo a integração..." />
       </Box>
     );
   }

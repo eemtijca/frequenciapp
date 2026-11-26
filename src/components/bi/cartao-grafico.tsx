@@ -32,6 +32,7 @@ import {
 import type { LinhaBi } from "@/domain/bi";
 import { baixarBi, pngBi } from "@/lib/bi-exportacao";
 import { CORES_BI, formatarValorBi, paginaTabelaBi, rotularPontosBi } from "@/lib/bi-visualizacao";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { LimiteGrafico } from "./limite-grafico";
 const VistaGrafico = dynamic(() => import("./vista-grafico"), {
   ssr: false,
@@ -42,9 +43,7 @@ const VistaGrafico = dynamic(() => import("./vista-grafico"), {
       sx={{ display: "flex", alignItems: "center", gap: 1 }}
     >
       <CircularProgress size={16} />
-      <Typography variant="body2" sx={{ color: "text.secondary" }}>
-        Preparando gráfico...
-      </Typography>
+      <TextoDeCarregamento>Preparando gráfico...</TextoDeCarregamento>
     </Box>
   ),
 });

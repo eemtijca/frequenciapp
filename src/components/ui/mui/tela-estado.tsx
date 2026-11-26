@@ -13,7 +13,7 @@ import ReportProblemRoundedIcon from "@mui/icons-material/ReportProblemRounded";
 import SearchOffRoundedIcon from "@mui/icons-material/SearchOffRounded";
 import SyncProblemRoundedIcon from "@mui/icons-material/SyncProblemRounded";
 import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
-import Alert from "@mui/material/Alert";
+import Alert, { alertClasses } from "@mui/material/Alert";
 import Box from "@mui/material/Box";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
@@ -318,6 +318,17 @@ export function AlertaCompacto({
               paddingY: 0.5,
               paddingX: 1,
               alignItems: "center",
+              ...(variante === "indisponivel" && {
+                alignItems: "flex-start",
+                [`& .${alertClasses.icon}, & .${alertClasses.message}`]: { py: 1 },
+                [`& .${alertClasses.icon}`]: {
+                  // A caixa do ícone acompanha só a primeira linha do título.
+                  typography: "body2",
+                  boxSizing: "content-box",
+                  height: "1lh",
+                  alignItems: "center",
+                },
+              }),
             }
           : {
               flexDirection: "column",

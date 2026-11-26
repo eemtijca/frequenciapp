@@ -48,7 +48,7 @@ import {
 import { VistaResumoParcial } from "@/components/chamada-parcial/resumo-semana-parcial";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { useNavegacaoDoDia } from "@/lib/navegacao-do-dia";
-import { avisarErro, avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
+import { mensagemAmigavel, useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
@@ -62,6 +62,7 @@ import { Selecionar } from "@/components/ui/mui/selecionar";
 import { Selo, type TomSelo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { TabelaPadrao } from "@/components/layout/tabela-padrao";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 import {
@@ -70,6 +71,7 @@ import {
   edicaoDoRegistro,
   type EdicaoParcial,
 } from "./dialogo-frequencia-parcial";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { DialogoEnviarParciais } from "./dialogo-enviar-parciais";
 
 interface Props {
@@ -280,6 +282,7 @@ export default function VistaFrequenciaParcial({
   onPendencia,
   onAbrirChamada,
 }: Props) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   // No domingo, a abertura é o resumo da semana encerrada.
   const limite = limiteAgendamentoParcial(diaInicial);
   const nav = useNavegacaoDoDia({
@@ -323,6 +326,7 @@ export default function VistaFrequenciaParcial({
     carga.chave === chaveCarga && carga.feriado !== undefined ? carga.feriado : feriadoCadastrado;
   const registros = carga.chave === chaveCarga ? carga.registros : REGISTROS_VAZIOS;
   const carregando = !nav.resumo && turmaId !== "" && carga.chave !== chaveCarga;
+  useLeituraDaVisao(carregando);
   const erro = carga.chave === chaveCarga ? carga.erro : "";
   const [editorAberto, setEditorAberto] = useState(false);
   const [baseEdicao, setBaseEdicao] = useState<FrequenciaDaChamada | null>(null);
@@ -349,7 +353,7 @@ export default function VistaFrequenciaParcial({
       return;
     }
     setRecarregar((valor) => valor + 1);
-  }, [sujo]);
+  }, [sujo, avisarInfo]);
   const marcarParcialAtualizada = useAtualizacaoTela("chamada-parcial", atualizarTela);
 
   const turmasOrdenadas = useMemo(() => {
@@ -1012,7 +1016,7 @@ export default function VistaFrequenciaParcial({
               }}
             >
               <CircularProgress size={18} aria-hidden="true" />
-              <Typography variant="body2">Carregando chamada parcial...</Typography>
+              <TextoDeCarregamento>Carregando chamada parcial...</TextoDeCarregamento>
             </Paper>
           ) : alunosFiltrados.length === 0 ? (
             <Paper variant="outlined" sx={{ px: 3, py: 4, textAlign: "center" }}>

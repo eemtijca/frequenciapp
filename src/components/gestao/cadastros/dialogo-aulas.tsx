@@ -16,7 +16,7 @@ import ListItem from "@mui/material/ListItem";
 import Stack from "@mui/material/Stack";
 import ToggleButton from "@mui/material/ToggleButton";
 import Typography from "@mui/material/Typography";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import type { Horario, Turma } from "@/domain/frequencia";
@@ -79,6 +79,7 @@ interface CopiarGradeProps {
 }
 
 function CopiarGrade({ destino, turmas, disabled, onOcupado, onMudanca }: CopiarGradeProps) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const [origemId, setOrigemId] = useState("");
   const [confirmando, setConfirmando] = useState(false);
@@ -269,6 +270,7 @@ export default function DialogoAulas(props: Props) {
 }
 
 function ConteudoDialogoAulas({ turma, turmas, aberto, onAbrir, onMudanca }: Props) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const [formulario, setFormulario] = useState<Formulario | null>(null);
   const [copiando, setCopiando] = useState(false);
   const { chaveAtiva, executar: executarPorChave } = useAcoesPorChave();

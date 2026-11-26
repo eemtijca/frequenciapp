@@ -1,4 +1,4 @@
-// Chamada retroativa sem composição comprovada: confirmação com motivo,
+// Chamada retroativa sem composição comprovada: confirmação com motivo opcional,
 // cancelamento sem gravação e auditoria na mesma transação. Dados sintéticos.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { diaLocal, diaSeguinte } from "@/domain/frequencia";
@@ -54,7 +54,7 @@ async function pedirSalvamento(page: Page, secao: Locator) {
   await secao.getByRole("button", { name: "Salvar", exact: true }).click();
   const resumo = page.getByRole("alertdialog", { name: "Salvar chamada?", exact: true });
   await expect(resumo).toBeVisible();
-  await resumo.getByRole("button", { name: "Salvar chamada", exact: true }).click();
+  await resumo.getByRole("button", { name: "Salvar", exact: true }).click();
   const historica = page.getByRole("dialog", {
     name: "Confirmar chamada histórica?",
     exact: true,
@@ -91,47 +91,70 @@ test.beforeAll(async () => {
 
 test.afterAll(limparMassa);
 
-test("cancela ou confirma a chamada histórica e registra o motivo na auditoria", async ({
-  page,
-}) => {
-  const secao = await abrirChamada(page);
-  await secao.getByRole("button", { name: /^E2E Retroativa Aluna:/ }).click();
-
-  let historica = await pedirSalvamento(page, secao);
-  await historica.getByRole("button", { name: "Cancelar", exact: true }).click();
-  await expect(historica).toBeHidden();
-  await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeEnabled();
-  const antes = await comBanco((cliente) =>
-    cliente.query("select 1 from frequencias where turma_id = $1 and dia = $2", [turmaId, dia]),
+test.beforeEach(async () => {
+  await comBanco((cliente) =>
+    cliente.query("delete from frequencias where turma_id = $1 and dia = $2", [turmaId, dia]),
   );
-  expect(antes.rowCount).toBe(0);
-
-  historica = await pedirSalvamento(page, secao);
-  await historica.getByLabel("Motivo").fill("Chamada do diário de papel");
-  await historica.getByRole("button", { name: "Confirmar e salvar", exact: true }).click();
-  await expect(historica).toBeHidden();
-  await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible({
-    timeout: 15_000,
-  });
-
-  const auditoria = await comBanco(async (cliente) => {
-    const resultado = await cliente.query<{
-      tipo: string;
-      motivo: string;
-      dia: string;
-      alunos_snapshot: string[];
-    }>(
-      "select tipo, motivo, to_char(dia, 'YYYY-MM-DD') as dia, alunos_snapshot from confirmacoes_historicas where turma_id = $1 and dia = $2",
-      [turmaId, dia],
-    );
-    return resultado.rows;
-  });
-  expect(auditoria).toEqual([
-    {
-      tipo: "CHAMADA_RETROATIVA",
-      motivo: "Chamada do diário de papel",
-      dia,
-      alunos_snapshot: [alunoId],
-    },
-  ]);
 });
+
+for (const motivo of ["Chamada do diário de papel", ""]) {
+  test(`cancela e confirma a chamada histórica ${motivo ? "com" : "sem"} motivo`, async ({
+    page,
+  }) => {
+    const pedidos: string[] = [];
+    page.on("request", (pedido) => {
+      const url = new URL(pedido.url());
+      if (url.pathname !== "/api/frequencias") return;
+      if (pedido.method() === "POST") pedidos.push("POST");
+      if (url.searchParams.get("verificarHistorico") === "true") pedidos.push(pedido.method());
+    });
+    const secao = await abrirChamada(page);
+    await secao.getByRole("button", { name: /^E2E Retroativa Aluna:/ }).click();
+
+    let historica = await pedirSalvamento(page, secao);
+    expect(pedidos).toEqual(["GET"]);
+    await historica.getByRole("button", { name: "Cancelar", exact: true }).click();
+    await expect(historica).toBeHidden();
+    await expect(secao.getByRole("button", { name: "Salvar", exact: true })).toBeFocused();
+    const antes = await comBanco((cliente) =>
+      cliente.query("select 1 from frequencias where turma_id = $1 and dia = $2", [turmaId, dia]),
+    );
+    expect(antes.rowCount).toBe(0);
+
+    historica = await pedirSalvamento(page, secao);
+    expect(pedidos).toEqual(["GET", "GET"]);
+    await historica.getByLabel("Motivo (opcional)").fill(motivo);
+    const envio = page.waitForRequest(
+      (pedido) =>
+        pedido.method() === "POST" && new URL(pedido.url()).pathname === "/api/frequencias",
+    );
+    await historica.getByRole("button", { name: "Confirmar e salvar", exact: true }).click();
+    expect((await envio).postDataJSON()).toMatchObject({ listaRevisada: [alunoId] });
+    await expect(historica).toBeHidden();
+    await expect(secao.getByRole("button", { name: /^Desbloquear chamada de/ })).toBeVisible({
+      timeout: 15_000,
+    });
+
+    expect(pedidos).toEqual(["GET", "GET", "POST"]);
+    const auditoria = await comBanco(async (cliente) => {
+      const resultado = await cliente.query<{
+        tipo: string;
+        motivo: string;
+        dia: string;
+        alunos_snapshot: string[];
+      }>(
+        "select tipo, motivo, to_char(dia, 'YYYY-MM-DD') as dia, alunos_snapshot from confirmacoes_historicas where turma_id = $1 and dia = $2",
+        [turmaId, dia],
+      );
+      return resultado.rows;
+    });
+    expect(auditoria).toEqual([
+      {
+        tipo: "CHAMADA_RETROATIVA",
+        motivo,
+        dia,
+        alunos_snapshot: [alunoId],
+      },
+    ]);
+  });
+}

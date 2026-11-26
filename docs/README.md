@@ -97,3 +97,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-079](adr/079-observabilidade-com-prometheus.md): coleta Prometheus autenticada, rede interna, painel no loopback e alertas sem notificação externa.
 - [ADR-080](adr/080-horario-de-provas-bimestrais.md): horário temporário de provas por turma e data, cadastrado na Gestão e mostrado em Horários até o fim do período.
 - [ADR-082](adr/082-navegacao-lateral-gestao.md): destinos de Gestão e Configurações na gaveta, com foco e preferência de movimento independentes do conteúdo.
+- [ADR-083](adr/083-confirmacao-historica-da-chamada.md): consulta antes da gravação, motivo opcional e preservação da auditoria da chamada histórica.

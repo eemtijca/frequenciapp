@@ -6,7 +6,12 @@ import type {
   RelatorioMovimentacoes,
 } from "@/domain/relatorio-movimentacoes";
 import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
-import { aguardarHidratacao, exporRelatorios, selecionarRelatorio } from "../helpers/pagina";
+import {
+  aguardarHidratacao,
+  conferirEsqueletoDaVisao,
+  exporRelatorios,
+  selecionarRelatorio,
+} from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 test.beforeAll(async () => {
@@ -196,7 +201,7 @@ test("agrupa duas turmas, filtra os registros e mantém os destinos legíveis no
   await expect(grupoA).toHaveCount(0);
   await expect(grupoB).toBeVisible();
   await page.screenshot({
-    path: `docs/imagens/locais/relatorio-movimentacoes-${info.project.name}.png`,
+    path: info.outputPath(`relatorio-movimentacoes-${info.project.name}.png`),
   });
 });
 
@@ -264,6 +269,8 @@ test("consulta dia, semana completa entre meses e período personalizado com fin
 test("oculta dados antigos na falha, permite tentar novamente e distingue o período vazio", async ({
   page,
 }) => {
+  // As respostas são interceptadas: este cenário cobre erro HTTP e recuperação online.
+  await page.addInitScript(() => Object.defineProperty(navigator, "onLine", { get: () => true }));
   const turmas = await turmasDoTeste(page);
   let estado: "dados" | "erro" | "vazio" = "dados";
   await page.route(ENDERECO, (rota) => {
@@ -275,12 +282,24 @@ test("oculta dados antigos na falha, permite tentar novamente e distingue o per�
   const painel = await abrir(page);
   await expect(totais(painel)).toHaveText(["2", "1"]);
   estado = "erro";
-  await painel.getByRole("button", { name: "Dia anterior do relatório", exact: true }).click();
+  const [falha] = await Promise.all([
+    page.waitForResponse(
+      (item) =>
+        item.request().method() === "GET" &&
+        new URL(item.url()).pathname === "/api/relatorios/movimentacoes",
+    ),
+    painel.getByRole("button", { name: "Dia anterior do relatório", exact: true }).click(),
+  ]);
+  expect(falha.status()).toBe(503);
   await expect(painel.getByRole("status")).toContainText("E2E Falha temporária do relatório.");
   await expect(totais(painel)).toHaveCount(0);
   await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
   estado = "dados";
-  await page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click();
+  const [resposta] = await Promise.all([
+    page.waitForResponse((item) => item.request().method() === "GET" && item.url() === falha.url()),
+    page.getByRole("button", { name: "Atualizar tela", exact: true }).first().click(),
+  ]);
+  expect(resposta.status()).toBe(200);
   await expect(totais(painel)).toHaveText(["2", "1"]);
   await expect(painel.getByText("E2E Falha temporária do relatório.", { exact: true })).toHaveCount(
     0,
@@ -346,59 +365,92 @@ test("uma resposta atrasada não substitui o dia escolhido depois", async ({ pag
   }
 });
 
-test("ao voltar à aba, aguarda dados novos sem exibir os totais da visita anterior", async ({
-  page,
-}) => {
-  const turmas = await turmasDoTeste(page);
-  let consultas = 0;
-  let repetir = false;
-  let liberar: () => void = () => undefined;
-  const espera = new Promise<void>((resolver) => {
-    liberar = resolver;
-  });
-  await page.route(ENDERECO, async (rota) => {
-    consultas += 1;
-    const dados = resultado(rota.request().url(), turmas);
-    // A primeira visita pode consultar duas vezes no modo estrito do desenvolvimento.
-    // Só a volta à aba espera e troca os totais.
-    if (repetir) {
-      await espera;
-      dados.turmas = dados.turmas.filter((grupo) => grupo.turmaRotulo === "E2E Ano B");
-      dados.totais = { saidas: 1, entradas: 0, total: 1 };
+for (const { ambiente, viewport, movel } of [
+  { ambiente: "desktop", viewport: { width: 1280, height: 900 }, movel: false },
+  { ambiente: "celular", viewport: { width: 390, height: 844 }, movel: true },
+]) {
+  test(`ao voltar à aba, aguarda dados novos sem exibir os totais da visita anterior (${ambiente})`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    const turmas = await turmasDoTeste(page);
+    let consultas = 0;
+    let repetir = false;
+    let liberar: () => void = () => undefined;
+    const espera = new Promise<void>((resolver) => {
+      liberar = resolver;
+    });
+    await page.route(ENDERECO, async (rota) => {
+      consultas += 1;
+      const dados = resultado(rota.request().url(), turmas);
+      // A primeira visita pode consultar duas vezes no modo estrito do desenvolvimento.
+      // Só a volta à aba espera e troca os totais.
+      if (repetir) {
+        await espera;
+        dados.turmas = dados.turmas.filter((grupo) => grupo.turmaRotulo === "E2E Ano B");
+        dados.totais = { saidas: 1, entradas: 0, total: 1 };
+      }
+      await rota.fulfill({ json: dados });
+    });
+    try {
+      const painel = await abrir(page);
+      await expect(totais(painel)).toHaveText(["2", "1"]);
+      await expect(painel).toHaveAttribute("aria-busy", "false");
+      const iniciais = consultas;
+      expect(iniciais).toBeGreaterThan(0);
+      repetir = true;
+      await selecionarRelatorio(page, "Histórico");
+      await expect(painel).toBeHidden();
+      await page.evaluate(
+        () =>
+          new Promise<void>((resolver) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolver())),
+          ),
+      );
+      expect(consultas).toBe(iniciais);
+      // A resposta fica retida até depois das asserções de carregamento.
+      const nav = await exporRelatorios(page);
+      const gaveta = page.getByRole("dialog", {
+        name: "Menu do aplicativo",
+        exact: true,
+        includeHidden: true,
+      });
+      if (movel) await expect(gaveta).toBeVisible();
+      await nav.getByRole("button", { name: "Saídas e Entradas", exact: true }).click();
+      if (movel) await expect(gaveta).not.toBeAttached();
+      await expect.poll(() => consultas).toBe(iniciais + 1);
+      const conteudo = page.locator('main#conteudo[data-visao="relatorios"]');
+      const pager = conteudo.locator('[data-pager="principal"]');
+      const alvo = pager.locator('section[aria-label="Relatório de saídas e entradas"]');
+      await expect(pager).toHaveAttribute("aria-busy", "true");
+      await expect(pager).toHaveAttribute("inert", "");
+      await conferirEsqueletoDaVisao(conteudo);
+      if (!movel) {
+        const barra = page.getByRole("complementary", {
+          name: "Navegação do aplicativo",
+          exact: true,
+        });
+        await expect(barra).toBeVisible();
+        await barra.getByRole("button", { name: "Histórico", exact: true }).click({ trial: true });
+      }
+      await expect(alvo).toHaveAttribute("aria-busy", "true");
+      await expect(totais(alvo)).toHaveCount(0);
+      await expect(alvo.locator('section[aria-label^="Turma "]')).toHaveCount(0);
+      liberar();
+      await expect(painel).toBeVisible();
+      await expect(totais(painel)).toHaveText(["1", "0"]);
+      await expect(painel).toHaveAttribute("aria-busy", "false");
+      await expect(
+        painel.getByRole("region", { name: "Turma E2E Ano B", exact: true }),
+      ).toBeVisible();
+      await expect(
+        painel.getByRole("region", { name: "Turma E2E Ano A", exact: true }),
+      ).toHaveCount(0);
+    } finally {
+      liberar();
     }
-    await rota.fulfill({ json: dados });
   });
-  try {
-    const painel = await abrir(page);
-    await expect(totais(painel)).toHaveText(["2", "1"]);
-    await expect(painel).toHaveAttribute("aria-busy", "false");
-    const iniciais = consultas;
-    expect(iniciais).toBeGreaterThan(0);
-    repetir = true;
-    await selecionarRelatorio(page, "Histórico");
-    await expect(painel).toBeHidden();
-    await page.evaluate(
-      () =>
-        new Promise<void>((resolver) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolver())),
-        ),
-    );
-    expect(consultas).toBe(iniciais);
-    await selecionarRelatorio(page, "Saídas e Entradas");
-    await expect.poll(() => consultas).toBe(iniciais + 1);
-    await expect(painel).toHaveAttribute("aria-busy", "true");
-    await expect(totais(painel)).toHaveCount(0);
-    await expect(painel.getByRole("region", { name: /^Turma / })).toHaveCount(0);
-    liberar();
-    await expect(totais(painel)).toHaveText(["1", "0"]);
-    await expect(painel).toHaveAttribute("aria-busy", "false");
-    await expect(
-      painel.getByRole("region", { name: "Turma E2E Ano B", exact: true }),
-    ).toBeVisible();
-  } finally {
-    liberar();
-  }
-});
+}
 
 test("agrupa por aluno, escolhe o aluno na relação da turma e filtra duas ou mais", async ({
   page,

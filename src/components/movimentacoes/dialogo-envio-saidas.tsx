@@ -15,14 +15,14 @@ import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
-import { avisarSucesso } from "@/lib/avisos";
-import { publicarAviso } from "@/components/ui/mui/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { Alerta } from "@/components/ui/mui/alerta";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
 import { Dialogo } from "@/components/ui/mui/dialogo";
 import { Selo } from "@/components/ui/mui/selo";
 import { diasDoMes, rotuloMes } from "@/domain/frequencia";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 
 interface ResumoEnvioSaidas {
@@ -99,7 +99,7 @@ function IndicadorLeitura() {
       sx={{ alignItems: "center", color: "text.secondary" }}
     >
       <CircularProgress size={16} aria-hidden="true" />
-      <Typography variant="body2">Lendo a planilha e montando a prévia...</Typography>
+      <TextoDeCarregamento>Lendo a planilha e montando a prévia...</TextoDeCarregamento>
     </Stack>
   );
 }
@@ -112,6 +112,7 @@ export default function DialogoEnvioSaidas({
   modoCompleto,
   aoConcluir,
 }: Props) {
+  const { avisarSucesso, publicarAviso } = useAvisosDaSessao();
   const online = useOnline();
   const [simulacao, setSimulacao] = useState<SimulacaoSaidas | null>(null);
   const [previaEntradas, setPreviaEntradas] = useState<PreviaEntradas | null>(null);

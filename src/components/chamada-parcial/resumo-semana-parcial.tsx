@@ -264,7 +264,7 @@ export function VistaResumoParcial({
       />
       <CorpoResumo>
         <Typography component="p" role="status" aria-live="polite" sx={VISUALMENTE_OCULTO}>
-          {carga.anuncio}
+          {!carga.dados && !carga.erro ? "Carregando resumo da semana..." : carga.anuncio}
         </Typography>
         {carga.erro && carga.dados ? (
           <AlertaCompacto
@@ -276,14 +276,6 @@ export function VistaResumoParcial({
         ) : null}
         {!carga.dados && !carga.erro ? (
           <Stack spacing={1} sx={{ py: 4 }}>
-            <Typography
-              component="p"
-              role="status"
-              variant="body2"
-              sx={{ color: "text.secondary", textAlign: "center" }}
-            >
-              Carregando resumo da semana...
-            </Typography>
             <Skeleton variant="rounded" height={96} />
             <Skeleton variant="rounded" height={160} />
           </Stack>

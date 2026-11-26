@@ -2,6 +2,7 @@
 
 - Status: aceita
 - Data: 2026-11-09
+- O [ADR-083](083-confirmacao-historica-da-chamada.md) acrescenta a consulta prévia e substitui a obrigatoriedade do motivo. As demais decisões permanecem vigentes.
 
 ## Contexto
 

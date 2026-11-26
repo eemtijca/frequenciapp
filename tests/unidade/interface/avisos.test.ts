@@ -4,10 +4,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { publicar } = vi.hoisted(() => ({ publicar: vi.fn() }));
 vi.mock("@/components/ui/mui/avisos", () => ({
-  publicarAviso: publicar,
+  publicarAvisoPublico: publicar,
 }));
 
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { avisosPublicos } from "@/lib/avisos";
+
+const { avisarErro, avisarInfo, avisarSucesso } = avisosPublicos;
 import { ErroApi } from "@/lib/api-cliente";
 
 describe("avisarErro", () => {

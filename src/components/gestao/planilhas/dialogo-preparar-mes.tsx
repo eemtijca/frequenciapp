@@ -10,7 +10,7 @@ import Typography from "@mui/material/Typography";
 import { rotuloMes } from "@/domain/frequencia";
 import { nomeAbaMensal } from "@/domain/planilha-mensal";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarInfo, avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
+import { mensagemAmigavel, useAvisosDaSessao } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
@@ -67,6 +67,7 @@ export function DialogoPrepararMes({
   disabled?: boolean;
   onAtualizar: () => Promise<void>;
 }) {
+  const { avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const [resultados, setResultados] = useState<ResultadoTurma[] | null>(null);
   const [turmaAtual, setTurmaAtual] = useState("");

@@ -36,6 +36,7 @@ import { Cartao } from "@/components/ui/mui/cartao";
 import { Selo } from "@/components/ui/mui/selo";
 import { SeletorPeriodo } from "@/components/ui/seletor-periodo";
 import { GraficoAlunos, GraficoSemanas } from "@/components/graficos/graficos-sob-demanda";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { numeraisTabulares } from "@/theme/tipografia";
 
 interface Props {
@@ -385,9 +386,7 @@ export default function VistaMinhasTurmas({ contexto, atualizacao = 0, onAtualiz
           sx={{ alignItems: "center", justifyContent: "center", minHeight: 160 }}
         >
           <CircularProgress size={18} aria-hidden="true" />
-          <Typography variant="body2" sx={{ color: "text.secondary" }}>
-            Carregando estatísticas
-          </Typography>
+          <TextoDeCarregamento>Carregando estatísticas</TextoDeCarregamento>
         </Stack>
       ) : dados && dados.turmaId === turmaId && !periodo ? (
         <EstadoVazio

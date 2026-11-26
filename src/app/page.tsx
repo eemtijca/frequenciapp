@@ -1,6 +1,6 @@
 // Página autenticada: carrega o escopo e encaminha o retorno da conexão Google.
 import { headers } from "next/headers";
-import { identidadeAtual } from "@/application/sessao";
+import { sessaoParaInterface } from "@/application/sessao";
 import { listarTodosAlunos } from "@/application/alunos";
 import { listarTodasTurmas } from "@/application/turmas";
 import { listarSeries } from "@/application/series";
@@ -13,6 +13,7 @@ import { ambiente } from "@/infra/ambiente";
 import { urlDoIndiceDeAgentes } from "@/infra/documentacao";
 import { diaLocal, diasDoMes } from "@/domain/frequencia";
 import { temCapacidade } from "@/domain/usuarios";
+import { DestinoSessao } from "@/components/entrada/transicao-sessao";
 import TelaLogin from "@/components/entrada/tela-login";
 import Aplicacao from "@/components/aplicacao";
 import AplicacaoDiretor from "@/components/diretor/aplicacao-diretor";
@@ -30,22 +31,30 @@ export default async function Pagina({
     aba?: string;
   }>;
 }) {
-  const usuario = await identidadeAtual(ambiente.authSecret);
+  const sessao = await sessaoParaInterface(ambiente.authSecret);
   const urlIndiceAgentes = urlDoIndiceDeAgentes(await headers());
-  if (!usuario) return <TelaLogin urlIndiceAgentes={urlIndiceAgentes} />;
+  const entrada = (
+    <DestinoSessao>
+      <TelaLogin urlIndiceAgentes={urlIndiceAgentes} />
+    </DestinoSessao>
+  );
+  if (!sessao) return entrada;
+  const { usuario, referenciaSessao } = sessao;
   // Recusa por padrão: o aplicativo completo só abre para quem opera a
   // escola; o diretor de turma tem a própria tela, só de leitura.
   if (!temCapacidade(usuario.papel, "operar")) {
     if (temCapacidade(usuario.papel, "verEstatisticasDasTurmas")) {
       return (
-        <AplicacaoDiretor
-          usuario={usuario}
-          contexto={await contextoDoDiretor(usuario.id)}
-          fuso={ambiente.fuso}
-        />
+        <DestinoSessao usuarioId={usuario.id} referenciaSessao={referenciaSessao}>
+          <AplicacaoDiretor
+            usuario={usuario}
+            contexto={await contextoDoDiretor(usuario.id)}
+            fuso={ambiente.fuso}
+          />
+        </DestinoSessao>
       );
     }
-    return <TelaLogin urlIndiceAgentes={urlIndiceAgentes} />;
+    return entrada;
   }
   const parametros = await searchParams;
   const dia = diaLocal(new Date(), ambiente.fuso);
@@ -74,30 +83,32 @@ export default async function Pagina({
   ]);
   const carregadoEm = new Date().toISOString();
   return (
-    <Aplicacao
-      usuario={usuario}
-      carregadoEm={carregadoEm}
-      diaCorrente={dia}
-      fuso={ambiente.fuso}
-      visaoInicial={parametros.visao}
-      abaMovimentacaoInicial={parametros.aba === "entradas" ? "entradas" : "saidas"}
-      abaGestaoInicial={parametros.google ? "configuracoes" : undefined}
-      planilhaInicial={
-        parametros.google
-          ? parametros.googleFinalidade === "SAIDAS" || parametros.googleFinalidade === "PARCIAL"
-            ? parametros.googleFinalidade
-            : "FREQUENCIA"
-          : undefined
-      }
-      seriesIniciais={series}
-      turmasIniciais={turmas}
-      alunosIniciais={alunos}
-      frequenciasIniciais={frequencias}
-      saidasIniciais={saidas}
-      justificativasIniciais={justificativas}
-      liberadoresIniciais={liberadores}
-      configuracoesIniciais={configuracoes}
-      resumoInicial={resumo}
-    />
+    <DestinoSessao usuarioId={usuario.id} referenciaSessao={referenciaSessao}>
+      <Aplicacao
+        usuario={usuario}
+        carregadoEm={carregadoEm}
+        diaCorrente={dia}
+        fuso={ambiente.fuso}
+        visaoInicial={parametros.visao}
+        abaMovimentacaoInicial={parametros.aba === "entradas" ? "entradas" : "saidas"}
+        abaGestaoInicial={parametros.google ? "configuracoes" : undefined}
+        planilhaInicial={
+          parametros.google
+            ? parametros.googleFinalidade === "SAIDAS" || parametros.googleFinalidade === "PARCIAL"
+              ? parametros.googleFinalidade
+              : "FREQUENCIA"
+            : undefined
+        }
+        seriesIniciais={series}
+        turmasIniciais={turmas}
+        alunosIniciais={alunos}
+        frequenciasIniciais={frequencias}
+        saidasIniciais={saidas}
+        justificativasIniciais={justificativas}
+        liberadoresIniciais={liberadores}
+        configuracoesIniciais={configuracoes}
+        resumoInicial={resumo}
+      />
+    </DestinoSessao>
   );
 }

@@ -10,6 +10,7 @@ import {
   listarFrequenciasDoMes,
   listarFrequenciasDoPeriodo,
   mesValidoOuParametro,
+  requerConfirmacaoHistorica,
   salvarFrequencia,
 } from "@/application/frequencias";
 import { LIMITE_DIAS_PERIODO } from "@/domain/frequencia";
@@ -36,6 +37,18 @@ export async function GET(requisicao: Request): Promise<Response> {
     const registradoPor = parametros.get("registradoPor")?.trim() ?? "";
     if (turmaId && !ehUuid(turmaId)) return erroApi("Turma inválida.", 400);
     if (registradoPor && !ehUuid(registradoPor)) return erroApi("Autoria inválida.", 400);
+
+    if (parametros.get("verificarHistorico") === "true") {
+      const dia = diaValidoOuParametro(parametros.get("dia"));
+      if (
+        !dia ||
+        !turmaId ||
+        ["mes", "de", "ate", "registradoPor"].some((p) => parametros.has(p))
+      ) {
+        return erroApi("Informe apenas a turma e o dia para verificar a chamada histórica.", 400);
+      }
+      return json({ requerConfirmacaoHistorica: await requerConfirmacaoHistorica(turmaId, dia) });
+    }
 
     const mes = mesValidoOuParametro(parametros.get("mes"));
     if (mes) {

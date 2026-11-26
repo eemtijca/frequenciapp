@@ -35,7 +35,7 @@ import {
   type ProvaBimestral,
 } from "@/domain/provas-bimestrais";
 import { corpoAlteracao, corpoJson, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { deDiaCivil, paraDiaCivil } from "@/lib/data-civil";
 import {
   avisarProvasBimestraisMudaram,
@@ -43,6 +43,7 @@ import {
 } from "@/lib/eventos-provas-bimestrais";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { Botao } from "@/components/ui/mui/botao";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { Campo, useCampo } from "@/components/ui/mui/campo";
 import { CampoTexto } from "@/components/ui/mui/text-field";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
@@ -180,10 +181,12 @@ function SeletorDataProva({ id, valor, min, max, disabled, onValor }: SeletorDat
 }
 
 export default function SecaoProvasBimestrais({ turmas, diaCorrente, rascunhoPendente }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const base = useId();
   const [provas, setProvas] = useState<ProvaBimestral[]>([]);
   const [carregado, setCarregado] = useState(false);
   const [erroLeitura, setErroLeitura] = useState("");
+  useLeituraDaVisao(!carregado && !erroLeitura);
   const [versao, setVersao] = useState(0);
   // No domingo, a data sugerida já é a segunda-feira.
   const [dia, setDia] = useState(() =>

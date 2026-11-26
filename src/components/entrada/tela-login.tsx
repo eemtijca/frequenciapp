@@ -1,8 +1,7 @@
 "use client";
 
 // Entrada no layout sign-in-side: marca e destaques no desktop, formulário único no celular.
-import { useEffect, useState, type FormEvent } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
 import WifiOffRoundedIcon from "@mui/icons-material/WifiOffRounded";
@@ -25,7 +24,8 @@ import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-es
 import { CampoTexto } from "@/components/ui/mui/text-field";
 import DialogoSobre from "@/components/dialogo-sobre";
 import { pedir, corpoJson, ErroApi } from "@/lib/api-cliente";
-import { avisarSucesso } from "@/lib/avisos";
+import { useAcaoUnica } from "@/lib/use-acao-unica";
+import { useAvisoDeExpiracao, useTransicaoDeEntrada } from "./transicao-sessao";
 import { ROTA_PRIVACIDADE } from "@/lib/rotas-publicas";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
@@ -68,14 +68,17 @@ interface Props {
 }
 
 export default function TelaLogin({ urlIndiceAgentes }: Props) {
-  const router = useRouter();
+  const { prepararEntrada, autenticando } = useTransicaoDeEntrada();
+  const formulario = useRef<HTMLFormElement>(null);
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [lembrar, setLembrar] = useState(true);
-  const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
   const [erroVariante, setErroVariante] = useState<VarianteEstado | null>(null);
-  const [avisoEntrada, setAvisoEntrada] = useState<VarianteEstado | null>(null);
+  const expirou = useAvisoDeExpiracao();
+  const [avisoEntrada, setAvisoEntrada] = useState<VarianteEstado | null>(
+    expirou ? "sessao_expirada" : null,
+  );
   const [sobreAberto, setSobreAberto] = useState(false);
 
   // Preenche o e-mail lembrado neste dispositivo, se houver. O armazenamento
@@ -106,35 +109,47 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
     }
   }, []);
 
-  async function submeter(evento: FormEvent<HTMLFormElement>) {
-    evento.preventDefault();
-    if (enviando) return;
-    setEnviando(true);
+  const { executando: enviando, executar: entrar } = useAcaoUnica(async () => {
+    const finalizarEntrada = prepararEntrada?.();
+    if (prepararEntrada && !finalizarEntrada) return;
     setErro("");
     setErroVariante(null);
     try {
-      await pedir<{ usuario: { nome: string } }>(
+      const { usuario } = await pedir<{ usuario?: { id?: unknown } }>(
         "/api/auth/entrar",
         corpoJson({ login: email, senha, lembrar }),
       );
+      if (typeof usuario?.id !== "string" || !usuario.id)
+        throw new Error("Identidade não confirmada.");
       try {
         if (lembrar) window.localStorage.setItem(CHAVE_EMAIL, email.trim().toLowerCase());
         else window.localStorage.removeItem(CHAVE_EMAIL);
       } catch {
         // Sem armazenamento local: o login continua.
       }
-      avisarSucesso("Entrada confirmada.");
-      router.refresh();
+      finalizarEntrada?.(usuario.id);
     } catch (excecao) {
+      finalizarEntrada?.();
       const mensagem =
         excecao instanceof ErroApi ? excecao.message : "Não foi possível entrar. Tente novamente.";
       setErro(mensagem);
       const status = excecao instanceof ErroApi ? excecao.status : 0;
       setErroVariante(status === 403 ? "conta_desativada" : status === 429 ? "limite" : null);
-    } finally {
-      setEnviando(false);
     }
+  });
+
+  useLayoutEffect(() => {
+    if (!erro || enviando) return;
+    const campo = formulario.current?.elements.namedItem("password");
+    if (campo instanceof HTMLInputElement) campo.focus();
+  }, [erro, enviando]);
+
+  function submeter(evento: FormEvent<HTMLFormElement>) {
+    evento.preventDefault();
+    void entrar();
   }
+
+  if (autenticando) return null;
 
   return (
     <Box
@@ -274,8 +289,8 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
 
             <Box
               component="form"
+              ref={formulario}
               onSubmit={submeter}
-              noValidate
               sx={{ display: "flex", flexDirection: "column", gap: 2.5 }}
             >
               <Campo id="email" rotulo="E-mail ou identificador">
@@ -344,7 +359,7 @@ export default function TelaLogin({ urlIndiceAgentes }: Props) {
                 fullWidth
                 sx={{ mt: 0.5, height: TOKENS_LAYOUT.alvoToque }}
               >
-                {enviando ? "Entrando..." : "Entrar"}
+                Entrar
               </Botao>
             </Box>
 

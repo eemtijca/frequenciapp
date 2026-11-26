@@ -13,7 +13,7 @@ import Link from "@mui/material/Link";
 import Stack from "@mui/material/Stack";
 import Typography from "@mui/material/Typography";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { Botao } from "@/components/ui/mui/botao";
 
@@ -105,6 +105,7 @@ export function SeletorPlanilhaGoogle({
   mes?: string;
   onAtualizar: () => Promise<void> | void;
 }) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const [ocupado, setOcupado] = useState(false);
   const emAndamento = useRef(false);
 
@@ -133,7 +134,7 @@ export function SeletorPlanilhaGoogle({
       avisarErro(new Error("Falha na conexão Google."), {
         contexto: "Não foi possível conectar a conta Google.",
       });
-  }, [finalidade]);
+  }, [avisarErro, avisarInfo, avisarSucesso, finalidade]);
 
   async function conectar(reconectar = false) {
     if (emAndamento.current) return;

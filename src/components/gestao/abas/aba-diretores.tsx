@@ -22,6 +22,7 @@ import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
+import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
 import { Campo } from "@/components/ui/mui/campo";
@@ -38,12 +39,12 @@ import {
   type DiretorDTO,
   type EstadoCredencial,
 } from "@/domain/diretores";
-import { publicarAviso } from "@/components/ui/mui/avisos";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica, useAcoesPorChave } from "@/lib/use-acao-unica";
 import { pedir, corpoJson, corpoAlteracao, ErroApi } from "@/lib/api-cliente";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TabelaCadastrosAdministrativos } from "./tabela-cadastros-administrativos";
 
 interface Props {
@@ -79,7 +80,9 @@ function dataCurta(iso: string | null): string {
 }
 
 export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: Props) {
+  const { avisarErro, avisarSucesso, publicarAviso } = useAvisosDaSessao();
   const [diretores, setDiretores] = useState<DiretorDTO[] | null>(null);
+  useLeituraDaVisao(diretores === null);
   const [dialogoAberto, setDialogoAberto] = useState(false);
   const [emEdicao, setEmEdicao] = useState<DiretorDTO | null>(null);
   const [formulario, setFormulario] = useState<Formulario>(VAZIO);
@@ -287,7 +290,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
       >
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {diretores === null
-            ? "Carregando..."
+            ? null
             : `${diretores.filter((diretor) => diretor.ativo).length} ${
                 diretores.filter((diretor) => diretor.ativo).length === 1
                   ? "diretor ativo"
@@ -311,7 +314,7 @@ export default function AbaDiretores({ turmas, diaCorrente, atualizacao = 0 }: P
           }}
         >
           <CircularProgress size={20} aria-hidden="true" />
-          <Typography variant="body2">Carregando diretores...</Typography>
+          <TextoDeCarregamento>Carregando diretores...</TextoDeCarregamento>
         </Stack>
       ) : (diretores ?? []).length === 0 ? (
         <EstadoVazio

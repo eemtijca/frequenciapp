@@ -94,6 +94,12 @@ async function alterarControle(controle: Locator, marcado: boolean): Promise<voi
 async function alterar(page: Page, controle: Locator, marcado: boolean): Promise<void> {
   await alterarControle(controle, marcado);
   await salvarConfiguracoes(page);
+  const confirmacao = page.getByRole("status").filter({
+    has: page.getByText("Configurações salvas.", { exact: true }),
+  });
+  await expect(confirmacao).toBeVisible();
+  await confirmacao.getByRole("button", { name: "Fechar aviso", exact: true }).click();
+  await expect(confirmacao).toBeHidden();
 }
 
 async function conferir(
@@ -102,9 +108,6 @@ async function conferir(
   turma: "A" | "B",
   exibe: boolean,
 ): Promise<void> {
-  // O aviso é temporário e cobre os controles superiores no celular.
-  // Aguarda antes de mover o ponteiro para lá, para não pausar o aviso por hover.
-  await expect(page.getByText("Indicação de origem atualizada.", { exact: true })).toHaveCount(0);
   await trocarVisao(page, "Chamada", "chamada");
   const chamada = page.locator('section[aria-label="Fazer chamada"]');
   await escolherTurmaNaChamada(chamada, new RegExp(`^${series[indice]} ${turma}$`));
@@ -118,20 +121,26 @@ async function conferir(
 test("desligada ou ligada sem seleção não mostra origem nem asterisco", async ({ page }) => {
   await page.goto("/");
   await aguardarHidratacao(page);
-  await conferir(page, 0, "A", false);
-  await conferir(page, 2, "A", false);
-  const painel = await abrirConfiguracoes(page);
-  await alterar(page, painel.getByRole("switch"), true);
-  await expect(
-    painel.getByText("Nenhuma série ou turma selecionada.", { exact: false }),
-  ).toBeVisible();
-  await conferir(page, 0, "A", false);
-  await conferir(page, 2, "A", false);
-  await page.reload();
-  await aguardarHidratacao(page);
-  const recarregado = await abrirConfiguracoes(page);
-  await expect(recarregado.getByRole("switch")).toBeChecked();
-  await expect(recarregado.getByRole("checkbox", { checked: true })).toHaveCount(0);
+  await test.step("Não mostra origem com o recurso desligado", async () => {
+    await conferir(page, 0, "A", false);
+    await conferir(page, 2, "A", false);
+  });
+  await test.step("Ativa sem selecionar séries ou turmas", async () => {
+    const painel = await abrirConfiguracoes(page);
+    await alterar(page, painel.getByRole("switch"), true);
+    await expect(
+      painel.getByText("Nenhuma série ou turma selecionada.", { exact: false }),
+    ).toBeVisible();
+    await conferir(page, 0, "A", false);
+    await conferir(page, 2, "A", false);
+  });
+  await test.step("Relê a configuração após recarregar", async () => {
+    await page.reload();
+    await aguardarHidratacao(page);
+    const recarregado = await abrirConfiguracoes(page);
+    await expect(recarregado.getByRole("switch")).toBeChecked();
+    await expect(recarregado.getByRole("checkbox", { checked: true })).toHaveCount(0);
+  });
 });
 
 test("seleciona uma série e mantém a escolha ao recarregar", async ({ page }, testInfo) => {
@@ -149,7 +158,6 @@ test("seleciona uma série e mantém a escolha ao recarregar", async ({ page }, 
     painel.getByRole("checkbox", { name: `Mostrar origem na série ${series[0]}`, exact: true }),
     true,
   );
-  await expect(page.getByText("Indicação de origem atualizada.", { exact: true })).toHaveCount(0);
   await testInfo.attach("origem-configurada", {
     body: await painel.screenshot(),
     contentType: "image/png",

@@ -14,7 +14,7 @@ import type { Turma } from "@/domain/frequencia";
 import type { planejarParciais } from "@/domain/planilha-parcial";
 import { CABECALHO_PARCIAL } from "@/domain/planilha-parcial";
 import { pedir, corpoJson } from "@/lib/api-cliente";
-import { avisarSucesso, mensagemAmigavel } from "@/lib/avisos";
+import { mensagemAmigavel, useAvisosDaSessao } from "@/lib/avisos";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
@@ -76,6 +76,7 @@ export function DialogoEnviarParciais({
   planilhaNome,
   onFechar,
 }: Props) {
+  const { avisarSucesso } = useAvisosDaSessao();
   const [de, setDe] = useState(`${diaInicial.slice(0, 7)}-01`);
   const [ate, setAte] = useState(diaInicial);
   const [turmaId, setTurmaId] = useState(turmaInicial);

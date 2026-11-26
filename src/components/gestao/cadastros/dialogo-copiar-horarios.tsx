@@ -16,7 +16,7 @@ import { Selecionar } from "@/components/ui/mui/selecionar";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro, avisarInfo, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 
@@ -29,6 +29,7 @@ interface Props {
 }
 
 export function DialogoCopiarHorarios({ destino, turmas, disabled, onOcupado, onMudanca }: Props) {
+  const { avisarErro, avisarInfo, avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const [origemId, setOrigemId] = useState("");
   const [confirmando, setConfirmando] = useState(false);

@@ -1,6 +1,7 @@
 // Monta cada painel na primeira visita e o preserva fora da árvore acessível ao sair.
 import { useState, type ReactNode } from "react";
 import Box from "@mui/material/Box";
+import { LimiteLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 
 interface Painel<T extends string> {
   valor: T;
@@ -27,7 +28,7 @@ export function PaineisVisitados<T extends string>({
         inert={oculto}
         sx={{ minWidth: 0, "&[hidden]": { display: "none" } }}
       >
-        {conteudo}
+        <LimiteLeituraDaVisao ativo={!oculto}>{conteudo}</LimiteLeituraDaVisao>
       </Box>
     );
   });

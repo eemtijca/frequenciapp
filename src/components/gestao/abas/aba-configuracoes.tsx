@@ -13,14 +13,13 @@ import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import Box from "@mui/material/Box";
 import Checkbox from "@mui/material/Checkbox";
-import CircularProgress from "@mui/material/CircularProgress";
 import Divider from "@mui/material/Divider";
 import FormControlLabel from "@mui/material/FormControlLabel";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Switch from "@mui/material/Switch";
 import Typography from "@mui/material/Typography";
-import { avisarErro, avisarSucesso } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { avisarBeneficiosMudaram } from "@/lib/eventos-beneficios";
 import { avisarOrdemAlmocoMudou } from "@/lib/eventos-ordem-almoco";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
@@ -40,6 +39,7 @@ import type {
 import { DIAS_ORDEM_ALMOCO } from "@/domain/ordem-almoco";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
 import { PaineisVisitados } from "@/components/gestao/paineis-visitados";
+import { EsperaDaVisao } from "@/components/layout/quadro-das-visoes";
 import { Acordeao } from "@/components/ui/mui/acordeao";
 import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { Campo } from "@/components/ui/mui/campo";
@@ -152,6 +152,7 @@ function ConteudoConfiguracoes({
   onAbrirParcial,
   onPendenciaConfiguracoes,
 }: Props) {
+  const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const {
     base: baseCarregada,
     rascunho: rascunhoCarregado,
@@ -278,6 +279,7 @@ function ConteudoConfiguracoes({
   }, [onPendenciaConfiguracoes]);
 
   if (!rascunhoCarregado || !baseCarregada) {
+    if (carregando) return <EsperaDaVisao rotulo="Carregando configurações..." />;
     return (
       <Box
         sx={{
@@ -294,23 +296,12 @@ function ConteudoConfiguracoes({
           borderRadius: 2,
         }}
       >
-        {carregando ? (
-          <>
-            <CircularProgress size={24} aria-label="Carregando configurações" />
-            <Typography variant="body2" sx={{ color: "text.secondary" }}>
-              Carregando configurações...
-            </Typography>
-          </>
-        ) : (
-          <>
-            <Typography variant="body2">
-              {erro || "Não foi possível carregar as configurações."}
-            </Typography>
-            <Botao type="button" variante="contorno" onClick={() => void recarregar()}>
-              Tentar novamente
-            </Botao>
-          </>
-        )}
+        <Typography role="alert" variant="body2">
+          {erro || "Não foi possível carregar as configurações."}
+        </Typography>
+        <Botao type="button" variante="contorno" onClick={() => void recarregar()}>
+          Tentar novamente
+        </Botao>
       </Box>
     );
   }

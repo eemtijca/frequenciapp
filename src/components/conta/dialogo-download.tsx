@@ -15,7 +15,7 @@ import { erroSenhaZip, MAXIMO_SENHA_ZIP } from "@/domain/downloads";
 import { baixarArquivo, protegerArquivo, type ArquivoDownload } from "@/lib/downloads";
 import { useAcaoUnica } from "@/lib/use-acao-unica";
 import { corpoJson, ErroApi, pedir } from "@/lib/api-cliente";
-import { avisarErro } from "@/lib/avisos";
+import { useAvisosDaSessao } from "@/lib/avisos";
 import { Botao } from "@/components/ui/mui/botao";
 import { Campo } from "@/components/ui/mui/campo";
 import { CampoSenha } from "@/components/ui/mui/campo-senha";
@@ -38,6 +38,7 @@ function ConteudoDownload({
   onConcluido,
   confirmarAdmin,
 }: Omit<Props, "aberto">) {
+  const { avisarErro } = useAvisosDaSessao();
   const id = useId();
   const idFormulario = `${id}-formulario`;
   const [formato, setFormato] = useState<Formato>("protegido");

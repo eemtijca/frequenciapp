@@ -72,7 +72,7 @@ for (const largura of [390, 800]) {
     const alunos = chamada.getByRole("list", { name: "Alunos da chamada", exact: true });
     const semAlunos = chamada.getByText("Nenhum aluno ativo nesta turma", { exact: true });
     await expect(vazia.or(alunos).or(semAlunos)).toBeVisible();
-    await expect(chamada.getByText("Carregando chamada...", { exact: true })).toBeHidden();
+    await expect(chamada.getByText("Carregando chamada...", { exact: true })).toHaveCount(0);
     await expect(
       chamada.getByRole("button", { name: "Tentar novamente", exact: true }),
     ).toBeHidden();
