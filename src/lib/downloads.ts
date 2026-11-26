@@ -8,7 +8,9 @@ export interface ArquivoDownload {
   /** Nome genérico: o diretório de um ZIP não é criptografado. */
   nomeNoZip: string;
   nomeZip: string;
-  registro?: "grade" | "relacao";
+  registro?: "grade" | "relacao" | "relatorio";
+  /** Hash do retrato usado no PDF, enviado só para a auditoria. */
+  retrato?: string;
 }
 
 export async function protegerArquivo(arquivo: ArquivoDownload, senha: string): Promise<Blob> {

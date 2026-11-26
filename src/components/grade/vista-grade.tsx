@@ -1,14 +1,18 @@
 "use client";
 
-// Grade de frequência por turma de origem, com P, F, FJ e S, coluna fixa e exportação.
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+// Grade de frequência por turma de origem, com P, F, FJ e S, coluna fixa,
+// totais do período, detalhe expansível e relatório em PDF.
+import { Fragment, useDeferredValue, useEffect, useMemo, useState } from "react";
 import ChevronLeftRoundedIcon from "@mui/icons-material/ChevronLeftRounded";
 import ChevronRightRoundedIcon from "@mui/icons-material/ChevronRightRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import TableViewRoundedIcon from "@mui/icons-material/TableViewRounded";
 import Box from "@mui/material/Box";
+import ButtonBase from "@mui/material/ButtonBase";
 import CircularProgress from "@mui/material/CircularProgress";
 import Fade from "@mui/material/Fade";
 import Stack from "@mui/material/Stack";
@@ -20,16 +24,34 @@ import TableHead from "@mui/material/TableHead";
 import TableRow from "@mui/material/TableRow";
 import Typography from "@mui/material/Typography";
 import { useAnimacoesDaInterface } from "@/theme/animacoes-da-interface";
-import type { Aluno, Frequencia, ModoPeriodo, ResumoAcumulado, Turma } from "@/domain/frequencia";
+import type {
+  Aluno,
+  DetalheDiaAluno,
+  Frequencia,
+  Justificativa,
+  ModoPeriodo,
+  ResumoAcumulado,
+  Turma,
+} from "@/domain/frequencia";
 import {
+  JUSTIFICATIVAS_PADRAO,
+  classificarDiaDoAluno,
   diasDoMes,
   diasDoPeriodo,
   mesSeguinte,
   montarGrade,
   normalizar,
+  rotuloData,
   rotuloDiaSemana,
   rotuloMes,
 } from "@/domain/frequencia";
+import {
+  type OcorrenciaGrade,
+  type RetratoGrade,
+  montarOcorrenciasDoAluno,
+  nomeArquivoRelatorioPdf,
+} from "@/domain/relatorio-grade";
+import { indexarPorDia } from "@/domain/relatorios";
 import { nomeArquivoCsv, paraCsv, turmaPlanilhaDaGrade } from "@/domain/planilha";
 import DialogoDownload from "@/components/conta/dialogo-download";
 import DialogoEnvio, { useEstadoPlanilha } from "@/components/grade/dialogo-envio";
@@ -57,6 +79,7 @@ interface Props {
   versao: number;
   atualizacao?: number;
   origens: Turma[];
+  justificativas?: readonly Justificativa[];
   onMes: (mes: string) => void;
 }
 
@@ -86,6 +109,7 @@ export default function VistaGrade({
   versao,
   atualizacao = 0,
   origens,
+  justificativas = JUSTIFICATIVAS_PADRAO,
   onMes,
 }: Props) {
   const { avisarSucesso } = useAvisosDaSessao();
@@ -166,17 +190,51 @@ export default function VistaGrade({
     return doPeriodo ?? [];
   }, [modo, frequencias, mes, doPeriodo]);
 
+  const horarios = useMemo(() => origens.flatMap((turma) => turma.horarios), [origens]);
+
   const grade = useMemo(() => {
     const alunosDaTurma = alunos.filter(
       (aluno) => aluno.ativo && aluno.turmaOriginalId === turmaEfetiva,
     );
-    return montarGrade(
-      alunosDaTurma,
-      frequenciasDoPeriodo,
-      dias,
-      origens.flatMap((turma) => turma.horarios),
+    return montarGrade(alunosDaTurma, frequenciasDoPeriodo, dias, horarios);
+  }, [alunos, turmaEfetiva, frequenciasDoPeriodo, dias, horarios]);
+
+  const porDia = useMemo(() => indexarPorDia(frequenciasDoPeriodo), [frequenciasDoPeriodo]);
+
+  const detalhesParciais = useMemo(() => {
+    const mapa = new Map<string, DetalheDiaAluno>();
+    for (const linha of grade.linhas) {
+      for (const dia of grade.dias) {
+        if (linha.marcas[dia] !== "S") continue;
+        mapa.set(
+          `${linha.aluno.id}:${dia}`,
+          classificarDiaDoAluno(linha.aluno, dia, porDia.get(dia) ?? [], horarios),
+        );
+      }
+    }
+    return mapa;
+  }, [grade, porDia, horarios]);
+
+  const [detalheAberto, setDetalheAberto] = useState<{
+    chave: string;
+    alunoId: string;
+  } | null>(null);
+  const [relatorioAberto, setRelatorioAberto] = useState(false);
+  const chaveDetalhe = `${turmaEfetiva}:${modo}`;
+  const alunoAberto = detalheAberto?.chave === chaveDetalhe ? detalheAberto.alunoId : null;
+  const ocorrenciasDoAluno = useMemo(() => {
+    if (!alunoAberto) return [];
+    const linha = grade.linhas.find((item) => item.aluno.id === alunoAberto);
+    if (!linha) return [];
+    return montarOcorrenciasDoAluno(
+      linha.aluno,
+      grade.dias,
+      linha.marcas,
+      porDia,
+      horarios,
+      justificativas,
     );
-  }, [alunos, turmaEfetiva, frequenciasDoPeriodo, dias, origens]);
+  }, [alunoAberto, grade, porDia, horarios, justificativas]);
 
   const nomes = useMemo(
     () => new Map(grade.linhas.map((linha) => [linha.aluno.id, normalizar(linha.aluno.nome)])),
@@ -222,6 +280,34 @@ export default function VistaGrade({
     };
   }
 
+  async function prepararRelatorio() {
+    const primeiro = grade.dias[0] ?? hoje;
+    const ultimo = grade.dias[grade.dias.length - 1] ?? hoje;
+    if (primeiro > hoje) {
+      throw new ErroApi("O período ainda não começou. Escolha um período até hoje.", 400);
+    }
+    // O relatório cobre o período exibido, mas nunca dias futuros.
+    const ate = ultimo > hoje ? hoje : ultimo;
+    const parametros = new URLSearchParams({
+      turmaOriginalId: turmaEfetiva,
+      de: primeiro,
+      ate,
+    });
+    const resposta = await pedir<RetratoGrade>(
+      `/api/relatorios/grade/retrato?${parametros.toString()}`,
+    );
+    const { gerarRelatorioGradePdf } = await import("@/lib/relatorio-grade-pdf");
+    const blob = await gerarRelatorioGradePdf(resposta.relatorio, resposta.retrato);
+    return {
+      blob,
+      nome: nomeArquivoRelatorioPdf(resposta.relatorio.turmaOriginal, resposta.relatorio.dias),
+      nomeNoZip: "relatorio.pdf",
+      nomeZip: "frequenciapp-relatorio.zip",
+      registro: "relatorio" as const,
+      retrato: resposta.retrato.hash,
+    };
+  }
+
   return (
     <Box
       component="section"
@@ -255,6 +341,19 @@ export default function VistaGrade({
               </Box>
             </Botao>
           ) : null}
+          <Botao
+            variante="contorno"
+            icone={<PictureAsPdfRoundedIcon />}
+            aria-label="Emitir relatório em PDF da turma de origem"
+            title="Emitir relatório em PDF da turma de origem"
+            onClick={() => setRelatorioAberto(true)}
+            disabled={grade.linhas.length === 0 || carregandoPeriodo}
+            sx={{ minHeight: 48 }}
+          >
+            <Box component="span" sx={{ display: { xs: "none", sm: "inline" } }}>
+              Emitir relatório
+            </Box>
+          </Botao>
           <BotaoIcone
             rotulo="Baixar planilha (CSV)"
             variante="secundario"
@@ -472,6 +571,7 @@ export default function VistaGrade({
                   <TableRow>
                     <TableCell
                       scope="col"
+                      rowSpan={2}
                       sx={{
                         ...colunaAlunoFixa,
                         zIndex: 3,
@@ -487,6 +587,8 @@ export default function VistaGrade({
                       <TableCell
                         key={dia}
                         scope="col"
+                        rowSpan={2}
+                        data-dia={dia}
                         align="center"
                         sx={{
                           width: 32,
@@ -503,9 +605,28 @@ export default function VistaGrade({
                       </TableCell>
                     ))}
                     <TableCell
-                      scope="col"
+                      scope="colgroup"
+                      colSpan={3}
                       align="center"
-                      title="Faltas totais (F + FJ) de todo o histórico"
+                      data-resumo="periodo"
+                      sx={{
+                        borderLeft: 1,
+                        borderColor: "divider",
+                        px: 0.5,
+                        py: 0.75,
+                        fontSize: 11,
+                        fontWeight: 500,
+                        color: "text.secondary",
+                      }}
+                    >
+                      No período
+                    </TableCell>
+                    <TableCell
+                      scope="col"
+                      rowSpan={2}
+                      align="center"
+                      data-resumo="historico"
+                      title="Faltas (F + FJ) de todo o histórico até hoje"
                       sx={{
                         // Reserva só a largura do conteúdo, sem disputar a sobra com Aluno.
                         width: "1px",
@@ -517,154 +638,300 @@ export default function VistaGrade({
                         color: "text.secondary",
                       }}
                     >
-                      Total
+                      Histórico
                     </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    {[
+                      {
+                        chave: "faltas",
+                        rotulo: "F",
+                        titulo: "Dias com falta sem justificativa no período",
+                      },
+                      {
+                        chave: "justificadas",
+                        rotulo: "FJ",
+                        titulo: "Dias com falta justificada no período",
+                      },
+                      {
+                        chave: "parciais",
+                        rotulo: "S",
+                        titulo: "Dias com presença parcial no período",
+                      },
+                    ].map((item) => (
+                      <TableCell
+                        key={item.chave}
+                        scope="col"
+                        align="center"
+                        data-resumo={item.chave}
+                        title={item.titulo}
+                        aria-label={item.titulo}
+                        sx={{
+                          width: 36,
+                          borderLeft: 1,
+                          borderColor: "divider",
+                          px: 0.5,
+                          py: 0.5,
+                          fontSize: 10,
+                          fontWeight: 600,
+                          color: "text.secondary",
+                        }}
+                      >
+                        {item.rotulo}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {linhas.map((linha) => (
-                    <TableRow key={linha.aluno.id}>
-                      <TableCell
-                        component="th"
-                        scope="row"
-                        sx={{
-                          ...colunaAlunoFixa,
-                          zIndex: 2,
-                          maxWidth: 176,
-                          borderRight: 1,
-                          borderColor: "divider",
-                          textAlign: "left",
-                          fontWeight: 400,
-                        }}
-                      >
-                        <Typography noWrap sx={{ fontSize: "0.875rem" }}>
-                          {linha.aluno.nome}
-                        </Typography>
-                        <Typography
-                          noWrap
-                          component="span"
-                          sx={{ display: "block", fontSize: 10, color: "text.secondary" }}
-                        >
-                          atual {turmaAtualDe(linha.aluno.turmaId)}
-                        </Typography>
-                      </TableCell>
-                      {grade.dias.map((dia) => {
-                        const marca = linha.marcas[dia];
-                        return (
+                  {linhas.map((linha) => {
+                    const aberto = alunoAberto === linha.aluno.id;
+                    return (
+                      <Fragment key={linha.aluno.id}>
+                        <TableRow>
                           <TableCell
-                            key={dia}
+                            component="th"
+                            scope="row"
+                            aria-label={`${linha.aluno.nome} atual ${turmaAtualDe(linha.aluno.turmaId)}`}
+                            sx={{
+                              ...colunaAlunoFixa,
+                              zIndex: 2,
+                              maxWidth: 192,
+                              minWidth: 156,
+                              borderRight: 1,
+                              borderColor: "divider",
+                              textAlign: "left",
+                              fontWeight: 400,
+                              p: 0,
+                            }}
+                          >
+                            <ButtonBase
+                              aria-expanded={aberto}
+                              aria-controls={`detalhe-grade-${linha.aluno.id}`}
+                              aria-label={`${aberto ? "Recolher" : "Ver"} faltas de ${linha.aluno.nome} no período`}
+                              onClick={() =>
+                                setDetalheAberto((atual) =>
+                                  atual?.chave === chaveDetalhe && atual.alunoId === linha.aluno.id
+                                    ? null
+                                    : { chave: chaveDetalhe, alunoId: linha.aluno.id },
+                                )
+                              }
+                              sx={{
+                                display: "flex",
+                                width: "100%",
+                                minHeight: 44,
+                                alignItems: "center",
+                                justifyContent: "flex-start",
+                                gap: 0.5,
+                                px: 1,
+                                py: 0.75,
+                                textAlign: "left",
+                                "&:hover": { bgcolor: "action.hover" },
+                              }}
+                            >
+                              <ExpandMoreRoundedIcon
+                                aria-hidden="true"
+                                sx={{
+                                  flexShrink: 0,
+                                  color: "text.secondary",
+                                  transform: aberto ? "none" : "rotate(-90deg)",
+                                  transition: (tema) =>
+                                    tema.transitions.create("transform", { duration: 150 }),
+                                }}
+                              />
+                              <Box sx={{ minWidth: 0, flex: 1 }}>
+                                <Typography noWrap data-nome-aluno sx={{ fontSize: "0.875rem" }}>
+                                  {linha.aluno.nome}
+                                </Typography>
+                                <Typography
+                                  noWrap
+                                  component="span"
+                                  sx={{ display: "block", fontSize: 10, color: "text.secondary" }}
+                                >
+                                  atual {turmaAtualDe(linha.aluno.turmaId)}
+                                </Typography>
+                              </Box>
+                            </ButtonBase>
+                          </TableCell>
+                          {grade.dias.map((dia) => {
+                            const marca = linha.marcas[dia];
+                            const detalhe = detalhesParciais.get(`${linha.aluno.id}:${dia}`);
+                            const proporcao =
+                              detalhe?.aulasPrevistas && detalhe.aulasPrevistas > 0
+                                ? `${detalhe.aulasFaltadas}/${detalhe.aulasPrevistas}`
+                                : "";
+                            return (
+                              <TableCell
+                                key={dia}
+                                align="center"
+                                data-marca={marca ?? ""}
+                                sx={{
+                                  borderLeft: 1,
+                                  borderColor: "divider",
+                                  px: 0.5,
+                                  py: 0.5,
+                                  bgcolor: dia === hoje ? "action.hover" : undefined,
+                                }}
+                              >
+                                {marca === "F" || marca === "FJ" ? (
+                                  <Box
+                                    component="span"
+                                    role="img"
+                                    aria-label={`${linha.aluno.nome} com ${
+                                      marca === "FJ" ? "falta justificada" : "falta"
+                                    } em ${dia}`}
+                                    sx={[
+                                      {
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        minWidth: 20,
+                                        height: 20,
+                                        px: 0.25,
+                                        borderRadius: "4px",
+                                        fontSize: marca === "FJ" ? 9 : 10,
+                                        fontWeight: 700,
+                                        lineHeight: 1,
+                                      },
+                                      marca === "FJ"
+                                        ? (tema) => ({
+                                            border: 1,
+                                            borderColor: tema.vars.palette.justificada.main,
+                                            color: tema.vars.palette.justificada.texto,
+                                          })
+                                        : (tema) => ({
+                                            bgcolor: tema.vars.palette.falta.main,
+                                            color: tema.vars.palette.falta.contrastText,
+                                          }),
+                                    ]}
+                                  >
+                                    {marca}
+                                  </Box>
+                                ) : marca === "S" ? (
+                                  <Box
+                                    component="span"
+                                    role="img"
+                                    aria-label={`${linha.aluno.nome} presente em parte das aulas em ${dia}${
+                                      proporcao
+                                        ? `, ${detalhe?.aulasFaltadas} de ${detalhe?.aulasPrevistas} aulas`
+                                        : ""
+                                    }`}
+                                    sx={(tema) => ({
+                                      display: "inline-flex",
+                                      flexDirection: "column",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      minWidth: 24,
+                                      minHeight: 24,
+                                      border: 1,
+                                      borderColor: tema.vars.palette.falta.main,
+                                      borderRadius: "4px",
+                                      color: tema.vars.palette.falta.texto,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      lineHeight: 1,
+                                    })}
+                                  >
+                                    <Box component="span">S</Box>
+                                    {proporcao ? (
+                                      <Box component="span" sx={{ fontSize: 7, fontWeight: 600 }}>
+                                        {proporcao}
+                                      </Box>
+                                    ) : null}
+                                  </Box>
+                                ) : marca === "P" ? (
+                                  <Box
+                                    component="span"
+                                    role="img"
+                                    aria-label={`${linha.aluno.nome} presente em ${dia}`}
+                                    sx={{
+                                      display: "inline-block",
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: "50%",
+                                      bgcolor: "primary.main",
+                                      opacity: 0.6,
+                                    }}
+                                  />
+                                ) : (
+                                  <Box
+                                    component="span"
+                                    role="img"
+                                    aria-label={`${linha.aluno.nome} sem frequência em ${dia}`}
+                                    sx={{
+                                      display: "inline-block",
+                                      minWidth: 1,
+                                      minHeight: 1,
+                                      fontSize: 10,
+                                      color: "text.disabled",
+                                    }}
+                                  />
+                                )}
+                              </TableCell>
+                            );
+                          })}
+                          {[
+                            { chave: "faltas", valor: linha.faltas },
+                            { chave: "justificadas", valor: linha.justificadas },
+                            { chave: "parciais", valor: linha.parciais },
+                          ].map((item) => (
+                            <TableCell
+                              key={item.chave}
+                              align="center"
+                              data-resumo={item.chave}
+                              sx={{
+                                width: 36,
+                                borderLeft: 1,
+                                borderColor: "divider",
+                                px: 0.5,
+                                color: "text.secondary",
+                                fontVariantNumeric: "tabular-nums",
+                              }}
+                            >
+                              {item.valor}
+                            </TableCell>
+                          ))}
+                          <TableCell
                             align="center"
+                            data-resumo="historico"
                             sx={{
                               borderLeft: 1,
                               borderColor: "divider",
-                              px: 0.5,
-                              py: 0.5,
-                              bgcolor: dia === hoje ? "action.hover" : undefined,
+                              px: 1,
+                              whiteSpace: "nowrap",
+                              color: "falta.texto",
+                              fontWeight: 600,
+                              fontVariantNumeric: "tabular-nums",
                             }}
                           >
-                            {marca === "F" || marca === "FJ" ? (
-                              <Box
-                                component="span"
-                                role="img"
-                                aria-label={`${linha.aluno.nome} com ${
-                                  marca === "FJ" ? "falta justificada" : "falta"
-                                } em ${dia}`}
-                                sx={[
-                                  {
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    minWidth: 20,
-                                    height: 20,
-                                    px: 0.25,
-                                    borderRadius: "4px",
-                                    fontSize: marca === "FJ" ? 9 : 10,
-                                    fontWeight: 700,
-                                    lineHeight: 1,
-                                  },
-                                  marca === "FJ"
-                                    ? (tema) => ({
-                                        border: 1,
-                                        borderColor: tema.vars.palette.justificada.main,
-                                        color: tema.vars.palette.justificada.texto,
-                                      })
-                                    : (tema) => ({
-                                        bgcolor: tema.vars.palette.falta.main,
-                                        color: tema.vars.palette.falta.contrastText,
-                                      }),
-                                ]}
-                              >
-                                {marca}
-                              </Box>
-                            ) : marca === "S" ? (
-                              <Box
-                                component="span"
-                                role="img"
-                                aria-label={`${linha.aluno.nome} presente em parte das aulas em ${dia}`}
-                                sx={(tema) => ({
-                                  display: "inline-flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                  width: 20,
-                                  height: 20,
-                                  border: 1,
-                                  borderColor: tema.vars.palette.falta.main,
-                                  borderRadius: "4px",
-                                  color: tema.vars.palette.falta.texto,
-                                  fontSize: 10,
-                                  fontWeight: 700,
-                                  lineHeight: 1,
-                                })}
-                              >
-                                S
-                              </Box>
-                            ) : marca === "P" ? (
-                              <Box
-                                component="span"
-                                role="img"
-                                aria-label={`${linha.aluno.nome} presente em ${dia}`}
-                                sx={{
-                                  display: "inline-block",
-                                  width: 6,
-                                  height: 6,
-                                  borderRadius: "50%",
-                                  bgcolor: "primary.main",
-                                  opacity: 0.6,
-                                }}
-                              />
-                            ) : (
-                              <Box
-                                component="span"
-                                role="img"
-                                aria-label={`${linha.aluno.nome} sem frequência em ${dia}`}
-                                sx={{
-                                  display: "inline-block",
-                                  minWidth: 1,
-                                  minHeight: 1,
-                                  fontSize: 10,
-                                  color: "text.disabled",
-                                }}
-                              />
-                            )}
+                            {acumuladoDe(linha.aluno.id) > 0 ? acumuladoDe(linha.aluno.id) : ""}
                           </TableCell>
-                        );
-                      })}
-                      <TableCell
-                        align="center"
-                        sx={{
-                          borderLeft: 1,
-                          borderColor: "divider",
-                          px: 1,
-                          whiteSpace: "nowrap",
-                          color: "falta.texto",
-                          fontWeight: 600,
-                          fontVariantNumeric: "tabular-nums",
-                        }}
-                      >
-                        {acumuladoDe(linha.aluno.id) > 0 ? acumuladoDe(linha.aluno.id) : ""}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableRow>
+                        {aberto ? (
+                          <TableRow key={`${linha.aluno.id}-detalhe`}>
+                            <TableCell
+                              id={`detalhe-grade-${linha.aluno.id}`}
+                              colSpan={grade.dias.length + 5}
+                              sx={{
+                                bgcolor: "action.hover",
+                                borderTop: 1,
+                                borderColor: "divider",
+                                px: 2,
+                                py: 1.5,
+                              }}
+                            >
+                              <DetalheFaltas
+                                faltas={linha.faltas}
+                                justificadas={linha.justificadas}
+                                parciais={linha.parciais}
+                                diasComRegistro={linha.frequencias}
+                                ocorrencias={ocorrenciasDoAluno}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </Fragment>
+                    );
+                  })}
                 </TableBody>
               </TabelaPadrao>
             )}
@@ -749,15 +1016,20 @@ export default function VistaGrade({
                   Como ler
                 </Typography>
                 <Stack spacing={0.5} sx={{ pt: 0.5 }}>
+                  <Typography variant="caption">No período: F, FJ e S contam dias.</Typography>
                   <Typography variant="caption">
-                    Total: faltas (F + FJ) de todo o histórico.
+                    Histórico: F + FJ de todo o histórico até hoje.
+                  </Typography>
+                  <Typography variant="caption">
+                    S 2/5: o aluno faltou a 2 de 5 aulas no dia.
                   </Typography>
                   <Typography variant="caption">
                     Célula vazia: turma sem frequência no dia.
                   </Typography>
                   <Typography variant="caption">
-                    Baixar planilha: todos os alunos ativos da turma de origem.
+                    Baixar planilha e PDF: todos os alunos ativos da turma de origem.
                   </Typography>
+                  <Typography variant="caption">O PDF cobre o período exibido até hoje.</Typography>
                 </Stack>
               </Box>
             </Stack>
@@ -776,6 +1048,17 @@ export default function VistaGrade({
           )
         }
       />
+      <DialogoDownload
+        aberto={relatorioAberto}
+        onAbrir={setRelatorioAberto}
+        preparar={prepararRelatorio}
+        onConcluido={() =>
+          avisarSucesso(
+            "Relatório baixado.",
+            "O PDF leva o resumo e o detalhamento das faltas da turma de origem.",
+          )
+        }
+      />
       {estadoPlanilha?.podeEnviar && grade.dias.length > 0 ? (
         <DialogoEnvio
           aberto={envioAberto}
@@ -789,6 +1072,113 @@ export default function VistaGrade({
         />
       ) : null}
     </Box>
+  );
+}
+
+/** Texto compacto das aulas de uma ocorrência, usado na linha expandida. */
+function textoAulasDaOcorrencia(ocorrencia: OcorrenciaGrade): string {
+  const previstas = ocorrencia.aulasPrevistas;
+  const faltadas = ocorrencia.aulasFaltadas;
+  if (previstas === null) return "Aulas não informadas";
+  if (faltadas === previstas) return `Todas as aulas (${previstas})`;
+  if (faltadas > previstas) {
+    return `${faltadas} aulas (${previstas} previstas, inclui aula fora da grade)`;
+  }
+  const base = `${faltadas} de ${previstas}`;
+  const rotulos =
+    ocorrencia.aulasFaltadasRotulos.length > 0
+      ? `: ${ocorrencia.aulasFaltadasRotulos.join("; ")}`
+      : "";
+  const referencia = ocorrencia.referenciaAulas === "grade_atual" ? " (grade atual)" : "";
+  return `${base}${rotulos}${referencia}`;
+}
+
+/** Texto compacto da justificativa de uma ocorrência. */
+function textoJustificativaDaOcorrencia(ocorrencia: OcorrenciaGrade): string {
+  const rotulos = ocorrencia.justificativas.join(", ");
+  if (ocorrencia.marca === "FJ") {
+    return rotulos ? `Justificativa: ${rotulos}` : "Justificativa não detalhada";
+  }
+  if (rotulos) return `Justificativa em parte das aulas: ${rotulos}`;
+  return "Sem justificativa";
+}
+
+interface DetalheFaltasProps {
+  faltas: number;
+  justificadas: number;
+  parciais: number;
+  diasComRegistro: number;
+  ocorrencias: OcorrenciaGrade[];
+}
+
+/** Resumo e ocorrências de um aluno, abertos abaixo da linha da Grade. */
+function DetalheFaltas({
+  faltas,
+  justificadas,
+  parciais,
+  diasComRegistro,
+  ocorrencias,
+}: DetalheFaltasProps) {
+  return (
+    <Stack spacing={1.5}>
+      <Typography variant="body2">
+        No período: {faltas} F, {justificadas} FJ e {parciais} S em {diasComRegistro}{" "}
+        {diasComRegistro === 1 ? "dia com registro" : "dias com registro"}.
+      </Typography>
+      {ocorrencias.length === 0 ? (
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          Sem faltas no período.
+        </Typography>
+      ) : (
+        <Stack component="ul" spacing={1} sx={{ listStyle: "none", m: 0, p: 0 }}>
+          {ocorrencias.map((ocorrencia) => (
+            <Box
+              component="li"
+              key={ocorrencia.dia}
+              sx={{ display: "flex", flexWrap: "wrap", gap: 1, alignItems: "baseline" }}
+            >
+              <Box
+                component="span"
+                sx={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  border: 1,
+                  borderRadius: 1,
+                  px: 0.75,
+                  py: 0.25,
+                  fontSize: 11,
+                  fontWeight: 500,
+                  fontVariantNumeric: "tabular-nums",
+                  ...(ocorrencia.marca === "F"
+                    ? {
+                        borderColor: "falta.main",
+                        bgcolor: "falta.fraco",
+                        color: "falta.texto",
+                      }
+                    : ocorrencia.marca === "FJ"
+                      ? {
+                          borderColor: "justificada.main",
+                          bgcolor: "justificada.fraco",
+                          color: "justificada.texto",
+                        }
+                      : { borderColor: "falta.main", color: "falta.texto" }),
+                }}
+              >
+                <Box component="span">{rotuloData(ocorrencia.dia)}</Box>
+                <Box component="strong">{ocorrencia.marca}</Box>
+              </Box>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                {textoAulasDaOcorrencia(ocorrencia)}
+              </Typography>
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                {textoJustificativaDaOcorrencia(ocorrencia)}
+              </Typography>
+            </Box>
+          ))}
+        </Stack>
+      )}
+    </Stack>
   );
 }
 

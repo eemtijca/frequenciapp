@@ -6,6 +6,7 @@ import pg from "pg";
 const URL_APP = process.env.APP_URL ?? "http://localhost:3000";
 const SENHA = "QA Exportacao Exclusiva 2026";
 const EMAIL = "qa-exportacoes@escola.exemplo";
+const RETRATO = "a".repeat(64);
 const banco = new pg.Client({ connectionString: process.env.DATABASE_URL });
 let admin = "";
 let coordenacao = "";
@@ -113,11 +114,15 @@ describe("cópia completa exige confirmação de acesso", () => {
   });
 });
 
-describe("registro de exportação CSV", () => {
-  it("registra apenas conta, tipo, formato e data, sem conteúdo", async () => {
-    for (const tipo of ["grade", "relacao"]) {
+describe("registro de exportação CSV e PDF", () => {
+  it("registra apenas conta, tipo, formato, retrato e data, sem conteúdo", async () => {
+    for (const tipo of ["grade", "relacao", "relatorio"]) {
       for (const formato of ["original", "zip"]) {
-        const resposta = await chamar("/api/exportacoes/registro", admin, { tipo, formato });
+        const resposta = await chamar("/api/exportacoes/registro", admin, {
+          tipo,
+          formato,
+          ...(tipo === "relatorio" ? { retrato: RETRATO } : {}),
+        });
         expect(resposta.status).toBe(200);
       }
     }
@@ -130,9 +135,11 @@ describe("registro de exportação CSV", () => {
       { acao: "download.preparar", alvo: "grade:zip" },
       { acao: "download.preparar", alvo: "relacao:original" },
       { acao: "download.preparar", alvo: "relacao:zip" },
+      { acao: "download.preparar", alvo: `relatorio:original:${RETRATO}` },
+      { acao: "download.preparar", alvo: `relatorio:zip:${RETRATO}` },
     ]);
   });
-  it("coordenação pode registrar somente grade, e exige origem e sessão válidas", async () => {
+  it("coordenação pode registrar grade e relatório, mas não relação", async () => {
     const corpo = { tipo: "grade", formato: "zip" };
     expect((await chamar("/api/exportacoes/registro", "", corpo)).status).toBe(401);
     expect(
@@ -140,16 +147,26 @@ describe("registro de exportação CSV", () => {
     ).toBe(403);
     expect((await chamar("/api/exportacoes/registro", coordenacao, corpo)).status).toBe(200);
     expect(
+      (
+        await chamar("/api/exportacoes/registro", coordenacao, {
+          tipo: "relatorio",
+          formato: "zip",
+          retrato: RETRATO,
+        })
+      ).status,
+    ).toBe(200);
+    expect(
       (await chamar("/api/exportacoes/registro", coordenacao, { ...corpo, tipo: "relacao" }))
         .status,
     ).toBe(403);
   });
-  it("nega nomes, conteúdo, senha e tipos desconhecidos sem gravar evento", async () => {
+  it("nega nomes, conteúdo, senha, retrato indevido e tipos desconhecidos", async () => {
     for (const extra of [
       { nome: "QA Estudante" },
       { conteudo: "CSV" },
       { senha: SENHA },
       { tipo: "copia" },
+      { retrato: RETRATO },
     ]) {
       expect(
         (
@@ -161,10 +178,17 @@ describe("registro de exportação CSV", () => {
         ).status,
       ).toBe(400);
     }
+    for (const corpo of [
+      { tipo: "relatorio", formato: "zip" },
+      { tipo: "relatorio", formato: "zip", retrato: "a".repeat(63) },
+      { tipo: "relatorio", formato: "zip", retrato: "z".repeat(64) },
+    ]) {
+      expect((await chamar("/api/exportacoes/registro", admin, corpo)).status).toBe(400);
+    }
     const registro = await banco.query(
       "select count(*)::int as total from auditoria where usuario_id = $1 and acao = 'download.preparar'",
       [usuarioId],
     );
-    expect(registro.rows[0]?.total).toBe(4);
+    expect(registro.rows[0]?.total).toBe(6);
   });
 });

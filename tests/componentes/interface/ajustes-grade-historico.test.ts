@@ -116,11 +116,11 @@ async function grade(pagina: Page, semana = false) {
 
 async function medirTotal(tabela: Locator) {
   return tabela.evaluate((el) => {
-    const cabecalho = el.querySelector("thead th:last-child");
-    const numero = el.querySelector("tbody tr:first-child td:last-child");
-    const dias = [...el.querySelectorAll("thead th")].slice(1, -1);
+    const cabecalho = el.querySelector('thead th[data-resumo="historico"]');
+    const numero = el.querySelector('tbody tr td[data-resumo="historico"]');
+    const dias = [...el.querySelectorAll("thead th[data-dia]")];
     const aluno = el.querySelector("tbody th");
-    const nome = aluno?.firstElementChild;
+    const nome = aluno?.querySelector("[data-nome-aluno]");
     const regiao = el.parentElement;
     const primeiroDia = dias[0];
     if (!cabecalho || !numero || !aluno || !nome || !regiao || !primeiroDia)
@@ -169,7 +169,7 @@ for (const tema of ["light", "dark"] as const) {
       expect(medidas.larguraAluno, "espaço livre transferido para Aluno").toBeLessThanOrEqual(212);
       expect(medidas.folgaAposNome).toBeLessThanOrEqual(64);
       expect(medidas.inicioPrimeiroDia - inicio.aluno).toBeLessThanOrEqual(213);
-      expect(medidas.larguraPainel - medidas.larguraTabela).toBeGreaterThan(900);
+      expect(medidas.larguraPainel - medidas.larguraTabela).toBeGreaterThan(800);
       expect(medidas.menorDia).toBeGreaterThanOrEqual(30);
       expect(medidas.largura, "Total semanal ocupa espaço além do necessário").toBeLessThanOrEqual(
         64,

@@ -77,6 +77,7 @@ function ConteudoDownload({
           corpoJson({
             tipo: arquivo.registro,
             formato: protegido ? "zip" : "original",
+            ...(arquivo.retrato ? { retrato: arquivo.retrato } : {}),
           }),
         );
       }

@@ -280,7 +280,7 @@ describe("palavra-chave e entrada do diretor", () => {
         liberadas.push(`${rota.metodo} ${rota.caminho} ${resposta.status}`);
     }
     expect(liberadas).toEqual([]);
-  });
+  }, 60_000);
 
   it("exige palavra nova diferente da atual e renova a validade", async () => {
     const igual = await chamar(

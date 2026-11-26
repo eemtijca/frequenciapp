@@ -63,7 +63,7 @@ delete from usuarios where id = '<id da conta>';
 
 Os downloads da Gestão e dos Relatórios oferecem ZIP com senha e AES-256 como escolha inicial. As exportações pessoais do FrequenciBI (tabela em CSV, gráfico em PNG e configurações) saem no formato original depois de confirmação, como descrito em [Análises no FrequenciBI](#análises-no-frequencibi). A opção de formato original exige escolha explícita e avisa que o conteúdo ficará legível. Nomes de arquivos protegidos são genéricos, pois o diretório de um ZIP permanece visível. A senha do ZIP fica apenas em memória no navegador, sem transmissão nem armazenamento pelo aplicativo. A senha de acesso, exigida separadamente para a cópia completa, é conferida no servidor com limite de tentativas.
 
-CSV de grade e relação registram preparação na auditoria, apenas com conta, tipo, formato e data. A cópia mantém `backup.exportar`, sem senha nem dados de alunos no evento. A administração deve definir destinatários autorizados, prazo de guarda e descarte de arquivos e cópias extraídas. O passo a passo e os limites estão em [downloads.md](downloads.md).
+CSV de grade, PDF da Grade e relação registram preparação na auditoria, apenas com conta, tipo, formato e, no relatório, o hash do retrato, sem dados de alunos no evento. A cópia mantém `backup.exportar`, sem senha nem dados de alunos no evento. A administração deve definir destinatários autorizados, prazo de guarda e descarte de arquivos e cópias extraídas. O passo a passo e os limites estão em [downloads.md](downloads.md).
 
 ## Repartição de papéis
 

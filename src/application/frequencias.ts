@@ -4,6 +4,7 @@ import { listarJustificativasAntecipadas } from "@/application/justificativas-an
 import { mesmasJustificativasAntecipadas } from "@/domain/justificativas-antecipadas";
 import { avaliarComposicaoHistorica } from "@/domain/listas-historicas";
 import { z } from "zod";
+import { Prisma } from "../../generated/prisma/client";
 import { registrarIntencaoEscolar } from "@/application/outbox-escolar";
 import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
@@ -16,6 +17,7 @@ import {
   ehDomingo,
   ehMesValido,
   horariosDaChamada,
+  type FaltaAluno,
   type Frequencia,
   type ResumoAcumulado,
   type ResultadoSalvamento,
@@ -101,12 +103,20 @@ interface LinhaFrequencia {
   aulas: { horarioId: string }[];
 }
 
+/** Linha crua de falta vinda do banco, antes do agrupamento por aluno. */
+export interface FaltaCrua {
+  alunoId: string;
+  horarioId: string;
+  justificativa: string | null;
+  observacao: string | null;
+}
+
 /**
  * Agrupa as faltas por aluno. A justificativa só vale quando todas as faltas
  * do aluno no dia têm o mesmo código; qualquer falta sem justificativa deixa
  * o aluno como falta simples.
  */
-function paraFrequencia(linha: LinhaFrequencia): Frequencia {
+export function agruparFaltas(faltas: readonly FaltaCrua[]): FaltaAluno[] {
   interface Grupo {
     horarios: string[];
     justificativas: Set<string>;
@@ -114,7 +124,7 @@ function paraFrequencia(linha: LinhaFrequencia): Frequencia {
     observacao: string | null;
   }
   const porAluno = new Map<string, Grupo>();
-  for (const falta of linha.faltas) {
+  for (const falta of faltas) {
     const grupo = porAluno.get(falta.alunoId) ?? {
       horarios: [],
       justificativas: new Set<string>(),
@@ -130,6 +140,20 @@ function paraFrequencia(linha: LinhaFrequencia): Frequencia {
     }
     porAluno.set(falta.alunoId, grupo);
   }
+  return [...porAluno.entries()].map(([alunoId, grupo]) => {
+    const unica = !grupo.semJustificativa && grupo.justificativas.size === 1;
+    const justificativa = unica ? ([...grupo.justificativas][0] ?? null) : null;
+    if (!justificativa) return { alunoId, horarios: grupo.horarios };
+    return {
+      alunoId,
+      horarios: grupo.horarios,
+      justificativa,
+      observacao: grupo.observacao,
+    };
+  });
+}
+
+function paraFrequencia(linha: LinhaFrequencia): Frequencia {
   return {
     dia: linha.dia.toISOString().slice(0, 10),
     turmaId: linha.turmaId,
@@ -145,17 +169,7 @@ function paraFrequencia(linha: LinhaFrequencia): Frequencia {
       registradoSeducPorNome: item.registradoSeducPorNome,
       revisaoSeduc: item.revisaoSeduc,
     })),
-    faltas: [...porAluno.entries()].map(([alunoId, grupo]) => {
-      const unica = !grupo.semJustificativa && grupo.justificativas.size === 1;
-      const justificativa = unica ? ([...grupo.justificativas][0] ?? null) : null;
-      if (!justificativa) return { alunoId, horarios: grupo.horarios };
-      return {
-        alunoId,
-        horarios: grupo.horarios,
-        justificativa,
-        observacao: grupo.observacao,
-      };
-    }),
+    faltas: agruparFaltas(linha.faltas),
   };
 }
 
@@ -282,17 +296,37 @@ export async function listarFrequenciasDoPeriodo(
  * dias distintos com falta simples, com falta justificada e com registro.
  * Um dia parcial no modo por aula conta como falta simples.
  */
-export async function resumoAcumulado(ate: string, de?: string): Promise<ResumoAcumulado> {
-  const linhas = await banco().frequencia.findMany({
-    where: {
-      dia: {
-        lte: new Date(`${ate}T12:00:00Z`),
-        ...(de ? { gte: new Date(`${de}T12:00:00Z`) } : {}),
-      },
+type ClienteResumo = Prisma.TransactionClient | ReturnType<typeof banco>;
+
+/**
+ * Acumulado por aluno até o dia informado, com início opcional do período:
+ * dias distintos com falta simples, com falta justificada e com registro.
+ * Um dia parcial no modo por aula conta como falta simples.
+ */
+async function resumoAcumuladoCom(
+  cliente: ClienteResumo,
+  ate: string,
+  de?: string,
+  alunoIds?: readonly string[],
+): Promise<ResumoAcumulado> {
+  if (alunoIds && alunoIds.length === 0) {
+    return { primeiroDia: null, diasLetivos: 0, porAluno: [] };
+  }
+  const where: Prisma.FrequenciaWhereInput = {
+    dia: {
+      lte: new Date(`${ate}T12:00:00Z`),
+      ...(de ? { gte: new Date(`${de}T12:00:00Z`) } : {}),
     },
+    ...(alunoIds ? { faltas: { some: { alunoId: { in: [...alunoIds] } } } } : {}),
+  };
+  const linhas = await cliente.frequencia.findMany({
+    where,
     select: {
       dia: true,
-      faltas: { select: { alunoId: true, justificativa: true } },
+      faltas: {
+        ...(alunoIds ? { where: { alunoId: { in: [...alunoIds] } } } : {}),
+        select: { alunoId: true, justificativa: true },
+      },
     },
     orderBy: { dia: "asc" },
   });
@@ -331,6 +365,20 @@ export async function resumoAcumulado(ate: string, de?: string): Promise<ResumoA
       diasComRegistro: valor.dias.size,
     })),
   };
+}
+
+/** Acumulado de toda a escola, ou de um período, para a tela. */
+export async function resumoAcumulado(ate: string, de?: string): Promise<ResumoAcumulado> {
+  return resumoAcumuladoCom(banco(), ate, de);
+}
+
+/** Acumulado histórico restrito aos alunos de um retrato, dentro da transação. */
+export async function resumoAcumuladoDosAlunos(
+  tx: Prisma.TransactionClient,
+  alunoIds: readonly string[],
+  ate: string,
+): Promise<ResumoAcumulado> {
+  return resumoAcumuladoCom(tx, ate, undefined, alunoIds);
 }
 
 /**

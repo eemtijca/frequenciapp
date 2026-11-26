@@ -6,6 +6,8 @@ allowBuilds:
   "@prisma/engines": true
   # Telemetria transitiva do Redocly: o script não é necessário e fica negado.
   "@scarf/scarf": false
+  # Aviso de financiamento do core-js, dependência opcional do jsPDF: negado.
+  core-js: false
   "@swc/core": true
   # O postinstall confere o binário da plataforma, exigido por Vite, Vitest e Vercel.
   esbuild: true

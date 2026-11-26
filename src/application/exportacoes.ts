@@ -10,10 +10,30 @@ import { exportarCopia } from "@/application/backup";
 const esquemaExportacaoCopia = z.object({ senha: z.string().min(1).max(200) }).strict();
 const esquemaRegistro = z
   .object({
-    tipo: z.enum(["grade", "relacao"]),
+    tipo: z.enum(["grade", "relacao", "relatorio"]),
     formato: z.enum(["original", "zip"]),
+    retrato: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/, "Retrato inválido.")
+      .optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((dados, contexto) => {
+    if (dados.tipo === "relatorio" && !dados.retrato) {
+      contexto.addIssue({
+        code: "custom",
+        path: ["retrato"],
+        message: "Informe o retrato do relatório.",
+      });
+    }
+    if (dados.tipo !== "relatorio" && dados.retrato) {
+      contexto.addIssue({
+        code: "custom",
+        path: ["retrato"],
+        message: "O retrato vale apenas para o relatório.",
+      });
+    }
+  });
 
 export async function exportarCopiaConfirmada(admin: Identidade, entrada: unknown) {
   const dados = esquemaExportacaoCopia.safeParse(entrada);
@@ -32,7 +52,10 @@ export async function registrarPreparacaoDownload(usuario: Identidade, entrada: 
     data: {
       usuarioId: usuario.id,
       acao: "download.preparar",
-      alvo: `${dados.data.tipo}:${dados.data.formato}`,
+      alvo:
+        dados.data.tipo === "relatorio"
+          ? `${dados.data.tipo}:${dados.data.formato}:${dados.data.retrato}`
+          : `${dados.data.tipo}:${dados.data.formato}`,
     },
   });
 }
