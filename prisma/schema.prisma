@@ -297,6 +297,7 @@ model Aluno {
   entradas             EntradaAtrasada[]
   frequenciasParciais  FrequenciaParcial[]
   chamadas             AlunoDaChamada[]
+  provas               ParticipanteProva[]
 
   @@index([turmaId, ordem])
   @@index([turmaOriginalId])
@@ -613,6 +614,38 @@ model ProvaBimestral {
   @@index([dia])
   @@index([turmaId, dia])
   @@map("provas_bimestrais")
+}
+
+// Prova específica (Enem, vestibulares e similares) com nome, local e data definidos
+// pela equipe. Os participantes e a frequência ficam em ParticipanteProva.
+model ProvaEspecifica {
+  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome          String              @db.VarChar(120)
+  local         String?             @db.VarChar(120)
+  dia           DateTime            @db.Date
+  criadoEm      DateTime            @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm  DateTime            @updatedAt @map("atualizado_em") @db.Timestamptz
+  participantes ParticipanteProva[]
+
+  @@index([dia])
+  @@map("provas_especificas")
+}
+
+// Aluno inscrito em uma prova específica. Presença nula é sem registro, verdadeira é
+// presente e falsa é ausente. Excluir a prova ou o aluno remove a inscrição.
+model ParticipanteProva {
+  id           String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provaId      String          @map("prova_id") @db.Uuid
+  alunoId      String          @map("aluno_id") @db.Uuid
+  presente     Boolean?
+  criadoEm     DateTime        @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm DateTime        @updatedAt @map("atualizado_em") @db.Timestamptz
+  prova        ProvaEspecifica @relation(fields: [provaId], references: [id], onDelete: Cascade)
+  aluno        Aluno           @relation(fields: [alunoId], references: [id], onDelete: Cascade)
+
+  @@unique([provaId, alunoId])
+  @@index([alunoId])
+  @@map("participantes_prova")
 }
 
 // Feriado escolar em uma data civil explícita, válido para todas as turmas.
