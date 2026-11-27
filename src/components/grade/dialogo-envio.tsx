@@ -864,7 +864,8 @@ export default function DialogoEnvio({
   );
 }
 
-export function useEstadoPlanilha() {
+/** Estado da planilha da escola; sem permissão para enviar, nem consulta a rota, que o servidor recusaria. */
+export function useEstadoPlanilha(habilitado = true) {
   const [estado, setEstado] = useState<{
     ativa: boolean;
     modo: "conservador" | "completo";
@@ -873,14 +874,16 @@ export function useEstadoPlanilha() {
     alteradasDepois: number;
   } | null>(null);
   const recarregar = useCallback(async () => {
+    if (!habilitado) return;
     try {
       const dados = await pedir<{ estado: typeof estado }>("/api/planilha/estado");
       setEstado(dados.estado);
     } catch {
       setEstado(null);
     }
-  }, []);
+  }, [habilitado]);
   useEffect(() => {
+    if (!habilitado) return;
     let viva = true;
     pedir<{ estado: typeof estado }>("/api/planilha/estado")
       .then((dados) => {
@@ -892,6 +895,6 @@ export function useEstadoPlanilha() {
     return () => {
       viva = false;
     };
-  }, []);
+  }, [habilitado]);
   return { estado, recarregar };
 }

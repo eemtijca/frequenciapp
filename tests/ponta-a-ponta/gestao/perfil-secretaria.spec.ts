@@ -119,10 +119,16 @@ test.describe("aplicativo reduzido da Secretaria", () => {
 
     await nav.getByRole("button", { name: "Grade", exact: true }).click();
     await expect(page.locator("main").first()).toHaveAttribute("data-visao", "relatorios");
-    await expect(page.getByRole("region", { name: "Grade de frequência" })).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Grade de frequência", exact: true }),
+    ).toBeVisible();
     await nav.getByRole("button", { name: "Por aluno", exact: true }).click();
-    await expect(page.getByRole("region", { name: "Relatório por aluno" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Histórico de frequências" })).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Relatório por aluno", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Histórico de frequências", exact: true }),
+    ).toHaveCount(0);
   });
 
   test("links diretos para áreas de fora abrem o Painel, ou a Grade no caso dos relatórios fechados", async ({
@@ -139,8 +145,40 @@ test.describe("aplicativo reduzido da Secretaria", () => {
     await page.goto("/?visao=historico");
     await aguardarHidratacao(page);
     await expect(page.locator("main").first()).toHaveAttribute("data-visao", "relatorios");
-    await expect(page.getByRole("region", { name: "Grade de frequência" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Histórico de frequências" })).toHaveCount(0);
+    await expect(
+      page.getByRole("region", { name: "Grade de frequência", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Histórico de frequências", exact: true }),
+    ).toHaveCount(0);
+  });
+
+  test("navegar pelo Painel, pela Grade e pelo Por aluno não dispara nenhuma requisição recusada", async ({
+    page,
+  }) => {
+    const recusadas: string[] = [];
+    page.on("response", (resposta) => {
+      const caminho = new URL(resposta.url()).pathname;
+      if (caminho.startsWith("/api/") && resposta.status() >= 400) {
+        recusadas.push(`${resposta.status()} ${caminho}`);
+      }
+    });
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    const nav = await abrirNavegacao(page);
+    await expect(page.locator("main").first()).toHaveAttribute("data-visao", "painel");
+    await nav.getByRole("button", { name: "Relatórios", exact: true }).click();
+    await nav.getByRole("button", { name: "Grade", exact: true }).click();
+    await expect(
+      page.getByRole("region", { name: "Grade de frequência", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Enviar para a planilha" })).toHaveCount(0);
+    await nav.getByRole("button", { name: "Por aluno", exact: true }).click();
+    await expect(
+      page.getByRole("region", { name: "Relatório por aluno", exact: true }),
+    ).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    expect(recusadas).toEqual([]);
   });
 
   test("no celular, o menu tem as mesmas duas áreas", async ({ page }) => {

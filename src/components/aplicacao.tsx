@@ -1140,6 +1140,7 @@ export default function Aplicacao({
             erro={erroFrequencias}
             destino={destinoRelatorios}
             destinosPermitidos={destinosDoPapel}
+            podeEnviarParaPlanilha={podeOperar}
             mes={mes}
             mesCorrente={diaCorrente.slice(0, 7)}
             diaCorrente={diaCorrente}
