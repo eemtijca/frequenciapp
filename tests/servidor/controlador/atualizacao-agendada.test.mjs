@@ -25,6 +25,7 @@ const banco = { cluster: "7654321098765432100", banco: "frequencia", schema: "pu
 const origem = { container: idDb, ...banco, bancoOid: "16384", schemaOid: "2200" };
 const diretorioSql = "prisma/migrations";
 const json = (obj) => `${JSON.stringify(obj)}\n`;
+const emitirLinha = (texto) => process.stdout.write(`${texto}\n`);
 const gravar = (nome, bytes) => fs.writeFileSync(nome, bytes, { mode: 0o600 });
 
 function catalogar(p, base, em, operacao) {
@@ -131,7 +132,7 @@ function docker(raiz, acao, args) {
     };
   }
   if (acao === "info") {
-    console.log(json({ ID: "daemon-sintetico" }).trim());
+    emitirLinha(json({ ID: "daemon-sintetico" }).trim());
   } else if (acao === "inspect") {
     if (args[0] === "--format") {
       const c = inspecionar(args[2]);
@@ -141,13 +142,13 @@ function docker(raiz, acao, args) {
         "{{.Image}}/{{.HostConfig.RestartPolicy.Name}}": `${c.Image}/${reinicio}`,
       };
       assert.ok(args[1] in formatos);
-      console.log(formatos[args[1]]);
-    } else console.log(JSON.stringify(args.map(inspecionar)));
+      emitirLinha(formatos[args[1]]);
+    } else emitirLinha(JSON.stringify(args.map(inspecionar)));
   } else if (acao === "image") {
     assert.deepEqual(args.slice(0, 2), ["inspect", "--format"]);
     const [, , formato, imagem] = args;
-    if (formato === "{{.Id}}") console.log(imagemAlvo);
-    else console.log(imagem === imagemBase ? base : alvo);
+    if (formato === "{{.Id}}") emitirLinha(imagemAlvo);
+    else emitirLinha(imagem === imagemBase ? base : alvo);
   } else if (acao === "run") {
     if (args.includes("/bin/cat")) {
       process.stdout.write(fs.readFileSync(`${raiz}/app/docker/app/migrar.mjs`));
@@ -158,7 +159,7 @@ function docker(raiz, acao, args) {
       const inventario = { ...dados.inventario };
       if (caso === "bytes-divergentes")
         inventario[`${diretorioSql}/${nova}/migration.sql`] = "0".repeat(64);
-      console.log(JSON.stringify(inventario));
+      emitirLinha(JSON.stringify(inventario));
     }
   } else if (acao === "exec") {
     if (args[0] === "-i") {
@@ -167,7 +168,7 @@ function docker(raiz, acao, args) {
       if (args[1] === idDb) assert.ok(args.includes("/var/run/postgresql"));
       else assert.equal(args.at(-1), ip);
       evento(iniciado ? "histórico-final" : "histórico-base");
-      console.log(
+      emitirLinha(
         JSON.stringify({
           ...origem,
           usuario: "frequencia",
@@ -184,7 +185,7 @@ function docker(raiz, acao, args) {
     } else {
       assert.equal(args[0], app);
       assert.match(args.at(-1), /api\/saude/);
-      console.log(JSON.stringify({ ok: true, commit: revisao }));
+      emitirLinha(JSON.stringify({ ok: true, commit: revisao }));
     }
   } else if (acao === "update") {
     assert.deepEqual(args, ["--restart=unless-stopped", idNovo]);
@@ -206,9 +207,9 @@ function docker(raiz, acao, args) {
     const [comando, ...opcoes] = args;
     const env = process.env;
     if (comando === "config") {
-      if (opcoes.includes("--services")) console.log("app\ndb\ncaddy");
+      if (opcoes.includes("--services")) emitirLinha("app\ndb\ncaddy");
       else if (opcoes.includes("--format")) {
-        console.log(
+        emitirLinha(
           JSON.stringify({
             name: "sintetico",
             networks: { interna: { internal: true, name: "sintetico-interna" } },
@@ -237,8 +238,8 @@ function docker(raiz, acao, args) {
         );
       } else assert.deepEqual(opcoes, ["--quiet"]);
     } else if (comando === "ps") {
-      if (opcoes.includes("-aq")) console.log(`${app}\n${idDb}`);
-      else console.log(opcoes.at(-1) === "db" ? idDb : app);
+      if (opcoes.includes("-aq")) emitirLinha(`${app}\n${idDb}`);
+      else emitirLinha(opcoes.at(-1) === "db" ? idDb : app);
     } else if (comando === "exec") {
       assert.equal(caso, "opt-out");
       assert.deepEqual(opcoes.slice(0, 4), ["-T", "db", "psql", "-XwqAt"]);
@@ -246,7 +247,7 @@ function docker(raiz, acao, args) {
       assert.match(consulta, /BEGIN READ ONLY/);
       assert.match(consulta, /_prisma_migrations/);
       evento("histórico para manifesto");
-      console.log(JSON.stringify([[anterior, sha(sqlBase), true]]));
+      emitirLinha(JSON.stringify([[anterior, sha(sqlBase), true]]));
     } else if (comando === "build") {
       assert.deepEqual(opcoes, ["app"]);
       assert.equal(env.COMMIT_SHA, alvo);
@@ -537,7 +538,7 @@ function rclone(config, caso, args) {
   const bytes = fs.readFileSync(`${config}/remoto-sintetico/${nome}`);
   if (acao === "lsjson") {
     assert.ok(args.includes("--stat"));
-    console.log(JSON.stringify({ Name: nome, Size: bytes.length, IsDir: false }));
+    emitirLinha(JSON.stringify({ Name: nome, Size: bytes.length, IsDir: false }));
   } else {
     assert.equal(acao, "cat");
     assert.equal(args[args.indexOf("--count") + 1], String(bytes.length + 1));

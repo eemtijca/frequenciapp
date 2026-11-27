@@ -78,7 +78,7 @@ done < <(compgen -e)
 
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.."
 repo=$PWD
-git_local() { GIT_ALLOW_PROTOCOL= /usr/bin/git --no-replace-objects --literal-pathspecs "$@"; }
+git_local() { GIT_ALLOW_PROTOCOL='' /usr/bin/git --no-replace-objects --literal-pathspecs "$@"; }
 if ! $regressoes; then
   [[ "$(git_local rev-parse HEAD)" == "$alvo" && "$(git_local rev-parse HEAD^1)" == "$base" ]] ||
     falhar 'O checkout não corresponde ao alvo e ao seu primeiro pai.'

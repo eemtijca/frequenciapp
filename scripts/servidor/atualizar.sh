@@ -606,7 +606,7 @@ SQL
 
 conferir_compose_migracoes_auto() {
   compose config --format json | node "$DIR/alvo-migracoes-auto.mjs" compose \
-    "$SERVIDOR_SERVICO_APP" "$SERVIDOR_SERVICO_DB" "$banco_auto" "$schema_auto" "$@"
+    "$SERVIDOR_SERVICO_APP" "$SERVIDOR_SERVICO_DB" "$banco_auto" "$schema_auto"
 }
 
 preparar_montagem_lote_auto() {
@@ -966,9 +966,10 @@ fi
 if [ -n "${imagem_migracoes_auto:-}" ]; then
   [ "$(conferir_compose_do_lote_auto)" = "$alvo_compose_auto" ] ||
     falhar_atualizacao "O Compose de partida divergiu da configuração aprovada." true
-  (umask 022; set -o noclobber; printf '%s' "$envelope_migracoes_auto" > "$pasta_lote_auto/entrada/autorizar") &&
-    chmod 0444 "$pasta_lote_auto/entrada/autorizar" ||
+  if ! (umask 022 && set -o noclobber && printf '%s' "$envelope_migracoes_auto" > "$pasta_lote_auto/entrada/autorizar") ||
+    ! chmod 0444 "$pasta_lote_auto/entrada/autorizar"; then
     falhar_atualizacao "A autorização efêmera de partida não pôde ser preparada." true
+  fi
   subida_lote_auto=true
   if ! compose_do_lote_auto up -d --no-deps --no-build --pull never \
     --wait --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE" "$SERVIDOR_SERVICO_APP"; then
