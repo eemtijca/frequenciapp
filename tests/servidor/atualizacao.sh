@@ -175,8 +175,11 @@ if [ "$1" = "inspect" ]; then
     exit
   fi
   if [ "${DOCKER_MANUAL:-false}" = true ]; then
-    app=$(jq -cn --arg id "$ID_APP" --arg projeto "$projeto" --arg imagem "$imagem_ativa" '
-      {Id:$id,Image:$imagem,State:{Running:true},Mounts:[],Config:{Env:["DATABASE_URL=postgresql://frequencia:fixture@db:5432/frequencia","DIRECT_URL=postgresql://frequencia:fixture@db:5432/frequencia","MIGRAR_NA_PARTIDA=true"],Labels:{"com.docker.compose.project":$projeto,"com.docker.compose.service":"app"}}}')
+    migrar_ativo="${MIGRAR_NA_PARTIDA_BASE_TESTE-true}"
+    if [ "$subiu" = true ]; then migrar_ativo="${MIGRAR_NA_PARTIDA_ALVO_TESTE-true}"; fi
+    app=$(jq -cn --arg id "$ID_APP" --arg projeto "$projeto" --arg imagem "$imagem_ativa" \
+      --arg migrar "$migrar_ativo" --arg host "${APP_HOST_BANCO_TESTE:-db}" '
+      {Id:$id,Image:$imagem,State:{Running:true},Mounts:[],Config:{Env:(["DATABASE_URL=postgresql://frequencia:fixture@\($host):5432/frequencia","DIRECT_URL=postgresql://frequencia:fixture@db:5432/frequencia"] + (if $migrar == "ausente" then [] else ["MIGRAR_NA_PARTIDA=" + $migrar] end)),Labels:{"com.docker.compose.project":$projeto,"com.docker.compose.service":"app"}}}')
     db=$(jq -cn --arg id "$ID_DB" --arg projeto "$projeto" --arg inicio "$INICIO_DB" '
       {Id:$id,State:{Running:true,StartedAt:$inicio},Mounts:[{Type:"volume",Name:($projeto+"-dados"),Source:("/var/lib/docker/volumes/"+$projeto+"-dados/_data"),Destination:"/var/lib/postgresql/data"}],Config:{Env:[],Labels:{"com.docker.compose.project":$projeto,"com.docker.compose.service":"db"}},NetworkSettings:{Networks:{"teste-interna":{IPAddress:"172.19.0.2"}}}}')
     if [ "$#" -eq 3 ]; then jq -cn --argjson app "$app" --argjson db "$db" '[$app,$db]'
@@ -710,17 +713,50 @@ grep -q 'não reaplica a revisão instalada com o migrador ativo' "$TMP_RAIZ/sai
   [ "$(cat "$DOCKER_UP_COUNTER")" = 1 ] && [ ! -e "$ESTADO_DIR/atualizacao-manual-pendente.json" ] ||
   falhar "a recusa de --forcar executou backup, gravou intenção ou iniciou outra partida."
 
+# A retomada exige uma opção explícita e o registro da revisão base.
+retomada=(--permitir-migracoes --base-sem-migrador)
+preparar_manual
+status=$(MIGRAR_NA_PARTIDA_BASE_TESTE=false executar_atualizacao "${retomada[@]}")
+exigir_recusa_manual 'não correspondem à base instalada'
+status=$(executar_atualizacao --registrar)
+[ "$status" -eq 0 ] || falhar "não foi possível registrar a base do ensaio de retomada."
+status=$(MIGRAR_NA_PARTIDA_BASE_TESTE=false executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'não correspondem à base instalada'
+status=$(MIGRAR_NA_PARTIDA_BASE_TESTE=false executar_atualizacao --base-sem-migrador --agendado)
+exigir_recusa_manual 'A opção --base-sem-migrador exige'
+for valor in ausente '' False true; do
+  status=$(MIGRAR_NA_PARTIDA_BASE_TESTE="$valor" executar_atualizacao "${retomada[@]}")
+  exigir_recusa_manual 'não correspondem à base instalada'
+done
+status=$(MIGRAR_NA_PARTIDA_BASE_TESTE=false APP_HOST_BANCO_TESTE=outro executar_atualizacao "${retomada[@]}")
+exigir_recusa_manual 'não correspondem à base instalada'
+status=$(MIGRAR_NA_PARTIDA_BASE_TESTE=false HISTORICO_BASE='[]' executar_atualizacao "${retomada[@]}")
+exigir_recusa_manual 'não correspondem à base instalada'
+[ ! -s "$BACKUP_CHAMADAS" ] && [ ! -e "$DOCKER_UP_COUNTER.dump" ] || falhar "uma base divergente chegou ao backup."
+status=$(MIGRAR_NA_PARTIDA_BASE_TESTE=false executar_atualizacao "${retomada[@]}")
+[ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a base recuperada com o migrador desligado foi recusada."; }
+[ "$(jq -er .commit "$ESTADO_DIR/estado.json")" = "$COMMIT_MIGRACAO" ] &&
+  [ ! -e "$ESTADO_DIR/atualizacao-manual-pendente.json" ] && [ "$(cat "$DOCKER_UP_COUNTER")" = 1 ] ||
+  falhar "a retomada não confirmou a revisão alvo."
+
 preparar_manual false true
 status=$(executar_atualizacao --permitir-migracoes)
 exigir_recusa_manual 'não implementa o protocolo manual compatível'
 
-for caso in saude historico sinal troca; do
+for caso in saude historico sinal troca migrador_alvo; do
   preparar_manual
   case "$caso" in
     saude) status=$(DOCKER_FALHA_UP=true executar_atualizacao --permitir-migracoes) ;;
     historico) status=$(HISTORICO_FINAL="$HISTORICO_MANUAL_BASE" executar_atualizacao --permitir-migracoes) ;;
     sinal) status=$(ABATER_APOS_PARTIDA=true executar_atualizacao --permitir-migracoes) ;;
     troca) status=$(ABATER_APOS_TROCA=true executar_atualizacao --permitir-migracoes) ;;
+    migrador_alvo)
+      status=$(executar_atualizacao --registrar)
+      [ "$status" -eq 0 ] || falhar "não foi possível registrar a base do ensaio de retomada."
+      status=$(MIGRAR_NA_PARTIDA_BASE_TESTE=false MIGRAR_NA_PARTIDA_ALVO_TESTE=false executar_atualizacao "${retomada[@]}")
+      grep -q 'O banco, o histórico ou a configuração do aplicativo alvo não conferem' "$TMP_RAIZ/saida.log" ||
+        falhar "a divergência do migrador no alvo não foi detectada na verificação final."
+      ;;
   esac
   exigir_falha "$status" "o resultado incerto foi tratado como sucesso: $caso"
   fase=partida
@@ -736,7 +772,7 @@ for caso in saude historico sinal troca; do
   jq -e --arg commit "$COMMIT_MIGRACAO" --arg fase "$fase" \
     '.fase == $fase and .alvo == $commit and (.backup.sha256 | length == 64)' "$pendente" >/dev/null
   antes=$(sha256sum "$ESTADO_DIR/ultimo-backup.json" "$BACKUP_BANCO_DIR/$(jq -r '.backup.arquivo' "$pendente")")
-  status=$(executar_atualizacao --permitir-migracoes --forcar)
+  status=$(MIGRAR_NA_PARTIDA_BASE_TESTE=false executar_atualizacao "${retomada[@]}" --forcar)
   exigir_falha "$status" "uma nova atualização ignorou o marcador."
   grep -q 'Atualização manual pendente ou incerta' "$TMP_RAIZ/saida.log" || falhar "a repetição não encontrou a guarda."
   for entrada in backup-real.sh restaurar.sh controlador/retencao.sh compose.sh; do

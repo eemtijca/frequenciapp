@@ -84,6 +84,7 @@ subida_lote_auto=false
 app_final_auto=""
 envelope_manual=""
 permissao_manual=false
+base_sem_migrador=false
 protecao_manual=false
 tag_override=""
 ref_override=""
@@ -108,6 +109,10 @@ while [ "$#" -gt 0 ]; do
       permissao_manual=true
       shift
       ;;
+    --base-sem-migrador)
+      base_sem_migrador=true
+      shift
+      ;;
     --agendado)
       agendado=true
       shift
@@ -128,7 +133,7 @@ while [ "$#" -gt 0 ]; do
       ;;
     --ajuda | -h)
       cat <<'TEXTO'
-Uso: atualizar.sh [--simular] [--forcar] [--registrar] [--agendado | --permitir-migracoes] [--modo auto|release|main] [--tag vX.Y.Z] [--ref REF]
+Uso: atualizar.sh [--simular] [--forcar] [--registrar] [--agendado | --permitir-migracoes [--base-sem-migrador]] [--modo auto|release|main] [--tag vX.Y.Z] [--ref REF]
 TEXTO
       exit 0
       ;;
@@ -137,6 +142,13 @@ TEXTO
       ;;
   esac
 done
+
+if [ "$base_sem_migrador" = true ]; then
+  if [ "$permissao_manual" != true ] || [ "$controlador_ativo" = true ] || [ "$agendado" = true ] ||
+    [ "$registrar" = true ] || [ "$simular" = true ] || [ "$MIGRAR_NA_PARTIDA" != true ]; then
+    erro "A opção --base-sem-migrador exige execução manual no perfil simples, com --permitir-migracoes e migrador habilitado no alvo."
+  fi
+fi
 
 if [ "$agendado" = true ]; then
   if [ "$registrar" = true ] || [ "$forcar" = true ] || [ "$permissao_manual" = true ] ||
@@ -607,6 +619,7 @@ conferir_saude_migracoes_auto() {
 conferir_banco_migracoes_auto() {
   local revisao="$1" banco app rede ip_banco servidor observacao_db observacao_app
   local perfil="${2:-auto}" sufixo="" inicio_container="" redes_app="" redes_observadas='{}' borda=false
+  local fase="${3:-alvo}" atestar_base_sem_migrador=false
   local -a nomes_redes=() opcoes_sonda=()
   if [ "$perfil" = manual ]; then sufixo=-manual; fi
   banco=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_DB") || return 1
@@ -650,13 +663,21 @@ conferir_banco_migracoes_auto() {
   if [ "$perfil" = manual ]; then
     inicio_container=$(docker inspect --format '{{.State.StartedAt}}' "$banco") || return 1
     [ -n "$inicio_container" ] || return 1
+    # Depois da reconciliação, o app da base pode continuar sem migrar. Só
+    # aceite isso na base registrada de uma atualização autorizada à mão.
+    if [ "$fase" = base ] && [ "$base_sem_migrador" = true ]; then
+      [ -f "$estado" ] && [ "$(ler_campo_json "$estado" commit)" = "$revisao" ] &&
+        conferir_revisao_migracoes "$app" "$revisao" || return 1
+      atestar_base_sem_migrador=true
+    fi
   fi
 
   # A conexão do app em uso precisa ser a rota efetiva do Compose, não uma URL alternativa.
   # Compare em pipe, sem ecoar ambiente ou credenciais.
   { compose config --format json && docker inspect "$app"; } | jq -es \
     --arg proj "$COMPOSE_PROJECT_NAME" --arg app "$SERVIDOR_SERVICO_APP" --argjson redes "$redes_observadas" \
-    --arg banco "$SERVIDOR_SERVICO_DB" --arg ip "$ip_banco" --argjson partida "${subida_lote_auto:-false}" '
+    --arg banco "$SERVIDOR_SERVICO_DB" --arg ip "$ip_banco" --argjson partida "${subida_lote_auto:-false}" \
+    --argjson atestar_base_sem_migrador "$atestar_base_sem_migrador" '
     length == 2 and (.[0].services[$app].environment as $esperado |
       .[1] | length == 1 and (.[0] |
         (.Config.Env | map(capture("^(?<key>[^=]+)=(?<value>.*)$")) | from_entries) as $real |
@@ -668,8 +689,11 @@ conferir_banco_migracoes_auto() {
           (if $partida then (.HostConfig.ExtraHosts == [$banco + ":" + $ip] or
             .HostConfig.ExtraHosts == [$banco + "=" + $ip]) else true end)
         end) and
-        all(["DATABASE_URL", "DIRECT_URL", "DATABASE_SCHEMA", "MIGRAR_NA_PARTIDA"][];
+        all(["DATABASE_URL", "DIRECT_URL", "DATABASE_SCHEMA"][];
           ($real[.] // "") == ($esperado[.] // "")) and
+        (if $atestar_base_sem_migrador then
+          $real.MIGRAR_NA_PARTIDA == "false" and $esperado.MIGRAR_NA_PARTIDA == "true"
+        else ($real.MIGRAR_NA_PARTIDA // "") == ($esperado.MIGRAR_NA_PARTIDA // "") end) and
         all($real | keys[]; test("^(PG|LD_|NODE_OPTIONS$|NODE_PATH$)") | not)))
     ' >/dev/null || return 1
 
@@ -821,7 +845,7 @@ preparar_migracao_manual() {
   if [ "$perfil_manual" = simples ]; then
     conferir_saude_migracoes_auto "$commit_atual" || erro "O aplicativo ativo não serve a revisão instalada."
   fi
-  banco_manual=$(conferir_banco_migracoes_auto "$commit_atual" manual) ||
+  banco_manual=$(conferir_banco_migracoes_auto "$commit_atual" manual base) ||
     erro "Banco de backup, conexões da aplicação ou histórico não correspondem à base instalada."
   origem_manual=$(projetar_banco_pre_migracao "$banco_manual")
   inicio_manual=$(jq -ce '{inicio,inicioContainer}' <<<"$banco_manual")
@@ -850,7 +874,7 @@ reconferir_base_manual() {
   if [ "$perfil_manual" = simples ]; then conferir_saude_migracoes_auto "$commit_atual" || return 1; fi
   backup_atual=$(conferir_backup_manual) || return 1
   [ "$backup_atual" = "$backup_manual" ] || return 1
-  observado=$(conferir_banco_migracoes_auto "$commit_atual" manual) || return 1
+  observado=$(conferir_banco_migracoes_auto "$commit_atual" manual base) || return 1
   [ "$observado" = "$banco_manual" ]
 }
 
@@ -1147,7 +1171,7 @@ elif [ "$protecao_manual" = true ]; then
     falhar_atualizacao "Falha de saúde após a partida manual." true
   fi
   banco_final_manual=$(conferir_banco_migracoes_auto "$alvo_commit" manual) ||
-    falhar_atualizacao "O histórico final da migração manual não confere." true
+    falhar_atualizacao "O banco, o histórico ou a configuração do aplicativo alvo não conferem após a partida manual." true
   [ "$banco_final_manual" = "$banco_manual" ] ||
     falhar_atualizacao "A identidade do banco após a migração manual mudou." true
   conferir_saude_migracoes_auto "$alvo_commit" || falhar_atualizacao "A revisão alvo não foi servida." true
