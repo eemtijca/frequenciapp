@@ -18,7 +18,7 @@ import MenuItem from "@mui/material/MenuItem";
 import Typography from "@mui/material/Typography";
 import type { Theme } from "@mui/material/styles";
 import type { Identidade } from "@/domain/usuarios";
-import { rotuloDePapel } from "@/domain/usuarios";
+import { rotuloDePapel, temCapacidade } from "@/domain/usuarios";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 import { OpcoesAnimacoes } from "./seletor-animacoes";
 
@@ -165,11 +165,13 @@ export function MenuConta({ usuario, movel, saindo, onAcao }: Props) {
             {movel ? "Conta" : usuario.email}
           </Typography>
         </Box>
-        <Item
-          icone={<NotificationsRoundedIcon fontSize="small" aria-hidden="true" />}
-          rotulo="Notificações"
-          onClick={() => acionar("notificacoes")}
-        />
+        {temCapacidade(usuario.papel, "receberNotificacoes") ? (
+          <Item
+            icone={<NotificationsRoundedIcon fontSize="small" aria-hidden="true" />}
+            rotulo="Notificações"
+            onClick={() => acionar("notificacoes")}
+          />
+        ) : null}
         <Item
           icone={<KeyRoundedIcon fontSize="small" aria-hidden="true" />}
           rotulo="Trocar senha"

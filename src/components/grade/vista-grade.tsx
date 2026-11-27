@@ -80,6 +80,8 @@ interface Props {
   atualizacao?: number;
   origens: Turma[];
   justificativas?: readonly Justificativa[];
+  /** Falso para quem só consulta: a Grade não oferece nem consulta o envio à planilha. */
+  podeEnviarParaPlanilha?: boolean;
   onMes: (mes: string) => void;
 }
 
@@ -110,6 +112,7 @@ export default function VistaGrade({
   atualizacao = 0,
   origens,
   justificativas = JUSTIFICATIVAS_PADRAO,
+  podeEnviarParaPlanilha = true,
   onMes,
 }: Props) {
   const { avisarSucesso } = useAvisosDaSessao();
@@ -124,7 +127,8 @@ export default function VistaGrade({
   useLeituraDaVisao(aberto && modo !== "mes" && doPeriodo === null && !erro);
   const [carregandoPeriodo, setCarregandoPeriodo] = useState(false);
   const [envioAberto, setEnvioAberto] = useState(false);
-  const { estado: estadoPlanilha, recarregar: recarregarPlanilha } = useEstadoPlanilha();
+  const { estado: estadoPlanilha, recarregar: recarregarPlanilha } =
+    useEstadoPlanilha(podeEnviarParaPlanilha);
 
   const rotuloDe = useMemo(() => {
     const mapa = new Map(origens.map((turma) => [turma.id, turma.rotulo]));

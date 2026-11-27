@@ -25,6 +25,10 @@ import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizaca
 
 interface Props {
   destino: DestinoRelatorios;
+  /** Destinos que o papel pode ler; sem a lista, todos. */
+  destinosPermitidos?: readonly DestinoRelatorios[];
+  /** Falso para quem só consulta: a Grade não oferece o envio à planilha. */
+  podeEnviarParaPlanilha?: boolean;
   ativo?: boolean;
   mes: string;
   mesCorrente: string;
@@ -49,6 +53,8 @@ interface Props {
 
 export default function VistaRelatorios({
   destino,
+  destinosPermitidos,
+  podeEnviarParaPlanilha = true,
   ativo = true,
   mes,
   mesCorrente,
@@ -76,7 +82,7 @@ export default function VistaRelatorios({
     setAtualizacao((valor) => valor + 1);
   });
 
-  const itens = [
+  const todosOsDestinos = [
     {
       valor: "resumo" as const,
       conteudo: (
@@ -132,6 +138,7 @@ export default function VistaRelatorios({
             atualizacao={atualizacao}
             origens={turmas}
             justificativas={justificativas}
+            podeEnviarParaPlanilha={podeEnviarParaPlanilha}
             onMes={onMes}
           />
         </ProvedorVisibilidadeGraficos>
@@ -170,6 +177,10 @@ export default function VistaRelatorios({
       ),
     },
   ];
+  // Quem só consulta nunca monta os destinos de fora da lista, nem escondidos.
+  const itens = destinosPermitidos
+    ? todosOsDestinos.filter((item) => destinosPermitidos.includes(item.valor))
+    : todosOsDestinos;
 
   return (
     <Box

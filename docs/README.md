@@ -101,3 +101,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-084](adr/084-relatorio-pdf-da-grade.md): retrato consistente da Grade e relatório em PDF no navegador.
 - [ADR-085](adr/085-provas-especificas.md): provas externas como Enem e vestibulares, com alunos inscritos e frequência própria, fora da Chamada.
 - [ADR-086](adr/086-mapa-openstreetmap-para-locais-de-prova.md): mapa do OpenStreetMap com GPS opcional para o local da prova, coordenadas no banco e cabeçalhos de segurança ajustados.
+- [ADR-087](adr/087-perfil-secretaria-e-capacidade-consultar.md): papel Secretaria, só de consulta, e a capacidade consultar na matriz de acesso, com o aplicativo reduzido ao Painel e a duas grades de relatório.

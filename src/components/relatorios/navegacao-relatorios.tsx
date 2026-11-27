@@ -18,12 +18,18 @@ const DESTINOS = [
 
 export type DestinoRelatorios = (typeof DESTINOS)[number]["valor"];
 
+/** Quem só consulta (Secretaria) lê a Grade e o Por aluno; Resumo, Histórico e movimentações ficam fora. */
+export const DESTINOS_DA_CONSULTA: readonly DestinoRelatorios[] = ["grade", "aluno"];
+
 export function OpcoesRelatorios({
   atual,
+  destinos,
   onEscolher,
   onVoltar,
 }: {
   atual: DestinoRelatorios | null;
+  /** Destinos mostrados; sem a lista, todos. */
+  destinos?: readonly DestinoRelatorios[];
   onEscolher: (destino: DestinoRelatorios) => void;
   onVoltar: () => void;
 }) {
@@ -37,16 +43,18 @@ export function OpcoesRelatorios({
           onEscolher={onVoltar}
         />
       </ListItem>
-      {DESTINOS.map(({ valor, rotulo, icone }) => (
-        <ListItem key={valor} disablePadding>
-          <OpcaoGaveta
-            rotulo={rotulo}
-            icone={icone}
-            atual={atual === valor}
-            onEscolher={() => onEscolher(valor)}
-          />
-        </ListItem>
-      ))}
+      {DESTINOS.filter(({ valor }) => !destinos || destinos.includes(valor)).map(
+        ({ valor, rotulo, icone }) => (
+          <ListItem key={valor} disablePadding>
+            <OpcaoGaveta
+              rotulo={rotulo}
+              icone={icone}
+              atual={atual === valor}
+              onEscolher={() => onEscolher(valor)}
+            />
+          </ListItem>
+        ),
+      )}
     </>
   );
 }

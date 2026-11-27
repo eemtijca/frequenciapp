@@ -1,7 +1,7 @@
 "use client";
 
-// Aba de equipe: contas da coordenação e da administração, com papel,
-// senha e situação. Sem atribuições de turma.
+// Aba de equipe: contas da coordenação, da secretaria e da administração, com
+// papel, senha e situação. Sem atribuições de turma.
 import { useEffect, useMemo, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
@@ -27,7 +27,7 @@ import { Dialogo } from "@/components/ui/mui/dialogo";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { AlertaCompacto, type VarianteEstado } from "@/components/ui/mui/tela-estado";
 import { Selo } from "@/components/ui/mui/selo";
-import { rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
+import { ehPapelDaEquipe, rotuloDePapel, type Papel, type UsuarioDTO } from "@/domain/usuarios";
 import { normalizar } from "@/domain/frequencia";
 import { useAvisosDaSessao } from "@/lib/avisos";
 import { estadoDeErro } from "@/lib/estado-http";
@@ -198,7 +198,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
         <Typography variant="body2" sx={{ color: "text.secondary" }}>
           {usuarios === null
             ? null
-            : `${usuarios.filter((u) => u.papel === "COORDENACAO").length} coordenação · ${usuarios.filter((u) => u.papel === "ADMIN").length} administração`}
+            : `${usuarios.filter((u) => u.papel === "COORDENACAO").length} coordenação · ${usuarios.filter((u) => u.papel === "SECRETARIA").length} secretaria · ${usuarios.filter((u) => u.papel === "ADMIN").length} administração`}
         </Typography>
         <Botao variante="principal" icone={<AddRoundedIcon />} onClick={abrirNovo}>
           Nova conta
@@ -246,7 +246,7 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
             />
           ) : (
             <TabelaCadastrosAdministrativos
-              caption="Contas da coordenação e da administração."
+              caption="Contas da coordenação, da secretaria e da administração."
               identidade="Conta"
             >
               <TableBody role="rowgroup">
@@ -411,15 +411,22 @@ export default function AbaEquipe({ usuarioId, onMudanca, atualizacao = 0 }: Pro
                 onValor={(valor) =>
                   setFormulario((atual) => ({
                     ...atual,
-                    papel: valor === "ADMIN" ? "ADMIN" : "COORDENACAO",
+                    papel: ehPapelDaEquipe(valor as Papel) ? (valor as Papel) : "COORDENACAO",
                   }))
                 }
                 opcoes={[
                   { valor: "COORDENACAO", rotulo: "Coordenação" },
+                  { valor: "SECRETARIA", rotulo: "Secretaria (só consulta)" },
                   { valor: "ADMIN", rotulo: "Administração (acesso total)" },
                 ]}
               />
             </Campo>
+            {formulario.papel === "SECRETARIA" ? (
+              <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                A Secretaria vê o Painel e, em Relatórios, a Grade e o Por aluno. Não faz chamada
+                nem registra saídas, entradas ou provas.
+              </Typography>
+            ) : null}
             {emEdicao?.id === usuarioId ? (
               <Typography variant="caption" sx={{ color: "text.secondary" }}>
                 O próprio acesso de administração não pode ser removido.

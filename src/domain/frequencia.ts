@@ -1,6 +1,7 @@
 // Domínio da frequência. Regras puras, sem dependência de framework
 // ou de banco: tudo aqui é testável de forma isolada.
 import type { Feriado } from "@/domain/calendario-letivo";
+import type { PapelDaEquipe } from "@/domain/usuarios";
 
 /** Marca de frequência de um aluno em um dia. */
 export type Marca = "P" | "S" | "F" | "FJ";
@@ -342,7 +343,7 @@ export interface ResumoAcumulado {
 export interface Responsavel {
   id: string;
   nome: string;
-  papel: "ADMIN" | "COORDENACAO";
+  papel: PapelDaEquipe;
 }
 
 /** Confirmação manual do lançamento de um aluno na Seduc, separada da frequência. */

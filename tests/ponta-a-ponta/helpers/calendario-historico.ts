@@ -1,7 +1,26 @@
 // Navega os seletores reais por rótulos acessíveis, sem selecionar dias intermediários.
-import { expect, type Locator } from "@playwright/test";
-import { nomeDoMes } from "@/domain/frequencia";
+import { expect, type Locator, type Page } from "@playwright/test";
+import { diaLocal, diaSeguinte, ehDomingo, nomeDoMes } from "@/domain/frequencia";
 import { navegarMeses, validarMesDoSeletor } from "./navegacao-periodo";
+
+/** Último domingo até hoje, usado para abrir o resumo semanal em qualquer dia. */
+export function ultimoDomingo(): string {
+  let dia = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
+  while (!ehDomingo(dia)) dia = diaSeguinte(dia, -1);
+  return dia;
+}
+
+/** Seleciona um domingo no calendário do seletor informado. */
+export async function escolherDomingo(page: Page, seletor: string, domingo: string): Promise<void> {
+  await page.locator(seletor).click();
+  const calendario = page.getByRole("dialog").last();
+  for (let tentativa = 0; tentativa < 3; tentativa += 1) {
+    if (await calendario.locator(`[data-dia="${domingo}"]`).count()) break;
+    await calendario.getByRole("button", { name: "Mês anterior", exact: true }).click();
+  }
+  await calendario.locator(`[data-dia="${domingo}"]`).click();
+  await expect(calendario).toBeHidden();
+}
 
 async function mover(painel: Locator, grade: Locator, nome: string, alvo: string) {
   const botao = painel.getByRole("button", { name: nome, exact: true });

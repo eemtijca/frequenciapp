@@ -42,6 +42,10 @@ export async function exportarCopiaConfirmada(admin: Identidade, entrada: unknow
   return exportarCopia(admin);
 }
 
+/**
+ * Registra o preparo de um download. Grade e relatório acompanham a consulta
+ * porque a auditoria não grava dado escolar; a relação continua na administração.
+ */
 export async function registrarPreparacaoDownload(usuario: Identidade, entrada: unknown) {
   const dados = esquemaRegistro.safeParse(entrada);
   if (!dados.success) throw new ErroHttp("Confira o tipo de exportação.", 400);

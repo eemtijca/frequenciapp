@@ -1,12 +1,12 @@
-// Configurações de recursos: leitura por qualquer sessão e atualização pela
-// administração, com auditoria.
+// Configurações de recursos: leitura pela capacidade consultar e atualização
+// pela administração, com auditoria.
 import { atualizarConfiguracoes, lerConfiguracoes } from "@/application/configuracoes";
 import {
   corpoJson,
   erroApi,
   executarRota,
   exigirAdmin,
-  exigirSessao,
+  exigirCapacidade,
   json,
   origemPermitida,
 } from "@/infra/http";
@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   return executarRota(async () => {
-    const sessao = await exigirSessao();
+    const sessao = await exigirCapacidade("consultar");
     if (!sessao.ok) return sessao.resposta;
     return json({ configuracoes: await lerConfiguracoes() });
   });

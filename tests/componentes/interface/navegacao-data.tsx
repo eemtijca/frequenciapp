@@ -302,6 +302,7 @@ const telas = {
       frequencias={[]}
       saidas={[]}
       configuracoes={CONFIGURACOES_PADRAO}
+      podeOperar
       onRecarregar={vazio}
       onRecarregarConfiguracoes={vazio}
     />
