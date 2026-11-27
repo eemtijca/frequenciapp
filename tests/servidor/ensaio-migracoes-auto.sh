@@ -4,6 +4,9 @@ set -euo pipefail
 umask 077
 
 IMAGEM=postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994
+IMAGEM_NODE=node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
+node_ensaio=/ensaio-node
+libatomic_ensaio=/usr/lib/libatomic.so.1
 etapa=entrada
 pasta=
 resumo=
@@ -92,13 +95,27 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 pasta=$(mktemp -d "${RUNNER_TEMP:-${TMPDIR:-/tmp}}/ensaio-migracoes.XXXXXXXXXXXX")
 # --mount usa vírgula como separador; não interpretar caminhos do host como opções.
-node_bin=$(node -p 'process.execPath')
 dependencias=$(realpath -e -- node_modules)
-for caminho in "$pasta" "$node_bin" "$dependencias"; do
+for caminho in "$pasta" "$dependencias"; do
   [[ "$caminho" == /* && "$caminho" != *','* && "$caminho" != *\"* && "$caminho" != *$'\n'* ]] ||
     falhar 'Caminho incompatível com as montagens privadas do ensaio.'
 done
-[[ -f "$node_bin" && -d "$dependencias/pg" ]] || falhar 'Instale as dependências fixadas antes do ensaio.'
+[[ -d "$dependencias/pg" ]] || falhar 'Instale as dependências fixadas antes do ensaio.'
+
+# Use Node e libatomic da mesma imagem Debian Bookworm, não o ELF do runner.
+etapa=projecao-runtime
+mkdir -m 700 "$pasta/runtime"
+extrair_runtime() {
+  docker_local 30s run --rm --pull never --network none --read-only --user "$uid:$gid" \
+    --cap-drop ALL --security-opt no-new-privileges --pids-limit 32 --memory 128m \
+    --log-driver none --entrypoint /bin/sh "$IMAGEM_NODE" -ec "$1"
+}
+extrair_runtime 'exec cat /usr/local/bin/node' >"$pasta/runtime/node"
+extrair_runtime "set -- /usr/lib/*/libatomic.so.1; [ \"\$#\" -eq 1 ]; exec cat \"\$1\"" \
+  >"$pasta/runtime/libatomic.so.1"
+[[ -s "$pasta/runtime/node" && -s "$pasta/runtime/libatomic.so.1" ]] || falhar 'Runtime incompleto.'
+chmod 500 "$pasta/runtime/node"
+chmod 400 "$pasta/runtime/libatomic.so.1"
 
 # Materializar só arquivos regulares e os bytes dos objetos Git, não o checkout.
 projetar() {
@@ -122,7 +139,8 @@ projetar() {
 }
 montagens=(
   --mount "type=bind,src=$dependencias,dst=/node_modules,readonly"
-  --mount "type=bind,src=$node_bin,dst=/ensaio-node,readonly"
+  --mount "type=bind,src=$pasta/runtime/node,dst=$node_ensaio,readonly"
+  --mount "type=bind,src=$pasta/runtime/libatomic.so.1,dst=$libatomic_ensaio,readonly"
 )
 prova_tmpfs="rw,nosuid,nodev,noexec,uid=$uid,gid=$gid,mode=0700,size=1m"
 if $regressoes; then
@@ -173,7 +191,8 @@ cid=$(<"$pasta/cid")
 [[ "$cid" =~ ^[0-9a-f]{64}$ ]]
 docker_local 10s inspect --type container "$cid" | jq -e \
   --arg id "$cid" --arg imagem "$imagem_id" --arg rodada "$rodada" \
-  --arg pasta "$pasta" --arg deps "$dependencias" --arg node "$node_bin" \
+  --arg pasta "$pasta" --arg deps "$dependencias" --arg node "$node_ensaio" \
+  --arg libatomic "$libatomic_ensaio" \
   --arg autorizacao "$autorizacao" --arg prova_tmpfs "$prova_tmpfs" --argjson regressoes "$regressoes" '
   length == 1 and (.[0] |
     .Id == $id and .Image == $imagem and .State.Status == "created" and
@@ -188,12 +207,23 @@ docker_local 10s inspect --type container "$cid" | jq -e \
     (if $regressoes then .HostConfig.Tmpfs[$autorizacao] == $prova_tmpfs else true end) and
     all(.Mounts[]; .Type == "bind" and .RW == false) and
     ([.Mounts[] | [.Destination, .Source]] | sort) ==
-      ([["/ensaio-node", $node], ["/node_modules", $deps]] +
+      ([[$node, $pasta + "/runtime/node"], [$libatomic, $pasta + "/runtime/libatomic.so.1"],
+          ["/node_modules", $deps]] +
         (if $regressoes then [["/regressoes", $pasta + "/regressoes"]]
          else [["/alvo", $pasta + "/alvo"], ["/base", $pasta + "/base"],
                [$autorizacao, $pasta + "/autorizacao"]] end) | sort))
 ' >/dev/null
 docker_local 15s start "$cid" >/dev/null
+
+executar_node() {
+  local prazo=$1
+  shift
+  docker_local "$prazo" exec --user "$uid:$gid" "$cid" env -i PATH=/usr/bin:/bin HOME=/tmp "$@"
+}
+etapa=runtime
+versao_node=${IMAGEM_NODE#node:}
+[[ $(executar_node 10s "$node_ensaio" --version) == "v${versao_node%%-*}" ]] ||
+  falhar 'O Node fixado não iniciou na imagem PostgreSQL.'
 
 psql_ensaio() {
   docker_local 40s exec -i "$cid" env -i PATH=/usr/local/bin:/usr/bin:/bin \
@@ -220,20 +250,20 @@ IFS='|' read -r banco_observado usuario_observado schema_observado ip_observado 
 
 if $regressoes; then
   etapa=regressoes
-  docker_local 90s exec --user "$uid:$gid" "$cid" env -i PATH=/usr/bin:/bin HOME=/tmp \
+  executar_node 90s \
     MIGRADOR_BANCO_DESCARTAVEL=true \
     "DIRECT_URL=postgresql://ensaio:$senha@127.0.0.1:5432/postgres" \
-    /ensaio-node --test /regressoes/tests/servidor/migracao-auto-lock.test.mjs
+    "$node_ensaio" --test /regressoes/tests/servidor/migracao-auto-lock.test.mjs
   exit 0
 fi
 
 migrar() {
   local modo=false lote="${2:-}"
   if [[ -n "$lote" ]]; then modo=true; fi
-  docker_local 150s exec --user "$uid:$gid" "$cid" env -i PATH=/usr/bin:/bin HOME=/tmp \
+  executar_node 150s \
     "MIGRACAO_AUTOMATICA=$modo" "MIGRACAO_LOTE_APROVADO=$lote" \
     "DIRECT_URL=postgresql://ensaio:$senha@127.0.0.1:5432/$banco?schema=public" \
-    /ensaio-node "/$1/docker/app/migrar.mjs" > "$pasta/migrador.log" 2>&1
+    "$node_ensaio" "/$1/docker/app/migrar.mjs" > "$pasta/migrador.log" 2>&1
 }
 
 historico() {
