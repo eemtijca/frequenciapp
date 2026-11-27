@@ -30,6 +30,29 @@ export function useAcaoUnica<T>(acao: () => Promise<T> | T) {
   return { executando, executar };
 }
 
+/**
+ * Uma escrita por vez, com a chave visível para a tela. Diferente de
+ * useAcoesPorChave, a segunda ação é ignorada em vez de correr em paralelo.
+ */
+export function useAcaoUnicaComChave() {
+  const [chaveAtiva, setChaveAtiva] = useState<string | null>(null);
+  const emAndamento = useRef(false);
+
+  const executar = useCallback(async (chave: string, acao: () => Promise<unknown>) => {
+    if (emAndamento.current) return undefined;
+    emAndamento.current = true;
+    setChaveAtiva(chave);
+    try {
+      return await acao();
+    } finally {
+      emAndamento.current = false;
+      setChaveAtiva(null);
+    }
+  }, []);
+
+  return { chaveAtiva, executar };
+}
+
 export function useAcoesPorChave() {
   const [chaveAtiva, setChaveAtiva] = useState<string | null>(null);
   const emAndamento = useRef(new Set<string>());

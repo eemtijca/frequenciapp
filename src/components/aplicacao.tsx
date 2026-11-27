@@ -39,6 +39,7 @@ import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import ChecklistRoundedIcon from "@mui/icons-material/ChecklistRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ExitToAppRoundedIcon from "@mui/icons-material/ExitToAppRounded";
+import FactCheckRoundedIcon from "@mui/icons-material/FactCheckRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import NotificationsRoundedIcon from "@mui/icons-material/NotificationsRounded";
@@ -87,6 +88,7 @@ import {
   type DestinoRelatorios,
 } from "@/components/relatorios/navegacao-relatorios";
 import VistaAlunos from "@/components/alunos/vista-alunos";
+import VistaProvas from "@/components/provas/vista-provas";
 import VistaGestao from "@/components/gestao/vista-gestao";
 import {
   categoriaDe,
@@ -120,6 +122,7 @@ export type Visao =
   | "chamada-parcial"
   | "saidas"
   | "relatorios"
+  | "provas"
   | "alunos"
   | "gestao";
 
@@ -151,6 +154,7 @@ const VISOES: Visao[] = [
   "chamada-parcial",
   "saidas",
   "relatorios",
+  "provas",
   "alunos",
   "gestao",
 ];
@@ -207,6 +211,11 @@ const ITEM_RELATORIOS: ItemNav = {
   visao: "relatorios",
   rotulo: "Relatórios",
   icone: TableChartRoundedIcon,
+};
+const ITEM_PROVAS: ItemNav = {
+  visao: "provas",
+  rotulo: "Provas",
+  icone: FactCheckRoundedIcon,
 };
 const ITEM_CHAMADA_PARCIAL: ItemNav = {
   visao: "chamada-parcial",
@@ -603,6 +612,7 @@ export default function Aplicacao({
     pedida &&
     (pedida !== "gestao" || ehAdmin) &&
     (pedida !== "chamada-parcial" || podeOperar) &&
+    (pedida !== "provas" || podeOperar) &&
     (pedida !== "saidas" || configuracoesIniciais.saidaAntecipada)
       ? pedida
       : "painel";
@@ -728,6 +738,7 @@ export default function Aplicacao({
     if (podeOperar) lista.splice(2, 0, ITEM_CHAMADA_PARCIAL);
     if (configuracoes.saidaAntecipada) lista.push(ITEM_SAIDAS);
     lista.push(ITEM_RELATORIOS);
+    if (podeOperar) lista.push(ITEM_PROVAS);
     // A administração cadastra e consulta alunos dentro da Gestão; a consulta avulsa é da coordenação.
     lista.push(ehAdmin ? ITEM_GESTAO : ITEM_ALUNOS);
     return lista;
@@ -1132,6 +1143,9 @@ export default function Aplicacao({
             onAbrir={abrirFrequencia}
             onRecarregar={recarregarFrequencias}
           />
+        )}
+        {alvoVisao === "provas" && podeOperar && (
+          <VistaProvas alunos={alunos} turmas={turmas} diaCorrente={diaCorrente} fuso={fuso} />
         )}
         {alvoVisao === "alunos" && !ehAdmin && (
           <VistaAlunos

@@ -72,7 +72,7 @@ A cópia JSON permanece na versão 1 e acrescenta `frequenciasParciais` opcional
 
 ## Página única com visões locais
 
-O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Painel, Chamada, Horários, Chamada Parcial, Saídas e entradas e Relatórios para a equipe; Alunos (consulta) para a coordenação; Gestão para a administração. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da chamada em aberto. Valores antigos de `?visao=` continuam abrindo a área correspondente.
+O aplicativo inteiro vive em `/`, com as visões trocadas no cliente: Painel, Chamada, Horários, Chamada Parcial, Saídas e entradas, Relatórios e Provas para a equipe; Alunos (consulta) para a coordenação; Gestão para a administração. A troca replica o fluxo do aplicativo original e o comportamento de app instalável em tela cheia. A tela de entrada usa o mesmo endereço quando não há sessão, e o `router.refresh()` reexecuta o componente de servidor após entrar ou sair. Não há navegação entre rotas de página: toda troca de contexto é local, o que mantém a rolagem e o estado da chamada em aberto. Valores antigos de `?visao=` continuam abrindo a área correspondente.
 
 Horários reutiliza as aulas no escopo de turmas da equipe e permite consulta por dia ou semana, sem nova rota de página. A administração configura as mesmas aulas em Gestão > Turmas. O mapa de disciplinas usa os dias ISO como chaves e não altera as regras de frequência nem inclui dados de professores.
 

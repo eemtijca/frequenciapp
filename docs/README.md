@@ -99,3 +99,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-082](adr/082-navegacao-lateral-gestao.md): destinos de Gestão e Configurações na gaveta, com foco e preferência de movimento independentes do conteúdo.
 - [ADR-083](adr/083-confirmacao-historica-da-chamada.md): consulta antes da gravação, motivo opcional e preservação da auditoria da chamada histórica.
 - [ADR-084](adr/084-relatorio-pdf-da-grade.md): retrato consistente da Grade e relatório em PDF no navegador.
+- [ADR-085](adr/085-provas-especificas.md): provas externas como Enem e vestibulares, com alunos inscritos e frequência própria, fora da Chamada.
