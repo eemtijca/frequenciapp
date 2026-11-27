@@ -30,6 +30,12 @@ export interface ParticipanteDaProva {
   presente: MarcaDaProva;
 }
 
+/** Prova aberta com a lista de participantes usada pela tela de frequência. */
+export interface DetalheDaProva {
+  prova: ProvaEspecifica;
+  participantes: ParticipanteDaProva[];
+}
+
 export interface DadosDaProvaEspecifica {
   nome: string;
   local: string | null;
@@ -78,5 +84,21 @@ export function resumirMarcas(marcas: readonly MarcaDaProva[]): {
     presentes,
     ausentes,
     pendentes: marcas.length - presentes - ausentes,
+  };
+}
+
+/** Atualiza a marca de um aluno e recalcula os contadores, sem tocar nos demais. */
+export function comMarca(
+  detalhe: DetalheDaProva,
+  alunoId: string,
+  marca: MarcaDaProva,
+): DetalheDaProva {
+  const participantes = detalhe.participantes.map((item) =>
+    item.alunoId === alunoId ? { ...item, presente: marca } : item,
+  );
+  const contagem = resumirMarcas(participantes.map((item) => item.presente));
+  return {
+    prova: { ...detalhe.prova, presentes: contagem.presentes, ausentes: contagem.ausentes },
+    participantes,
   };
 }

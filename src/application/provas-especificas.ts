@@ -8,6 +8,7 @@ import {
   LIMITE_PARTICIPANTES_PROVA,
   normalizarProvaEspecifica,
   problemaNaProvaEspecifica,
+  resumirMarcas,
   type MarcaDaProva,
   type ParticipanteDaProva,
   type ProvaEspecifica,
@@ -52,7 +53,7 @@ function paraDia(dia: Date): string {
   return dia.toISOString().slice(0, 10);
 }
 
-function lerDados(entrada: unknown) {
+function validarProvaDaEntrada(entrada: unknown) {
   const dados = esquemaProva.safeParse(entrada);
   if (!dados.success) throw primeiroErro(dados.error);
   const prova = normalizarProvaEspecifica(dados.data);
@@ -112,17 +113,16 @@ export async function lerProvaEspecifica(
       presente: linha.presente,
     }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
-  const presentes = participantes.filter((p) => p.presente === true).length;
-  const ausentes = participantes.filter((p) => p.presente === false).length;
+  const contagem = resumirMarcas(participantes.map((p) => p.presente));
   return {
     prova: {
       id: prova.id,
       nome: prova.nome,
       local: prova.local,
       dia: paraDia(prova.dia),
-      total: participantes.length,
-      presentes,
-      ausentes,
+      total: contagem.total,
+      presentes: contagem.presentes,
+      ausentes: contagem.ausentes,
     },
     participantes,
   };
@@ -133,7 +133,7 @@ export async function criarProvaEspecifica(
   usuario: { id: string },
   entrada: unknown,
 ): Promise<ProvaEspecifica> {
-  const prova = lerDados(entrada);
+  const prova = validarProvaDaEntrada(entrada);
   return comTransacao(async (tx) => {
     const criada = await tx.provaEspecifica.create({
       data: { nome: prova.nome, local: prova.local, dia: new Date(`${prova.dia}T12:00:00Z`) },
@@ -158,7 +158,7 @@ export async function editarProvaEspecifica(
   entrada: unknown,
 ): Promise<void> {
   exigirId(id);
-  const prova = lerDados(entrada);
+  const prova = validarProvaDaEntrada(entrada);
   await comTransacao(async (tx) => {
     const alteradas = await tx.provaEspecifica.updateMany({
       where: { id },
@@ -187,7 +187,7 @@ export async function definirParticipantes(
   usuario: { id: string },
   id: string,
   entrada: unknown,
-): Promise<{ total: number }> {
+): Promise<void> {
   exigirId(id);
   const dados = esquemaParticipantes.safeParse(entrada);
   if (!dados.success) throw primeiroErro(dados.error);
@@ -226,7 +226,6 @@ export async function definirParticipantes(
       "prova-especifica.participantes",
       `prova:${id}:entraram:${entraram.length}:sairam:${sairam.length}`,
     );
-    return { total: desejados.size };
   });
 }
 
@@ -235,7 +234,7 @@ export async function registrarFrequenciaDaProva(
   usuario: { id: string },
   id: string,
   entrada: unknown,
-): Promise<{ atualizados: number }> {
+): Promise<void> {
   exigirId(id);
   const dados = esquemaFrequencia.safeParse(entrada);
   if (!dados.success) throw primeiroErro(dados.error);
@@ -266,6 +265,5 @@ export async function registrarFrequenciaDaProva(
       "prova-especifica.frequencia",
       `prova:${id}:marcas:${alunoIds.length}`,
     );
-    return { atualizados: alunoIds.length };
   });
 }

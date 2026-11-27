@@ -24,14 +24,14 @@ import {
   type Turma,
 } from "@/domain/frequencia";
 import {
-  resumirMarcas,
+  comMarca,
   type MarcaDaProva,
   type ParticipanteDaProva,
   type ProvaEspecifica,
 } from "@/domain/provas-especificas";
 import { corpoAlteracao, pedir } from "@/lib/api-cliente";
 import { useAvisosDaSessao } from "@/lib/avisos";
-import { useAcoesPorChave } from "@/lib/use-acao-unica";
+import { useAcaoUnicaComChave } from "@/lib/use-acao-unica";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
@@ -67,14 +67,28 @@ function contarAlunos(quantidade: number): string {
   return quantidade === 1 ? "1 aluno" : `${quantidade} alunos`;
 }
 
-function ResumoDaProva({ prova }: { prova: ProvaEspecifica }) {
+function contarMarcados(quantidade: number, singular: string, plural: string): string {
+  return quantidade === 1 ? `1 ${singular}` : `${quantidade} ${plural}`;
+}
+
+function ResumoDaProva({
+  prova,
+  completo = false,
+}: {
+  prova: ProvaEspecifica;
+  completo?: boolean;
+}) {
   const pendentes = prova.total - prova.presentes - prova.ausentes;
   return (
     <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
       <Selo rotulo={contarAlunos(prova.total)} />
-      {prova.presentes > 0 ? <Selo tom="sucesso" rotulo={`${prova.presentes} presentes`} /> : null}
-      {prova.ausentes > 0 ? <Selo tom="perigo" rotulo={`${prova.ausentes} ausentes`} /> : null}
-      {pendentes > 0 && prova.total > 0 ? (
+      {completo || prova.presentes > 0 ? (
+        <Selo tom="sucesso" rotulo={contarMarcados(prova.presentes, "presente", "presentes")} />
+      ) : null}
+      {completo || prova.ausentes > 0 ? (
+        <Selo tom="perigo" rotulo={contarMarcados(prova.ausentes, "ausente", "ausentes")} />
+      ) : null}
+      {completo || (pendentes > 0 && prova.total > 0) ? (
         <Selo tom="atencao" rotulo={`${pendentes} sem registro`} />
       ) : null}
     </Stack>
@@ -155,8 +169,9 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
   const [aberturas, setAberturas] = useState(0);
   const [dialogo, setDialogo] = useState<"nova" | "editar" | "alunos" | "remover" | null>(null);
   const [removendo, setRemovendo] = useState(false);
-  const { chaveAtiva, executar: executarPorAluno } = useAcoesPorChave();
+  const { chaveAtiva, executar: executarFrequencia } = useAcaoUnicaComChave();
   const pedidoDetalhe = useRef(0);
+  const abertaIdRef = useRef<string | null>(null);
 
   const rotuloDe = useMemo(
     () => new Map(turmas.map((turma) => [turma.id, turma.rotulo])),
@@ -200,16 +215,19 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
   }, [marcarAtualizado]);
 
   function abrirProva(id: string) {
+    abertaIdRef.current = id;
     setAbertaId(id);
     setDetalhe(null);
     setBusca("");
     lerDetalhe(id).catch((excecao) => {
+      abertaIdRef.current = null;
       setAbertaId(null);
       avisarErro(excecao, { contexto: "Não foi possível abrir a prova." });
     });
   }
 
   function voltarParaLista() {
+    abertaIdRef.current = null;
     pedidoDetalhe.current += 1;
     setAbertaId(null);
     setDetalhe(null);
@@ -223,23 +241,19 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
 
   async function marcar(alunoId: string, marca: MarcaDaProva) {
     if (!detalhe) return;
+    const provaId = detalhe.prova.id;
     const anterior = detalhe;
-    const participantes = detalhe.participantes.map((item) =>
-      item.alunoId === alunoId ? { ...item, presente: marca } : item,
-    );
-    const contagem = resumirMarcas(participantes.map((item) => item.presente));
-    setDetalhe({
-      prova: { ...detalhe.prova, presentes: contagem.presentes, ausentes: contagem.ausentes },
-      participantes,
-    });
-    await executarPorAluno(alunoId, async () => {
+    await executarFrequencia(alunoId, async () => {
+      setDetalhe(comMarca(anterior, alunoId, marca));
       try {
         const dados = await pedir<Detalhe>(
-          `/api/provas/${anterior.prova.id}/frequencia`,
+          `/api/provas/${provaId}/frequencia`,
           corpoAlteracao("PUT", { marcas: [{ alunoId, presente: marca }] }),
         );
+        if (abertaIdRef.current !== provaId) return;
         setDetalhe(dados);
       } catch (excecao) {
+        if (abertaIdRef.current !== provaId) return;
         setDetalhe(anterior);
         avisarErro(excecao, { contexto: "Não foi possível salvar a frequência." });
       }
@@ -248,23 +262,27 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
 
   async function marcarPendentesComoPresentes() {
     if (!detalhe) return;
+    const provaId = detalhe.prova.id;
     const marcas = detalhe.participantes
       .filter((item) => item.presente === null)
       .map((item) => ({ alunoId: item.alunoId, presente: true }));
     if (marcas.length === 0) return;
-    await executarPorAluno("todos", async () => {
+    await executarFrequencia("todos", async () => {
       try {
         const dados = await pedir<Detalhe>(
-          `/api/provas/${detalhe.prova.id}/frequencia`,
+          `/api/provas/${provaId}/frequencia`,
           corpoAlteracao("PUT", { marcas }),
         );
+        if (abertaIdRef.current !== provaId) return;
         setDetalhe(dados);
         avisarSucesso(
           "Presenças registradas.",
           `${contarAlunos(marcas.length)} marcados como presentes.`,
         );
       } catch (excecao) {
-        avisarErro(excecao, { contexto: "Não foi possível salvar a frequência." });
+        if (abertaIdRef.current === provaId) {
+          avisarErro(excecao, { contexto: "Não foi possível salvar a frequência." });
+        }
       }
     });
   }
@@ -395,7 +413,7 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
                 </>
               }
             />
-            <ResumoDaProva prova={prova} />
+            <ResumoDaProva prova={prova} completo />
             <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
               <Botao
                 variante="principal"
@@ -408,7 +426,7 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
               {pendentes > 0 ? (
                 <Botao
                   variante="contorno"
-                  disabled={chaveAtiva === "todos"}
+                  disabled={chaveAtiva !== null}
                   onClick={() => void marcarPendentesComoPresentes()}
                   sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
                 >
@@ -443,7 +461,7 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
                       key={participante.alunoId}
                       participante={participante}
                       turma={rotuloDe.get(participante.turmaId) ?? "Turma"}
-                      ocupado={chaveAtiva === participante.alunoId || chaveAtiva === "todos"}
+                      ocupado={chaveAtiva !== null}
                       onMarcar={(alunoId, marca) => void marcar(alunoId, marca)}
                     />
                   ))}
