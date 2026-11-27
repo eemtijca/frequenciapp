@@ -38,7 +38,7 @@ A combinação cobre navegadores modernos sem tokens por formulário.
 ## Cabeçalhos e CSP
 
 - CSP por nonce em cada requisição, montada por URL em `src/infra/csp.ts`: scripts limitados ao próprio servidor com `strict-dynamic`; estilos externos com `'unsafe-inline'` para as posições dinâmicas dos componentes; `object-src 'none'`, `base-uri 'self'`, `frame-ancestors 'none'`. Em produção, a única exceção é a documentação interativa, que recebe `'unsafe-eval'` para a validação do "Try it out" (ver [ADR-043](adr/043-documentacao-interativa-e-csp.md)). Ela não guarda no navegador as credenciais digitadas em Authorize.
-- `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` sem câmera, microfone ou geolocalição.
+- `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` sem câmera nem microfone e com geolocalização só para a própria origem, usada no botão Usar minha localização do mapa de locais de prova ([ADR-086](adr/086-mapa-openstreetmap-para-locais-de-prova.md)). O CSP libera imagens de `https://tile.openstreetmap.org` e nenhum outro destino externo de mapa; o aplicativo não envia coordenada a terceiros, e o navegador pede só os tiles da área exibida.
 - Sem `X-Powered-By`. HSTS é adicionado no caminho self-hosted pelo `next.config.ts` apenas quando o tráfego é TLS (produção sem `PERMITIR_HTTP`); na Vercel, o cabeçalho vem da plataforma. O CSP só inclui `upgrade-insecure-requests` quando a requisição chega por HTTPS.
 
 Em desenvolvimento, a CSP abre `unsafe-eval` para as ferramentas do Next, o que não vale em produção, exceto na rota da documentação interativa (ADR-043).

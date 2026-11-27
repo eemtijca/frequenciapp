@@ -18,6 +18,8 @@ interface Prova {
   id: string;
   nome: string;
   local: string | null;
+  latitude: number | null;
+  longitude: number | null;
   dia: string;
   total: number;
   presentes: number;
@@ -225,6 +227,164 @@ it("a administração e a coordenação cadastram prova, inclusive no domingo e 
     ids.has(prova.id),
   );
   expect(lista.map((prova) => prova.nome)).toEqual(["QA Enem", "QA Vestibular"]);
+});
+
+it("grava as coordenadas do mapa arredondadas, recusa par incompleto e fora da faixa e permite limpar", async () => {
+  const prova = await criar({
+    nome: "QA Mapa",
+    local: "Escola Central",
+    latitude: -3.731912345678,
+    longitude: -38.526687654321,
+    dia: "2026-11-15",
+  });
+  expect(prova).toMatchObject({ latitude: -3.731912, longitude: -38.526688 });
+  expect((await ler(prova.id)).prova).toMatchObject({ latitude: -3.731912, longitude: -38.526688 });
+
+  const casos: Array<[string, Record<string, unknown>, string]> = [
+    ["só a latitude", { latitude: -3.7 }, "Informe a latitude e a longitude juntas."],
+    ["só a longitude", { longitude: -38.5 }, "Informe a latitude e a longitude juntas."],
+    [
+      "latitude fora da faixa",
+      { latitude: 91, longitude: 0 },
+      "A latitude deve ficar entre -90 e 90.",
+    ],
+    [
+      "longitude fora da faixa",
+      { latitude: 0, longitude: -181 },
+      "A longitude deve ficar entre -180 e 180.",
+    ],
+    ["latitude em texto", { latitude: "-3.7", longitude: -38.5 }, "Latitude inválida."],
+  ];
+  for (const [, coordenadas, mensagem] of casos) {
+    const resposta = await chamar("/api/provas", "POST", cookieCoordenacao, {
+      nome: "QA Mapa inválido",
+      dia: "2026-11-15",
+      ...coordenadas,
+    });
+    expect(resposta.status).toBe(400);
+    expect(((await resposta.json()) as { error: string }).error).toBe(mensagem);
+  }
+
+  const zero = await chamar(`/api/provas/${prova.id}`, "PATCH", cookieCoordenacao, {
+    nome: "QA Mapa",
+    dia: "2026-11-15",
+    latitude: 0,
+    longitude: 0,
+  });
+  expect(((await zero.json()) as { prova: Prova }).prova).toMatchObject({
+    latitude: 0,
+    longitude: 0,
+  });
+
+  const limpa = await chamar(`/api/provas/${prova.id}`, "PATCH", cookieCoordenacao, {
+    nome: "QA Mapa",
+    dia: "2026-11-15",
+  });
+  expect(((await limpa.json()) as { prova: Prova }).prova).toMatchObject({
+    latitude: null,
+    longitude: null,
+  });
+  const lista = (
+    (await (await chamar("/api/provas", "GET", cookieCoordenacao)).json()) as { provas: Prova[] }
+  ).provas.find((item) => item.id === prova.id);
+  expect(lista).toMatchObject({ latitude: null, longitude: null });
+});
+
+it("soma os alunos distintos das provas a até 100 m do ponto e ignora as de longe e as sem local", async () => {
+  const ponto = { latitude: -3.7319, longitude: -38.5267 };
+  const aoLado = { latitude: ponto.latitude + 0.0002, longitude: ponto.longitude }; // cerca de 22 m
+  const longe = { latitude: ponto.latitude + 0.01, longitude: ponto.longitude }; // cerca de 1,1 km
+  const margem = { latitude: ponto.latitude + 0.00135, longitude: ponto.longitude }; // cerca de 150 m
+  const dani = (
+    await banco.query<{ id: string }>(
+      "insert into alunos (nome, turma_id, turma_original_id, ordem) values ('QA Dani', $1, $1, 8) returning id",
+      [turmaId],
+    )
+  ).rows[0]?.id;
+  const inscrever = (id: string, alunoIds: Array<string | undefined>) =>
+    chamar(`/api/provas/${id}/participantes`, "PUT", cookieCoordenacao, { alunoIds });
+
+  const a = await criar({ nome: "QA Local A", dia: "2026-11-20", ...ponto });
+  const b = await criar({ nome: "QA Local B", dia: "2026-11-21", ...aoLado });
+  const c = await criar({ nome: "QA Local C", dia: "2026-11-22", ...longe });
+  const g = await criar({ nome: "QA Local G", dia: "2026-11-23", ...margem });
+  const semLocal = await criar({ nome: "QA Local sem ponto", dia: "2026-11-24" });
+  await inscrever(a.id, [alunos[0], alunos[1]]);
+  await inscrever(b.id, [alunos[1], alunos[2]]); // alunos[1] repete: conta uma vez
+  await inscrever(c.id, [dani]);
+  await inscrever(g.id, [alunos[0]]);
+  await inscrever(semLocal.id, [alunos[2]]);
+
+  interface Ocupacao {
+    alunos: number;
+    provas: Array<{ id: string; nome: string; dia: string; alunos: number; atual: boolean }>;
+  }
+  const consultar = async (parametros: string, cookie = cookieCoordenacao) => {
+    const resposta = await chamar(`/api/provas/ocupacao?${parametros}`, "GET", cookie);
+    return {
+      status: resposta.status,
+      corpo: (await resposta.json()) as Ocupacao & { error: string },
+    };
+  };
+  const doPonto = `latitude=${ponto.latitude}&longitude=${ponto.longitude}`;
+
+  const noPonto = await consultar(doPonto);
+  expect(noPonto.status).toBe(200);
+  expect(noPonto.corpo.alunos).toBe(3);
+  expect(noPonto.corpo.provas.filter((p) => p.nome.startsWith("QA Local"))).toEqual([
+    { id: b.id, nome: "QA Local B", dia: "2026-11-21", alunos: 2, atual: false },
+    { id: a.id, nome: "QA Local A", dia: "2026-11-20", alunos: 2, atual: false },
+  ]);
+
+  // Vírgula decimal e a administração valem como no restante da API.
+  const comVirgula = await consultar(
+    `latitude=${String(ponto.latitude).replace(".", ",")}&longitude=${String(ponto.longitude).replace(".", ",")}`,
+    cookieAdmin,
+  );
+  expect(comVirgula.corpo.alunos).toBe(3);
+
+  // A prova em edição entra com os próprios alunos, mesmo marcada em outro ponto.
+  const comAtual = await consultar(`${doPonto}&provaId=${c.id}`);
+  expect(comAtual.corpo.alunos).toBe(4);
+  expect(comAtual.corpo.provas.find((p) => p.id === c.id)).toMatchObject({
+    atual: true,
+    alunos: 1,
+  });
+
+  // A prova em edição que já está no ponto não é contada duas vezes.
+  const jaNoPonto = await consultar(`${doPonto}&provaId=${a.id}`);
+  expect(jaNoPonto.corpo.alunos).toBe(3);
+  expect(jaNoPonto.corpo.provas.filter((p) => p.id === a.id)).toHaveLength(1);
+
+  // Longe de todas, a ocupação é zero.
+  const vazio = await consultar(`latitude=${ponto.latitude - 0.01}&longitude=${ponto.longitude}`);
+  expect(vazio.corpo).toMatchObject({ alunos: 0 });
+  expect(vazio.corpo.provas.filter((p) => p.nome.startsWith("QA Local"))).toEqual([]);
+
+  // Validação e acesso.
+  const faltando = await consultar("latitude=-3.7");
+  expect(faltando.status).toBe(400);
+  expect(faltando.corpo.error).toBe("Informe a latitude e a longitude.");
+  expect((await consultar("latitude=95&longitude=0")).corpo.error).toBe(
+    "A latitude deve ficar entre -90 e 90.",
+  );
+  expect((await consultar("latitude=abc&longitude=0")).status).toBe(400);
+  expect((await consultar(`${doPonto}&provaId=nao-e-uuid`)).corpo.error).toBe("Prova inválida.");
+  expect((await consultar(doPonto, "")).status).toBe(401);
+});
+
+it("o banco recusa coordenadas incompletas ou fora da faixa mesmo sem passar pela API", async () => {
+  const inserir = (latitude: number | null, longitude: number | null) =>
+    banco.query(
+      "insert into provas_especificas (nome, dia, latitude, longitude, atualizado_em) values ('QA Banco', '2026-11-16', $1, $2, now())",
+      [latitude, longitude],
+    );
+  await expect(inserir(10, null)).rejects.toThrow(/provas_especificas_coordenadas_ck/);
+  await expect(inserir(null, 10)).rejects.toThrow(/provas_especificas_coordenadas_ck/);
+  await expect(inserir(91, 0)).rejects.toThrow(/provas_especificas_coordenadas_ck/);
+  await expect(inserir(0, 181)).rejects.toThrow(/provas_especificas_coordenadas_ck/);
+  await inserir(-3.7319, -38.5267);
+  await banco.query("delete from provas_especificas where nome = 'QA Banco'");
 });
 
 it("inscreve alunos, mantém marcas ao reenviar a lista e recusa aluno inativo ou desconhecido", async () => {

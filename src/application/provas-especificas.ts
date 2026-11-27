@@ -5,11 +5,17 @@ import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
 import {
+  caixaDeBusca,
+  coordenadaDoTexto,
+  distanciaEmMetros,
   LIMITE_PARTICIPANTES_PROVA,
   normalizarProvaEspecifica,
   problemaNaProvaEspecifica,
+  problemaNasCoordenadas,
+  RAIO_DO_MESMO_LOCAL_METROS,
   resumirMarcas,
   type MarcaDaProva,
+  type OcupacaoDoLocal,
   type ParticipanteDaProva,
   type ProvaEspecifica,
 } from "@/domain/provas-especificas";
@@ -18,6 +24,8 @@ const esquemaProva = z
   .object({
     nome: z.string("Informe o nome da prova."),
     local: z.string("Local inválido.").nullish(),
+    latitude: z.number("Latitude inválida.").nullish(),
+    longitude: z.number("Longitude inválida.").nullish(),
     dia: z.string("Informe a data da prova."),
   })
   .strict();
@@ -40,6 +48,27 @@ const esquemaFrequencia = z
       .max(LIMITE_PARTICIPANTES_PROVA, `Envie no máximo ${LIMITE_PARTICIPANTES_PROVA} marcas.`),
   })
   .strict();
+
+const coordenadaDaConsulta = z
+  .string("Informe a latitude e a longitude.")
+  .transform((texto, contexto) => {
+    const valor = coordenadaDoTexto(texto);
+    if (valor === null) {
+      contexto.addIssue({ code: "custom", message: "Informe a latitude e a longitude." });
+      return z.NEVER;
+    }
+    return valor;
+  });
+
+const esquemaOcupacao = z.object({
+  latitude: coordenadaDaConsulta,
+  longitude: coordenadaDaConsulta,
+  provaId: z
+    .string()
+    .nullish()
+    .transform((texto) => (texto === null || texto === undefined || texto === "" ? null : texto))
+    .refine((texto) => texto === null || z.uuid().safeParse(texto).success, "Prova inválida."),
+});
 
 function primeiroErro(erro: z.ZodError): ErroHttp {
   return new ErroHttp(erro.issues[0]?.message ?? "Dados inválidos.", 400);
@@ -83,6 +112,8 @@ export async function listarProvasEspecificas(): Promise<ProvaEspecifica[]> {
       id: prova.id,
       nome: prova.nome,
       local: prova.local,
+      latitude: prova.latitude,
+      longitude: prova.longitude,
       dia: paraDia(prova.dia),
       total,
       presentes,
@@ -119,6 +150,8 @@ export async function lerProvaEspecifica(
       id: prova.id,
       nome: prova.nome,
       local: prova.local,
+      latitude: prova.latitude,
+      longitude: prova.longitude,
       dia: paraDia(prova.dia),
       total: contagem.total,
       presentes: contagem.presentes,
@@ -136,13 +169,21 @@ export async function criarProvaEspecifica(
   const prova = validarProvaDaEntrada(entrada);
   return comTransacao(async (tx) => {
     const criada = await tx.provaEspecifica.create({
-      data: { nome: prova.nome, local: prova.local, dia: new Date(`${prova.dia}T12:00:00Z`) },
+      data: {
+        nome: prova.nome,
+        local: prova.local,
+        latitude: prova.latitude,
+        longitude: prova.longitude,
+        dia: new Date(`${prova.dia}T12:00:00Z`),
+      },
     });
     await auditar(tx, usuario.id, "prova-especifica.criar", `prova:${criada.id}`);
     return {
       id: criada.id,
       nome: criada.nome,
       local: criada.local,
+      latitude: criada.latitude,
+      longitude: criada.longitude,
       dia: prova.dia,
       total: 0,
       presentes: 0,
@@ -151,7 +192,7 @@ export async function criarProvaEspecifica(
   });
 }
 
-/** Altera nome, local e data de uma prova, sem mexer nos alunos nem na frequência. */
+/** Substitui nome, local, coordenadas e data de uma prova, sem mexer nos alunos nem na frequência. */
 export async function editarProvaEspecifica(
   usuario: { id: string },
   id: string,
@@ -162,7 +203,13 @@ export async function editarProvaEspecifica(
   await comTransacao(async (tx) => {
     const alteradas = await tx.provaEspecifica.updateMany({
       where: { id },
-      data: { nome: prova.nome, local: prova.local, dia: new Date(`${prova.dia}T12:00:00Z`) },
+      data: {
+        nome: prova.nome,
+        local: prova.local,
+        latitude: prova.latitude,
+        longitude: prova.longitude,
+        dia: new Date(`${prova.dia}T12:00:00Z`),
+      },
     });
     if (alteradas.count === 0) throw new ErroHttp("Prova não encontrada.", 404);
     await auditar(tx, usuario.id, "prova-especifica.editar", `prova:${id}`);
@@ -266,4 +313,58 @@ export async function registrarFrequenciaDaProva(
       `prova:${id}:marcas:${alunoIds.length}`,
     );
   });
+}
+
+/**
+ * Soma os alunos distintos das provas marcadas no mesmo lugar, a até 100 m do ponto. A prova em
+ * edição entra na conta com os próprios alunos, mesmo que o ponto novo ainda não esteja salvo.
+ * Um aluno em duas provas do mesmo lugar conta uma vez.
+ */
+export async function lerOcupacaoDoLocal(entrada: unknown): Promise<OcupacaoDoLocal> {
+  const dados = esquemaOcupacao.safeParse(entrada);
+  if (!dados.success) throw primeiroErro(dados.error);
+  const { latitude, longitude, provaId } = dados.data;
+  const problema = problemaNasCoordenadas(latitude, longitude);
+  if (problema) throw new ErroHttp(problema, 400);
+
+  // A caixa é folgada de propósito; a distância exata é conferida em seguida, em metros.
+  const caixa = caixaDeBusca({ latitude, longitude }, RAIO_DO_MESMO_LOCAL_METROS);
+  const linhas = await banco().provaEspecifica.findMany({
+    where: {
+      OR: [...(provaId === null ? [] : [{ id: provaId }]), caixa],
+    },
+    select: {
+      id: true,
+      nome: true,
+      dia: true,
+      latitude: true,
+      longitude: true,
+      participantes: { select: { alunoId: true } },
+    },
+  });
+
+  const distintos = new Set<string>();
+  const provas = linhas
+    .filter((linha) => {
+      if (linha.id === provaId) return true;
+      if (linha.latitude === null || linha.longitude === null) return false;
+      return (
+        distanciaEmMetros(
+          { latitude, longitude },
+          { latitude: linha.latitude, longitude: linha.longitude },
+        ) <= RAIO_DO_MESMO_LOCAL_METROS
+      );
+    })
+    .sort((a, b) => b.dia.getTime() - a.dia.getTime() || a.nome.localeCompare(b.nome, "pt-BR"))
+    .map((linha) => {
+      for (const { alunoId } of linha.participantes) distintos.add(alunoId);
+      return {
+        id: linha.id,
+        nome: linha.nome,
+        dia: paraDia(linha.dia),
+        alunos: linha.participantes.length,
+        atual: linha.id === provaId,
+      };
+    });
+  return { alunos: distintos.size, provas };
 }

@@ -33,6 +33,9 @@ it("expõe a política, o escopo drive.file e as lacunas institucionais", () => 
   expect(html).toContain(LACUNAS_PRIVACIDADE.encarregado);
   expect(html).toContain(LACUNAS_PRIVACIDADE.email);
   expect(html).toContain('data-lacuna="email"');
+  expect(html).toContain("Prova específica");
+  expect(html).toContain("Usar minha localização");
+  expect(html).toContain("tile.openstreetmap.org");
   expect(html).toContain('<h1 class="');
   expect(html).not.toContain("tailwind");
   expect(html).not.toMatch(/\bvocês?\b/i);

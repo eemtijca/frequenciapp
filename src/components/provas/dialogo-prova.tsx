@@ -2,6 +2,9 @@
 
 // Diálogo de cadastro e edição de uma prova específica: nome, local opcional e data.
 import { useId, useState } from "react";
+import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import Stack from "@mui/material/Stack";
+import Typography from "@mui/material/Typography";
 import dayjs, { type Dayjs } from "dayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { useReduzirAnimacoesDosSeletores } from "@/theme/animacoes-da-interface";
@@ -10,6 +13,8 @@ import {
   LIMITE_NOME_PROVA_ESPECIFICA,
   normalizarProvaEspecifica,
   problemaNaProvaEspecifica,
+  rotuloDasCoordenadas,
+  type PontoGeografico,
   type ProvaEspecifica,
 } from "@/domain/provas-especificas";
 import { corpoAlteracao, corpoJson, pedir } from "@/lib/api-cliente";
@@ -21,12 +26,13 @@ import { Campo, useCampo } from "@/components/ui/mui/campo";
 import { CampoTexto } from "@/components/ui/mui/text-field";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { DialogoPadrao } from "@/components/layout/dialogo-padrao";
+import { DialogoMapaLocal } from "@/components/provas/dialogo-mapa-local";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
   aberto: boolean;
   /** Prova em edição; nulo cadastra uma nova. */
-  prova: Pick<ProvaEspecifica, "id" | "nome" | "local" | "dia"> | null;
+  prova: Pick<ProvaEspecifica, "id" | "nome" | "local" | "latitude" | "longitude" | "dia"> | null;
   diaCorrente: string;
   onFechar: () => void;
   /** Chamado depois de gravar, com o id da prova cadastrada ou editada. */
@@ -111,10 +117,24 @@ export function DialogoProva({ aberto, prova, diaCorrente, onFechar, onSalvo }: 
   const [nome, setNome] = useState(prova?.nome ?? "");
   const [local, setLocal] = useState(prova?.local ?? "");
   const [dia, setDia] = useState(prova?.dia ?? diaCorrente);
+  const [ponto, setPonto] = useState<PontoGeografico | null>(
+    prova && prova.latitude !== null && prova.longitude !== null
+      ? { latitude: prova.latitude, longitude: prova.longitude }
+      : null,
+  );
+  const [mapaAberto, setMapaAberto] = useState(false);
+  // Uma instância nova a cada abertura reinicia os campos do mapa a partir do ponto atual.
+  const [aberturasDoMapa, setAberturasDoMapa] = useState(0);
   const [erro, setErro] = useState("");
 
   const { executando, executar } = useAcaoUnica(async () => {
-    const dados = normalizarProvaEspecifica({ nome, local, dia });
+    const dados = normalizarProvaEspecifica({
+      nome,
+      local,
+      dia,
+      latitude: ponto?.latitude ?? null,
+      longitude: ponto?.longitude ?? null,
+    });
     const problema = problemaNaProvaEspecifica(dados);
     if (problema) {
       setErro(problema);
@@ -200,6 +220,42 @@ export function DialogoProva({ aberto, prova, diaCorrente, onFechar, onSalvo }: 
               disabled={executando}
             />
           </Campo>
+          <Stack spacing={1} role="group" aria-labelledby={`${base}-mapa`}>
+            <Typography id={`${base}-mapa`} variant="body2" sx={{ fontWeight: 600 }}>
+              Local no mapa (opcional)
+            </Typography>
+            <Typography variant="body2" sx={{ color: "text.secondary" }}>
+              {ponto
+                ? `Marcado em ${rotuloDasCoordenadas(ponto.latitude, ponto.longitude)}.`
+                : "Nenhum ponto marcado. O mapa usa o OpenStreetMap e pode ler o GPS do aparelho."}
+            </Typography>
+            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+              <Botao
+                variante="contorno"
+                type="button"
+                icone={<PlaceRoundedIcon />}
+                disabled={executando}
+                onClick={() => {
+                  setAberturasDoMapa((atual) => atual + 1);
+                  setMapaAberto(true);
+                }}
+                sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+              >
+                {ponto ? "Alterar no mapa" : "Marcar no mapa"}
+              </Botao>
+              {ponto ? (
+                <Botao
+                  variante="texto"
+                  type="button"
+                  disabled={executando}
+                  onClick={() => setPonto(null)}
+                  sx={{ minHeight: TOKENS_LAYOUT.alvoToque, color: "falta.texto" }}
+                >
+                  Remover do mapa
+                </Botao>
+              ) : null}
+            </Stack>
+          </Stack>
           <Campo id={`${base}-dia`} rotulo="Data">
             <SeletorDataDaProva
               id={`${base}-dia`}
@@ -216,6 +272,17 @@ export function DialogoProva({ aberto, prova, diaCorrente, onFechar, onSalvo }: 
           ) : null}
         </div>
       </form>
+      <DialogoMapaLocal
+        key={aberturasDoMapa}
+        aberto={mapaAberto}
+        ponto={ponto}
+        provaId={prova?.id ?? null}
+        onFechar={() => setMapaAberto(false)}
+        onConfirmar={(novo) => {
+          setPonto(novo);
+          setMapaAberto(false);
+        }}
+      />
     </DialogoPadrao>
   );
 }
