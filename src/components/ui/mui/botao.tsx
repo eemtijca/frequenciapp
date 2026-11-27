@@ -7,6 +7,7 @@ import Button, { type ButtonProps } from "@mui/material/Button";
 import IconButton, { type IconButtonProps } from "@mui/material/IconButton";
 import type { Theme } from "@mui/material/styles";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { ESTILO_ALVO_TOQUE } from "./alvo-toque";
 
 export type VarianteBotao =
   "principal" | "neutro" | "primario" | "secundario" | "contorno" | "texto" | "destrutivo";
@@ -27,19 +28,6 @@ const TAMANHOS = {
   pequeno: "small",
   medio: "medium",
 } as const satisfies Record<TamanhoBotao, "small" | "medium">;
-
-const ALVO_TOQUE = {
-  position: "relative",
-  "&::after": {
-    content: '""',
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    width: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    height: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    transform: "translate(-50%, -50%)",
-  },
-} as const;
 
 type Acao =
   | { href: string; onClick?: never }
@@ -96,7 +84,7 @@ export function Botao({
       startIcon={carregando ? undefined : icone}
       aria-busy={carregando || undefined}
       sx={[
-        { height: TOKENS_LAYOUT.botao[tamanho], ...ALVO_TOQUE },
+        { height: TOKENS_LAYOUT.botao[tamanho], ...ESTILO_ALVO_TOQUE },
         (theme) => ({
           "&.Mui-disabled": {
             background: `${theme.vars.palette.action.disabledBackground} !important`,
@@ -226,7 +214,7 @@ export function BotaoIcone({
         {
           width: TOKENS_LAYOUT.botao[tamanho],
           height: TOKENS_LAYOUT.botao[tamanho],
-          ...ALVO_TOQUE,
+          ...ESTILO_ALVO_TOQUE,
         },
         (theme) => estilosIcone(theme, variante),
         ...(Array.isArray(sx) ? sx : [sx]),

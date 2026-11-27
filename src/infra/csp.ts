@@ -18,7 +18,8 @@ const DIRETIVAS_FIXAS = [
   "connect-src 'self' https://accounts.google.com https://www.googleapis.com",
   "frame-src https://docs.google.com https://drive.google.com",
   "font-src 'self' data:",
-  "img-src 'self' data: blob:",
+  // Tiles do mapa de locais de prova; o servidor público do OpenStreetMap exige atribuição.
+  "img-src 'self' data: blob: https://tile.openstreetmap.org",
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

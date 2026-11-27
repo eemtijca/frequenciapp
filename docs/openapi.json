@@ -376,7 +376,10 @@
             "in": "header",
             "required": false,
             "description": "Envie 1 para incluir a referência opaca da sessão válida. Ela serve para comparação na interface, não para autenticação.",
-            "schema": { "type": "string", "const": "1" }
+            "schema": {
+              "type": "string",
+              "const": "1"
+            }
           }
         ],
         "responses": {
@@ -12798,6 +12801,8 @@
                           "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
                           "nome": "Enem 2026",
                           "local": "Escola Estadual Central",
+                          "latitude": -3.7319,
+                          "longitude": -38.5267,
                           "dia": "2026-11-29",
                           "total": 14,
                           "presentes": 7,
@@ -12840,6 +12845,8 @@
                   "value": {
                     "nome": "Enem 2026",
                     "local": "Escola Estadual Central",
+                    "latitude": -3.7319,
+                    "longitude": -38.5267,
                     "dia": "2026-11-29"
                   }
                 }
@@ -12863,6 +12870,8 @@
                         "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
                         "nome": "Enem 2026",
                         "local": "Escola Estadual Central",
+                        "latitude": -3.7319,
+                        "longitude": -38.5267,
                         "dia": "2026-11-29",
                         "total": 0,
                         "presentes": 0,
@@ -12924,6 +12933,8 @@
                         "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
                         "nome": "Enem 2026",
                         "local": "Escola Estadual Central",
+                        "latitude": -3.7319,
+                        "longitude": -38.5267,
                         "dia": "2026-11-29",
                         "total": 14,
                         "presentes": 7,
@@ -12966,7 +12977,7 @@
       "patch": {
         "operationId": "editarProvaEspecifica",
         "summary": "Editar nome, local e data da prova",
-        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria. Não altera os alunos nem a frequência.",
+        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria. Substitui nome, local, coordenadas e data; omitir as coordenadas as limpa. Não altera os alunos nem a frequência.",
         "tags": ["provas"],
         "parameters": [
           {
@@ -12995,6 +13006,8 @@
                   "value": {
                     "nome": "Enem 2026",
                     "local": "Escola Estadual Central",
+                    "latitude": -3.7319,
+                    "longitude": -38.5267,
                     "dia": "2026-11-29"
                   }
                 }
@@ -13018,6 +13031,8 @@
                         "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
                         "nome": "Enem 2026",
                         "local": "Escola Estadual Central",
+                        "latitude": -3.7319,
+                        "longitude": -38.5267,
                         "dia": "2026-11-29",
                         "total": 14,
                         "presentes": 7,
@@ -13169,6 +13184,8 @@
                         "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
                         "nome": "Enem 2026",
                         "local": "Escola Estadual Central",
+                        "latitude": -3.7319,
+                        "longitude": -38.5267,
                         "dia": "2026-11-29",
                         "total": 14,
                         "presentes": 7,
@@ -13275,6 +13292,8 @@
                         "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
                         "nome": "Enem 2026",
                         "local": "Escola Estadual Central",
+                        "latitude": -3.7319,
+                        "longitude": -38.5267,
                         "dia": "2026-11-29",
                         "total": 14,
                         "presentes": 7,
@@ -13311,6 +13330,99 @@
           },
           "404": {
             "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/provas/ocupacao": {
+      "get": {
+        "operationId": "lerOcupacaoDoLocal",
+        "summary": "Contar os alunos que fazem prova em um lugar",
+        "description": "Administração e coordenação (capacidade de operação). Soma os alunos distintos de todas as provas marcadas a até 100 m do ponto, de qualquer data; um aluno em duas provas do lugar conta uma vez. Com `provaId`, a prova em edição entra na conta com os próprios alunos, mesmo que o ponto novo ainda não esteja salvo. Alimenta o selo numérico sobre o marcador do mapa.",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "latitude",
+            "in": "query",
+            "required": true,
+            "description": "Latitude do ponto, em graus decimais, com ponto ou vírgula.",
+            "schema": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "example": -3.7319
+          },
+          {
+            "name": "longitude",
+            "in": "query",
+            "required": true,
+            "description": "Longitude do ponto, em graus decimais, com ponto ou vírgula.",
+            "schema": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "example": -38.5267
+          },
+          {
+            "name": "provaId",
+            "in": "query",
+            "required": false,
+            "description": "Prova em edição, para contar os alunos dela junto com os do lugar.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ocupação do lugar.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OcupacaoDoLocal"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "alunos": 18,
+                      "provas": [
+                        {
+                          "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
+                          "nome": "Simulado regional",
+                          "dia": "2026-12-06",
+                          "alunos": 6,
+                          "atual": false
+                        },
+                        {
+                          "id": "9b1c2d3e-4f50-4a61-8b72-c3d4e5f60718",
+                          "nome": "Enem 2026",
+                          "dia": "2026-11-29",
+                          "alunos": 14,
+                          "atual": false
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
           },
           "503": {
             "$ref": "#/components/responses/Erro503"
@@ -15136,7 +15248,10 @@
           "listaRevisada": {
             "type": "array",
             "description": "Identificadores dos alunos exibidos na revisão do primeiro lançamento histórico. Quando enviada, a lista deve coincidir, sem considerar a ordem e sem duplicatas, com a lista gravada pela transação.",
-            "items": { "type": "string", "format": "uuid" }
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
           },
           "confirmarHistorico": {
             "type": "boolean",
@@ -21567,7 +21682,17 @@
         "type": "object",
         "title": "Prova específica",
         "description": "Prova como o Enem ou um vestibular, com as contagens de frequência.",
-        "required": ["id", "nome", "local", "dia", "total", "presentes", "ausentes"],
+        "required": [
+          "id",
+          "nome",
+          "local",
+          "latitude",
+          "longitude",
+          "dia",
+          "total",
+          "presentes",
+          "ausentes"
+        ],
         "properties": {
           "id": {
             "type": "string",
@@ -21584,6 +21709,20 @@
             "maxLength": 120,
             "description": "Local de realização; nulo quando não foi informado.",
             "example": "Escola Estadual Central"
+          },
+          "latitude": {
+            "type": ["number", "null"],
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude do local no mapa, em graus decimais; arredondada em seis casas. Vem junto com a longitude ou não vem.",
+            "example": -3.7319
+          },
+          "longitude": {
+            "type": ["number", "null"],
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude do local no mapa, em graus decimais; arredondada em seis casas.",
+            "example": -38.5267
           },
           "dia": {
             "type": "string",
@@ -21636,7 +21775,7 @@
       "NovaProvaEspecifica": {
         "type": "object",
         "title": "Nova prova específica",
-        "description": "Nome, local opcional e data. Os espaços das pontas são removidos e o local vazio vira nulo.",
+        "description": "Nome, local opcional, coordenadas opcionais do mapa e data. Os espaços das pontas são removidos, o local vazio vira nulo e as coordenadas vão juntas ou nenhuma (400 caso contrário). Ao editar, o corpo substitui tudo: omitir as coordenadas as limpa.",
         "additionalProperties": false,
         "required": ["nome", "dia"],
         "properties": {
@@ -21650,6 +21789,20 @@
             "type": ["string", "null"],
             "maxLength": 120,
             "example": "Escola Estadual Central"
+          },
+          "latitude": {
+            "type": ["number", "null"],
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude do local no mapa, em graus decimais; arredondada em seis casas. Vem junto com a longitude ou não vem.",
+            "example": -3.7319
+          },
+          "longitude": {
+            "type": ["number", "null"],
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude do local no mapa, em graus decimais; arredondada em seis casas.",
+            "example": -38.5267
           },
           "dia": {
             "type": "string",
@@ -21743,6 +21896,59 @@
                   "example": true
                 }
               }
+            }
+          }
+        }
+      },
+      "ProvaNoLocal": {
+        "type": "object",
+        "title": "Prova no mesmo lugar",
+        "description": "Prova marcada a até 100 m do ponto, com os alunos inscritos nela.",
+        "required": ["id", "nome", "dia", "alunos", "atual"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01"
+          },
+          "nome": {
+            "type": "string",
+            "example": "Enem 2026"
+          },
+          "dia": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-29"
+          },
+          "alunos": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Alunos inscritos nesta prova.",
+            "example": 14
+          },
+          "atual": {
+            "type": "boolean",
+            "description": "Verdadeiro para a prova informada em `provaId`.",
+            "example": false
+          }
+        }
+      },
+      "OcupacaoDoLocal": {
+        "type": "object",
+        "title": "Ocupação do lugar",
+        "description": "Alunos distintos que fazem prova no lugar e as provas que entram na conta, da mais recente para a mais antiga.",
+        "required": ["alunos", "provas"],
+        "properties": {
+          "alunos": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Alunos distintos somando todas as provas do lugar.",
+            "example": 18
+          },
+          "provas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProvaNoLocal"
             }
           }
         }

@@ -13,6 +13,7 @@ import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
 import { useColorScheme } from "@mui/material/styles";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { ESTILO_ALVO_TOQUE } from "./alvo-toque";
 
 type ModoTema = "light" | "dark" | "system";
 
@@ -33,19 +34,6 @@ const OPCOES: readonly OpcaoTema[] = [
   { valor: "light", rotulo: "Claro", Icone: LightModeRoundedIcon },
   { valor: "dark", rotulo: "Escuro", Icone: DarkModeRoundedIcon },
 ];
-
-const ALVO_TOQUE = {
-  position: "relative",
-  "&::after": {
-    content: '""',
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    width: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    height: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    transform: "translate(-50%, -50%)",
-  },
-} as const;
 
 const assinarMontagem = () => () => undefined;
 const obterMontado = () => true;
@@ -77,7 +65,11 @@ export function SeletorTema() {
         aria-expanded={aberto}
         aria-controls={aberto ? idMenu : undefined}
         onClick={(evento) => setAncora(evento.currentTarget)}
-        sx={{ width: TOKENS_LAYOUT.botao.medio, height: TOKENS_LAYOUT.botao.medio, ...ALVO_TOQUE }}
+        sx={{
+          width: TOKENS_LAYOUT.botao.medio,
+          height: TOKENS_LAYOUT.botao.medio,
+          ...ESTILO_ALVO_TOQUE,
+        }}
       >
         <IconeAtual />
       </IconButton>

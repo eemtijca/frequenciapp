@@ -35,6 +35,7 @@ import {
   rotuloMes,
 } from "@/domain/frequencia";
 import { TOKENS_LAYOUT } from "@/theme/layout";
+import { ESTILO_ALVO_TOQUE } from "@/components/ui/mui/alvo-toque";
 
 interface Props {
   id: string;
@@ -83,19 +84,6 @@ const DIAS = [
 const ALTURA_GATILHO = 44;
 const ALTURA_CELULA = 44;
 const LARGURA_PAINEL = "min(24rem, calc(100vw - 2rem))";
-
-const ALVO_TOQUE = {
-  position: "relative",
-  "&::after": {
-    content: '""',
-    position: "absolute",
-    top: "50%",
-    left: "50%",
-    width: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    height: `max(100%, ${TOKENS_LAYOUT.alvoToque}px)`,
-    transform: "translate(-50%, -50%)",
-  },
-} as const;
 
 /** Mesmo dia em outro mês, limitado ao último dia do mês de destino. */
 function mesmoDiaNoMes(dia: string, deslocamento: number): string {
@@ -467,7 +455,7 @@ export function SeletorPeriodo({
             (modo === "dia" ? mesVisivel <= piso.slice(0, 7) : anoVisivel <= piso.slice(0, 4)),
           )}
           onClick={() => (modo === "dia" ? mudarMes(-1) : mudarAno(-1))}
-          sx={ALVO_TOQUE}
+          sx={ESTILO_ALVO_TOQUE}
         >
           <ChevronLeftRoundedIcon fontSize="small" />
         </IconButton>
@@ -487,7 +475,7 @@ export function SeletorPeriodo({
             modo === "dia" ? mesVisivel >= limite.slice(0, 7) : anoVisivel >= limite.slice(0, 4)
           }
           onClick={() => (modo === "dia" ? mudarMes(1) : mudarAno(1))}
-          sx={ALVO_TOQUE}
+          sx={ESTILO_ALVO_TOQUE}
         >
           <ChevronRightRoundedIcon fontSize="small" />
         </IconButton>

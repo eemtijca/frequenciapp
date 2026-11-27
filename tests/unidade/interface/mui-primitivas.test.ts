@@ -440,7 +440,8 @@ describe("restrições estáticas das primitivas", () => {
     const ler = (arquivo: string) => readFileSync(path.join(raiz, arquivo), "utf8");
 
     expect(ler("botao.tsx")).toContain("TOKENS_LAYOUT.botao");
-    expect(ler("botao.tsx")).toContain("TOKENS_LAYOUT.alvoToque");
+    expect(ler("botao.tsx")).toContain("ESTILO_ALVO_TOQUE");
+    expect(ler("alvo-toque.ts")).toContain("TOKENS_LAYOUT.alvoToque");
     expect(ler("cartao.tsx")).toContain("TOKENS_LAYOUT.cartao");
     expect(ler("tela-estado.tsx")).toContain("TOKENS_LAYOUT.dialogo");
   });
