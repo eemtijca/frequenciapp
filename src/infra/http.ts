@@ -90,6 +90,7 @@ type Guarda = { ok: true; usuario: Identidade } | { ok: false; resposta: Respons
 /** Recusa por capacidade: a mensagem diz o que falta, sem expor o papel. */
 const RECUSA_POR_CAPACIDADE: Record<Capacidade, string> = {
   operar: "Seu acesso não permite esta operação.",
+  consultar: "Seu acesso não permite consultar estes dados.",
   administrar: "Apenas o administrador pode fazer esta operação.",
   alterarPropriaSenha: "Seu acesso não permite trocar a senha por aqui.",
   verEstatisticasDasTurmas: "Seu acesso não permite ver estas estatísticas.",

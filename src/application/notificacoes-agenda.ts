@@ -6,6 +6,7 @@ import { banco } from "@/infra/banco";
 import { ambiente } from "@/infra/ambiente";
 import { conferirParVapid, enviarPush, pushConfigurado } from "@/infra/web-push";
 import { diaLocal, diaSeguinte, diaDaSemanaIso, ehDomingo } from "@/domain/frequencia";
+import { papeisComCapacidade } from "@/domain/usuarios";
 import {
   horarioDeEnvioAtingido,
   mensagemDoResumo,
@@ -107,7 +108,7 @@ async function filtroPendencias(dia: string): Promise<Prisma.AssinaturaPushWhere
     chaveVapid: ambiente.push.publicKey,
     usuario: {
       ativo: true,
-      papel: { in: ["ADMIN", "COORDENACAO"] },
+      papel: { in: papeisComCapacidade("receberNotificacoes") },
       OR: [
         { preferenciaNotificacoes: { is: null } },
         { preferenciaNotificacoes: { is: { chamadasPendentes: true } } },

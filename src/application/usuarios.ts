@@ -9,8 +9,9 @@ import { hashearSenha } from "@/infra/auth/hash";
 import { comTransacao } from "@/infra/transacoes";
 import { auditar } from "@/infra/auditoria";
 import { ErroHttp } from "@/infra/erros";
-import { PAPEIS_DA_EQUIPE, ehPapelDaEquipe, problemaDeSenha } from "@/domain/usuarios";
-import type { Identidade, Papel, PapelDaEquipe, UsuarioDTO } from "@/domain/usuarios";
+import { PAPEIS_DA_EQUIPE, papeisComCapacidade, problemaDeSenha } from "@/domain/usuarios";
+import type { Responsavel } from "@/domain/frequencia";
+import type { Identidade, Papel, UsuarioDTO } from "@/domain/usuarios";
 
 const nomeUsuario = z
   .string()
@@ -71,19 +72,19 @@ export async function listarUsuarios(): Promise<UsuarioDTO[]> {
 }
 
 /**
- * Equipe ativa que pode liberar saídas: direção e coordenação, com os
- * dados mínimos para o campo de responsável.
+ * Equipe ativa que pode liberar saídas: quem tem a capacidade de operar (direção e
+ * coordenação, não a secretaria), com os dados mínimos para o campo de responsável.
  */
-export async function listarResponsaveis(): Promise<
-  { id: string; nome: string; papel: PapelDaEquipe }[]
-> {
+export async function listarResponsaveis(): Promise<Responsavel[]> {
   const linhas = await banco().usuario.findMany({
-    where: { ativo: true, papel: { in: [...PAPEIS_DA_EQUIPE] } },
+    where: { ativo: true, papel: { in: papeisComCapacidade("operar") } },
     orderBy: [{ papel: "asc" }, { nome: "asc" }],
     select: { id: true, nome: true, papel: true },
   });
   return linhas.flatMap((linha) =>
-    ehPapelDaEquipe(linha.papel) ? [{ ...linha, papel: linha.papel }] : [],
+    linha.papel === "ADMIN" || linha.papel === "COORDENACAO"
+      ? [{ id: linha.id, nome: linha.nome, papel: linha.papel }]
+      : [],
   );
 }
 

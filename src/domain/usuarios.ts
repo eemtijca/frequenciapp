@@ -2,10 +2,10 @@
 // e nomes de exibição: testáveis de forma isolada.
 
 /** Papel do usuário na aplicação. */
-export type Papel = "ADMIN" | "COORDENACAO" | "DIRETOR_TURMA";
+export type Papel = "ADMIN" | "COORDENACAO" | "SECRETARIA" | "DIRETOR_TURMA";
 
 /** Papéis da equipe escolar, criados na aba Equipe; o diretor tem cadastro próprio. */
-export const PAPEIS_DA_EQUIPE = ["ADMIN", "COORDENACAO"] as const;
+export const PAPEIS_DA_EQUIPE = ["ADMIN", "COORDENACAO", "SECRETARIA"] as const;
 export type PapelDaEquipe = (typeof PAPEIS_DA_EQUIPE)[number];
 
 /** Verdadeiro para os papéis da equipe escolar. */
@@ -19,6 +19,7 @@ export function ehPapelDaEquipe(papel: Papel): papel is PapelDaEquipe {
  */
 export type Capacidade =
   | "operar"
+  | "consultar"
   | "administrar"
   | "alterarPropriaSenha"
   | "verEstatisticasDasTurmas"
@@ -30,14 +31,26 @@ export type Capacidade =
  * as capacidades: esquecer um papel novo quebra a compilação.
  */
 const CAPACIDADES_POR_PAPEL: Record<Papel, readonly Capacidade[]> = {
-  ADMIN: ["operar", "administrar", "alterarPropriaSenha", "receberNotificacoes"],
-  COORDENACAO: ["operar", "alterarPropriaSenha", "receberNotificacoes"],
+  ADMIN: ["operar", "consultar", "administrar", "alterarPropriaSenha", "receberNotificacoes"],
+  COORDENACAO: ["operar", "consultar", "alterarPropriaSenha", "receberNotificacoes"],
+  // A secretaria só lê o Painel e as grades de relatório: não opera chamada, saídas, entradas nem provas.
+  SECRETARIA: ["consultar", "alterarPropriaSenha"],
   DIRETOR_TURMA: ["verEstatisticasDasTurmas", "alterarPropriaSenha", "receberNotificacoes"],
 };
 
 /** Verdadeiro quando o papel concede a capacidade; o restante é recusado. */
 export function temCapacidade(papel: Papel, capacidade: Capacidade): boolean {
   return CAPACIDADES_POR_PAPEL[papel]?.includes(capacidade) ?? false;
+}
+
+/** Papéis da equipe que concedem a capacidade, na ordem em que a equipe é listada. */
+export function papeisComCapacidade(capacidade: Capacidade): PapelDaEquipe[] {
+  return PAPEIS_DA_EQUIPE.filter((papel) => temCapacidade(papel, capacidade));
+}
+
+/** Verdadeiro para quem só consulta o Painel e os relatórios e não opera a escola. */
+export function ehSomenteConsulta(papel: Papel): boolean {
+  return temCapacidade(papel, "consultar") && !temCapacidade(papel, "operar");
 }
 
 /** Usuário visível pela interface. Sem segredos. */
@@ -73,6 +86,7 @@ export function primeiroNome(nomeCompleto: string): string {
 const ROTULOS_DE_PAPEL: Record<Papel, string> = {
   ADMIN: "Administração",
   COORDENACAO: "Coordenação",
+  SECRETARIA: "Secretaria",
   DIRETOR_TURMA: "Diretor de turma",
 };
 

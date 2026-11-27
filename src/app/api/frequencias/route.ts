@@ -19,6 +19,7 @@ import {
   ehUuid,
   erroApi,
   executarRota,
+  exigirCapacidade,
   exigirSessao,
   json,
   origemPermitida,
@@ -29,7 +30,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET(requisicao: Request): Promise<Response> {
   return executarRota(async () => {
-    const sessao = await exigirSessao();
+    const sessao = await exigirCapacidade("consultar");
     if (!sessao.ok) return sessao.resposta;
     const parametros = new URL(requisicao.url).searchParams;
 

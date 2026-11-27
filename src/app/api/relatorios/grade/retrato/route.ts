@@ -1,12 +1,12 @@
 // Retrato consistente da Grade para o relatório em PDF, sem cache e sem escrita.
 import { obterRetratoGrade } from "@/application/relatorio-grade";
-import { erroApi, executarRota, exigirSessao, json } from "@/infra/http";
+import { erroApi, executarRota, exigirCapacidade, json } from "@/infra/http";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(requisicao: Request): Promise<Response> {
   return executarRota(async () => {
-    const sessao = await exigirSessao();
+    const sessao = await exigirCapacidade("consultar");
     if (!sessao.ok) return sessao.resposta;
 
     const parametros = new URL(requisicao.url).searchParams;
