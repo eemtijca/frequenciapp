@@ -40,9 +40,12 @@ export default async function Pagina({
   );
   if (!sessao) return entrada;
   const { usuario, referenciaSessao } = sessao;
-  // Recusa por padrão: o aplicativo completo só abre para quem opera a
-  // escola; o diretor de turma tem a própria tela, só de leitura.
-  if (!temCapacidade(usuario.papel, "operar")) {
+  // Recusa por padrão: o aplicativo abre para quem opera a escola ou, reduzido ao Painel e aos
+  // relatórios de leitura, para quem só consulta (Secretaria). O diretor de turma tem a própria
+  // tela, só de leitura, e qualquer outro papel volta à entrada.
+  const operaAEscola = temCapacidade(usuario.papel, "operar");
+  const soConsulta = !operaAEscola && temCapacidade(usuario.papel, "consultar");
+  if (!operaAEscola && !soConsulta) {
     if (temCapacidade(usuario.papel, "verEstatisticasDasTurmas")) {
       return (
         <DestinoSessao usuarioId={usuario.id} referenciaSessao={referenciaSessao}>
@@ -77,7 +80,10 @@ export default async function Pagina({
     listarFrequenciasDoMes(mes),
     listarSaidas({ de: dias[0] ?? `${mes}-01`, ate: dias[dias.length - 1] ?? `${mes}-28` }),
     listarJustificativas(),
-    listarLiberadores(),
+    // Quem libera saídas é dado de operação: o modo consulta não o recebe.
+    soConsulta
+      ? Promise.resolve([] as Awaited<ReturnType<typeof listarLiberadores>>)
+      : listarLiberadores(),
     lerConfiguracoes(),
     resumoAcumulado(dia),
   ]);

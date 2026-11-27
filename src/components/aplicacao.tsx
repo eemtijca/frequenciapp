@@ -61,7 +61,7 @@ import type {
   Turma,
 } from "@/domain/frequencia";
 import { useSaidasMensais } from "@/components/movimentacoes/use-historico-movimentacoes";
-import { temCapacidade, type Identidade } from "@/domain/usuarios";
+import { ehSomenteConsulta, temCapacidade, type Identidade } from "@/domain/usuarios";
 import { pedir } from "@/lib/api-cliente";
 import { temRascunhoChamada } from "@/lib/rascunho-chamada";
 import { MenuConta, type AcaoConta } from "@/components/conta/menu-conta";
@@ -83,6 +83,7 @@ import VistaPainel from "@/components/painel/vista-painel";
 import VistaMovimentacoes from "@/components/movimentacoes/vista-movimentacoes";
 import VistaRelatorios from "@/components/relatorios/vista-relatorios";
 import {
+  DESTINOS_DA_CONSULTA,
   OpcoesRelatorios,
   type DestinoRelatorios,
 } from "@/components/relatorios/navegacao-relatorios";
@@ -178,6 +179,15 @@ function destinoRelatoriosDe(valor: string | undefined): DestinoRelatorios {
   return valor === "historico" || valor === "grade" ? valor : "resumo";
 }
 
+/** Destino inicial dos Relatórios; quem só consulta abre a Grade quando o pedido está fora da sua lista. */
+function destinoInicialDeRelatorios(
+  valor: string | undefined,
+  permitidos: readonly DestinoRelatorios[] | undefined,
+): DestinoRelatorios {
+  const pedido = destinoRelatoriosDe(valor);
+  return !permitidos || permitidos.includes(pedido) ? pedido : "grade";
+}
+
 function larguraDaVisao(visao: Visao): LarguraConteudo {
   // Relatórios largos e a Grade usam a largura excepcional; o restante lê
   // confortavelmente na largura de leitura ou de gestão.
@@ -192,8 +202,10 @@ interface ItemNav {
   icone: ElementType;
 }
 
+const ITEM_PAINEL: ItemNav = { visao: "painel", rotulo: "Painel", icone: PieChartRoundedIcon };
+
 const ITENS_INICIAIS: ItemNav[] = [
-  { visao: "painel", rotulo: "Painel", icone: PieChartRoundedIcon },
+  ITEM_PAINEL,
   { visao: "chamada", rotulo: "Chamada", icone: ChecklistRoundedIcon },
   { visao: "horarios", rotulo: "Horários", icone: CalendarMonthRoundedIcon },
 ];
@@ -595,12 +607,18 @@ export default function Aplicacao({
   const referenciaSessao = useReferenciaDaSessao();
   const ehAdmin = temCapacidade(usuario.papel, "administrar");
   const podeOperar = temCapacidade(usuario.papel, "operar");
+  // Papel que só consulta (Secretaria): Painel e Relatórios, só a Grade e o Por aluno. O servidor
+  // recusa o resto pelas capacidades; aqui a interface apenas não oferece o que não abriria.
+  const somenteConsulta = ehSomenteConsulta(usuario.papel);
+  const destinosDoPapel = somenteConsulta ? DESTINOS_DA_CONSULTA : undefined;
+  const podeReceberAvisos = temCapacidade(usuario.papel, "receberNotificacoes");
   // Para a administração, um link antigo para Alunos abre o cadastro na Gestão.
   const visaoPedida = visaoValida(visaoInicial);
   const alunosPelaGestao = ehAdmin && visaoPedida === "alunos";
   const pedida = alunosPelaGestao ? "gestao" : visaoPedida;
   const inicial =
     pedida &&
+    (!somenteConsulta || pedida === "painel" || pedida === "relatorios") &&
     (pedida !== "gestao" || ehAdmin) &&
     (pedida !== "chamada-parcial" || podeOperar) &&
     (pedida !== "saidas" || configuracoesIniciais.saidaAntecipada)
@@ -627,7 +645,7 @@ export default function Aplicacao({
   );
   const iniciarTrocaRef = useRef<((acao: () => void) => void) | null>(null);
   const [destinoRelatorios, setDestinoRelatorios] = useState(() =>
-    destinoRelatoriosDe(visaoInicial),
+    destinoInicialDeRelatorios(visaoInicial, destinosDoPapel),
   );
   const relatorioAnterior = useRef(destinoRelatorios);
   const gestaoAnterior = useRef({ cadastro, emConfiguracoes, destinoConfiguracoes });
@@ -724,6 +742,7 @@ export default function Aplicacao({
   }
 
   const itens = useMemo<ItemNav[]>(() => {
+    if (somenteConsulta) return [ITEM_PAINEL, ITEM_RELATORIOS];
     const lista = [...ITENS_INICIAIS];
     if (podeOperar) lista.splice(2, 0, ITEM_CHAMADA_PARCIAL);
     if (configuracoes.saidaAntecipada) lista.push(ITEM_SAIDAS);
@@ -731,7 +750,7 @@ export default function Aplicacao({
     // A administração cadastra e consulta alunos dentro da Gestão; a consulta avulsa é da coordenação.
     lista.push(ehAdmin ? ITEM_GESTAO : ITEM_ALUNOS);
     return lista;
-  }, [configuracoes.saidaAntecipada, ehAdmin, podeOperar]);
+  }, [configuracoes.saidaAntecipada, ehAdmin, podeOperar, somenteConsulta]);
   const indiceAtivo = itens.findIndex((item) => item.visao === visao);
   const tituloAtual = itens.find((item) => item.visao === visao)?.rotulo ?? "FrequenciApp";
 
@@ -863,6 +882,12 @@ export default function Aplicacao({
   const escolherDestino = useCallback(
     (destino: DestinoNavegacao, fecharMenu?: FecharMenu, focarAoConcluir = false) => {
       if (!itens.some((item) => item.visao === destino.visao)) return;
+      if (
+        destino.relatorio !== undefined &&
+        destinosDoPapel &&
+        !destinosDoPapel.includes(destino.relatorio)
+      )
+        return;
       if (destino.visao !== visao && visaoComRascunho(visao)) {
         origemDialogoRef.current = fecharMenu
           ? gatilhoMenuRef.current
@@ -876,7 +901,7 @@ export default function Aplicacao({
       fecharMenu?.(destino);
       iniciarTroca(destino, focarAoConcluir);
     },
-    [iniciarTroca, itens, visao, visaoComRascunho],
+    [destinosDoPapel, iniciarTroca, itens, visao, visaoComRascunho],
   );
 
   function abrirPeloAtalho(proxima: Visao) {
@@ -1114,6 +1139,7 @@ export default function Aplicacao({
             carregando={carregandoFrequencias}
             erro={erroFrequencias}
             destino={destinoRelatorios}
+            destinosPermitidos={destinosDoPapel}
             mes={mes}
             mesCorrente={diaCorrente.slice(0, 7)}
             diaCorrente={diaCorrente}
@@ -1256,6 +1282,7 @@ export default function Aplicacao({
                 {estado.nivel === "relatorios" ? (
                   <OpcoesRelatorios
                     atual={visao === "relatorios" ? destinoRelatorios : null}
+                    destinos={destinosDoPapel}
                     onEscolher={(relatorio) =>
                       escolherDestino({ visao: "relatorios", relatorio }, fecharMenu)
                     }
@@ -1508,16 +1535,18 @@ export default function Aplicacao({
                 <BotaoAtualizar variante="texto" />
               </Box>
               <SeletorTema />
-              <BotaoIcone
-                rotulo="Configurar notificações"
-                icone={<NotificationsRoundedIcon />}
-                variante="texto"
-                onClick={(evento) => {
-                  origemDialogoRef.current = evento.currentTarget;
-                  setNotificacoesAbertas(true);
-                }}
-                sx={{ width: TOKENS_LAYOUT.alvoToque, height: TOKENS_LAYOUT.alvoToque }}
-              />
+              {podeReceberAvisos ? (
+                <BotaoIcone
+                  rotulo="Configurar notificações"
+                  icone={<NotificationsRoundedIcon />}
+                  variante="texto"
+                  onClick={(evento) => {
+                    origemDialogoRef.current = evento.currentTarget;
+                    setNotificacoesAbertas(true);
+                  }}
+                  sx={{ width: TOKENS_LAYOUT.alvoToque, height: TOKENS_LAYOUT.alvoToque }}
+                />
+              ) : null}
             </Toolbar>
           </AppBar>
 
