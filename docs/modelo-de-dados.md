@@ -4,16 +4,16 @@ Entidades, invariantes e derivações. A coordenação faz uma chamada por turma
 
 ## Usuário (usuario)
 
-| Campo        | Tipo     | Observação                                         |
-| ------------ | -------- | -------------------------------------------------- |
-| id           | uuid     | Gerado pelo banco.                                 |
-| email        | texto    | Único sem diferenciar caixa, por índice funcional. |
-| senhaHash    | texto    | scrypt com sal e formato versionado.               |
-| nome         | texto    | Nome de tratamento usado na saudação.              |
-| papel        | enum     | `ADMIN`, `COORDENACAO` ou `DIRETOR_TURMA`.         |
-| ativo        | booleano | Desativado perde o acesso na próxima requisição.   |
-| criadoEm     | data     |                                                    |
-| atualizadoEm | data     |                                                    |
+| Campo        | Tipo     | Observação                                               |
+| ------------ | -------- | -------------------------------------------------------- |
+| id           | uuid     | Gerado pelo banco.                                       |
+| email        | texto    | Único sem diferenciar caixa, por índice funcional.       |
+| senhaHash    | texto    | scrypt com sal e formato versionado.                     |
+| nome         | texto    | Nome de tratamento usado na saudação.                    |
+| papel        | enum     | `ADMIN`, `COORDENACAO`, `SECRETARIA` ou `DIRETOR_TURMA`. |
+| ativo        | booleano | Desativado perde o acesso na próxima requisição.         |
+| criadoEm     | data     |                                                          |
+| atualizadoEm | data     |                                                          |
 
 Não há telefone, CPF, matrícula ou qualquer outro dado pessoal. A administração configura tudo e a coordenação registra a frequência. O administrador inicial é criado pelo comando `criar-admin` com credenciais do ambiente; as contas de coordenação nascem pelo comando `criar-coordenacao` ou pela área de Gestão.
 

@@ -3,7 +3,7 @@
   "info": {
     "title": "API do FrequenciApp",
     "summary": "Gestão de frequência escolar",
-    "description": "Rotas HTTP do aplicativo de frequência escolar. Todas respondem JSON com `Cache-Control: no-store`.\n\n## Visão geral\n\nO aplicativo cobre chamada diária, frequências parciais e personalizadas, entradas atrasadas,\nsaídas antecipadas, justificativas, calendário letivo, notificações push, integração com o\nGoogle Planilhas, indicadores externos, chaves do FrequenciBI, exportações e cópia de segurança.\n\n## Como autenticar\n\n- Cookie de sessão `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com\n  `PERMITIR_HTTP=true`). O esquema `sessao` da especificação representa esse cookie.\n- Diretor de turma entra com identificador e palavra-chave; o cookie é de sessão e a validade no\n  servidor é a menor entre a sessão do diretor e a validade da palavra-chave.\n- As guardas por capacidade são: `administrar` (papel ADMIN), `operar` (ADMIN e COORDENACAO),\n  `alterarPropriaSenha`, `verEstatisticasDasTurmas` (papel DIRETOR_TURMA) e `receberNotificacoes`.\n- Sem sessão, 401; com sessão sem a capacidade, 403. Mutações também exigem origem confiável.\n- `GET /api/notificacoes/resumo`, `GET /api/notificacoes/agenda`, `GET /api/planilha/fila/agenda`\n  e `GET /api/indicadores/agenda` usam `Authorization: Bearer <CRON_SECRET>`, sem sessão.\n- `GET /api/bi` usa somente `Authorization: Bearer fbi_...`, sem sessão nem chave na URL.\n\n## Envelope de erro\n\nErros seguem `{ \"error\": string, \"codigo\"?: string, ...campos extras }`, em português claro e sem\ndetalhes internos. Alguns conflitos trazem campos extras, como `conflito` e `frequencia`.\nCorpos malformados respondem 400 e corpos acima de 200 kB respondem 413.\nStatus usados: 400, 401, 403, 404, 405, 409, 410, 413, 429, 500, 502 e 503.\n\n## Convenções\n\n- Datas civis usam `YYYY-MM-DD`; instantes usam ISO 8601; o fuso padrão é `America/Fortaleza` (`TZ_APP`).\n- A chamada guarda apenas as faltas, com revisão otimista; conflito de revisão responde 409 com a\n  versão vigente e nunca sobrescreve.\n- Um arquivo próprio de especificação fica em `docs/openapi.json` e a página interativa em `/api/docs`.\n\n## Referências\n\n- Documentação narrativa: https://github.com/eemtijca/frequenciapp/blob/main/docs/api.md\n- Contexto para modelos de linguagem: https://github.com/eemtijca/frequenciapp/blob/main/public/llms.txt\n",
+    "description": "Rotas HTTP do aplicativo de frequência escolar. Todas respondem JSON com `Cache-Control: no-store`.\n\n## Visão geral\n\nO aplicativo cobre chamada diária, frequências parciais e personalizadas, entradas atrasadas,\nsaídas antecipadas, justificativas, calendário letivo, notificações push, integração com o\nGoogle Planilhas, indicadores externos, chaves do FrequenciBI, exportações e cópia de segurança.\n\n## Como autenticar\n\n- Cookie de sessão `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com\n  `PERMITIR_HTTP=true`). O esquema `sessao` da especificação representa esse cookie.\n- Diretor de turma entra com identificador e palavra-chave; o cookie é de sessão e a validade no\n  servidor é a menor entre a sessão do diretor e a validade da palavra-chave.\n- As guardas por capacidade são: `administrar` (papel ADMIN), `operar` (ADMIN e COORDENACAO),\n  `consultar` (ADMIN, COORDENACAO e SECRETARIA, só leitura do Painel e das grades de relatório),\n  `alterarPropriaSenha`, `verEstatisticasDasTurmas` (papel DIRETOR_TURMA) e `receberNotificacoes`.\n- Sem sessão, 401; com sessão sem a capacidade, 403. Mutações também exigem origem confiável.\n- `GET /api/notificacoes/resumo`, `GET /api/notificacoes/agenda`, `GET /api/planilha/fila/agenda`\n  e `GET /api/indicadores/agenda` usam `Authorization: Bearer <CRON_SECRET>`, sem sessão.\n- `GET /api/bi` usa somente `Authorization: Bearer fbi_...`, sem sessão nem chave na URL.\n\n## Envelope de erro\n\nErros seguem `{ \"error\": string, \"codigo\"?: string, ...campos extras }`, em português claro e sem\ndetalhes internos. Alguns conflitos trazem campos extras, como `conflito` e `frequencia`.\nCorpos malformados respondem 400 e corpos acima de 200 kB respondem 413.\nStatus usados: 400, 401, 403, 404, 405, 409, 410, 413, 429, 500, 502 e 503.\n\n## Convenções\n\n- Datas civis usam `YYYY-MM-DD`; instantes usam ISO 8601; o fuso padrão é `America/Fortaleza` (`TZ_APP`).\n- A chamada guarda apenas as faltas, com revisão otimista; conflito de revisão responde 409 com a\n  versão vigente e nunca sobrescreve.\n- Um arquivo próprio de especificação fica em `docs/openapi.json` e a página interativa em `/api/docs`.\n\n## Referências\n\n- Documentação narrativa: https://github.com/eemtijca/frequenciapp/blob/main/docs/api.md\n- Contexto para modelos de linguagem: https://github.com/eemtijca/frequenciapp/blob/main/public/llms.txt\n",
     "version": "0.1.0",
     "contact": {
       "name": "FrequenciApp no GitHub",
@@ -2919,7 +2919,7 @@
       "get": {
         "operationId": "listarFrequencias",
         "summary": "Consultar frequências por dia, mês ou período",
-        "description": "Qualquer sessão da operação. Com dia e turma devolve a chamada e o feriado; com mês, com período ou com dia sem turma devolve as frequências. Com verificarHistorico=true, dia e turmaId, devolve apenas se a confirmação histórica é necessária, sem gravar nem acionar a fila.",
+        "description": "Capacidade consultar (administração, coordenação e Secretaria). Com dia e turma devolve a chamada e o feriado; com mês, com período ou com dia sem turma devolve as frequências. Com verificarHistorico=true, dia e turmaId, devolve apenas se a confirmação histórica é necessária, sem gravar nem acionar a fila.",
         "tags": ["frequencias"],
         "parameters": [
           {
@@ -3254,7 +3254,7 @@
       "get": {
         "operationId": "obterResumoFrequencias",
         "summary": "Consultar o acumulado de faltas",
-        "description": "Qualquer sessão da operação. O parâmetro de limita a data inicial; sem ele, considera a primeira chamada salva. Um dia com faltas justificadas conta em faltasJustificadas; falta simples ou parcial conta em faltas.",
+        "description": "Capacidade consultar (administração, coordenação e Secretaria). O parâmetro de limita a data inicial; sem ele, considera a primeira chamada salva. Um dia com faltas justificadas conta em faltasJustificadas; falta simples ou parcial conta em faltas.",
         "tags": ["frequencias"],
         "parameters": [
           {
@@ -4086,7 +4086,7 @@
       "get": {
         "operationId": "listarSaidas",
         "summary": "Listar as saídas antecipadas",
-        "description": "Sessão da operação. É preciso informar dia, período, aluno ou turma.",
+        "description": "Capacidade consultar (administração, coordenação e Secretaria). É preciso informar dia, período, aluno ou turma.",
         "tags": ["saidas"],
         "parameters": [
           {
@@ -4617,7 +4617,7 @@
       "get": {
         "operationId": "obterRetratoGrade",
         "summary": "Consultar o retrato consistente da Grade",
-        "description": "Exige capacidade operar. Lê alunos, frequências, justificativas e histórico em uma única transação RepeatableRead, sem escrever. O período pode terminar no último dia do mês corrente e tem limite de 366 dias.",
+        "description": "Exige a capacidade consultar (administração, coordenação e Secretaria). Lê alunos, frequências, justificativas e histórico em uma única transação RepeatableRead, sem escrever. O período pode terminar no último dia do mês corrente e tem limite de 366 dias.",
         "tags": ["relatorios"],
         "parameters": [
           {
@@ -4683,7 +4683,7 @@
       "get": {
         "operationId": "obterConfiguracoes",
         "summary": "Consultar as configurações da escola",
-        "description": "Qualquer sess?o. O calend?rio traz todos os anos e os dois limites de infrequ?ncia do Painel v?m em porcentagem inteira.",
+        "description": "Capacidade consultar (administração, coordenação e Secretaria). O calendário traz todos os anos e os dois limites de infrequência do Painel vêm em porcentagem inteira.",
         "tags": ["configuracoes"],
         "responses": {
           "200": {
@@ -12778,7 +12778,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "frequenciapp_sessao",
-        "description": "Cookie de sessão da aplicação. As guardas por capacidade decidem o acesso: administrar (papel ADMIN), operar (ADMIN e COORDENACAO), alterarPropriaSenha, verEstatisticasDasTurmas (papel DIRETOR_TURMA) e receberNotificacoes. Sem sessão, 401; com sessão sem a capacidade, 403; mutações também exigem origem confiável."
+        "description": "Cookie de sessão da aplicação. As guardas por capacidade decidem o acesso: administrar (papel ADMIN), operar (ADMIN e COORDENACAO), consultar (ADMIN, COORDENACAO e SECRETARIA), alterarPropriaSenha, verEstatisticasDasTurmas (papel DIRETOR_TURMA) e receberNotificacoes. Sem sessão, 401; com sessão sem a capacidade, 403; mutações também exigem origem confiável."
       },
       "segredoAgendador": {
         "type": "apiKey",
@@ -13087,7 +13087,7 @@
           },
           "papel": {
             "type": "string",
-            "enum": ["ADMIN", "COORDENACAO", "DIRETOR_TURMA"],
+            "enum": ["ADMIN", "COORDENACAO", "SECRETARIA", "DIRETOR_TURMA"],
             "description": "Papel da conta no aplicativo.",
             "example": "ADMIN"
           },
@@ -19549,7 +19549,7 @@
           },
           "papel": {
             "type": "string",
-            "enum": ["ADMIN", "COORDENACAO"],
+            "enum": ["ADMIN", "COORDENACAO", "SECRETARIA"],
             "example": "COORDENACAO"
           }
         }
@@ -19574,7 +19574,7 @@
           },
           "papel": {
             "type": "string",
-            "enum": ["ADMIN", "COORDENACAO"],
+            "enum": ["ADMIN", "COORDENACAO", "SECRETARIA"],
             "example": "ADMIN"
           },
           "ativo": {

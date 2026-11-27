@@ -172,6 +172,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Adicionado
 
+- Novo papel Secretaria, só de consulta, criado em Gestão, Equipe. A Secretaria abre o aplicativo reduzido, com o Painel e Relatórios, e em Relatórios só a Grade e o Por aluno: sem Chamada, Chamada Parcial, Horários, Saídas e Entradas, Alunos, Gestão, FrequenciBI nem notificações, e sem o envio da Grade à planilha. O acesso é por capacidade: a matriz ganha `consultar`, concedida à administração, à coordenação e à Secretaria, e as leituras do Painel, da Grade e do Por aluno (`GET /api/frequencias`, `/api/frequencias/resumo`, `/api/saidas`, `/api/configuracoes` e `/api/relatorios/grade/retrato`) passam a exigir `consultar`, enquanto toda escrita segue em `operar` ou `administrar`. A lista de quem libera saídas e os destinatários dos avisos saem da capacidade, e a Secretaria fica fora de ambos ([ADR-087](docs/adr/087-perfil-secretaria-e-capacidade-consultar.md)).
+
 - Relatórios, Grade: as colunas do período mostram F, FJ e S por aluno, a célula de presença parcial informa as aulas faltadas e a linha do aluno abre o detalhamento com datas, aulas e justificativas. O novo relatório em PDF reúne o resumo e o detalhamento das faltas da turma de origem até hoje, com retrato consistente do banco, hash completo no rodapé, download protegido e registro de auditoria com o hash do retrato.
 
 - A página pública `/privacidade` descreve o tratamento de dados da EEMTI José Cláudio de Araújo, inclusive o escopo `drive.file` da integração Google, e abre sem sessão. `/politica-de-privacidade` redireciona para ela. A entrada e o diálogo Sobre apontam para a página.
