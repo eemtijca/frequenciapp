@@ -54,6 +54,7 @@ interface Props {
   feriados: readonly Feriado[];
   configuracoes: Configuracoes;
   mostrarSaidas: boolean;
+  podeOperar?: boolean;
   versao?: number;
   contexto?: "painel" | "chamada";
   ativo?: boolean;
@@ -263,6 +264,7 @@ export function VistaResumoSemana({
   feriados,
   configuracoes,
   mostrarSaidas,
+  podeOperar = true,
   versao = 0,
   contexto = "chamada",
   ativo = true,
@@ -275,7 +277,7 @@ export function VistaResumoSemana({
   const de = dias[0] ?? "";
   const ate = dias[dias.length - 1] ?? "";
   const turmasChave = useMemo(() => turmas.map((turma) => turma.id).join(","), [turmas]);
-  const periodo = `${de}|${ate}|${turmasChave}|${contexto}|${mostrarSaidas ? 1 : 0}`;
+  const periodo = `${de}|${ate}|${turmasChave}|${contexto}|${mostrarSaidas ? 1 : 0}|${podeOperar ? 1 : 0}`;
   const painel = contexto === "painel";
 
   const carregar = useCallback(
@@ -293,12 +295,12 @@ export function VistaResumoSemana({
                 signal: sinal,
               })
             : Promise.resolve({ saidas: [] as SaidaAntecipada[] }),
-          painel && mostrarSaidas
+          painel && mostrarSaidas && podeOperar
             ? pedir<{ entradas: EntradaAtrasada[] }>(`/api/entradas?de=${de}&ate=${ate}`, {
                 signal: sinal,
               })
             : Promise.resolve({ entradas: [] as EntradaAtrasada[] }),
-          painel
+          painel && podeOperar
             ? pedir<{ registros: RegistroPersonalizado[] }>(
                 `/api/frequencias-personalizadas?de=${de}&ate=${ate}`,
                 { signal: sinal },
@@ -329,17 +331,17 @@ export function VistaResumoSemana({
             ? "Não foi possível carregar as saídas."
             : "",
         avisoEntradas:
-          painel && mostrarSaidas && entradasResultado.status === "rejected"
+          painel && mostrarSaidas && podeOperar && entradasResultado.status === "rejected"
             ? "Não foi possível carregar as entradas."
             : "",
         avisoParciais:
-          painel && parciaisResultado.status === "rejected"
+          painel && podeOperar && parciaisResultado.status === "rejected"
             ? "Não foi possível carregar as pendências da Seduc."
             : "",
       };
       return { dados, assinatura: JSON.stringify(dados) };
     },
-    [ate, de, mostrarSaidas, onRecarregarConfiguracoes, painel, turmas],
+    [ate, de, mostrarSaidas, onRecarregarConfiguracoes, painel, podeOperar, turmas],
   );
 
   const resumo = useResumoSemanal<DadosSemana>({
@@ -446,7 +448,7 @@ export function VistaResumoSemana({
   );
 
   const pendenciasSeduc = useMemo(() => {
-    if (!dados) return [];
+    if (!dados || !podeOperar) return [];
     return dados.parciais
       .filter((registro) => exigeConferenciaSeduc(registro) && !registro.registradoSeduc)
       .map((registro) => ({
@@ -462,7 +464,7 @@ export function VistaResumoSemana({
           a.turma.localeCompare(b.turma, "pt-BR") ||
           a.nome.localeCompare(b.nome, "pt-BR"),
       );
-  }, [dados]);
+  }, [dados, podeOperar]);
 
   const avisos = [dados?.avisoSaidas, dados?.avisoEntradas, dados?.avisoParciais].filter(
     (aviso): aviso is string => Boolean(aviso),
@@ -484,7 +486,9 @@ export function VistaResumoSemana({
         fuso={fuso}
         descricao={
           painel
-            ? "Frequência, movimentações e pendências da Seduc de todas as turmas visíveis."
+            ? podeOperar
+              ? "Frequência, movimentações e pendências da Seduc de todas as turmas visíveis."
+              : "Frequência da semana de todas as turmas visíveis."
             : "Frequência e saídas da turma selecionada."
         }
       />
@@ -925,7 +929,7 @@ export function VistaResumoSemana({
           );
         })}
 
-        {painel && mostrarSaidas ? (
+        {painel && mostrarSaidas && podeOperar ? (
           <SecaoResumo
             id="movimentacoes"
             titulo="Movimentações"
@@ -996,7 +1000,7 @@ export function VistaResumoSemana({
           </SecaoResumo>
         ) : null}
 
-        {painel ? (
+        {painel && podeOperar ? (
           <SecaoResumo
             id="pendenciasSeduc"
             titulo="Pendentes na Seduc"

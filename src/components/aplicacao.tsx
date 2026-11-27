@@ -1081,6 +1081,7 @@ export default function Aplicacao({
             frequencias={frequencias}
             saidas={saidas}
             configuracoes={configuracoes}
+            podeOperar={podeOperar}
             onRecarregar={recarregarMes}
             onRecarregarConfiguracoes={recarregarConfiguracoes}
           />

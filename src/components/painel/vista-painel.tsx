@@ -70,6 +70,7 @@ interface Props {
   frequencias: Frequencia[];
   saidas: SaidaAntecipada[];
   configuracoes: Configuracoes;
+  podeOperar: boolean;
   onRecarregar: (mes: string) => Promise<void>;
   onRecarregarConfiguracoes: () => Promise<void>;
 }
@@ -149,6 +150,7 @@ export default function VistaPainel({
   frequencias,
   saidas,
   configuracoes,
+  podeOperar,
   onRecarregar,
   onRecarregarConfiguracoes,
 }: Props) {
@@ -513,7 +515,8 @@ export default function VistaPainel({
             domingo={nav.domingo}
             feriados={configuracoes.feriados}
             configuracoes={configuracoes}
-            mostrarSaidas={configuracoes.saidaAntecipada}
+            mostrarSaidas={configuracoes.saidaAntecipada && podeOperar}
+            podeOperar={podeOperar}
             versao={recarregar}
             contexto="painel"
             ativo={ativo}
