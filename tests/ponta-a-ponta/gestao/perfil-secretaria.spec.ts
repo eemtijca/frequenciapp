@@ -1,14 +1,16 @@
 // Perfil Secretaria: a administração cria a conta na Equipe e a Secretaria abre o aplicativo reduzido, só com o
 // Painel e, em Relatórios, a Grade e o Por aluno, sem caminho para chamada, avisos, cadastros nem gestão.
-import { test, expect } from "@playwright/test";
+import { test, expect, type Locator, type Page } from "@playwright/test";
 import { selecionarCadastroGestao } from "../../helpers/categorias-configuracoes";
-import { comBanco } from "../helpers/banco";
+import { comBanco, criarMassaE2E, limparMassaE2E } from "../helpers/banco";
+import { escolherDomingo, ultimoDomingo } from "../helpers/calendario-historico";
 import { hashearSenha } from "../../../src/infra/auth/hash";
 import { abrirMenuConta, abrirNavegacao, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
 
 const senha = "SecretariaE2E2026";
+const senhaZip = "SecretariaZip2026!";
 const emailCriadoNaTela = "e2e.secretaria.tela@escola.exemplo";
 const emailDeLeitura = "e2e.secretaria.leitura@escola.exemplo";
 
@@ -21,6 +23,7 @@ async function limpar() {
 }
 
 test.beforeAll(async () => {
+  await criarMassaE2E();
   await limpar();
   const senhaHash = await hashearSenha(senha);
   await comBanco(async (banco) => {
@@ -32,7 +35,40 @@ test.beforeAll(async () => {
   });
 });
 
-test.afterAll(limpar);
+test.afterAll(async () => {
+  await limpar();
+  await limparMassaE2E();
+});
+
+async function abrirGradeDaSecretaria(page: Page): Promise<Locator> {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto("/");
+  await aguardarHidratacao(page);
+  const nav = await abrirNavegacao(page);
+  await nav.getByRole("button", { name: "Relatórios", exact: true }).click();
+  await nav.getByRole("button", { name: "Grade", exact: true }).click();
+  const grade = page.getByRole("region", { name: "Grade de frequência", exact: true });
+  await expect(grade).toBeVisible();
+  const turma = grade.getByRole("button", { name: /E2E Ano A/ });
+  if (await turma.isVisible().catch(() => false)) {
+    await turma.evaluate((elemento: HTMLElement) => elemento.click());
+  }
+  await expect(grade.getByRole("button", { name: "Baixar planilha (CSV)" })).toBeEnabled();
+  return grade;
+}
+
+async function baixarDaGrade(page: Page, grade: Locator, botao: string) {
+  await grade.getByRole("button", { name: botao }).click();
+  const dialogo = page.getByRole("dialog", { name: "Preparar download" });
+  await expect(dialogo).toBeVisible();
+  await dialogo.getByLabel("Senha do ZIP", { exact: true }).fill(senhaZip);
+  await dialogo.getByLabel("Confirmar senha do ZIP").fill(senhaZip);
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    dialogo.getByRole("button", { name: "Baixar ZIP protegido" }).click(),
+  ]);
+  return download;
+}
 
 test("a administração cria a Secretaria na Equipe e a lista mostra o papel", async ({ page }) => {
   await page.goto("/");
@@ -179,6 +215,65 @@ test.describe("aplicativo reduzido da Secretaria", () => {
     ).toBeVisible();
     await page.waitForLoadState("networkidle");
     expect(recusadas).toEqual([]);
+  });
+
+  test("o resumo de domingo não consulta operações nem mostra seções de operação", async ({
+    page,
+  }) => {
+    const caminhos: string[] = [];
+    const recusadas: string[] = [];
+    page.on("request", (requisicao) => {
+      const caminho = new URL(requisicao.url()).pathname;
+      if (caminho === "/api/entradas" || caminho === "/api/frequencias-personalizadas") {
+        caminhos.push(caminho);
+      }
+    });
+    page.on("response", (resposta) => {
+      const caminho = new URL(resposta.url()).pathname;
+      if (caminho.startsWith("/api/") && resposta.status() >= 400) {
+        recusadas.push(`${resposta.status()} ${caminho}`);
+      }
+    });
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/");
+    await aguardarHidratacao(page);
+    const domingo = ultimoDomingo();
+    await escolherDomingo(page, "#dia-painel", domingo);
+
+    const resumo = page.getByRole("region", { name: "Resumo da semana", exact: true });
+    await expect(resumo).toBeVisible();
+    await page.waitForLoadState("networkidle");
+    expect(caminhos).toEqual([]);
+    expect(recusadas).toEqual([]);
+    await expect(resumo.locator('[data-secao="resumo-movimentacoes"]')).toHaveCount(0);
+    await expect(resumo.locator('[data-secao="resumo-pendenciasSeduc"]')).toHaveCount(0);
+  });
+
+  test("baixa o CSV da Grade sem requisição recusada", async ({ page }) => {
+    const registros: number[] = [];
+    page.on("response", (resposta) => {
+      if (new URL(resposta.url()).pathname === "/api/exportacoes/registro") {
+        registros.push(resposta.status());
+      }
+    });
+    const grade = await abrirGradeDaSecretaria(page);
+    const download = await baixarDaGrade(page, grade, "Baixar planilha (CSV)");
+    expect(download.suggestedFilename()).toBe("frequenciapp-grade.zip");
+    expect(registros).toEqual([200]);
+  });
+
+  test("baixa o PDF da Grade sem requisição recusada", async ({ page }) => {
+    const registros: number[] = [];
+    page.on("response", (resposta) => {
+      if (new URL(resposta.url()).pathname === "/api/exportacoes/registro") {
+        registros.push(resposta.status());
+      }
+    });
+    const grade = await abrirGradeDaSecretaria(page);
+    const download = await baixarDaGrade(page, grade, "Emitir relatório em PDF da turma de origem");
+    expect(download.suggestedFilename()).toBe("frequenciapp-relatorio.zip");
+    expect(registros).toEqual([200]);
   });
 
   test("no celular, o menu tem as mesmas duas áreas", async ({ page }) => {

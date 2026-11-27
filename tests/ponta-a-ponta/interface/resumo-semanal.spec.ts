@@ -1,13 +1,12 @@
 // Resumo semanal: calendário, seções recolhíveis, atualização e filtros das movimentações.
-import { expect, test, type Page } from "@playwright/test";
-import { diaLocal, diaSeguinte, ehDomingo, rotuloDataCurta } from "@/domain/frequencia";
+import { expect, test } from "@playwright/test";
+import { rotuloDataCurta } from "@/domain/frequencia";
 import { semanaEncerrada } from "@/domain/resumo-semana";
 import { criarMassaE2E, limparMassaE2E } from "../helpers/banco";
+import { escolherDomingo, ultimoDomingo } from "../helpers/calendario-historico";
 import { abrirDiaSeResumo, aguardarHidratacao, trocarVisao } from "../helpers/pagina";
 
 test.use({ serviceWorkers: "block" });
-
-const hoje = diaLocal(new Date(), process.env.TZ_APP ?? "America/Fortaleza");
 
 test.beforeAll(async () => {
   await criarMassaE2E();
@@ -16,23 +15,6 @@ test.beforeAll(async () => {
 test.afterAll(async () => {
   await limparMassaE2E();
 });
-
-function ultimoDomingo(): string {
-  let dia = hoje;
-  while (!ehDomingo(dia)) dia = diaSeguinte(dia, -1);
-  return dia;
-}
-
-async function escolherDomingo(page: Page, seletor: string, domingo: string): Promise<void> {
-  await page.locator(seletor).click();
-  const calendario = page.getByRole("dialog").last();
-  for (let tentativa = 0; tentativa < 3; tentativa += 1) {
-    if (await calendario.locator(`[data-dia="${domingo}"]`).count()) break;
-    await calendario.getByRole("button", { name: "Mês anterior", exact: true }).click();
-  }
-  await calendario.locator(`[data-dia="${domingo}"]`).click();
-  await expect(calendario).toBeHidden();
-}
 
 test("o Painel abre a semana escolhida com a Visão geral aberta e as demais seções recolhidas", async ({
   page,
