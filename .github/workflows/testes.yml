@@ -44,6 +44,12 @@ jobs:
       - name: Instalar dependências
         run: pnpm install --frozen-lockfile
 
+      - name: Testar migração protegida em PostgreSQL isolado
+        run: |
+          docker pull postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994
+          env -i PATH="$PATH" HOME="$HOME" RUNNER_TEMP="$RUNNER_TEMP" \
+            bash tests/servidor/ensaio-migracoes-auto.sh --regressoes
+
       - name: Preparar chaves sintéticas de push
         run: node tests/gerar-ambiente-push.mjs "$GITHUB_ENV"
 

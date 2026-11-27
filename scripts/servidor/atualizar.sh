@@ -677,8 +677,9 @@ conferir_banco_migracoes_auto() {
   [ "$servidor" = "${POSTGRES_USER:-frequencia}" ] || return 1
   observacao_db=$(node "$DIR/alvo-migracoes-auto.mjs" "sql-historico$sufixo" "$schema_auto" |
     timeout -k 3 18 docker exec -i "$banco" env -i PATH=/usr/local/bin:/usr/bin:/bin \
-      PGCONNECT_TIMEOUT=4 psql -XwqAt -h /var/run/postgresql -p 5432 \
-      -U "$servidor" -d "$banco_auto" -v ON_ERROR_STOP=1 -f - 2>/dev/null |
+      LC_ALL=C PGCONNECT_TIMEOUT=4 psql -XwqAt -h /var/run/postgresql -p 5432 \
+      -U "$servidor" -d "$banco_auto" -v ON_ERROR_STOP=1 -v VERBOSITY=sqlstate -f - \
+      2> >(diagnosticar_permissao_historico '^psql:<stdin>:[0-9]+: ERROR:  42501$' >&2) |
     node "$DIR/alvo-migracoes-auto.mjs" "historico$sufixo" "$APP_DIR" "$revisao" "$banco_auto" "$schema_auto") || return 1
   observacao_app=$(node "$DIR/alvo-migracoes-auto.mjs" "sql-historico$sufixo" "$schema_auto" |
     timeout -k 3 22 docker exec -i "$app" node --input-type=module -e '
@@ -714,8 +715,12 @@ conferir_banco_migracoes_auto() {
           } finally { await cliente.end(); }
         }
         process.stdout.write(primeiro);
-      } catch { process.exitCode = 1; }
-    ' -- "$ip_banco" "${opcoes_sonda[@]}" 2>/dev/null |
+      } catch (erro) {
+        if (erro.code === "42501") process.stderr.write("42501\n");
+        process.exitCode = 1;
+      }
+    ' -- "$ip_banco" "${opcoes_sonda[@]}" \
+      2> >(diagnosticar_permissao_historico '^42501$' >&2) |
     node "$DIR/alvo-migracoes-auto.mjs" "historico$sufixo" "$APP_DIR" "$revisao" "$banco_auto" "$schema_auto") || return 1
   [ "$observacao_app" = "$observacao_db" ] || return 1
   [ "$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_DB")" = "$banco" ] &&
@@ -728,6 +733,13 @@ conferir_banco_migracoes_auto() {
     . + {container:$container,ip:$ip} + (if $inicio == "" then {} else {inicioContainer:$inicio} end) +
       (if $redes == {} then {} else {redes:$redes} end)
   ' <<<"$observacao_db"
+}
+
+diagnosticar_permissao_historico() {
+  # Só publica a categoria conhecida, nunca o conteúdo do erro do cliente.
+  if grep -E "$1" >/dev/null; then
+    printf 'PostgreSQL: RLS efetiva ou privilégios insuficientes impedem conferir o histórico.\n'
+  fi
 }
 
 projetar_banco_pre_migracao() {

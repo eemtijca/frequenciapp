@@ -127,7 +127,8 @@ montagens=(
 prova_tmpfs="rw,nosuid,nodev,noexec,uid=$uid,gid=$gid,mode=0700,size=1m"
 if $regressoes; then
   etapa=projecao-regressoes
-  for fonte in docker/app/migrar.mjs src/infra/schema-postgres.mjs tests/servidor/migracao-auto-lock.test.mjs; do
+  for fonte in docker/app/migrar.mjs src/infra/schema-postgres.mjs tests/servidor/migracao-auto-lock.test.mjs \
+    scripts/servidor/{alvo-migracoes-auto,politica-migracoes-auto}.mjs; do
     install -D -m 600 -- "$repo/$fonte" "$pasta/regressoes/$fonte"
   done
   ln -s /node_modules "$pasta/regressoes/node_modules"

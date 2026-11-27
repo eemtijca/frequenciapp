@@ -174,6 +174,7 @@ function docker(raiz, acao, args) {
           usuario: "frequencia",
           primario: true,
           gatilhos: false,
+          historicoCompativel: true,
           registros: [
             [anterior, sha(sqlBase), true],
             ...(iniciado && caso !== "historico-final-divergente"
