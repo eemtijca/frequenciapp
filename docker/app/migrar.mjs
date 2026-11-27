@@ -12,6 +12,7 @@ import {
   identificadorPostgres,
   resolverSchema,
   selecionarSchema,
+  sqlHistoricoCompativel,
 } from "../../src/infra/schema-postgres.mjs";
 
 const TIMEOUT_CONEXAO_MS = 5000;
@@ -276,13 +277,7 @@ async function conferirBaseBloqueada(lote, historico, progresso = 0) {
       ${manual ? "EXTRACT(epoch FROM pg_catalog.pg_postmaster_start_time())::text AS inicio," : ""}
       NOT pg_catalog.pg_is_in_recovery() AS primario,
       NOT EXISTS (SELECT FROM pg_catalog.pg_event_trigger WHERE evtenabled <> 'D') AS sem_gatilhos,
-      EXISTS (
-        SELECT FROM pg_catalog.pg_class c
-        WHERE c.relnamespace = n.oid AND c.relname = '_prisma_migrations'
-          AND c.relkind = 'r' AND c.relpersistence = 'p' AND NOT c.relispartition
-          AND NOT c.relrowsecurity AND NOT c.relhasrules AND NOT c.relhastriggers
-          AND NOT EXISTS (SELECT FROM pg_catalog.pg_inherits WHERE inhparent = c.oid OR inhrelid = c.oid)
-      ) AS historico_simples
+      ${sqlHistoricoCompativel} AS historico_compativel
       FROM pg_catalog.pg_namespace n WHERE nspname = $1`,
     [lote.schema],
   );
@@ -301,8 +296,8 @@ async function conferirBaseBloqueada(lote, historico, progresso = 0) {
     "Identidade do PostgreSQL divergente ou gatilho de evento habilitado.",
   );
   exigirAprovacao(
-    atual.historico_simples === true,
-    "Tabela de histórico não suportada pela aprovação automática.",
+    atual.historico_compativel === true,
+    "Tabela de histórico não suportada pela migração protegida.",
   );
   const { rows: registros } = await cliente.query(
     `SELECT migration_name, checksum,

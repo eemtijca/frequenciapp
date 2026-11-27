@@ -119,13 +119,13 @@ async function fixture(t) {
   assert.equal(inicial.status, 0, inicial.stderr);
   for (const arquivo of pendentes) await escrever(arquivo);
   const {
-    rows: [identidade],
+    rows: [{ inicio, ...identidade }],
   } = await cliente.query(`
     SELECT (SELECT system_identifier::text FROM pg_control_system()) AS cluster,
       current_database() AS banco,
       (SELECT oid::text FROM pg_database WHERE datname = current_database()) AS "bancoOid",
       'public' AS schema, 'public'::regnamespace::oid::text AS "schemaOid", current_user AS usuario,
-      host(inet_server_addr()) AS ip
+      host(inet_server_addr()) AS ip, EXTRACT(epoch FROM pg_postmaster_start_time())::text AS inicio
   `);
   const lote = {
     ...identidade,
@@ -134,16 +134,15 @@ async function fixture(t) {
     aplicadas: nomesEHashes(aplicadas),
     pendentes: nomesEHashes(pendentes),
   };
-  const auto = async (aprovacao = lote, { prova } = {}) => {
+  const auto = (aprovacao = lote, opcoes) => protegido(aprovacao, "MIGRACAO_AUTOMATICA", opcoes);
+  const manual = (opcoes) => protegido({ ...lote, inicio }, "MIGRACAO_MANUAL_PROTEGIDA", opcoes);
+  async function protegido(aprovacao, modo, { prova } = {}) {
     const envelope = Buffer.from(JSON.stringify(aprovacao)).toString("base64url");
     await rm(autorizacao, { force: true });
     if (prova !== null)
       await writeFile(autorizacao, prova ?? envelope, { mode: 0o600, flag: "wx" });
-    return migrar({
-      MIGRACAO_AUTOMATICA: "true",
-      MIGRACAO_LOTE_APROVADO: envelope,
-    });
-  };
+    return migrar({ [modo]: "true", MIGRACAO_LOTE_APROVADO: envelope });
+  }
   async function estado() {
     const { rows } = await cliente.query(`SELECT
       (SELECT array_agg(migration_name ORDER BY started_at) FROM public._prisma_migrations) AS historico,
@@ -152,7 +151,7 @@ async function fixture(t) {
       to_regclass('public.outra') IS NOT NULL AS tabela`);
     return rows[0];
   }
-  return { cliente, conectar, lote, migrar, auto, escrever, estado };
+  return { cliente, conectar, lote, migrar, auto, manual, escrever, estado };
 }
 
 const baseIntacta = { historico: [aplicadas[0][0]], coluna: false, tabela: false };
@@ -161,6 +160,88 @@ const alvoCompleto = {
   coluna: true,
   tabela: true,
 };
+
+test("sonda antecipada não lê histórico filtrado nem aceita a estrutura proibida", async (t) => {
+  const { cliente, conectar } = await fixture(t);
+  const { stdout: sql } = await executar(process.execPath, [
+    path.join(raiz, "scripts/servidor/alvo-migracoes-auto.mjs"),
+    "sql-historico-manual",
+    "public",
+  ]);
+  await cliente.query("ALTER TABLE public._prisma_migrations ENABLE ROW LEVEL SECURITY");
+  async function observar() {
+    const respostas = await cliente.query(sql);
+    return respostas.flatMap((r) => r.rows).map((r) => r.json_build_object)[0];
+  }
+  const aceita = await observar();
+  assert.equal(aceita.historicoCompativel, true);
+  assert.deepEqual(
+    aceita.registros,
+    nomesEHashes(aplicadas).map(({ nome, sha256 }) => [nome, sha256, true]),
+  );
+
+  const leitura = await conectar();
+  await leitura.query("SET ROLE pg_read_all_data");
+  await assert.rejects(leitura.query(sql), { code: "42501", message: /row-level security/ });
+  await leitura.query("ROLLBACK");
+
+  await cliente.query("CREATE POLICY restrita ON public._prisma_migrations USING (false)");
+  const recusa = await observar();
+  assert.equal(recusa.historicoCompativel, false);
+  assert.deepEqual(recusa.registros, []);
+  await cliente.query("ALTER TABLE public._prisma_migrations DISABLE ROW LEVEL SECURITY");
+  assert.equal(
+    (await observar()).historicoCompativel,
+    false,
+    "Uma política inativa também é recusada.",
+  );
+});
+
+test("migração manual aceita RLS legada sem alterar a proteção do histórico", async (t) => {
+  const { cliente, manual, estado, lote } = await fixture(t);
+  await cliente.query("ALTER TABLE public._prisma_migrations ENABLE ROW LEVEL SECURITY");
+  const primeira = await manual();
+  assert.equal(primeira.status, 0, primeira.stderr);
+  assert.deepEqual(await estado(), alvoCompleto);
+  const consulta =
+    "SELECT migration_name, checksum, xmin::text FROM public._prisma_migrations ORDER BY started_at";
+  const { rows: antes } = await cliente.query(consulta);
+  assert.deepEqual(
+    antes.map((r) => r.checksum),
+    [...lote.aplicadas, ...lote.pendentes].map((m) => m.sha256),
+  );
+  const segunda = await manual({ prova: null });
+  assert.equal(segunda.status, 0, segunda.stderr);
+  assert.match(segunda.stdout, /já está na última revisão/);
+  assert.deepEqual((await cliente.query(consulta)).rows, antes);
+  const {
+    rows: [protecao],
+  } = await cliente.query(`SELECT relrowsecurity, relforcerowsecurity
+    FROM pg_class WHERE oid = 'public._prisma_migrations'::regclass`);
+  assert.deepEqual(protecao, { relrowsecurity: true, relforcerowsecurity: false });
+});
+
+test("migração manual recusa RLS forçada ou com política, mesmo para papel isento", async (t) => {
+  const { cliente, manual, estado } = await fixture(t);
+  await cliente.query("ALTER TABLE public._prisma_migrations ENABLE ROW LEVEL SECURITY");
+  for (const [ativar, remover] of [
+    [
+      "ALTER TABLE public._prisma_migrations FORCE ROW LEVEL SECURITY",
+      "ALTER TABLE public._prisma_migrations NO FORCE ROW LEVEL SECURITY",
+    ],
+    [
+      "CREATE POLICY restrita ON public._prisma_migrations USING (false)",
+      "DROP POLICY restrita ON public._prisma_migrations",
+    ],
+  ]) {
+    await cliente.query(ativar);
+    const resultado = await manual();
+    assert.equal(resultado.status, 4, resultado.stderr);
+    assert.match(resultado.stderr, /Tabela de histórico não suportada/);
+    assert.deepEqual(await estado(), baseIntacta);
+    await cliente.query(remover);
+  }
+});
 
 test("modo automático sem aprovação recusa a DDL e não avança o histórico", async (t) => {
   const { migrar, estado } = await fixture(t);

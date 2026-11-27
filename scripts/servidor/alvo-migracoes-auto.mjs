@@ -4,7 +4,11 @@ import { createHash } from "node:crypto";
 import { readFileSync, readSync, realpathSync } from "node:fs";
 import { isIPv4 } from "node:net";
 import { pathToFileURL } from "node:url";
-import { identidadeDaConexao, resolverSchema } from "../../src/infra/schema-postgres.mjs";
+import {
+  identidadeDaConexao,
+  resolverSchema,
+  sqlHistoricoCompativel,
+} from "../../src/infra/schema-postgres.mjs";
 import { inventariarLoteAutomatico } from "./politica-migracoes-auto.mjs";
 
 const pasta = "prisma/migrations";
@@ -435,16 +439,21 @@ function conferirImagem(prova, repo, revisao, manual = false) {
 
 function sqlHistorico(schema, manual = false) {
   exigir(schemaValido(schema));
+  // off induz erro em vez de aplicar uma política. Não desabilita RLS na tabela.
   return `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
 SET LOCAL search_path = pg_catalog;
 SET LOCAL statement_timeout = '5s';
 SET LOCAL lock_timeout = '2s';
-WITH historico AS (
+SET LOCAL row_security = off;
+WITH estrutura AS MATERIALIZED (
+  SELECT nspname, oid, ${sqlHistoricoCompativel} AS compativel
+  FROM pg_catalog.pg_namespace n WHERE nspname = '${schema}'
+), historico AS (
   SELECT migration_name, checksum, started_at,
     (rolled_back_at IS NULL AND finished_at IS NOT NULL AND finished_at >= started_at
       AND pg_catalog.isfinite(started_at) AND pg_catalog.isfinite(finished_at) AND applied_steps_count > 0
       AND count(*) OVER (PARTITION BY started_at) = 1) AS completa
-  FROM "${schema}"._prisma_migrations
+  FROM ONLY "${schema}"._prisma_migrations
   ${manual ? "WHERE rolled_back_at IS NULL" : ""}
   LIMIT ${maxMigracoes + 1}
 )
@@ -458,13 +467,18 @@ SELECT pg_catalog.json_build_object(
   'primario', NOT pg_catalog.pg_is_in_recovery(),
   ${manual ? "'inicio', EXTRACT(epoch FROM pg_catalog.pg_postmaster_start_time())::text," : ""}
   'gatilhos', EXISTS (SELECT 1 FROM pg_catalog.pg_event_trigger WHERE evtenabled <> 'D'),
-  'registros', (SELECT coalesce(json_agg(json_build_array(migration_name, checksum, completa)
-    ORDER BY started_at), '[]'::json) FROM historico)
+  'historicoCompativel', compativel,
+  'registros', CASE WHEN compativel THEN (
+    SELECT coalesce(json_agg(json_build_array(migration_name, checksum, completa)
+      ORDER BY started_at), '[]'::json) FROM historico
+  ) ELSE '[]'::json END
 )
-FROM pg_catalog.pg_namespace WHERE nspname = '${schema}';
+FROM estrutura;
 ROLLBACK;
 `;
 }
+
+class EstruturaHistoricoIncompativel extends Error {}
 
 function conferirHistorico(prova, repo, revisao, banco, schema, manual = false) {
   exigir(objeto(prova) && identificador(idBanco, banco) && schemaValido(schema));
@@ -472,6 +486,7 @@ function conferirHistorico(prova, repo, revisao, banco, schema, manual = false) 
   exigir(identificador(/^[1-9][0-9]{0,19}$/, cluster));
   exigir([bancoOid, schemaOid].every((oid) => identificador(/^[1-9][0-9]{0,9}$/, oid)));
   exigir(prova.banco === banco && prova.schema === schema && identificador(idBanco, usuario));
+  if (prova.historicoCompativel !== true) throw new EstruturaHistoricoIncompativel();
   exigir(primario === true && gatilhos === false && Array.isArray(registros));
   const esperados = [...hashesGit(repo, revisao, false)].filter(([nome]) => caminhoSql.test(nome));
   exigir(registros.length === esperados.length);
@@ -615,7 +630,7 @@ if (
   const [acao, ...args] = process.argv.slice(2);
   try {
     cli(acao, args);
-  } catch {
+  } catch (erro) {
     const mensagens = new Map([
       ["compose", "Compose: configuração ou destino da migração não conferido."],
       ["imagem", "Imagem: inventário ou bytes não correspondem ao commit alvo."],
@@ -625,9 +640,17 @@ if (
       ],
       ["sql-historico", "PostgreSQL: schema não suportado pela guarda automática."],
       ["historico", "PostgreSQL: identidade ou histórico não corresponde à revisão esperada."],
+      [
+        "historico-manual",
+        "PostgreSQL: identidade ou histórico não corresponde à revisão esperada.",
+      ],
       ["envelope", "Não foi possível vincular o lote à identidade do banco e às revisões."],
     ]);
-    console.error(mensagens.get(acao) ?? "Guarda de migrações: ação ou argumentos inválidos.");
+    console.error(
+      erro instanceof EstruturaHistoricoIncompativel
+        ? "PostgreSQL: estrutura da tabela de histórico incompatível com a migração protegida."
+        : (mensagens.get(acao) ?? "Guarda de migrações: ação ou argumentos inválidos."),
+    );
     process.exitCode = 1;
   }
 }

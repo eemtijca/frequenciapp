@@ -388,6 +388,7 @@ const identidade = {
 function postgres() {
   return {
     ...identidade,
+    historicoCompativel: true,
     registros: [primeiro, segundo].map((nome) => [nome, hash(arquivos[caminho(nome)]), true]),
   };
 }
@@ -437,6 +438,22 @@ test("aceita somente o histórico completo e ordenado do banco e schema declarad
     assert.equal(r.status, 1);
     assert.match(r.stderr, /PostgreSQL/);
     assert.equal(r.stdout, "");
+  }
+});
+
+test("recusa estrutura incompatível mesmo com todos os registros esperados", (t) => {
+  const { repo, revisao } = fixture(t);
+  for (const modo of ["historico", "historico-manual"]) {
+    for (const valor of [false, "true", undefined]) {
+      const r = cli([modo, repo, revisao, "sintetico", "public"], {
+        ...postgres(),
+        inicio: "1767225600.000000",
+        historicoCompativel: valor,
+      });
+      assert.equal(r.status, 1);
+      assert.match(r.stderr, /estrutura.*histórico/i);
+      assert.equal(r.stdout, "");
+    }
   }
 });
 

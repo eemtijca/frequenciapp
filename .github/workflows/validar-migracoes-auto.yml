@@ -44,6 +44,7 @@ jobs:
       - name: Preparar dependências fixadas
         run: |
           pnpm install --frozen-lockfile --ignore-scripts --prod
+          docker pull node:26.13.1-bookworm-slim@sha256:5df79989ed685e09f0a98019db4cebfb22fb9df1a53c0161664a011f7ff6b0f1
           docker pull postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994
 
       - name: Exercitar recusas, rollback e concorrência em PostgreSQL isolado

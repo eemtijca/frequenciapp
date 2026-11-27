@@ -82,12 +82,16 @@ historico() {
   local consulta registros
   consulta=$(cat)
   [[ "$consulta" == *"pg_control_system"* && "$consulta" == *"_prisma_migrations"* ]] || exit 1
+  if [ "${HISTORICO_RLS_EFETIVA:-false}" = true ]; then
+    printf 'psql:<stdin>:21: ERROR:  42501\n' >&2
+    exit 3
+  fi
   if [ "$subiu" = true ]; then
     registros="${HISTORICO_FINAL:-$HISTORICO_MANUAL_ALVO}"
   else
     registros="${HISTORICO_BASE:-$HISTORICO_MANUAL_BASE}"
   fi
-  origem "$registros"
+  origem "$registros" | jq -c --argjson compativel "${HISTORICO_COMPATIVEL:-true}" '.historicoCompativel = $compativel'
 }
 
 if [ "$1" = update ]; then
@@ -660,6 +664,12 @@ if [ "$status" -ne 0 ] || ! grep -q 'bloqueariam a atualização' "$TMP_RAIZ/sai
 fi
 status=$(ATUALIZAR_PERMITIR_MIGRACOES=true executar_atualizacao)
 exigir_recusa_manual 'Há migrações novas'
+status=$(HISTORICO_COMPATIVEL=false executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'estrutura da tabela de histórico incompatível'
+status=$(HISTORICO_RLS_EFETIVA=true executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'RLS efetiva ou privilégios insuficientes'
+[ ! -s "$BACKUP_CHAMADAS" ] && [ ! -e "$DOCKER_UP_COUNTER.dump" ] ||
+  falhar 'A recusa da estrutura do histórico chegou ao backup.'
 status=$(RECIBO_VARIANTE=legado executar_atualizacao --permitir-migracoes)
 exigir_recusa_manual 'sem recibo de origem'
 status=$(RECIBO_VARIANTE=adulterado executar_atualizacao --permitir-migracoes)

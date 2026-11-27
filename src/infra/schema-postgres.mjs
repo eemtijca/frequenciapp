@@ -77,6 +77,18 @@ export function identificadorPostgres(nome) {
   return `"${validarIdentificador(nome).replaceAll('"', '""')}"`;
 }
 
+// Predicado compartilhado pelas sondas e pelo migrador, no schema de n.oid.
+// RLS legada só é inerte se não houver políticas nem filtragem nesta sessão.
+export const sqlHistoricoCompativel = `EXISTS (
+  SELECT FROM pg_catalog.pg_class c
+  WHERE c.relnamespace = n.oid AND c.relname = '_prisma_migrations'
+    AND c.relkind = 'r' AND c.relpersistence = 'p' AND NOT c.relispartition
+    AND NOT c.relhasrules AND NOT c.relhastriggers AND NOT c.relforcerowsecurity
+    AND NOT EXISTS (SELECT FROM pg_catalog.pg_inherits WHERE inhparent = c.oid OR inhrelid = c.oid)
+    AND NOT EXISTS (SELECT FROM pg_catalog.pg_policy WHERE polrelid = c.oid)
+    AND pg_catalog.row_security_active(c.oid) IS FALSE
+)`;
+
 // Exclusivo para conexão direta ou pooler de sessão. O runtime qualifica seu SQL.
 export async function selecionarSchema(
   cliente,
