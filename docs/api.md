@@ -280,13 +280,19 @@ Provas específicas, como o Enem e vestibulares. Todas as rotas exigem sessão c
 
 Permissão: capacidade de operação, sem origem obrigatória.
 
-Devolve `{"provas": [{"id", "nome", "local", "dia", "total", "presentes", "ausentes"}]}`, da data mais recente para a mais antiga. `local` é nulo quando não foi informado.
+Devolve `{"provas": [{"id", "nome", "local", "latitude", "longitude", "dia", "total", "presentes", "ausentes"}]}`, da data mais recente para a mais antiga. `local`, `latitude` e `longitude` são nulos quando não foram informados.
 
 ### POST /api/provas
 
 Permissão: capacidade de operação, com origem confiável e auditoria.
 
-Auditoria `prova-especifica.criar`. Corpo `{"nome": string, "local"?: string | null, "dia": "YYYY-MM-DD"}`, com nome de 1 a 120 caracteres e local de até 120; os espaços das pontas saem e o local vazio vira nulo. A data pode ser passada ou cair no domingo. 201 `{"prova": ProvaEspecifica}`; 400 corpo inválido, campo extra, nome vazio ou data inexistente; 401 sem sessão; 403 origem inválida ou papel sem a capacidade.
+Auditoria `prova-especifica.criar`. Corpo `{"nome": string, "local"?: string | null, "latitude"?: number | null, "longitude"?: number | null, "dia": "YYYY-MM-DD"}`, com nome de 1 a 120 caracteres e local de até 120; os espaços das pontas saem e o local vazio vira nulo. As coordenadas, em graus decimais, vêm do mapa ou do GPS do aparelho: as duas ou nenhuma, latitude de -90 a 90 e longitude de -180 a 180, arredondadas em seis casas; o banco repete essa regra em uma restrição. A data pode ser passada ou cair no domingo. 201 `{"prova": ProvaEspecifica}`; 400 corpo inválido, campo extra, nome vazio, coordenada sozinha ou fora da faixa, ou data inexistente; 401 sem sessão; 403 origem inválida ou papel sem a capacidade.
+
+### GET /api/provas/ocupacao
+
+Permissão: capacidade de operação, sem origem obrigatória.
+
+Soma os alunos que fazem prova em um lugar do mapa. Query: `latitude` e `longitude` obrigatórias, em graus decimais com ponto ou vírgula, e `provaId` opcional. Conta os alunos distintos de todas as provas marcadas a até 100 m do ponto (distância de haversine, de qualquer data); um aluno em duas provas do lugar conta uma vez. Com `provaId`, a prova em edição entra com os próprios alunos, mesmo que o ponto novo ainda não esteja salvo, e vem marcada com `atual: true`. 200 `{"alunos": number, "provas": [{"id", "nome", "dia", "alunos", "atual"}]}`, com as provas da mais recente para a mais antiga; 400 coordenada ausente, ilegível ou fora da faixa, ou `provaId` que não é UUID; 401 sem sessão; 403 papel sem a capacidade. Alimenta o selo numérico sobre o marcador do mapa e não devolve dado de aluno, só contagens e os nomes das provas.
 
 ### GET /api/provas/{id}
 
@@ -298,7 +304,7 @@ Permissão: capacidade de operação, sem origem obrigatória.
 
 Permissão: capacidade de operação, com origem confiável e auditoria.
 
-Auditoria `prova-especifica.editar`. Mesmo corpo do cadastro; não altera alunos nem frequência. 200 no formato da leitura; 400 e 404 como acima.
+Auditoria `prova-especifica.editar`. Mesmo corpo do cadastro, que substitui tudo: omitir as coordenadas as limpa. Não altera alunos nem frequência. 200 no formato da leitura; 400 e 404 como acima.
 
 ### DELETE /api/provas/{id}
 

@@ -292,6 +292,18 @@ export default function VistaPrivacidade() {
                     ser comprovada: nome de quem confirmou, motivo e identificadores internos dos
                     alunos, sem o nome deles nesse retrato.
                   </li>
+                  <li>
+                    Prova específica, como Enem ou vestibular, quando a equipe a cadastra: nome da
+                    prova, data, local em texto, coordenadas do local escolhidas no mapa, alunos
+                    inscritos e a marca de presente, ausente ou sem registro. As coordenadas
+                    descrevem o local da prova, não a posição de quem usa o aplicativo.
+                  </li>
+                  <li>
+                    Posição do aparelho: só é lida quando a pessoa toca em Usar minha localização e
+                    o navegador autoriza. Ela aparece no mapa e só é gravada, como coordenadas do
+                    local da prova, se a equipe salvar a prova. Não há rastreamento nem gravação de
+                    trajeto.
+                  </li>
                 </Lista>
                 <Paragrafo>
                   Justificativa, observação e motivo são textos livres. O aplicativo não pede dado
@@ -523,6 +535,14 @@ export default function VistaPrivacidade() {
                     Serviço de push do navegador (endereços aceitos: Google, Mozilla, Apple ou
                     Microsoft), se houver notificações ativas. O aviso não identifica aluno nem
                     turma.
+                  </li>
+                  <li>
+                    OpenStreetMap, quando a equipe abre o mapa do local de uma prova: o navegador
+                    baixa as imagens do mapa direto de tile.openstreetmap.org, servidor da
+                    OpenStreetMap Foundation, que recebe o endereço IP, o navegador, a origem do
+                    aplicativo e a área exibida, que pode ser a vizinhança da posição lida pelo GPS.
+                    Não saem alunos, provas nem as coordenadas gravadas. O mapa é dos colaboradores
+                    do OpenStreetMap (openstreetmap.org/copyright).
                   </li>
                   <li>
                     Base de feriados, só quando a administração aciona a sincronização. O servidor

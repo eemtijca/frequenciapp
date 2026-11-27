@@ -10,6 +10,7 @@ import FactCheckRoundedIcon from "@mui/icons-material/FactCheckRounded";
 import GroupAddRoundedIcon from "@mui/icons-material/GroupAddRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
 import Box from "@mui/material/Box";
+import Link from "@mui/material/Link";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
 import ListItemButton from "@mui/material/ListItemButton";
@@ -25,6 +26,8 @@ import {
 } from "@/domain/frequencia";
 import {
   comMarca,
+  enderecoNoOpenStreetMap,
+  rotuloDasCoordenadas,
   type MarcaDaProva,
   type ParticipanteDaProva,
   type ProvaEspecifica,
@@ -35,7 +38,9 @@ import { useAcaoUnicaComChave } from "@/lib/use-acao-unica";
 import { useAtualizacaoTela } from "@/components/atualizacao/contexto-atualizacao";
 import { AtualizadoDaVisao } from "@/components/ui/mui/atualizado-em";
 import { BarraBusca } from "@/components/ui/mui/barra-busca";
+import { ESTILO_ALVO_TOQUE } from "@/components/ui/mui/alvo-toque";
 import { Botao } from "@/components/ui/mui/botao";
+import { ESTILO_TEXTO_OCULTO } from "@/components/ui/mui/texto-de-carregamento";
 import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { Selo } from "@/components/ui/mui/selo";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
@@ -413,6 +418,32 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
                 </>
               }
             />
+            {prova.latitude !== null && prova.longitude !== null ? (
+              <Stack
+                direction="row"
+                spacing={0.75}
+                useFlexGap
+                sx={{ alignItems: "center", flexWrap: "wrap", color: "text.secondary" }}
+              >
+                <PlaceRoundedIcon fontSize="small" aria-hidden="true" />
+                <Typography variant="body2">
+                  Local no mapa: {rotuloDasCoordenadas(prova.latitude, prova.longitude)}
+                </Typography>
+                <Link
+                  href={enderecoNoOpenStreetMap(prova.latitude, prova.longitude)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="body2"
+                  sx={ESTILO_ALVO_TOQUE}
+                >
+                  Abrir no OpenStreetMap
+                  <Box component="span" sx={ESTILO_TEXTO_OCULTO}>
+                    {" "}
+                    (abre em nova aba)
+                  </Box>
+                </Link>
+              </Stack>
+            ) : null}
             <ResumoDaProva prova={prova} completo />
             <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
               <Botao

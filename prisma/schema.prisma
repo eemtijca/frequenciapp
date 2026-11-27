@@ -619,12 +619,14 @@ model ProvaBimestral {
   @@map("provas_bimestrais")
 }
 
-// Prova específica (Enem, vestibulares e similares) com nome, local e data definidos
-// pela equipe. Os participantes e a frequência ficam em ParticipanteProva.
+// Prova específica (Enem, vestibulares e similares) com nome, local, coordenadas opcionais
+// do mapa e data definidos pela equipe. Os participantes e a frequência ficam em ParticipanteProva.
 model ProvaEspecifica {
   id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   nome          String              @db.VarChar(120)
   local         String?             @db.VarChar(120)
+  latitude      Float?              @db.DoublePrecision
+  longitude     Float?              @db.DoublePrecision
   dia           DateTime            @db.Date
   criadoEm      DateTime            @default(now()) @map("criado_em") @db.Timestamptz
   atualizadoEm  DateTime            @updatedAt @map("atualizado_em") @db.Timestamptz

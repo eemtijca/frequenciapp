@@ -142,6 +142,8 @@ O horário de provas é temporário. A administração cadastra a mesma prova pa
 | id           | uuid  |                                                  |
 | nome         | texto | De 1 a 120 caracteres.                           |
 | local        | texto | Opcional, até 120 caracteres.                    |
+| latitude     | real  | Opcional, de -90 a 90, em graus decimais.        |
+| longitude    | real  | Opcional, de -180 a 180; vem com a latitude.     |
 | dia          | data  | Data civil; pode ser passada ou cair no domingo. |
 | criadoEm     | data  |                                                  |
 | atualizadoEm | data  |                                                  |
@@ -157,7 +159,7 @@ O horário de provas é temporário. A administração cadastra a mesma prova pa
 | criadoEm     | data     |                                                              |
 | atualizadoEm | data     |                                                              |
 
-Só aluno ativo e sem desistência entra na prova; quem já está inscrito continua se depois for desativado. A frequência da prova é independente da Chamada e das planilhas, e as provas específicas não entram na cópia JSON ([ADR-085](adr/085-provas-especificas.md)).
+As coordenadas vêm do mapa do OpenStreetMap, do GPS do aparelho ou da digitação, e descrevem o local da prova; uma restrição do banco exige as duas ou nenhuma, dentro da faixa geográfica ([ADR-086](adr/086-mapa-openstreetmap-para-locais-de-prova.md)). Só aluno ativo e sem desistência entra na prova; quem já está inscrito continua se depois for desativado. A frequência da prova é independente da Chamada e das planilhas, e as provas específicas não entram na cópia JSON ([ADR-085](adr/085-provas-especificas.md)).
 
 ## Frequência (frequencia)
 
