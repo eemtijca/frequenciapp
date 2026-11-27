@@ -51,6 +51,93 @@ function config() {
 }
 
 const compose = ["compose", "app", "db", "sintetico", "public"];
+const composeManual = ["compose-manual", ...compose.slice(1)];
+
+function configComBordaCompartilhada() {
+  const c = config();
+  c.networks.borda = { name: "proxy_compartilhado", external: true, ipam: {} };
+  c.services.app.networks.borda = { aliases: ["frequencia"] };
+  return c;
+}
+
+test("aceita a rede externa de borda só no Compose manual e preserva a rede interna do banco", () => {
+  const c = configComBordaCompartilhada();
+  const r = cli(composeManual, c);
+  assert.equal(r.status, 0, r.stderr);
+  const projecao = JSON.parse(r.stdout);
+  assert.equal(projecao.rede, "qa_interna");
+  assert.deepEqual(projecao.redesApp, ["proxy_compartilhado", "qa_interna", "qa_publica"]);
+  assert.match(projecao.topologia, /^[0-9a-f]{64}$/);
+  assert.equal(cli(compose, c).status, 1);
+
+  const imagem = `sha256:${"a".repeat(64)}`;
+  const envelope = "lote_sintetico";
+  const source = "/diretorio-privado/entrada";
+  const partida = c.services.app;
+  partida.image = imagem;
+  partida.restart = "no";
+  Object.assign(partida.environment, {
+    MIGRACAO_MANUAL_PROTEGIDA: "true",
+    MIGRACAO_LOTE_APROVADO: envelope,
+    ADMIN_EMAIL: "",
+    ADMIN_SENHA: "",
+  });
+  partida.volumes = [
+    {
+      type: "bind",
+      source,
+      target: "/run/frequenciapp-migracao",
+      read_only: true,
+      bind: { create_host_path: false },
+    },
+  ];
+  const ip = "192.0.2.10";
+  const args = [...composeManual, imagem, envelope, source, ip];
+  assert.equal(cli(args, c).status, 1);
+  partida.extra_hosts = [`db=${ip}`];
+  assert.equal(cli(args.slice(0, -1), c).status, 1);
+  const alvo = cli(args, c);
+  assert.equal(alvo.status, 0, alvo.stderr);
+  assert.deepEqual(JSON.parse(alvo.stdout), projecao);
+  for (const mapa of [["db=192.0.2.11"], [`db=${ip}`, "outro=192.0.2.11"], { outro: ip }]) {
+    partida.extra_hosts = mapa;
+    assert.equal(cli(args, c).status, 1);
+  }
+  partida.extra_hosts = { db: ip };
+  c.networks.borda.name = "outra_borda";
+  const outra = cli(args, c);
+  assert.equal(outra.status, 0, outra.stderr);
+  assert.notEqual(JSON.parse(outra.stdout).topologia, projecao.topologia);
+});
+
+test("recusa a configuração manual quando a borda compromete o isolamento do banco", () => {
+  for (const alterar of [
+    (c) => {
+      c.services.db.networks.borda = null;
+    },
+    (c) => {
+      c.networks.interna.external = true;
+    },
+    (c) => {
+      c.networks.borda.name = c.networks.interna.name;
+    },
+    (c) => {
+      c.networks.borda.driver = "overlay";
+    },
+    (c) => {
+      c.networks.borda.ipam = { config: [{ subnet: "192.0.2.0/24" }] };
+    },
+    (c) => {
+      c.services.proxy = { networks: { borda: { aliases: ["DB."] } } };
+    },
+  ]) {
+    const c = configComBordaCompartilhada();
+    alterar(c);
+    const r = cli(composeManual, c);
+    assert.equal(r.status, 1);
+    assert.equal(r.stdout, "");
+  }
+});
 
 test("projeta apenas o destino do banco Compose compartilhado por backup, app e migrador", () => {
   const r = cli(compose, config());

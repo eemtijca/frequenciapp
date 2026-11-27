@@ -144,6 +144,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 ### Corrigido
 
 - O atualizador manual no perfil simples confere a origem do backup e preserva o conjunto de recuperação quando uma troca com migração na partida fica incerta, sem rollback automático após possível escrita.
+- A atualização manual preserva a rede de um proxy compartilhado sem conectar o PostgreSQL à borda nem ampliar a aprovação automática de migrações.
 
 - O FrequenciBI deixa de responder 409 quando a abertura do painel faz leituras paralelas com a mesma chave. O retrato é lido em transação serializável sem escritas e o uso é contabilizado depois do commit em uma atualização atômica. Revogação e expiração continuam valendo para novas consultas.
 - A imagem da aplicação inicia como `node` mesmo quando a atualização automática cria o contexto de build com `umask 077`. A construção verifica o acesso aos arquivos de execução antes que o atualizador substitua o contêiner ativo.

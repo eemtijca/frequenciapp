@@ -111,6 +111,9 @@ fi
 if [ "$1" = exec ]; then
   [ "${DOCKER_MANUAL:-false}" = true ] || exit 90
   if [ "$2" = "$ID_APP" ]; then
+    if [ "${BORDA_LEGADA_TESTE:-false}" = true ] && [ "$subiu" = false ]; then
+      printf 'saude-legada\n' >>"$DOCKER_LOG"
+    fi
     if [ "$subiu" = false ]; then revisao_ativa="$DOCKER_REVISAO_BASE"; fi
     jq -cn --arg commit "$revisao_ativa" '{ok:true,commit:$commit}'
   elif [ "$3" = "$ID_APP" ]; then
@@ -252,8 +255,10 @@ case "$comando" in
       fi
       jq -cn --arg projeto "$projeto" --arg migrar "$MIGRAR_NA_PARTIDA" \
         --arg imagem "${APP_IMAGEM:-teste/local}" --arg reinicio "${MIGRACAO_POLITICA_REINICIO:-unless-stopped}" \
-        --argjson manual "$config_manual" --argjson bind "$bind_manual" --arg periodo "$periodo_saude" '
-        {name:$projeto,services:{app:{image:$imagem,restart:$reinicio,command:["./docker/app/entrypoint.sh"],healthcheck:{interval:$periodo},networks:{interna:null},environment:({MIGRAR_NA_PARTIDA:$migrar,DATABASE_URL:"postgresql://frequencia:fixture@db:5432/frequencia",DIRECT_URL:"postgresql://frequencia:fixture@db:5432/frequencia"} + ($manual // {})),volumes:$bind},db:{networks:{interna:null},environment:{POSTGRES_DB:"frequencia",POSTGRES_USER:"frequencia"},volumes:[{type:"volume",source:"dados",target:"/var/lib/postgresql/data"}]},caddy:{}},networks:{interna:{name:"teste-interna",internal:true}},volumes:{dados:{name:($projeto+"-dados")}}}'
+        --argjson manual "$config_manual" --argjson bind "$bind_manual" --arg periodo "$periodo_saude" \
+        --argjson borda "${BORDA_LEGADA_TESTE:-false}" '
+        {name:$projeto,services:{app:{image:$imagem,restart:$reinicio,command:["./docker/app/entrypoint.sh"],healthcheck:{interval:$periodo},networks:{interna:null},environment:({MIGRAR_NA_PARTIDA:$migrar,DATABASE_URL:"postgresql://frequencia:fixture@db:5432/frequencia",DIRECT_URL:"postgresql://frequencia:fixture@db:5432/frequencia"} + ($manual // {})),volumes:$bind},db:{networks:{interna:null},environment:{POSTGRES_DB:"frequencia",POSTGRES_USER:"frequencia"},volumes:[{type:"volume",source:"dados",target:"/var/lib/postgresql/data"}]},caddy:{}},networks:{interna:{name:"teste-interna",internal:true}},volumes:{dados:{name:($projeto+"-dados")}}} |
+        if $borda then .services.app.networks.borda = null | .networks.borda = {name:"teste-borda-ausente",external:true} else . end'
     elif [[ " $* " == *" --services "* ]]; then
       printf 'app\ndb\ncaddy\n'
       if [ "$perfil_backup" = true ] && [ "${BACKUP_PLANILHAS_HABILITADO:-true}" = "true" ]; then
@@ -661,6 +666,11 @@ status=$(RECIBO_VARIANTE=adulterado executar_atualizacao --permitir-migracoes)
 exigir_recusa_manual 'sem recibo de origem'
 status=$(BANCO_DIFERENTE=true executar_atualizacao --permitir-migracoes)
 exigir_recusa_manual 'não correspondem à base instalada'
+status=$(BORDA_LEGADA_TESTE=true executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'não correspondem à base instalada'
+if grep -qx 'saude-legada' "$DOCKER_LOG"; then
+  falhar "a atualização com borda consultou a saúde do app legado antes de conferir o destino."
+fi
 for desvio in reinicio homonimo falha; do
   rm -f "$DOCKER_UP_COUNTER.dump"
   status=$(DUMP_VARIANTE="$desvio" executar_atualizacao --permitir-migracoes)

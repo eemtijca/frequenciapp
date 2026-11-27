@@ -582,12 +582,17 @@ conferir_compose_do_lote_auto() {
     "$imagem_migracoes_auto" "$envelope_migracoes_auto" "$pasta_lote_auto/entrada"
 }
 
-conferir_saude_migracoes_auto() {
-  local revisao="$1" app imagem prova
-  app=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_APP") || return 1
+conferir_revisao_migracoes() {
+  local app="$1" revisao="$2" imagem
   [[ "$app" =~ ^[a-f0-9]{64}$ ]] || return 1
   imagem=$(docker inspect --format '{{.Image}}' "$app") || return 1
-  [[ "$imagem" =~ ^sha256:[a-f0-9]{64}$ ]] && [ "$(revisao_da_imagem "$imagem")" = "$revisao" ] || return 1
+  [[ "$imagem" =~ ^sha256:[a-f0-9]{64}$ ]] && [ "$(revisao_da_imagem "$imagem")" = "$revisao" ]
+}
+
+conferir_saude_migracoes_auto() {
+  local revisao="$1" app prova
+  app=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_APP") || return 1
+  conferir_revisao_migracoes "$app" "$revisao" || return 1
   prova=$(timeout -k 3 12 docker exec "$app" node --input-type=module -e '
     try {
       const resposta = await fetch("http://127.0.0.1:3000/api/saude", { signal: AbortSignal.timeout(5000) });
@@ -601,19 +606,43 @@ conferir_saude_migracoes_auto() {
 
 conferir_banco_migracoes_auto() {
   local revisao="$1" banco app rede ip_banco servidor observacao_db observacao_app
-  local perfil="${2:-auto}" sufixo="" inicio_container=""
+  local perfil="${2:-auto}" sufixo="" inicio_container="" redes_app="" redes_observadas='{}' borda=false
+  local -a nomes_redes=() opcoes_sonda=()
   if [ "$perfil" = manual ]; then sufixo=-manual; fi
   banco=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_DB") || return 1
   app=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_APP") || return 1
   [[ "$banco" =~ ^[0-9a-f]{64}$ && "$app" =~ ^[0-9a-f]{64}$ && "$banco" != "$app" ]] || return 1
   rede=$(jq -er '.rede' <<<"$alvo_compose_auto") || return 1
+  if [ "$perfil" = manual ]; then
+    redes_app=$(jq -ec '.redesApp // []' <<<"$alvo_compose_auto") || return 1
+    if [ "$redes_app" != '[]' ]; then
+      borda=true
+      opcoes_sonda=(--borda)
+      mapfile -t nomes_redes < <(jq -r '.[]' <<<"$redes_app")
+      # A configuração externa não descreve o driver real nem garante que a
+      # rede interna já existente no daemon ainda isole o PostgreSQL.
+      redes_observadas=$(timeout -k 3 12 docker network inspect -- "${nomes_redes[@]}" | jq -ce \
+        --arg rede "$rede" --argjson esperadas "$redes_app" '
+        select((map(.Name)|sort) == $esperadas and
+          (map(.Id)|unique|length) == length and
+          all(.[]; .Driver == "bridge" and .Scope == "local" and .Ingress == false and
+            (.Id | test("^[0-9a-f]{64}$"))) and
+          any(.[]; .Name == $rede and .Internal == true)) |
+        map({key:.Name, value:.Id}) | from_entries
+      ') || return 1
+      conferir_revisao_migracoes "$app" "$revisao" || return 1
+    fi
+  fi
 
   # Os clientes de backup e de histórico usam o mesmo contêiner e socket local.
   ip_banco=$(docker inspect "$banco" | jq -er \
-    --arg proj "$COMPOSE_PROJECT_NAME" --arg db "$SERVIDOR_SERVICO_DB" --arg rede "$rede" '
+    --arg proj "$COMPOSE_PROJECT_NAME" --arg db "$SERVIDOR_SERVICO_DB" --arg rede "$rede" \
+    --argjson borda "$borda" --argjson redes "$redes_observadas" '
       select(length == 1) | .[0] | select(.State.Running and
       .Config.Labels["com.docker.compose.project"] == $proj and
       .Config.Labels["com.docker.compose.service"] == $db and
+      (if $borda then (.NetworkSettings.Networks | keys) == [$rede] and
+        .NetworkSettings.Networks[$rede].NetworkID == $redes[$rede] else true end) and
       all(.Config.Env[]; test("^PG(HOST|HOSTADDR|DATABASE|PORT|USER|SERVICE|SERVICEFILE|OPTIONS)=") | not)) |
       .NetworkSettings.Networks[$rede].IPAddress | select(type == "string" and test("^[0-9.]+$"))
     ') || return 1
@@ -626,13 +655,19 @@ conferir_banco_migracoes_auto() {
   # A conexão do app em uso precisa ser a rota efetiva do Compose, não uma URL alternativa.
   # Compare em pipe, sem ecoar ambiente ou credenciais.
   { compose config --format json && docker inspect "$app"; } | jq -es \
-    --arg proj "$COMPOSE_PROJECT_NAME" --arg app "$SERVIDOR_SERVICO_APP" '
+    --arg proj "$COMPOSE_PROJECT_NAME" --arg app "$SERVIDOR_SERVICO_APP" --argjson redes "$redes_observadas" \
+    --arg banco "$SERVIDOR_SERVICO_DB" --arg ip "$ip_banco" --argjson partida "${subida_lote_auto:-false}" '
     length == 2 and (.[0].services[$app].environment as $esperado |
       .[1] | length == 1 and (.[0] |
         (.Config.Env | map(capture("^(?<key>[^=]+)=(?<value>.*)$")) | from_entries) as $real |
         .State.Running and
         .Config.Labels["com.docker.compose.project"] == $proj and
         .Config.Labels["com.docker.compose.service"] == $app and
+        (if $redes == {} then true else
+          (.NetworkSettings.Networks | map_values(.NetworkID)) == $redes and
+          (if $partida then (.HostConfig.ExtraHosts == [$banco + ":" + $ip] or
+            .HostConfig.ExtraHosts == [$banco + "=" + $ip]) else true end)
+        end) and
         all(["DATABASE_URL", "DIRECT_URL", "DATABASE_SCHEMA", "MIGRAR_NA_PARTIDA"][];
           ($real[.] // "") == ($esperado[.] // "")) and
         all($real | keys[]; test("^(PG|LD_|NODE_OPTIONS$|NODE_PATH$)") | not)))
@@ -648,13 +683,24 @@ conferir_banco_migracoes_auto() {
   observacao_app=$(node "$DIR/alvo-migracoes-auto.mjs" "sql-historico$sufixo" "$schema_auto" |
     timeout -k 3 22 docker exec -i "$app" node --input-type=module -e '
       import fs from "node:fs";
+      import { lookup } from "node:dns/promises";
       import pg from "pg";
       const sql = fs.readFileSync(0, "utf8");
       const ipEsperado = process.argv[1];
+      const borda = process.argv[2] === "--borda";
       let primeiro;
       try {
         for (const nome of ["DIRECT_URL", "DATABASE_URL"]) {
-          const cliente = new pg.Client({connectionString: process.env[nome], connectionTimeoutMillis: 4000});
+          let connectionString = process.env[nome];
+          if (borda) {
+            const url = new URL(connectionString);
+            const destinos = await lookup(url.hostname, { all: true });
+            if (!destinos.length || !destinos.every(({ address }) => address === ipEsperado)) throw new Error();
+            // Não resolver novamente entre a conferência e a autenticação.
+            url.hostname = ipEsperado;
+            connectionString = url.href;
+          }
+          const cliente = new pg.Client({connectionString, connectionTimeoutMillis: 4000});
           try {
             await cliente.connect();
             const { rows } = await cliente.query("SELECT pg_catalog.host(pg_catalog.inet_server_addr()) AS ip");
@@ -669,7 +715,7 @@ conferir_banco_migracoes_auto() {
         }
         process.stdout.write(primeiro);
       } catch { process.exitCode = 1; }
-    ' -- "$ip_banco" 2>/dev/null |
+    ' -- "$ip_banco" "${opcoes_sonda[@]}" 2>/dev/null |
     node "$DIR/alvo-migracoes-auto.mjs" "historico$sufixo" "$APP_DIR" "$revisao" "$banco_auto" "$schema_auto") || return 1
   [ "$observacao_app" = "$observacao_db" ] || return 1
   [ "$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_DB")" = "$banco" ] &&
@@ -677,8 +723,10 @@ conferir_banco_migracoes_auto() {
   if [ "$perfil" = manual ]; then
     [ "$(docker inspect --format '{{.State.StartedAt}}' "$banco")" = "$inicio_container" ] || return 1
   fi
-  jq -ce --arg container "$banco" --arg ip "$ip_banco" --arg inicio "$inicio_container" '
-    . + {container:$container,ip:$ip} + (if $inicio == "" then {} else {inicioContainer:$inicio} end)
+  jq -ce --arg container "$banco" --arg ip "$ip_banco" --arg inicio "$inicio_container" \
+    --argjson redes "$redes_observadas" '
+    . + {container:$container,ip:$ip} + (if $inicio == "" then {} else {inicioContainer:$inicio} end) +
+      (if $redes == {} then {} else {redes:$redes} end)
   ' <<<"$observacao_db"
 }
 
@@ -707,8 +755,10 @@ conferir_compose_manual() {
   if [ "$#" -eq 0 ]; then
     compose config --format json | node "$DIR/alvo-migracoes-auto.mjs" compose-manual "${opcoes[@]}"
   else
+    local -a ip=()
+    if [ -n "${ip_manual_borda:-}" ]; then ip=("$ip_manual_borda"); fi
     compose_manual_alvo config --format json | node "$DIR/alvo-migracoes-auto.mjs" compose-manual \
-      "${opcoes[@]}" "$imagem_manual" "$envelope_manual" "$pasta_lote_auto/entrada"
+      "${opcoes[@]}" "$imagem_manual" "$envelope_manual" "$pasta_lote_auto/entrada" "${ip[@]}"
   fi
 }
 
@@ -721,10 +771,13 @@ compose_manual_alvo() {
 preparar_envelope_manual() {
   envelope_manual=$(node "$DIR/alvo-migracoes-auto.mjs" envelope-manual \
     "$APP_DIR" "$commit_atual" "$alvo_commit" <<<"$banco_manual") || return 1
+  ip_manual_borda=$(jq -r 'if has("redes") then .ip else "" end' <<<"$banco_manual") || return 1
   preparar_montagem_lote_auto || return 1
-  jq -n --arg app "$SERVIDOR_SERVICO_APP" --arg envelope "$envelope_manual" '
+  jq -n --arg app "$SERVIDOR_SERVICO_APP" --arg envelope "$envelope_manual" \
+    --arg db "$SERVIDOR_SERVICO_DB" --arg ip "$ip_manual_borda" '
     {services:{($app):{environment:{MIGRACAO_MANUAL_PROTEGIDA:"true",
-      MIGRACAO_LOTE_APROVADO:$envelope,ADMIN_EMAIL:"",ADMIN_SENHA:""}}}}
+      MIGRACAO_LOTE_APROVADO:$envelope,ADMIN_EMAIL:"",ADMIN_SENHA:""}} +
+      (if $ip == "" then {} else {extra_hosts:[$db + "=" + $ip]} end)}}
   ' >"$pasta_lote_auto/manual.json"
 }
 
@@ -749,7 +802,13 @@ preparar_migracao_manual() {
   banco_auto="${POSTGRES_DB:-frequencia}"
   schema_auto="${DATABASE_SCHEMA:-public}"
   alvo_compose_auto=$(conferir_compose_manual) || erro "Alvo Compose da migração manual não conferido."
-  conferir_saude_migracoes_auto "$commit_atual" || erro "O aplicativo ativo não serve a revisão instalada."
+  perfil_manual=$(jq -er 'if has("redesApp") then "borda" else "simples" end' <<<"$alvo_compose_auto") ||
+    erro "Perfil Compose da migração manual não conferido."
+  # Na borda, a rota de saúde do app antigo pode abrir uma conexão sem a pinagem.
+  # A base usa a revisão da imagem e a sonda do banco pelo destino verificado.
+  if [ "$perfil_manual" = simples ]; then
+    conferir_saude_migracoes_auto "$commit_atual" || erro "O aplicativo ativo não serve a revisão instalada."
+  fi
   banco_manual=$(conferir_banco_migracoes_auto "$commit_atual" manual) ||
     erro "Banco de backup, conexões da aplicação ou histórico não correspondem à base instalada."
   origem_manual=$(projetar_banco_pre_migracao "$banco_manual")
@@ -776,7 +835,7 @@ registrar_fase_manual() {
 
 reconferir_base_manual() {
   local observado backup_atual
-  conferir_saude_migracoes_auto "$commit_atual" || return 1
+  if [ "$perfil_manual" = simples ]; then conferir_saude_migracoes_auto "$commit_atual" || return 1; fi
   backup_atual=$(conferir_backup_manual) || return 1
   [ "$backup_atual" = "$backup_manual" ] || return 1
   observado=$(conferir_banco_migracoes_auto "$commit_atual" manual) || return 1

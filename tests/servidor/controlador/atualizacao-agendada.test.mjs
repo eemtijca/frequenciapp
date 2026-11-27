@@ -166,7 +166,7 @@ function docker(raiz, acao, args) {
       assert.ok([app, idDb].includes(args[1]));
       assert.match(fs.readFileSync(0, "utf8"), /pg_control_system/);
       if (args[1] === idDb) assert.ok(args.includes("/var/run/postgresql"));
-      else assert.equal(args.at(-1), ip);
+      else assert.deepEqual(args.slice(6), ["--", ip]);
       evento(iniciado ? "histórico-final" : "histórico-base");
       emitirLinha(
         JSON.stringify({

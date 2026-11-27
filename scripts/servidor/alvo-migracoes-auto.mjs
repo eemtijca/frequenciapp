@@ -97,6 +97,7 @@ function conferirCompose(
   envelope,
   diretorio,
   manual = false,
+  ipManual,
 ) {
   exigir(identificador(idCompose, app) && identificador(idCompose, db) && app !== db);
   exigir(identificador(idBanco, banco) && schemaValido(schema));
@@ -154,7 +155,6 @@ function conferirCompose(
     exigir(
       semOpcoes(servico, [
         "network_mode",
-        "extra_hosts",
         "links",
         "external_links",
         "dns",
@@ -201,17 +201,43 @@ function conferirCompose(
   const rede = config.networks[redes[0]];
   exigir(rede?.internal === true);
   const nomes = new Set();
+  const redesExternas = [];
   for (const chave of Object.keys(aplicacao.networks)) {
     const declarada = config.networks[chave];
     exigir(
       objeto(declarada) &&
-        !declarada.external &&
         (declarada.driver === undefined || declarada.driver === "bridge") &&
         identificador(idCompose, declarada.name) &&
         !nomes.has(declarada.name),
     );
+    if (declarada.external) {
+      // Só a partida manual pode preservar uma rede de borda preexistente.
+      // A rede interna que identifica o banco nunca pode ser externa.
+      exigir(
+        manual &&
+          chave !== redes[0] &&
+          declarada.external === true &&
+          Object.keys(declarada).every((campo) => ["name", "external", "ipam"].includes(campo)) &&
+          (declarada.ipam === undefined ||
+            (objeto(declarada.ipam) && Object.keys(declarada.ipam).length === 0)),
+      );
+      redesExternas.push(declarada.name);
+    }
     nomes.add(declarada.name);
   }
+  exigir(semOpcoes(postgres, ["extra_hosts"]));
+  if (partidaManual && redesExternas.length > 0) {
+    // A mesma resolução local protege as conexões do migrador e do app.
+    exigir(typeof ipManual === "string" && isIPv4(ipManual));
+    exigir(
+      (Array.isArray(aplicacao.extra_hosts) &&
+        aplicacao.extra_hosts.length === 1 &&
+        aplicacao.extra_hosts[0] === `${db}=${ipManual}`) ||
+        (objeto(aplicacao.extra_hosts) &&
+          Object.keys(aplicacao.extra_hosts).length === 1 &&
+          aplicacao.extra_hosts[db] === ipManual),
+    );
+  } else exigir(ipManual === undefined && semOpcoes(aplicacao, ["extra_hosts"]));
   // Um alias em qualquer rede da aplicação poderia ganhar a resolução de db.
   for (const [nome, servico] of Object.entries(config.services)) {
     for (const [chave, ligacao] of Object.entries(servico.networks ?? {})) {
@@ -228,6 +254,7 @@ function conferirCompose(
   if (manual) {
     const servico = { ...aplicacao, environment: { ...amb } };
     for (const chave of ["image", "build", "restart", "volumes"]) delete servico[chave];
+    if (redesExternas.length > 0) delete servico.extra_hosts;
     for (const chave of [
       "COMMIT_SHA",
       "MIGRACAO_AUTOMATICA",
@@ -251,6 +278,7 @@ function conferirCompose(
     schema,
     usuario,
     ...(manual ? { topologia } : {}),
+    ...(redesExternas.length ? { redesApp: [...nomes].sort() } : {}),
   };
 }
 
@@ -532,10 +560,15 @@ function lerEntrada() {
 function cli(acao, args) {
   if (acao === "compose" && [4, 7].includes(args.length)) {
     console.log(JSON.stringify(conferirCompose(lerEntrada(), ...args)));
-  } else if (acao === "compose-manual" && [4, 7].includes(args.length)) {
+  } else if (acao === "compose-manual" && [4, 7, 8].includes(args.length)) {
     console.log(
       JSON.stringify(
-        conferirCompose(lerEntrada(), ...Array.from({ length: 7 }, (_, i) => args[i]), true),
+        conferirCompose(
+          lerEntrada(),
+          ...Array.from({ length: 7 }, (_, i) => args[i]),
+          true,
+          args[7],
+        ),
       ),
     );
   } else if (acao === "transicao-manual" && args.length === 3) {
