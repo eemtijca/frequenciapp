@@ -607,7 +607,7 @@ conferir_saude_migracoes_auto() {
 conferir_banco_migracoes_auto() {
   local revisao="$1" banco app rede ip_banco servidor observacao_db observacao_app
   local perfil="${2:-auto}" sufixo="" inicio_container="" redes_app="" redes_observadas='{}' borda=false
-  local -a nomes_redes=()
+  local -a nomes_redes=() opcoes_sonda=()
   if [ "$perfil" = manual ]; then sufixo=-manual; fi
   banco=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_DB") || return 1
   app=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_APP") || return 1
@@ -617,6 +617,7 @@ conferir_banco_migracoes_auto() {
     redes_app=$(jq -ec '.redesApp // []' <<<"$alvo_compose_auto") || return 1
     if [ "$redes_app" != '[]' ]; then
       borda=true
+      opcoes_sonda=(--borda)
       mapfile -t nomes_redes < <(jq -r '.[]' <<<"$redes_app")
       # A configuração externa não descreve o driver real nem garante que a
       # rede interna já existente no daemon ainda isole o PostgreSQL.
@@ -686,7 +687,7 @@ conferir_banco_migracoes_auto() {
       import pg from "pg";
       const sql = fs.readFileSync(0, "utf8");
       const ipEsperado = process.argv[1];
-      const borda = process.argv[2] === "true";
+      const borda = process.argv[2] === "--borda";
       let primeiro;
       try {
         for (const nome of ["DIRECT_URL", "DATABASE_URL"]) {
@@ -714,7 +715,7 @@ conferir_banco_migracoes_auto() {
         }
         process.stdout.write(primeiro);
       } catch { process.exitCode = 1; }
-    ' -- "$ip_banco" "$borda" 2>/dev/null |
+    ' -- "$ip_banco" "${opcoes_sonda[@]}" 2>/dev/null |
     node "$DIR/alvo-migracoes-auto.mjs" "historico$sufixo" "$APP_DIR" "$revisao" "$banco_auto" "$schema_auto") || return 1
   [ "$observacao_app" = "$observacao_db" ] || return 1
   [ "$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_DB")" = "$banco" ] &&
