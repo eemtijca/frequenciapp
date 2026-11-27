@@ -11,6 +11,7 @@ let serieId = "";
 let turmaId = "";
 const alunos: string[] = [];
 let alunoInativo = "";
+let alunoDesistente = "";
 const provasCriadas: string[] = [];
 
 interface Prova {
@@ -98,6 +99,13 @@ beforeAll(async () => {
         [turmaId],
       )
     ).rows[0]?.id ?? "";
+  alunoDesistente =
+    (
+      await banco.query<{ id: string }>(
+        "insert into alunos (nome, turma_id, turma_original_id, ordem, ativo, desistente_em) values ('QA Desistente', $1, $1, 5, true, current_date - 10) returning id",
+        [turmaId],
+      )
+    ).rows[0]?.id ?? "";
 });
 
 afterAll(async () => {
@@ -123,6 +131,75 @@ it("recusa sem sessão e de origem desconhecida", async () => {
   expect(origemInvalida.status).toBe(403);
 });
 
+it("recusa origem inválida nas demais escritas e registra a auditoria de cada uma", async () => {
+  const prova = await criar({ nome: "QA Origem", dia: "2026-11-30" });
+  const caminho = `/api/provas/${prova.id}`;
+  const origemInvalida = "https://origem-invalida.exemplo";
+
+  const patch = await chamar(
+    caminho,
+    "PATCH",
+    cookieCoordenacao,
+    { nome: "QA Origem 2", dia: "2026-11-30" },
+    origemInvalida,
+  );
+  expect(patch.status).toBe(403);
+  const remocao = await chamar(caminho, "DELETE", cookieCoordenacao, undefined, origemInvalida);
+  expect(remocao.status).toBe(403);
+  const participantes = await chamar(
+    `${caminho}/participantes`,
+    "PUT",
+    cookieCoordenacao,
+    { alunoIds: [alunos[0]] },
+    origemInvalida,
+  );
+  expect(participantes.status).toBe(403);
+  const frequencia = await chamar(
+    `${caminho}/frequencia`,
+    "PUT",
+    cookieCoordenacao,
+    { marcas: [{ alunoId: alunos[0], presente: true }] },
+    origemInvalida,
+  );
+  expect(frequencia.status).toBe(403);
+
+  expect(
+    (
+      await chamar(`${caminho}/participantes`, "PUT", cookieCoordenacao, {
+        alunoIds: [alunos[0]],
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await chamar(`${caminho}/frequencia`, "PUT", cookieCoordenacao, {
+        marcas: [{ alunoId: alunos[0], presente: true }],
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await chamar(caminho, "PATCH", cookieCoordenacao, {
+        nome: "QA Origem 2",
+        dia: "2026-11-30",
+      })
+    ).status,
+  ).toBe(200);
+  expect((await chamar(caminho, "DELETE", cookieCoordenacao)).status).toBe(200);
+
+  const auditoria = await banco.query<{ acao: string }>(
+    "select acao from auditoria where alvo = $1 or alvo like $2 order by criado_em",
+    [`prova:${prova.id}`, `prova:${prova.id}:%`],
+  );
+  expect(auditoria.rows.map((linha) => linha.acao)).toEqual([
+    "prova-especifica.criar",
+    "prova-especifica.participantes",
+    "prova-especifica.frequencia",
+    "prova-especifica.editar",
+    "prova-especifica.remover",
+  ]);
+});
+
 it.each([
   ["sem nome", { nome: "  ", dia: "2026-11-08" }, "Informe o nome da prova."],
   ["data inexistente", { nome: "QA Enem", dia: "2026-02-30" }, "Data da prova inválida."],
@@ -143,8 +220,9 @@ it("a administração e a coordenação cadastram prova, inclusive no domingo e 
   );
   expect(semLocal.local).toBeNull();
   const resposta = await chamar("/api/provas", "GET", cookieAdmin);
+  const ids = new Set([doEnem.id, semLocal.id]);
   const lista = ((await resposta.json()) as { provas: Prova[] }).provas.filter((prova) =>
-    provasCriadas.includes(prova.id),
+    ids.has(prova.id),
   );
   expect(lista.map((prova) => prova.nome)).toEqual(["QA Enem", "QA Vestibular"]);
 });
@@ -175,6 +253,10 @@ it("inscreve alunos, mantém marcas ao reenviar a lista e recusa aluno inativo o
 
   const inativo = await chamar(caminho, "PUT", cookieCoordenacao, { alunoIds: [alunoInativo] });
   expect(inativo.status).toBe(400);
+  const desistente = await chamar(caminho, "PUT", cookieCoordenacao, {
+    alunoIds: [alunoDesistente],
+  });
+  expect(desistente.status).toBe(400);
   const inexistente = await chamar(caminho, "PUT", cookieCoordenacao, {
     alunoIds: ["00000000-0000-4000-8000-000000000000"],
   });

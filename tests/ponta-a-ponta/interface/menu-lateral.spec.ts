@@ -212,6 +212,8 @@ test.describe("menu lateral", () => {
     await page.goto("/");
     let navegacao = await abrirNavegacao(page);
     const secoes = await navegacao.getByRole("button").allTextContents();
+    expect(secoes).toContain("Provas");
+    expect(secoes.indexOf("Provas")).toBeLessThan(secoes.indexOf("Gestão"));
     await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Abrir menu" })).toBeHidden();
 
@@ -331,6 +333,9 @@ test.describe("menu da coordenação", () => {
     await expect(navegacao.getByRole("button", { name: "Chamada", exact: true })).toBeVisible();
     await expect(navegacao.getByRole("button", { name: "Gestão", exact: true })).toHaveCount(0);
     await expect(navegacao.getByRole("button", { name: "Chamada Parcial" })).toBeVisible();
+    const secoes = await navegacao.getByRole("button").allTextContents();
+    expect(secoes).toContain("Provas");
+    expect(secoes.indexOf("Provas")).toBeLessThan(secoes.indexOf("Alunos"));
     const menu = page.getByRole("dialog", { name: "Menu do aplicativo", exact: true });
     await expect(menu.getByText("Demo", { exact: true })).toBeVisible();
     const conta = await abrirMenuConta(page, menu);

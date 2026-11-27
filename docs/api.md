@@ -278,29 +278,43 @@ Provas específicas, como o Enem e vestibulares. Todas as rotas exigem sessão c
 
 ### GET /api/provas
 
+Permissão: capacidade de operação, sem origem obrigatória.
+
 Devolve `{"provas": [{"id", "nome", "local", "dia", "total", "presentes", "ausentes"}]}`, da data mais recente para a mais antiga. `local` é nulo quando não foi informado.
 
 ### POST /api/provas
+
+Permissão: capacidade de operação, com origem confiável e auditoria.
 
 Auditoria `prova-especifica.criar`. Corpo `{"nome": string, "local"?: string | null, "dia": "YYYY-MM-DD"}`, com nome de 1 a 120 caracteres e local de até 120; os espaços das pontas saem e o local vazio vira nulo. A data pode ser passada ou cair no domingo. 201 `{"prova": ProvaEspecifica}`; 400 corpo inválido, campo extra, nome vazio ou data inexistente; 401 sem sessão; 403 origem inválida ou papel sem a capacidade.
 
 ### GET /api/provas/{id}
 
+Permissão: capacidade de operação, sem origem obrigatória.
+
 200 `{"prova", "participantes": [{"alunoId", "nome", "turmaId", "presente"}]}`, com os alunos em ordem alfabética e `presente` verdadeiro, falso ou nulo (sem registro). 404 quando a prova não existe ou o id não é um UUID.
 
 ### PATCH /api/provas/{id}
+
+Permissão: capacidade de operação, com origem confiável e auditoria.
 
 Auditoria `prova-especifica.editar`. Mesmo corpo do cadastro; não altera alunos nem frequência. 200 no formato da leitura; 400 e 404 como acima.
 
 ### DELETE /api/provas/{id}
 
+Permissão: capacidade de operação, com origem confiável e auditoria.
+
 Auditoria `prova-especifica.remover`. Remove a prova, os alunos inscritos e a frequência. 200 `{"ok": true}`; 404 quando a prova não existe.
 
 ### PUT /api/provas/{id}/participantes
 
+Permissão: capacidade de operação, com origem confiável e auditoria.
+
 Auditoria `prova-especifica.participantes`. Corpo `{"alunoIds": uuid[]}`, a lista completa, de até 3000 alunos sem repetição. Quem continua mantém a marca, quem sai perde a inscrição e quem entra precisa estar ativo e sem desistência. 200 no formato da leitura; 400 lista inválida, repetida ou com aluno inexistente, inativo ou desistente; 404 prova inexistente.
 
 ### PUT /api/provas/{id}/frequencia
+
+Permissão: capacidade de operação, com origem confiável e auditoria.
 
 Auditoria `prova-especifica.frequencia`. Corpo `{"marcas": [{"alunoId": uuid, "presente": true | false | null}]}`, de 1 a 3000 marcas. `true` é presente, `false` é ausente e `null` limpa o registro. Só vale para aluno já inscrito, e a gravação é atômica. 200 no formato da leitura; 400 marca inválida ou aluno fora da prova; 404 prova inexistente.
 
