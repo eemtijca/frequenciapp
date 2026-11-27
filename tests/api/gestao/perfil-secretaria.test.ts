@@ -117,6 +117,8 @@ const recusas: Array<[string, string, string, unknown?]> = [
   ["ler quem libera saídas", "GET", "/api/liberadores"],
   ["ler os responsáveis", "GET", "/api/responsaveis"],
   ["ler as provas bimestrais", "GET", "/api/provas-bimestrais"],
+  ["listar as provas específicas", "GET", "/api/provas"],
+  ["cadastrar uma prova específica", "POST", "/api/provas", {}],
   ["alterar as configurações", "PATCH", "/api/configuracoes", { saidaAntecipada: false }],
   ["listar a equipe", "GET", "/api/usuarios"],
   [
