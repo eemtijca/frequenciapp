@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import { verificarCapacidadeRclone } from "../dropbox-estado.mjs";
+import { politicaMigracoesAuto } from "../ambiente-seguro.mjs";
 import {
   exigir,
   protegido,
@@ -19,6 +20,10 @@ import {
   verificarCheckout,
   verificarJournal,
   verificarPin,
+  exigirEvidenciaMigracoesAuto,
+  lerAprovacaoMigracoesAuto,
+  verificarRecusaMigracoesAuto,
+  CODIGO_ABORTO_MIGRACOES_AUTO,
   autorizar,
 } from "./contrato.mjs";
 
@@ -236,6 +241,7 @@ function instalar(args) {
   validarOperadorEConfig(p);
   const arquivos = {};
   inventariar(fonte, "scripts/servidor", arquivos);
+  inventariar(fonte, "src/infra/schema-postgres.mjs", arquivos);
   inventariar(fonte, "docker/app/migrar.mjs", arquivos);
   for (const n of ["cli.mjs", "contrato.mjs", "trancar.sh"])
     exigir(arquivos[`scripts/servidor/controlador/${n}`], "Fonte operacional incompleta.");
@@ -427,22 +433,65 @@ const acoes = {
 function classificarAtualizacao(opcoes) {
   let ajuda = false,
     simular = false,
-    registrar = false;
+    registrar = false,
+    agendado = false,
+    modo,
+    ref;
   for (let i = 0; i < opcoes.length; i++) {
     const n = opcoes[i];
     if (n === "--ajuda" || n === "-h") ajuda = true;
     else if (n === "--simular") simular = true;
     else if (n === "--registrar") registrar = true;
-    else if (n === "--modo")
-      exigir(["auto", "release", "main"].includes(opcoes[++i]), "Modo de atualização inválido.");
-    else
+    else if (n === "--agendado") agendado = true;
+    else if (n === "--ref") {
+      exigir(ref === undefined, "Referência de atualização repetida.");
+      ref = opcoes[++i];
+      exigir(ref?.length === 40 && !/[^0-9a-f]/.test(ref), "--ref exige um SHA completo.");
+    } else if (n === "--modo") {
+      modo = opcoes[++i];
+      exigir(["auto", "release", "main"].includes(modo), "Modo de atualização inválido.");
+    } else
       exigir(
-        ["--forcar", "--permitir-migracoes", "--agendado"].includes(n),
+        ["--forcar", "--permitir-migracoes"].includes(n),
         "Opção de atualização desconhecida.",
       );
   }
+  exigir(
+    ref === undefined || (agendado && modo === "main" && !registrar),
+    "--ref só é aceito em atualização agendada com --modo main.",
+  );
   exigir(!(simular && registrar), "--simular e --registrar são incompatíveis.");
-  return ajuda ? "ajuda" : simular ? "simular" : registrar ? "registrar-atualizacao" : "preparar";
+  const classe = ajuda
+    ? "ajuda"
+    : simular
+      ? "simular"
+      : registrar
+        ? "registrar-atualizacao"
+        : "preparar";
+  return { classe, ref };
+}
+function conferirReferenciaAgendada(p, env, ref) {
+  const remoto = env.ATUALIZAR_REMOTO || "origin";
+  exigir(
+    /^[a-zA-Z0-9][a-zA-Z0-9_.-]{0,63}$/.test(remoto) && !/[\r\n]/.test(remoto),
+    "Remoto de atualização inválido.",
+  );
+  const revisao = resultado(
+    comando(
+      "/usr/bin/git",
+      [
+        "--no-replace-objects",
+        "-C",
+        p.app,
+        "rev-parse",
+        "--verify",
+        `refs/remotes/${remoto}/main^{commit}`,
+      ],
+      env,
+    ),
+    "Não foi possível conferir a main local do remoto configurado.",
+  );
+  exigir(revisao === `${ref}\n`, "--ref não corresponde à main local do remoto configurado.");
 }
 function classificarBackupBanco(opcoes) {
   // O parser Bash encerra na primeira ajuda; opção desconhecida anterior recusa.
@@ -452,7 +501,7 @@ function classificarBackupBanco(opcoes) {
   }
   return "backup-banco";
 }
-function iniciarIntencao(p, env, operacao, acao) {
+function iniciarIntencao(p, env, operacao, acao, migracoesAuto = false) {
   const pasta = `${p.dados}/journal/${operacao}`;
   mkdir(pasta);
   exclusivo(`${pasta}/intencao.json`, {
@@ -461,6 +510,7 @@ function iniciarIntencao(p, env, operacao, acao) {
     alvo: p.alvo,
     acao,
     snapshot: p.manifestoSha256,
+    ...(migracoesAuto ? { migracoesAuto: true } : {}),
     em: new Date().toISOString(),
   });
   exclusivo(`${pasta}/observado-antes.json`, observar(p, env));
@@ -490,12 +540,12 @@ async function executar(arquivo, args, trancado) {
     Object.hasOwn(acoes, acao) || ["estado", "instalar-rotinas"].includes(acao),
     "Operação não permitida; Compose arbitrário não é uma entrada do operador.",
   );
-  const classe =
-    acao === "atualizar"
-      ? classificarAtualizacao(opcoes)
-      : acao === "backup-banco"
-        ? classificarBackupBanco(opcoes)
-        : acao;
+  const atualizacao = acao === "atualizar" ? classificarAtualizacao(opcoes) : null;
+  const classe = atualizacao
+    ? atualizacao.classe
+    : acao === "backup-banco"
+      ? classificarBackupBanco(opcoes)
+      : acao;
   env.COMPOSE_ARQUIVOS = p.compose.join(":");
   if (!trancado) {
     const r = spawnSync("/bin/bash", [`${aqui}/trancar.sh`, arquivo, ...args], {
@@ -506,6 +556,7 @@ async function executar(arquivo, args, trancado) {
     return;
   }
   autorizar(arquivo, acao);
+  if (atualizacao?.ref !== undefined) conferirReferenciaAgendada(p, env, atualizacao.ref);
   if (
     env.BACKUP_DROPBOX_CONFIG &&
     (classe === "backup-banco" || (acao === "atualizar" && classe === "preparar"))
@@ -568,6 +619,30 @@ async function executar(arquivo, args, trancado) {
     // Código interno 10 só classifica no-op enquanto não houve intenção. Não
     // transforma falha de atualização iniciada em sucesso nem fabrica um pin.
     const semMudanca = preparar && status === 10 && !fs.existsSync(pasta);
+    if (preparar && status === CODIGO_ABORTO_MIGRACOES_AUTO && !sinal && !interrompido) {
+      const intent = json(`${pasta}/intencao.json`);
+      const recusaSha256 = verificarRecusaMigracoesAuto(p, operacao, intent);
+      const antes = json(`${pasta}/observado-antes.json`);
+      const depois = observar(p, env);
+      const porId = (a, b) => a.id.localeCompare(b.id);
+      exigir(
+        JSON.stringify(antes.sort(porId)) === JSON.stringify(depois.sort(porId)),
+        "Recursos mudaram após a recusa; estado incerto.",
+      );
+      exclusivo(`${pasta}/observado-depois.json`, depois);
+      exclusivo(`${pasta}/abortada.json`, {
+        versao: 1,
+        operacao,
+        alvo: p.alvo,
+        intencaoSha256: hash(fs.readFileSync(`${pasta}/intencao.json`)),
+        recusaSha256,
+        status,
+      });
+      verificarJournal(p);
+      console.error("[controlador] Lote automático recusado antes da troca.");
+      process.exitCode = status;
+      return;
+    }
     exigir(
       (status === 0 || semMudanca) && !sinal && !interrompido,
       "Filho não concluiu com sucesso confirmado; estado incerto.",
@@ -579,26 +654,34 @@ async function executar(arquivo, args, trancado) {
     if (!leitura && !semMudanca) {
       const observado = observar(p, env);
       exclusivo(`${pasta}/observado-depois.json`, observado);
+      const intent = json(`${pasta}/intencao.json`);
+      const aprovacao = lerAprovacaoMigracoesAuto(p, operacao, intent);
       if (preparar) {
         exigir(
           observado.some(
             (c) =>
               c.servico === (env.SERVIDOR_SERVICO_APP ?? "app") &&
               c.executando &&
-              c.saude === "healthy",
+              c.saude === "healthy" &&
+              (!aprovacao || c.imagem === aprovacao.imagem),
           ),
           "Saúde física não confirmada.",
         );
-        verificarPin(p, operacao);
+        if (!aprovacao) verificarPin(p, operacao);
       }
       exclusivo(`${pasta}/concluida.json`, {
         versao: 1,
         operacao,
         alvo: p.alvo,
         intencaoSha256: hash(fs.readFileSync(`${pasta}/intencao.json`)),
+        ...(aprovacao ? { migracoesAutoSha256: aprovacao.sha256 } : {}),
         em: new Date().toISOString(),
         status: 0,
       });
+      if (aprovacao) {
+        verificarJournal(p);
+        console.log(`[controlador] Atualização automática concluída para ${aprovacao.commit}.`);
+      }
     }
     process.exitCode = 0;
   } catch (e) {
@@ -655,6 +738,10 @@ async function principal() {
     process.exitCode = r.error ? 78 : (r.status ?? 1);
     return;
   }
+  if (acao === "politica-migracoes-auto") {
+    const { alterarPoliticaMigracoes } = await import("./reconfigurar.mjs");
+    return alterarPoliticaMigracoes(arquivo, args);
+  }
   if (acao === "reconfigurar-rotinas") {
     const { reconfigurarRotinas } = await import("./reconfigurar.mjs");
     return reconfigurarRotinas(arquivo, args);
@@ -670,12 +757,54 @@ async function principal() {
       "Preparação de atualização ausente.",
     );
     env.COMPOSE_ARQUIVOS = p.compose.join(":");
-    iniciarIntencao(p, env, preparacao, "atualizar");
+    const migracoesAuto = args.length === 1 && args[0] === "--migracoes-auto";
+    exigir(args.length === 0 || migracoesAuto, "Argumentos inválidos para iniciar atualização.");
+    if (migracoesAuto)
+      exigir(
+        politicaMigracoesAuto(fs.readFileSync(p.appEnv, "utf8"), fs.readFileSync(p.opsEnv, "utf8")),
+        "Política automática não habilitada no ambiente operacional.",
+      );
+    iniciarIntencao(p, env, preparacao, "atualizar", migracoesAuto);
     return;
   }
   const operacao = process.env.SERVIDOR_CONTROLADOR_OPERACAO;
   exigir(operacao, "Intenção de atualização ausente.");
   if (acao === "fixar") return fixar(p, env, operacao);
+  if (["registrar-migracoes-auto", "abortar-migracoes-auto"].includes(acao)) {
+    const pasta = `${p.dados}/journal/${operacao}`;
+    const intencao = json(`${pasta}/intencao.json`);
+    exigir(
+      intencao.acao === "atualizar" &&
+        intencao.migracoesAuto === true &&
+        ["migracoes-auto", "recusa-migracoes-auto", "concluida", "abortada"].every(
+          (nome) => !fs.lstatSync(`${pasta}/${nome}.json`, { throwIfNoEntry: false }),
+        ),
+      "A operação não está aguardando aprovação ou recusa automática.",
+    );
+    if (acao === "abortar-migracoes-auto") {
+      exigir(args.length === 0, "Argumentos inválidos para recusar o lote automático.");
+      exclusivo(`${pasta}/recusa-migracoes-auto.json`, {
+        versao: 1,
+        alvo: p.alvo,
+        operacao,
+        intencaoSha256: hash(fs.readFileSync(`${pasta}/intencao.json`)),
+      });
+      return;
+    }
+    exigir(args.length === 1, "Argumentos inválidos para registrar o lote automático.");
+    const evidencia = JSON.parse(args[0]);
+    exigirEvidenciaMigracoesAuto(evidencia);
+    verificarPin(p, operacao);
+    exclusivo(`${pasta}/migracoes-auto.json`, {
+      versao: 1,
+      alvo: p.alvo,
+      operacao,
+      ...evidencia,
+      pinSha256: hash(fs.readFileSync(`${p.dados}/pins/${operacao}/pin.json`)),
+      em: new Date().toISOString(),
+    });
+    return;
+  }
   if (acao === "validar-fonte") {
     protegido(`${args[0]}/docker/app/migrar.mjs`);
     exigir(

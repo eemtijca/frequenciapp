@@ -1,9 +1,10 @@
 // Valida arquivos de ambiente antes do source, aceitando apenas atribuições literais.
 // A gramática recusa construções executáveis e não repete valores nas mensagens de erro.
-import { readFileSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 const NOME_VARIAVEL = /^[A-Z_][A-Z0-9_]*$/;
+export const CHAVE_MIGRACOES_AUTO = "ATUALIZAR_APROVAR_MIGRACOES_AUTOMATICAMENTE";
 const VALOR_SEM_ASPAS = /^[\p{L}\p{N}\p{M}_.:/@%+=,-]+$/u;
 const CONTROLE = /[\u0000-\u001F\u007F]/;
 const PROIBIDOS = [
@@ -114,6 +115,59 @@ export function validarConteudoAmbiente(conteudo, arquivo = "<ambiente>") {
   return { atribuicoes };
 }
 
+export function politicaMigracoesAuto(app, ops) {
+  let politica;
+  const atribuicao = new RegExp(`^\\s*(?:export\\s+)?${CHAVE_MIGRACOES_AUTO}\\s*=`);
+  for (const [arquivo, texto] of [
+    ["app.env", app],
+    ["ops.env", ops],
+  ]) {
+    for (const [indice, linha] of texto.split("\n").entries()) {
+      if (!atribuicao.test(linha)) continue;
+      const numero = indice + 1;
+      if (arquivo !== "ops.env")
+        recusar(arquivo, numero, `${CHAVE_MIGRACOES_AUTO} só pertence ao ops.env`);
+      if (politica !== undefined)
+        recusar(arquivo, numero, `${CHAVE_MIGRACOES_AUTO} está duplicada`);
+      const literal = linha.startsWith(`${CHAVE_MIGRACOES_AUTO}=`)
+        ? linha.slice(CHAVE_MIGRACOES_AUTO.length + 1)
+        : "";
+      const valor = /^(?:true|false)$/.test(literal)
+        ? literal
+        : /^(['"])(true|false)\1$/.exec(literal)?.[2];
+      if (valor === undefined)
+        recusar(arquivo, numero, `${CHAVE_MIGRACOES_AUTO} exige true ou false`);
+      politica = valor === "true";
+    }
+  }
+  return politica ?? false;
+}
+
+function lerAmbientePrivado(caminho, rotulo) {
+  try {
+    const fd = openSync(caminho, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+    try {
+      const st = fstatSync(fd);
+      if (
+        !st.isFile() ||
+        st.nlink !== 1 ||
+        st.size > 1048576 ||
+        (st.uid !== 0 && st.uid !== process.getuid()) ||
+        (st.mode & 0o037) !== 0
+      )
+        throw new Error("arquivo sem proteção");
+      const texto = readFileSync(fd, "utf8");
+      validarConteudoAmbiente(texto, rotulo);
+      return texto;
+    } finally {
+      closeSync(fd);
+    }
+  } catch (erro) {
+    if (erro instanceof ErroAmbiente) throw erro;
+    throw new Error(`${rotulo}: ambiente operacional ausente ou sem proteção.`);
+  }
+}
+
 export function validarArquivoAmbiente(caminho) {
   let conteudo;
   try {
@@ -132,7 +186,20 @@ if (executadoDiretamente) {
     process.exitCode = 2;
   } else {
     try {
-      for (const caminho of process.argv.slice(2)) validarArquivoAmbiente(caminho);
+      const [, , primeiro, ...args] = process.argv;
+      if (primeiro === "--politica-migracoes-auto") {
+        if (args.length !== 2) throw new Error("Informe app.env e ops.env.");
+        console.log(
+          String(
+            politicaMigracoesAuto(
+              lerAmbientePrivado(args[0], "app.env"),
+              lerAmbientePrivado(args[1], "ops.env"),
+            ),
+          ),
+        );
+      } else {
+        for (const caminho of [primeiro, ...args]) validarArquivoAmbiente(caminho);
+      }
     } catch (erro) {
       console.error(erro instanceof Error ? erro.message : "Arquivo de ambiente inválido.");
       process.exitCode = 1;

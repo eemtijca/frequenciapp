@@ -16,6 +16,7 @@ import {
   verificarPin,
   retomadaRotinas,
   atualizarSeletores,
+  atualizarPoliticaMigracoes,
   configuracaoRotinas,
 } from "./contrato.mjs";
 import { gerarRotinas } from "./cron.mjs";
@@ -79,7 +80,7 @@ function reconhecer(p, destino, adotar) {
   }
   return { cron, logrotate };
 }
-function gerarSnapshot(p, operacao) {
+function gerarSnapshot(p, operacao, atualizarControlador = true) {
   const base = `${p.prefixo}/geracoes`;
   if (!existe(base)) {
     fs.mkdirSync(base, { mode: 0o700 });
@@ -91,18 +92,26 @@ function gerarSnapshot(p, operacao) {
   sincronizar(base);
   const membros = json(`${p.snapshot}/manifesto.json`),
     manifesto = {};
-  for (const n of [
-    "cli.mjs",
-    "contrato.mjs",
-    "cron.mjs",
-    "trancar.sh",
-    "retencao.sh",
-    "reconfigurar.mjs",
-  ])
-    membros[`scripts/servidor/controlador/${n}`] = null;
-  for (const nome of Object.keys(membros)) {
-    const atualizado = nome.startsWith("scripts/servidor/controlador/");
-    const origem = atualizado ? `${aqui}/${path.basename(nome)}` : `${p.snapshot}/${nome}`;
+  // O controlador e o validador que fornece seus novos exports vêm juntos.
+  // Os demais scripts operacionais continuam fixados pelo snapshot adotado.
+  const atualizados = new Map();
+  if (atualizarControlador) {
+    for (const nome of [
+      "cli.mjs",
+      "contrato.mjs",
+      "cron.mjs",
+      "trancar.sh",
+      "retencao.sh",
+      "reconfigurar.mjs",
+    ])
+      atualizados.set(`scripts/servidor/controlador/${nome}`, `${aqui}/${nome}`);
+    atualizados.set(
+      "scripts/servidor/ambiente-seguro.mjs",
+      `${path.dirname(aqui)}/ambiente-seguro.mjs`,
+    );
+  }
+  for (const nome of new Set([...Object.keys(membros), ...atualizados.keys()])) {
+    const origem = atualizados.get(nome) ?? `${p.snapshot}/${nome}`;
     const bytes = ler(origem);
     const dir = path.dirname(`${snapshot}/${nome}`);
     fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -178,12 +187,16 @@ function opcoes(args) {
   exigir(adotar === null || /^[a-f0-9]{64}$/.test(adotar), "Hash de adoção do cron inválido.");
   return { plano, adotar };
 }
-export function reconfigurarRotinas(arquivo, args) {
+function pedidoAdministrativo() {
   exigir(process.getuid() === 0, "Reconfiguração exige entrada administrativa.");
-  const { plano, adotar } = opcoes([...args]);
   const raw = fs.readFileSync(0);
   exigir(raw.length <= 65536, "Pedido de reconfiguração excede o limite.");
-  const pedido = JSON.parse(raw);
+  return JSON.parse(raw);
+}
+
+export function reconfigurarRotinas(arquivo, args) {
+  const { plano, adotar } = opcoes([...args]);
+  const pedido = pedidoAdministrativo();
   exigir(
     pedido && Object.keys(pedido).every((n) => ["seletores", "destino"].includes(n)),
     "Pedido de reconfiguração contém campos desconhecidos.",
@@ -201,28 +214,12 @@ export function reconfigurarRotinas(arquivo, args) {
       "Retomada exige as mesmas escolhas da intenção durável.",
     );
   else reconhecer(p, destino, adotar);
-  const lock = `${p.locks}/operacoes-${p.alvo}.lock`;
-  if (existe(lock)) protegido(lock, "arquivo", true);
-  const fd = fs.openSync(
-    lock,
-    fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW,
-    0o600,
-  );
-  const stdio = ["ignore", "pipe", "pipe"];
-  while (stdio.length <= fd) stdio.push("ignore");
-  stdio[fd] = fd;
-  try {
-    const r = spawnSync("/usr/bin/flock", ["-n", String(fd)], { stdio });
-    exigir(
-      !r.error && !r.signal && r.status === 0,
-      "Trava física ocupada; reconfiguração recusada.",
-    );
-    const s = fs.fstatSync(fd),
-      atual = protegido(lock, "arquivo", true);
-    exigir(s.dev === atual.dev && s.ino === atual.ino, "Trava física mudou.");
+  comTrava(p, () => {
+    const anterior = p;
     // Nenhum dado pré-trava confere autoridade depois de adquiri-la.
     retomada = retomadaRotinas(arquivo);
     p = retomada?.p ?? perfil(arquivo);
+    exigir(p.alvo === anterior.alvo && p.locks === anterior.locks, "Autoridade da trava mudou.");
     integridade(p, retomada?.operacao);
     conferirIdentidade(p);
     let rotinas;
@@ -308,31 +305,147 @@ export function reconfigurarRotinas(arquivo, args) {
       });
       retomada = retomadaRotinas(arquivo);
     }
-    for (const a of retomada.i.arquivos) {
-      retomadaRotinas(arquivo);
-      publicar(a, retomada.operacao);
-    }
-    const q = perfil(arquivo);
-    integridade(q, retomada.operacao);
-    conferirIdentidade(q);
-    exclusivo(`${retomada.pasta}/concluida.json`, {
-      versao: 1,
-      operacao: retomada.operacao,
-      alvo: q.alvo,
-      intencaoSha256: hash(ler(`${retomada.pasta}/intencao.json`, true)),
-      em: new Date().toISOString(),
-      status: 0,
-    });
-    verificarJournal(q);
+    concluirTransicao(arquivo, retomada);
     console.log(
       JSON.stringify({
         reconfigurado: true,
         semMudancas: false,
-        geracao: q.geracao,
+        geracao: retomada.operacao,
         seletores: pedido.seletores,
       }),
     );
+  });
+}
+
+function comTrava(p, executar) {
+  const lock = `${p.locks}/operacoes-${p.alvo}.lock`;
+  if (existe(lock)) protegido(lock, "arquivo", true);
+  const fd = fs.openSync(
+    lock,
+    fs.constants.O_RDWR | fs.constants.O_CREAT | fs.constants.O_NOFOLLOW,
+    0o600,
+  );
+  const stdio = ["ignore", "pipe", "pipe"];
+  while (stdio.length <= fd) stdio.push("ignore");
+  stdio[fd] = fd;
+  try {
+    const r = spawnSync("/usr/bin/flock", ["-n", String(fd)], { stdio });
+    exigir(
+      !r.error && !r.signal && r.status === 0,
+      "Trava física ocupada; reconfiguração recusada.",
+    );
+    const s = fs.fstatSync(fd),
+      atual = protegido(lock, "arquivo", true);
+    exigir(s.dev === atual.dev && s.ino === atual.ino, "Trava física mudou.");
+    return executar();
   } finally {
     fs.closeSync(fd);
   }
+}
+
+function concluirTransicao(arquivo, retomada) {
+  for (const a of retomada.i.arquivos) {
+    retomadaRotinas(arquivo, retomada.i.acao);
+    publicar(a, retomada.operacao);
+  }
+  const q = perfil(arquivo);
+  integridade(q, retomada.operacao);
+  conferirIdentidade(q);
+  exclusivo(`${retomada.pasta}/concluida.json`, {
+    versao: 1,
+    operacao: retomada.operacao,
+    alvo: q.alvo,
+    intencaoSha256: hash(ler(`${retomada.pasta}/intencao.json`, true)),
+    em: new Date().toISOString(),
+    status: 0,
+  });
+  verificarJournal(q);
+}
+
+// Entrada administrativa distinta: nenhuma opção de rotina, cron ou sudo delegado.
+export function alterarPoliticaMigracoes(arquivo, args) {
+  const { plano, adotar } = opcoes([...args]);
+  const pedido = pedidoAdministrativo();
+  exigir(
+    adotar === null &&
+      pedido &&
+      Object.keys(pedido).length === 1 &&
+      typeof pedido.habilitada === "boolean",
+    "Informe somente habilitada como booleano.",
+  );
+  const acao = "politica-migracoes-auto";
+  const retomar = () => retomadaRotinas(arquivo, acao);
+  const anterior = retomar()?.p ?? perfil(arquivo);
+  comTrava(anterior, () => {
+    let retomada = retomar();
+    const p = retomada?.p ?? perfil(arquivo);
+    exigir(p.alvo === anterior.alvo && p.locks === anterior.locks, "Autoridade da trava mudou.");
+    integridade(p, retomada?.operacao);
+    conferirIdentidade(p);
+    if (pedido.habilitada) {
+      const membros = json(`${p.snapshot}/manifesto.json`);
+      exigir(
+        Object.hasOwn(membros, "scripts/servidor/politica-migracoes-auto.mjs"),
+        "Adote o snapshot com suporte a migrações automáticas antes de habilitar.",
+      );
+    }
+    if (retomada)
+      exigir(
+        retomada.i.habilitada === pedido.habilitada,
+        "Retomada exige a mesma política comprovada.",
+      );
+    const opsAntes = ler(p.opsEnv, true);
+    const ops = atualizarPoliticaMigracoes(ler(p.appEnv, true), opsAntes, pedido.habilitada);
+    const semMudancas = !retomada && ops.equals(opsAntes);
+    if (plano || semMudancas) {
+      console.log(
+        JSON.stringify({
+          plano,
+          semMudancas,
+          retomada: Boolean(retomada),
+          habilitada: pedido.habilitada,
+        }),
+      );
+      return;
+    }
+    if (!retomada) {
+      const operacao = randomUUID();
+      const geracao = gerarSnapshot(p, operacao, false);
+      const q = {
+        ...p,
+        versao: 2,
+        snapshot: geracao.snapshot,
+        compose: p.compose.map((n) => geracao.snapshot + n.slice(p.snapshot.length)),
+        manifestoSha256: geracao.manifestoSha256,
+        opsEnvSha256: hash(ops),
+        geracao: operacao,
+      };
+      const pasta = `${p.dados}/journal/${operacao}`;
+      fs.mkdirSync(pasta, { mode: 0o700 });
+      sincronizar(`${p.dados}/journal`);
+      exclusivo(`${pasta}/intencao.json`, {
+        versao: 1,
+        operacao,
+        alvo: p.alvo,
+        acao,
+        snapshot: p.manifestoSha256,
+        em: new Date().toISOString(),
+        habilitada: pedido.habilitada,
+        arquivos: [
+          registro(p.opsEnv, ops, 0o600),
+          registro(arquivo, serializar(q), 0o600),
+          registro(`${p.prefixo}/executar`, entrada(q), 0o700),
+        ],
+      });
+      retomada = retomar();
+    }
+    concluirTransicao(arquivo, retomada);
+    console.log(
+      JSON.stringify({
+        habilitada: pedido.habilitada,
+        geracao: retomada.operacao,
+        semMudancas: false,
+      }),
+    );
+  });
 }

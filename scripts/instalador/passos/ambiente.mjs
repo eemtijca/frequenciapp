@@ -17,6 +17,7 @@ import {
 import { contemSegredo } from "../redigir.mjs";
 import { resolverProxy } from "../configuracao-proxy.mjs";
 import { lerFusoHost } from "./agendador.mjs";
+import { CHAVE_MIGRACOES_AUTO, politicaMigracoesAuto } from "../../servidor/ambiente-seguro.mjs";
 
 export const id = "ambiente";
 export const titulo = "Gera app.env e ops.env com segredos e permissões corretas";
@@ -211,6 +212,7 @@ export function executar(ctx) {
   const configuracao = ctx.configuracao;
   const appExistente = textoExistente(ctx.caminhos.appEnv, "app.env");
   const opsExistente = textoExistente(ctx.caminhos.opsEnv, "ops.env");
+  const migracoesAuto = politicaMigracoesAuto(appExistente, opsExistente);
   const appAtual = lerEnv(appExistente).mapa;
   const opsAtual = lerEnv(opsExistente).mapa;
   const rotinas = rotinasPrevistas(ctx);
@@ -357,6 +359,7 @@ export function executar(ctx) {
     ["ATUALIZAR_REMOTO", "origin"],
     ["ATUALIZAR_BACKUP_ANTES", "true"],
     ["ATUALIZAR_PERMITIR_MIGRACOES", "false"],
+    [CHAVE_MIGRACOES_AUTO, String(migracoesAuto)],
     ["ATUALIZAR_VERIFICAR_IMAGEM", "true"],
     ["ATUALIZAR_SAUDE_URL", `https://${dominio}/api/saude`],
     ["ATUALIZAR_TIMEOUT_SAUDE", "180"],

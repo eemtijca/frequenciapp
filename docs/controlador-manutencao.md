@@ -144,13 +144,24 @@ A primeira transição cria uma geração física em `geracoes/<uuid>/` e um per
 
 Antes de publicar qualquer arquivo ativo, uma intenção versão 1 registra em diretório privado os bytes e hashes anteriores e desejados. Cada publicação é atômica por arquivo e sincronizada; o conjunto não é uma troca atômica única. Uma interrupção bloqueia a entrada normal. A retomada repete o `aplicar --retomar` com as mesmas escolhas e só aceita arquivos que ainda correspondam exatamente ao estado antigo ou novo comprovado. Um terceiro valor, identidade divergente ou operação incerta alheia exige revisão, sem rollback nem limpeza automática. Os bytes da configuração na intenção são sensíveis e não devem entrar em logs públicos ou issues.
 
+### Política de migrações automáticas
+
+Depois de adotar o snapshot que implementa a política, o administrador pode planejar a alteração a partir da fonte administrativa confiável:
+
+```bash
+printf '%s\n' '{"habilitada":true}' | sudo node scripts/servidor/controlador/cli.mjs \
+  politica-migracoes-auto /opt/frequenciapp-controlador/perfil.json --plano
+```
+
+Depois de revisar o plano, repetir com `--confirmar`. Usar `{"habilitada":false}` para desabilitar; a opção ausente equivale a desabilitada. O comando não é oferecido pela entrada delegada `executar`, nem pelo `aplicar` de rotinas. Sob a mesma trava da atualização, ele altera somente a política no `ops.env` e os metadados da geração. Não edite o `ops.env` adotado diretamente; isso invalida seu hash. Nenhum cron é ligado ou alterado. Uma publicação interrompida exige repetir `--confirmar` com o mesmo valor. Desabilitar não interrompe uma migração em curso nem libera um journal incerto.
+
 ### Observabilidade
 
 O perfil adotado guarda hashes de `app.env`, de `ops.env` e da lista Compose. `METRICAS_TOKEN`, `OBSERVABILIDADE_HABILITADA` e `PROMETHEUS_PORTA` não são seletores de rotina. Acrescentar o token, a flag, o overlay ou qualquer configuração de `infra/observabilidade` altera essa configuração e invalida o perfil.
 
 O snapshot da adoção com observabilidade inclui `compose.observabilidade.yml`, `infra/observabilidade/**` e o Caddyfile ou o diretório do Nginx. A entrada estável monta o Compose com `COMPOSE_DIR` no snapshot, e `COMPOSE_ARQUIVOS` aponta somente para os arquivos copiados. A lista explícita é autoritativa: se `OBSERVABILIDADE_HABILITADA=true` e o overlay não estiver nela, a adoção e a leitura são recusadas antes de qualquer mutação. Se a flag estiver desligada, o overlay citado na lista explícita continua sendo respeitado, o que preserva a topologia escolhida.
 
-O `aplicar` com controlador adotado executa apenas a reconfiguração restrita das rotinas (`reconfigurar-rotinas`) e recusa a configuração alterada com `Configuração mudou; adoção explícita necessária`. Para receber as variáveis, o overlay e as novas configurações, a instalação precisa de readoção revisada, com novo snapshot e conferência de identidade. A atualização comum não aplica as variáveis nem altera a topologia adotada. A nova geração criada pela reconfiguração restrita copia os mesmos arquivos do snapshot e mantém os hashes no manifesto.
+O `aplicar` com controlador adotado executa apenas a reconfiguração restrita das rotinas (`reconfigurar-rotinas`) e recusa a configuração alterada com `Configuração mudou; adoção explícita necessária`. Para receber as variáveis, o overlay e as novas configurações, a instalação precisa de readoção revisada, com novo snapshot e conferência de identidade. A atualização comum não aplica as variáveis nem altera a topologia adotada. Na reconfiguração restrita, a nova geração atualiza os módulos do controlador junto com o validador de ambiente que eles importam. Os outros arquivos continuam fixados pelo snapshot anterior, inclusive o Compose, o migrador e o script de atualização. A reconfiguração não habilita migrações automáticas nem substitui a adoção do snapshot que oferece esse suporte.
 
 O caminho de ativação está em [observabilidade.md](observabilidade.md#instalação-existente) e a readoção em [Readoção](#readoção).
 
@@ -235,6 +246,10 @@ sudo /opt/frequenciapp-controlador/executar atualizar --simular
 Os modos de atualização são `auto`, `release` e `main`. `release` usa a tag estável mais recente; `main` usa `ATUALIZAR_REF`, por padrão `origin/main`. `auto` escolhe release quando a tag é compatível com o estado atual e main nos demais casos. A atualização simples grava `estado.json` com modo, referência, commit, imagem, imagem de backup e horário. Em falha, grava `falha.json` com a possibilidade de migrações aplicadas.
 
 Quando o controlador está ativo e a atualização falha, a imagem e o commit anteriores não são iniciados automaticamente. O estado anterior continua registrado, o backup e o pin permanecem, e a recuperação é uma decisão administrativa. Usar o backup e o procedimento de restauração de [backup-servidor.md](backup-servidor.md); não tratar a falha como sucesso nem apagar o journal.
+
+Para fixar a revisão de uma atualização agendada, a entrada estável aceita `atualizar --agendado --modo main --ref <SHA>` somente com 40 caracteres hexadecimais minúsculos e se o SHA for a `main` local do remoto configurado. Referências simbólicas e o uso manual de `--ref` por essa entrada são recusados. A fixação da referência não concede aprovação para migrar.
+
+O controlador escreve a conclusão automática apenas depois de conferir a imagem saudável e persistir `concluida.json` com o SHA-256 de `migracoes-auto.json`. A leitura do journal volta a conferir esses bytes e o pin. Uma recusa registrada pelo atualizador antes da aprovação e da troca pode terminar como `abortada.json`, com código 20 e sem mensagem de sucesso, se os recursos observados permanecerem iguais. Uma falha sem essa prova ou após a aprovação continua incerta e bloqueia novas mutações.
 
 ## compose.sh e instalar-rotinas.sh
 

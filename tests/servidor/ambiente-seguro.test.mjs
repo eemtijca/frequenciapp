@@ -57,6 +57,39 @@ test("os exemplos de ambiente reais passam", () => {
   }
 });
 
+test("só o arquivo operacional privado pode autorizar migrações automáticas", () => {
+  const diretorio = mkdtempSync(join(tmpdir(), "politica-migracoes-"));
+  const chave = "ATUALIZAR_APROVAR_MIGRACOES_AUTOMATICAMENTE";
+  try {
+    const app = criarArquivo(diretorio, "app.env", "");
+    const ops = criarArquivo(diretorio, "ops.env", "");
+    const consultar = () =>
+      spawnSync(process.execPath, [validador, "--politica-migracoes-auto", app, ops], {
+        encoding: "utf8",
+        env: { PATH: process.env.PATH, [chave]: "true" },
+      });
+    let resultado = consultar();
+    assert.equal(resultado.status, 0, resultado.stderr);
+    assert.equal(resultado.stdout.trim(), "false");
+    writeFileSync(ops, `${chave}='true'\n`);
+    resultado = consultar();
+    assert.equal(resultado.status, 0, resultado.stderr);
+    assert.equal(resultado.stdout.trim(), "true");
+    for (const conteudo of [`${chave}=true\n${chave}=false\n`, `${chave}=sim\n`, `${chave}=\n`]) {
+      writeFileSync(ops, conteudo);
+      assert.notEqual(consultar().status, 0);
+    }
+    writeFileSync(ops, `${chave}=false\n`);
+    writeFileSync(app, `${chave}=true\n`);
+    assert.notEqual(consultar().status, 0);
+    writeFileSync(app, "");
+    chmodSync(ops, 0o644);
+    assert.notEqual(consultar().status, 0);
+  } finally {
+    rmSync(diretorio, { recursive: true, force: true });
+  }
+});
+
 test("comentários, valores vazios, aspas e base64 são aceitos", () => {
   const conteudo = [
     "# Comentário com `crase`, $ cifrão e ponto e vírgula;",

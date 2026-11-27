@@ -277,8 +277,12 @@ conferir_identidade() {
   local registro="${SERVIDOR_IDENTIDADE_ARQUIVO:-$SERVIDOR_CONFIG_DIR/identidade.json}"
   local captura
   command -v node >/dev/null || erro "Instale Node.js para conferir a identidade operacional."
-  captura=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-identidade.XXXXXX")
-  chmod 700 "$captura"
+  captura=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-identidade.XXXXXX") ||
+    erro "Não foi possível criar o diretório privado da conferência."
+  if ! chmod 700 "$captura"; then
+    rmdir -- "$captura" || true
+    erro "Não foi possível proteger o diretório da conferência."
+  fi
   # A captura privada não deve aparecer em logs: config contém ambiente resolvido.
   if ! (
     set -Eeuo pipefail

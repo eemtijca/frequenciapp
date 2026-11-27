@@ -289,6 +289,30 @@ O expurgo local mantém o comportamento conservador anterior: erro interrompe a 
 
 ## Restauração
 
+### Registro de recuperação para migrações automáticas
+
+O backup não cria nem atualiza essa prova. Para o modo opt-in de migrações agendadas com controlador adotado, um administrador registra o resultado somente depois de uma verificação independente:
+
+1. Identifique um conjunto cifrado confirmado deste alvo, retido localmente e no destino remoto adotado. Use o catálogo protegido da instalação e confira os bytes obtidos do destino remoto contra o recibo, não só o nome ou o ponteiro mais recente. Registre o identificador do cluster PostgreSQL da origem pela conexão efetiva do backup e o retrato independente que será comparado ao resultado. O identificador não vem do banco restaurado.
+2. Com a chave privada mantida fora do servidor, decifre esse conjunto em estação isolada e use a restauração oficial em um PostgreSQL descartável. Compare o resultado com o retrato da origem, incluindo dados, constraints e histórico de migrações. A listagem com `pg_restore -l`, a verificação de checksums e o ensaio sintético do CI não substituem esse procedimento.
+3. Só após o sucesso, publique `recuperacao-migracoes-auto.json` diretamente na raiz de configuração do perfil adotado (campo `config` do perfil). Use diretório protegido e arquivo regular privado de `root`, sem links; grave um temporário privado e publique por renomeação atômica como parte da administração do alvo. Não inclua chaves, URLs de conexão, credenciais, SQL ou dados da escola. Não coloque o registro no checkout, num artefato do CI ou no destino de backup.
+
+O JSON usa exatamente estes campos:
+
+| Campo                                    | Valor                                                                                                                                                                                                                            |
+| ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `versao`                                 | Número `1`.                                                                                                                                                                                                                      |
+| `resultado`                              | `restaurado-e-conferido`, somente após a comparação independente.                                                                                                                                                                |
+| `ensaiadoEm`                             | Data do fim do ensaio em UTC ISO 8601 com milissegundos. Não pode estar no futuro e vale por até 30 dias.                                                                                                                        |
+| `alvo`, `cluster`, `banco`, `schema`     | Alvo adotado no controlador, `system_identifier` observado na origem como texto decimal e banco e schema efetivos. Cópias físicas podem compartilhar o identificador do cluster; ele não substitui a identidade do alvo adotado. |
+| `remoto`, `criptografia`, `destinatario` | Destino de backup adotado, `gpg` ou `age` e fingerprint exato da chave de cifra GPG ou SHA-256 dos destinatários age.                                                                                                            |
+| `recibo`, `reciboSha256`                 | Nome do recibo `<base>.confirmado.json` ensaiado e SHA-256 dos bytes exatos do recibo no catálogo protegido.                                                                                                                     |
+| `arquivo`, `sha256`                      | Nome e SHA-256 exatos do dump cifrado que foi restaurado.                                                                                                                                                                        |
+
+Mantenha localmente o conjunto ensaiado durante a validade do registro. Se ele for expurgado, se a evidência vencer ou se o alvo, a cifra, o destinatário ou o destino mudar, refaça o ensaio para liberar novas atualizações automáticas. O backup imediatamente anterior à mudança é outro conjunto: exige confirmação local e remota e o pin da própria operação, com a mesma autoridade de backup. Isso estende a confiança no procedimento ensaiado ao novo backup verificado; não afirma que o novo dump, individualmente, já passou por restauração. O campo `recuperacaoExercitada` dos recibos continua `false`.
+
+Após o build e antes da aprovação para a troca, o atualizador relê pelo rclone o recibo e todos os objetos do backup novo no destino adotado. Confere tipo, tamanho e SHA-256 contra o conjunto fixado, sem confiar só na confirmação gravada no recibo. A releitura não publica nem remove objetos, não grava os artefatos em disco e usa `BACKUP_TIMEOUT_DUMP_SEGUNDOS` como prazo total. Se qualquer objeto estiver ausente, indisponível ou divergente, o atualizador bloqueia a troca.
+
 ### Download remoto
 
 Antes de restaurar, o conjunto remoto precisa ser baixado e conferido. O acesso remoto do helper usa apenas rclone, então funciona com qualquer destino, inclusive o Dropbox adotado, e não depende do cliente nativo nem de `BACKUP_DROPBOX_CONFIG`.

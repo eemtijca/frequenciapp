@@ -113,6 +113,62 @@ test("reconfigura seletivamente o perfil adotado e repete sem mover a trava", ()
   }
 });
 
+test("a entrada estável carrega após reconfigurar snapshot com validador legado", () => {
+  const f = fixture();
+  try {
+    const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+    const anterior = JSON.parse(fs.readFileSync(f.perfil));
+    const manifesto = `${anterior.snapshot}/manifesto.json`;
+    const membros = JSON.parse(fs.readFileSync(manifesto));
+    const validador = "scripts/servidor/ambiente-seguro.mjs";
+    const politica = "scripts/servidor/politica-migracoes-auto.mjs";
+    // Bytes do validador anterior à política, retirados de 89973e7. O CI não leva .git.
+    const legado = fs.readFileSync(
+      new URL("./fixtures/ambiente-seguro-legado.mjs", import.meta.url),
+    );
+    f.gravar(`${anterior.snapshot}/${validador}`, legado);
+    membros[validador] = hash(legado);
+    delete membros[politica];
+    fs.rmSync(`${anterior.snapshot}/${politica}`, { force: true });
+    const manifestoAnterior = JSON.stringify(membros) + "\n";
+    f.gravar(manifesto, manifestoAnterior);
+    anterior.manifestoSha256 = hash(manifestoAnterior);
+    f.gravar(f.perfil, JSON.stringify(anterior));
+
+    const entrada = `${f.prefixo}/executar`;
+    const lockAntes = fs.statSync(`${anterior.locks}/operacoes-${anterior.alvo}.lock`);
+    const publicado = JSON.parse(f.ok(comando(f)).stdout);
+    const estado = JSON.parse(f.ok(f.executar(entrada, ["estado"])).stdout);
+    assert.equal(estado.alvo, anterior.alvo);
+    const atual = JSON.parse(fs.readFileSync(f.perfil));
+    assert.equal(atual.geracao, publicado.geracao);
+    assert.notEqual(atual.snapshot, anterior.snapshot);
+    assert.equal(atual.migradorSha256, anterior.migradorSha256);
+    assert.deepEqual(
+      fs.readFileSync(`${atual.snapshot}/scripts/servidor/atualizar.sh`),
+      fs.readFileSync(`${anterior.snapshot}/scripts/servidor/atualizar.sh`),
+    );
+    const lockDepois = fs.statSync(`${atual.locks}/operacoes-${atual.alvo}.lock`);
+    assert.equal(atual.locks, anterior.locks);
+    assert.equal(lockDepois.dev, lockAntes.dev);
+    assert.equal(lockDepois.ino, lockAntes.ino);
+    assert.equal(fs.readFileSync(manifesto, "utf8"), manifestoAnterior);
+    assert.deepEqual(fs.readFileSync(`${anterior.snapshot}/${validador}`), legado);
+
+    const antes = guardar(f);
+    recusa(
+      f.executar(process.execPath, [f.cli, "politica-migracoes-auto", f.perfil, "--confirmar"], {
+        input: '{"habilitada":true}',
+      }),
+      /Adote o snapshot com suporte a migrações automáticas/,
+    );
+    assert.deepEqual(guardar(f), antes);
+    assert.deepEqual(fs.readdirSync(`${f.prefixo}/dados/journal`), [publicado.geracao]);
+  } finally {
+    f.limpar();
+  }
+});
+
 function comando(f, extras = [], opcoes = {}) {
   return f.executar(
     process.execPath,

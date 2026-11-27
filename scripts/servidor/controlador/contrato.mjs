@@ -4,6 +4,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { CHAVE_MIGRACOES_AUTO, politicaMigracoesAuto } from "../ambiente-seguro.mjs";
 
 export const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 export function exigir(ok, mensagem) {
@@ -412,6 +413,21 @@ export function atualizarSeletores(bytes, seletores) {
   return Buffer.from(texto);
 }
 
+export function atualizarPoliticaMigracoes(app, ops, valor) {
+  exigir(typeof valor === "boolean", "Informe uma política booleana de migrações automáticas.");
+  const texto = ops.toString("utf8");
+  exigir(Buffer.from(texto).equals(ops), "ops.env precisa ser UTF-8 válido.");
+  const atual = politicaMigracoesAuto(app.toString("utf8"), texto);
+  if (atual === valor) return ops;
+  const atribuicao = `${CHAVE_MIGRACOES_AUTO}=${valor}`;
+  const linha = new RegExp(`^${CHAVE_MIGRACOES_AUTO}=.*$`, "m");
+  return Buffer.from(
+    linha.test(texto)
+      ? texto.replace(linha, atribuicao)
+      : `${texto}${texto && !texto.endsWith("\n") ? "\n" : ""}${atribuicao}\n`,
+  );
+}
+
 export function configuracaoRotinas(bytes, seletores) {
   const config = bytes === null ? {} : JSON.parse(bytes.toString("utf8"));
   exigir(
@@ -432,7 +448,7 @@ export function configuracaoRotinas(bytes, seletores) {
 
 // Somente esta leitura administrativa aceita uma publicação incompleta. Cada byte
 // precisa pertencer aos estados antigo/novo de uma intenção durável e restrita.
-export function retomadaRotinas(arquivo) {
+export function retomadaRotinas(arquivo, acao = "reconfigurar-rotinas") {
   const prefixo = path.dirname(arquivo),
     atual = json(arquivo);
   exigir(
@@ -443,7 +459,9 @@ export function retomadaRotinas(arquivo) {
   protegido(raiz, "diretorio", true);
   const pendentes = fs
     .readdirSync(raiz)
-    .filter((n) => !fs.existsSync(`${raiz}/${n}/concluida.json`));
+    .filter(
+      (n) => !["concluida", "abortada"].some((fim) => fs.existsSync(`${raiz}/${n}/${fim}.json`)),
+    );
   if (!pendentes.length) return null;
   exigir(
     pendentes.length === 1 && /^[a-f0-9-]{36}$/.test(pendentes[0]),
@@ -456,7 +474,7 @@ export function retomadaRotinas(arquivo) {
     i.versao === 1 &&
       i.operacao === operacao &&
       i.alvo === atual.alvo &&
-      i.acao === "reconfigurar-rotinas" &&
+      i.acao === acao &&
       Array.isArray(i.arquivos),
     "Journal anterior incerto; reconfiguração recusada.",
   );
@@ -493,17 +511,20 @@ export function retomadaRotinas(arquivo) {
       JSON.stringify(p.compose.map((n) => q.snapshot + n.slice(p.snapshot.length))),
     "Compose da geração diverge.",
   );
-  protegido(i.destino, "diretorio");
+  const politica = i.acao === "politica-migracoes-auto";
   const permitidos = new Map([
-    [p.appEnv, 0o600],
     [p.opsEnv, 0o600],
     [arquivo, 0o600],
     [`${prefixo}/executar`, 0o700],
-    [`${i.destino}/cron.d/frequenciapp`, 0o644],
-    [`${i.destino}/logrotate.d/frequenciapp`, 0o644],
-    [`${p.dados}/rotinas.json`, 0o600],
-    [`${p.config}/instalador.json`, 0o600],
   ]);
+  if (!politica) {
+    protegido(i.destino, "diretorio");
+    permitidos.set(p.appEnv, 0o600);
+    permitidos.set(`${i.destino}/cron.d/frequenciapp`, 0o644);
+    permitidos.set(`${i.destino}/logrotate.d/frequenciapp`, 0o644);
+    permitidos.set(`${p.dados}/rotinas.json`, 0o600);
+    permitidos.set(`${p.config}/instalador.json`, 0o600);
+  }
   exigir(i.arquivos.length === permitidos.size, "Arquivos incompletos na transição.");
   const antigos = new Map(),
     novos = new Map();
@@ -529,20 +550,121 @@ export function retomadaRotinas(arquivo) {
     antigos.set(a.caminho, antes);
     novos.set(a.caminho, depois);
   }
-  for (const n of [p.appEnv, p.opsEnv])
+  if (politica) {
+    protegido(p.appEnv, "arquivo", true);
     exigir(
-      antigos.get(n) && atualizarSeletores(antigos.get(n), i.seletores).equals(novos.get(n)),
-      "Transição modifica configuração além dos seletores.",
+      antigos.get(p.opsEnv) &&
+        atualizarPoliticaMigracoes(
+          fs.readFileSync(p.appEnv),
+          antigos.get(p.opsEnv),
+          i.habilitada,
+        ).equals(novos.get(p.opsEnv)) &&
+        q.manifestoSha256 === p.manifestoSha256,
+      "Transição modifica configuração ou snapshot além da política de migrações.",
     );
+  } else {
+    for (const n of [p.appEnv, p.opsEnv])
+      exigir(
+        antigos.get(n) && atualizarSeletores(antigos.get(n), i.seletores).equals(novos.get(n)),
+        "Transição modifica configuração além dos seletores.",
+      );
+    const config = `${p.config}/instalador.json`;
+    exigir(
+      configuracaoRotinas(antigos.get(config), i.seletores).equals(novos.get(config)),
+      "Transição altera configuração do instalador além dos seletores.",
+    );
+  }
   conferirPerfil(arquivo, p, true, antigos);
-  const config = `${p.config}/instalador.json`;
-  exigir(
-    configuracaoRotinas(antigos.get(config), i.seletores).equals(novos.get(config)),
-    "Transição altera configuração do instalador além dos seletores.",
-  );
   conferirPerfil(arquivo, q, true, novos);
   verificarJournal(p, operacao);
   return { p, q, i, operacao, pasta };
+}
+
+export const CODIGO_ABORTO_MIGRACOES_AUTO = 20;
+
+export function exigirEvidenciaMigracoesAuto(evidencia) {
+  const chaves = (obj, ...nomes) =>
+    obj &&
+    typeof obj === "object" &&
+    !Array.isArray(obj) &&
+    Object.keys(obj).length === nomes.length &&
+    nomes.every((nome) => Object.hasOwn(obj, nome));
+  const hexadecimal = (s, tamanho) =>
+    typeof s === "string" && s.length === tamanho && !/[^a-f0-9]/.test(s);
+  const id = (n) => Number.isSafeInteger(n) && n > 0;
+  const { lote, ensaio, recuperacao, imagem } = evidencia ?? {};
+  exigir(
+    chaves(evidencia, "lote", "ensaio", "recuperacao", "imagem") &&
+      chaves(lote, "base", "alvo", "migracoes") &&
+      hexadecimal(lote.base, 40) &&
+      hexadecimal(lote.alvo, 40) &&
+      lote.base !== lote.alvo &&
+      Array.isArray(lote.migracoes) &&
+      lote.migracoes.length > 0 &&
+      lote.migracoes.length <= 64 &&
+      lote.migracoes.every(
+        (m, i, todos) =>
+          chaves(m, "caminho", "sha256") &&
+          typeof m.caminho === "string" &&
+          /^prisma\/migrations\/[0-9]{14}_[a-z0-9_]{1,120}\/migration\.sql(?![\s\S])/.test(
+            m.caminho,
+          ) &&
+          (i === 0 || todos[i - 1].caminho < m.caminho) &&
+          hexadecimal(m.sha256, 64),
+      ) &&
+      chaves(ensaio, "runId", "tentativa") &&
+      id(ensaio.runId) &&
+      id(ensaio.tentativa) &&
+      hexadecimal(recuperacao, 64) &&
+      typeof imagem === "string" &&
+      imagem.startsWith("sha256:") &&
+      hexadecimal(imagem.slice(7), 64),
+    "Evidência automática incompleta ou inválida.",
+  );
+}
+
+export function lerAprovacaoMigracoesAuto(p, operacao, intent) {
+  const nome = `${p.dados}/journal/${operacao}/migracoes-auto.json`;
+  const existe = fs.lstatSync(nome, { throwIfNoEntry: false });
+  if (intent.acao !== "atualizar" || intent.migracoesAuto !== true) {
+    exigir(!existe, "Aprovação automática sem intenção correspondente.");
+    return null;
+  }
+  const { versao, alvo, operacao: id, pinSha256, em, ...evidencia } = json(nome);
+  exigirEvidenciaMigracoesAuto(evidencia);
+  verificarPin(p, operacao);
+  exigir(
+    versao === 1 &&
+      alvo === p.alvo &&
+      id === operacao &&
+      typeof em === "string" &&
+      Number.isFinite(Date.parse(em)) &&
+      pinSha256 === hash(fs.readFileSync(`${p.dados}/pins/${operacao}/pin.json`)),
+    "Aprovação automática diverge da operação ou do backup fixado.",
+  );
+  return {
+    sha256: hash(fs.readFileSync(nome)),
+    imagem: evidencia.imagem,
+    commit: evidencia.lote.alvo,
+  };
+}
+
+export function verificarRecusaMigracoesAuto(p, operacao, intent) {
+  const pasta = `${p.dados}/journal/${operacao}`;
+  const recusa = json(`${pasta}/recusa-migracoes-auto.json`);
+  exigir(
+    intent.acao === "atualizar" &&
+      intent.migracoesAuto === true &&
+      recusa.versao === 1 &&
+      recusa.operacao === operacao &&
+      recusa.alvo === p.alvo &&
+      recusa.intencaoSha256 === hash(fs.readFileSync(`${pasta}/intencao.json`)) &&
+      !fs.lstatSync(`${pasta}/migracoes-auto.json`, { throwIfNoEntry: false }),
+    "Recusa anterior à troca não comprovada.",
+  );
+  if (fs.lstatSync(`${p.dados}/pins/${operacao}`, { throwIfNoEntry: false }))
+    verificarPin(p, operacao);
+  return hash(fs.readFileSync(`${pasta}/recusa-migracoes-auto.json`));
 }
 
 export function verificarJournal(p, operacaoPermitida = "") {
@@ -563,21 +685,41 @@ export function verificarJournal(p, operacaoPermitida = "") {
       "Operação incerta bloqueia mutações. Revisão administrativa obrigatória.",
     );
     if (n === operacaoPermitida) continue;
+    const abortada = fs.lstatSync(`${pasta}/abortada.json`, { throwIfNoEntry: false });
+    const fimArquivo = `${pasta}/${abortada ? "abortada" : "concluida"}.json`;
     exigir(
-      fs.existsSync(`${pasta}/concluida.json`),
+      fs.existsSync(fimArquivo),
       "Operação anterior em andamento ou incerta; mutações bloqueadas.",
     );
-    const fim = json(`${pasta}/concluida.json`);
+    const fim = json(fimArquivo);
     exigir(
       fim.operacao === n &&
         fim.alvo === p.alvo &&
         fim.intencaoSha256 === hash(fs.readFileSync(`${pasta}/intencao.json`)),
       "Conclusão diverge da intenção.",
     );
+    if (abortada) {
+      exigir(
+        !fs.lstatSync(`${pasta}/concluida.json`, { throwIfNoEntry: false }) &&
+          fim.status === CODIGO_ABORTO_MIGRACOES_AUTO &&
+          fim.recusaSha256 === verificarRecusaMigracoesAuto(p, n, intent),
+        "Aborto diverge da recusa comprovada.",
+      );
+    } else {
+      exigir(
+        !fs.lstatSync(`${pasta}/recusa-migracoes-auto.json`, { throwIfNoEntry: false }),
+        "Journal contém conclusão e recusa incompatíveis.",
+      );
+      const aprovacao = lerAprovacaoMigracoesAuto(p, n, intent);
+      exigir(
+        fim.migracoesAutoSha256 === aprovacao?.sha256,
+        "Conclusão diverge da aprovação automática.",
+      );
+      if (intent.acao === "atualizar" && !aprovacao) verificarPin(p, n);
+    }
     // A leitura não confia só na presença visível após falha de escrita.
-    sincronizar(`${pasta}/concluida.json`);
+    sincronizar(fimArquivo);
     sincronizar(pasta);
-    if (intent.acao === "atualizar") verificarPin(p, n);
   }
   return nomes;
 }

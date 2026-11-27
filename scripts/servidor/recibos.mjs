@@ -7,6 +7,48 @@ import { pathToFileURL } from "node:url";
 const padraoBase = /^frequenciapp-[0-9]{8}T[0-9]{6}Z-[a-f0-9]{8}$/;
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
+export const camposBancoPreMigracao = [
+  "container",
+  "cluster",
+  "banco",
+  "bancoOid",
+  "schema",
+  "schemaOid",
+];
+const operacaoValida = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+const corresponde = (s, regex) => typeof s === "string" && regex.exec(s)?.[0] === s;
+
+export function validarBancoPreMigracao(banco) {
+  if (
+    !banco ||
+    typeof banco !== "object" ||
+    Object.keys(banco).length !== camposBancoPreMigracao.length ||
+    !camposBancoPreMigracao.every((k) => Object.hasOwn(banco, k)) ||
+    !corresponde(banco.container, /^[a-f0-9]{64}$/) ||
+    !corresponde(banco.cluster, /^[1-9][0-9]{0,19}$/) ||
+    BigInt(banco.cluster) > 18446744073709551615n ||
+    !corresponde(banco.banco, /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/) ||
+    !corresponde(banco.schema, /^[a-z_][a-z0-9_]{0,62}$/) ||
+    ![banco.bancoOid, banco.schemaOid].every(
+      (oid) => corresponde(oid, /^[1-9][0-9]{0,9}$/) && Number(oid) <= 4294967295,
+    )
+  ) {
+    throw new Error("Identidade física do banco pré-migração inválida.");
+  }
+  return banco;
+}
+
+function validarOrigemPreMigracao(origem, escopo) {
+  const { operacao, ...banco } = origem;
+  validarBancoPreMigracao(banco);
+  if (
+    !corresponde(operacao, operacaoValida) ||
+    banco.banco !== escopo.banco ||
+    banco.schema !== escopo.schema
+  )
+    throw new Error("Origem do dump não corresponde ao escopo do recibo.");
+}
+
 function mesmoEscopo(r, opcoes) {
   return (
     typeof opcoes.banco === "string" &&
@@ -66,6 +108,7 @@ export function validarRecibo(r) {
     throw new Error("Artefatos do recibo não pertencem ao conjunto.");
   }
   if (r.etapas.remotoVerificado && !r.remoto) throw new Error("Verificação remota sem destino.");
+  if (Object.hasOwn(r, "origem")) validarOrigemPreMigracao(r.origem, r.escopo);
   return r;
 }
 
@@ -102,6 +145,7 @@ export function criarRecibo(diretorio, dados) {
     base: dados.base,
     em: dados.em ?? new Date().toISOString(),
     escopo: { tipo: "schema", schema: dados.schema, alvo: dados.alvo, banco: dados.banco ?? null },
+    ...(dados.origem !== undefined ? { origem: dados.origem } : {}),
     criptografia: dados.criptografia,
     destinatario: dados.destinatario,
     remoto: dados.remoto,
@@ -112,6 +156,13 @@ export function criarRecibo(diretorio, dados) {
     })),
   };
   validarRecibo(r);
+  if (
+    dados.origem !== undefined &&
+    r.artefatos.find((a) => a.nome === `${r.base}.dump.${r.criptografia}`).sha256 !==
+      dados.sha256Produzido
+  ) {
+    throw new Error("Os bytes do dump diferem do fluxo observado.");
+  }
   conferirArtefatos(diretorio, r);
   return r;
 }
@@ -169,15 +220,19 @@ function lerCatalogo(diretorio, local) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const [acao, diretorio, base] = process.argv.slice(2);
+    const [acao, diretorio, base, origem, sha256Produzido] = process.argv.slice(2);
     const e = process.env;
     if (acao === "criar") {
+      if (process.argv.length !== 5 && process.argv.length !== 7)
+        throw new Error("Argumentos de recibo inválidos.");
       process.stdout.write(
         JSON.stringify(
           criarRecibo(diretorio, {
             base,
             alvo: e.SERVIDOR_ALVO_CHAVE,
             banco: e.BACKUP_BANCO_VERIFICADO,
+            origem: origem === undefined ? undefined : JSON.parse(origem),
+            sha256Produzido,
             criptografia: e.BACKUP_CRIPTOGRAFIA ?? "gpg",
             schema: e.DATABASE_SCHEMA ?? "public",
             remoto: e.BACKUP_REMOTO ?? "",
@@ -186,6 +241,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
           }),
         ) + "\n",
       );
+    } else if (acao === "banco-pre-migracao" && process.argv.length === 4) {
+      const banco = validarBancoPreMigracao(JSON.parse(diretorio));
+      process.stdout.write(JSON.stringify(banco) + "\n");
     } else if (acao === "conferir-estado") {
       const estado = JSON.parse(readFileSync(base, "utf8"));
       if (

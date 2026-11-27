@@ -542,6 +542,17 @@ O atualizador compara a base instalada, a ponta da `main`, a janela e o SHA-256 
 
 Uma instalação antiga não atualiza o próprio agendamento ao receber essa revisão. A adoção inicial do código e a atualização do cron são etapas operacionais separadas.
 
+##### Política automática sem manifesto por lote
+
+`ATUALIZAR_APROVAR_MIGRACOES_AUTOMATICAMENTE=false` é o padrão. Com `true` no `ops.env` privado, o atualizador agendado do **controlador adotado** pode aprovar automaticamente migrações elegíveis. A opção não instala nem habilita o cron, não vale no canal `release` e não muda a execução manual. Um lançador personalizado não deve repassar `--permitir-migracoes` para contornar a política: deve usar a entrada estável do controlador com `atualizar --agendado`, mantendo as próprias guardas de Compose e scripts. Sem o controlador, o fluxo automático recusa a migração.
+
+- O alvo deve ser o próximo commit da `main` canônica em relação à revisão instalada. O workflow pós-merge e seus insumos confiáveis já precisam estar presentes na base, sem mudança no lote. Execução em PR, prova ausente ou um intervalo de migrações acumuladas requerem revisão manual.
+- Só aceita novos arquivos `migration.sql` ordenados. A política reconhece `CREATE TABLE` simples e adição de coluna anulável sem `DEFAULT`, com tipos incorporados e sem dependências externas. SQL fora desse subconjunto, edições ou remoções de migrações e mudanças de Compose, scripts operacionais ou da construção da imagem não são aprovados automaticamente.
+- Exige o histórico exato no mesmo PostgreSQL do backup, da aplicação e do migrador, um [ensaio de recuperação registrado](backup-servidor.md), e um novo backup cifrado verificado local e remotamente, fixado pelo controlador. Após o build, o atualizador confere os bytes da imagem, o backup e a tentativa do CI antes de gravar `migracoes-auto.json` no journal protegido.
+- A subida usa a imagem conferida, sem recriar o banco ou o proxy e sem reinício automático do app até conferir a saúde e o histórico final. O migrador reconfere o lote sob travas com prazo e aplica o SQL e o histórico na mesma transação. Uma recusa confirmada antes da troca mantém a versão em uso. Após registrar a aprovação, uma falha ou interrupção fica incerta: preserve o journal e o backup fixado. Não repita o cron nem faça rollback automático: a imagem anterior não desfaz alterações no banco.
+
+Adote primeiro a revisão e o agendamento confiáveis com a opção desligada. Só ative após confirmar o alvo, o backup recuperável e a janela do agendamento. Para ativar ou desligar, use a [reconfiguração administrativa da política](controlador-manutencao.md), não uma edição direta do `ops.env` com o controlador adotado. O lançador privado pode fixar a revisão conferida com `atualizar --agendado --modo main --ref <SHA-completo>`; se a ponta mudar, o atualizador recusa a troca. Voltar a `false` impede novas aprovações automáticas; não cancela nem desfaz migração iniciada. `--simular --agendado` não consome aprovação nem ensaia recuperação ou aplicação.
+
 `ATUALIZAR_VERIFICAR_IMAGEM=true` confere o rótulo da imagem antes da aplicação. `ATUALIZAR_BACKUP_ANTES=false` é rejeitado porque o backup anterior é obrigatório.
 
 Quando o healthcheck usa HTTPS com CA interna, defina `ATUALIZAR_SAUDE_CA` e `RESTAURAR_SAUDE_CA` com o caminho do certificado. Sem a CA, o `curl` usa o repositório do sistema.

@@ -61,6 +61,10 @@ function preparar() {
   fs.mkdirSync(fonte, { recursive: true, mode: 0o700 });
   copiar(`${repo}/scripts/servidor`, `${fonte}/scripts/servidor`);
   gravar(`${fonte}/docker/app/migrar.mjs`, fs.readFileSync(`${repo}/docker/app/migrar.mjs`));
+  gravar(
+    `${fonte}/src/infra/schema-postgres.mjs`,
+    fs.readFileSync(`${repo}/src/infra/schema-postgres.mjs`),
+  );
   fs.mkdirSync(app, { mode: 0o700 });
   copiar(`${fonte}/docker`, `${app}/docker`);
   gravar(`${app}/compose.yml`, "# Configuração sintética sem clientes reais.\nservices: {}\n");

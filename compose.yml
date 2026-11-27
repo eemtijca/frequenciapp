@@ -31,7 +31,7 @@ services:
       args:
         COMMIT_SHA: ${COMMIT_SHA:-}
     image: ${APP_IMAGEM:-frequenciapp:local}
-    restart: unless-stopped
+    restart: ${MIGRACAO_POLITICA_REINICIO:-unless-stopped}
     depends_on:
       db:
         condition: service_healthy
@@ -44,6 +44,8 @@ services:
       METRICAS_TOKEN: ${METRICAS_TOKEN:-}
       COMMIT_SHA: ${COMMIT_SHA:-}
       MIGRAR_NA_PARTIDA: ${MIGRAR_NA_PARTIDA:-true}
+      MIGRACAO_AUTOMATICA: ${MIGRACAO_AUTOMATICA:-false}
+      MIGRACAO_LOTE_APROVADO: ${MIGRACAO_LOTE_APROVADO:-}
       PUSH_VAPID_PUBLIC_KEY: ${PUSH_VAPID_PUBLIC_KEY:-}
       PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
       PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-}
