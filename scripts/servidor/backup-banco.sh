@@ -39,7 +39,11 @@ if [ "$sem_escrita" = true ] && [ "$verificar_somente" != true ]; then
   erro "--sem-escrita exige --verificar."
 fi
 
+# A expectativa vem do atualizador, não dos arquivos de ambiente nem do recibo.
+readonly pre_migracao="${BACKUP_MIGRACOES_AUTO_ESPERADO+x}"
+readonly banco_pre_migracao_esperado="${BACKUP_MIGRACOES_AUTO_ESPERADO:-}"
 carregar_ambiente
+unset BACKUP_MIGRACOES_AUTO_ESPERADO
 
 BACKUP_MODO="${BACKUP_MODO:-compose}"
 BACKUP_CRIPTOGRAFIA="${BACKUP_CRIPTOGRAFIA:-gpg}"
@@ -81,6 +85,17 @@ case "$BACKUP_CRIPTOGRAFIA" in
   gpg | age) ;;
   *) erro "BACKUP_CRIPTOGRAFIA invÃ¡lida: $BACKUP_CRIPTOGRAFIA. Use gpg ou age." ;;
 esac
+
+if [ -n "$pre_migracao" ]; then
+  [ "$BACKUP_MODO" = compose ] && [ "$verificar_somente" = false ] && [ "$(id -u)" = 0 ] &&
+    [ "${SERVIDOR_CONTROLADOR_ACAO:-}" = atualizar ] && [ -n "${SERVIDOR_CONTROLADOR_PERFIL:-}" ] &&
+    [[ "${SERVIDOR_CONTROLADOR_OPERACAO:-}" =~ ^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$ ]] ||
+    erro "Backup pré-migração exige operação Compose ativa do controlador."
+  node "$DIR/recibos.mjs" banco-pre-migracao "$banco_pre_migracao_esperado" >/dev/null ||
+    erro "Identidade esperada do banco pré-migração inválida."
+  # O pai Dropbox relança este mesmo produtor sob a autoridade de transporte.
+  export BACKUP_MIGRACOES_AUTO_ESPERADO="$banco_pre_migracao_esperado"
+fi
 
 case "$BACKUP_RETER_MINIMO" in
   '' | *[!0-9]*) erro "BACKUP_RETER_MINIMO deve ser um nÃºmero inteiro maior ou igual a zero." ;;
@@ -397,8 +412,61 @@ try {
 NODE
 }
 
+observar_banco_pre_migracao() {
+  local container iniciado sonda
+  container=$(timeout -k 3 15 "${COMPOSE[@]}" ps -q --no-trunc "$SERVIDOR_SERVICO_DB") || return 1
+  [ "$container" = "$container_pre_migracao" ] || return 1
+  iniciado=$(timeout -k 3 15 docker inspect "$container" | jq -ers \
+    --arg id "$container" --arg projeto "$COMPOSE_PROJECT_NAME" --arg servico "$SERVIDOR_SERVICO_DB" '
+    select(length == 1 and (.[0] | type == "array" and length == 1)) | .[0][0] |
+    select(.Id == $id and .State.Running == true and
+      .Config.Labels["com.docker.compose.project"] == $projeto and
+      .Config.Labels["com.docker.compose.service"] == $servico) |
+    .State.StartedAt | select(type == "string" and length > 0)
+  ') || return 1
+  # PSQL e pg_dump usam o mesmo ID, socket local, porta, usuário e banco.
+  sonda=$(timeout -k 3 15 "${exec_pre_migracao[@]}" psql -XwqAt "${conexao_pre_migracao[@]}" \
+    -v ON_ERROR_STOP=1 -v "schema=$DATABASE_SCHEMA" -v "usuario=${POSTGRES_USER:-frequencia}" -f - 2>/dev/null <<'SQL'
+BEGIN READ ONLY;
+SET LOCAL statement_timeout = '5s';
+SET LOCAL search_path = pg_catalog;
+SELECT json_build_object(
+  'cluster', (SELECT system_identifier::text FROM pg_catalog.pg_control_system()),
+  'banco', current_database(), 'bancoOid', d.oid::text,
+  'schema', n.nspname, 'schemaOid', n.oid::text,
+  'primario', NOT pg_is_in_recovery(), 'inicio', pg_postmaster_start_time()::text
+)
+FROM pg_catalog.pg_database d CROSS JOIN pg_catalog.pg_namespace n
+WHERE d.datname = current_database() AND n.nspname = :'schema'
+  AND inet_server_addr() IS NULL AND current_user = :'usuario';
+ROLLBACK;
+SQL
+  ) || return 1
+  jq -cesS --arg container "$container" --arg iniciado "$iniciado" \
+    --argjson esperado "$banco_pre_migracao_esperado" '
+    select(length == 1) | .[0] | . + {container:$container} |
+    select(.primario == true and (.inicio | type == "string" and length > 0) and
+      (del(.inicio,.primario) == $esperado)) | . + {inicioContainer:$iniciado}
+  ' <<<"$sonda"
+}
+
 if [ "$BACKUP_MODO" = "compose" ]; then
-  conferir_banco_compose
+  if [ -n "$pre_migracao" ]; then
+    container_pre_migracao=$(jq -er '.container' <<<"$banco_pre_migracao_esperado")
+    banco_esperado=$(jq -er '.banco' <<<"$banco_pre_migracao_esperado")
+    [ "$banco_esperado" = "${POSTGRES_DB:-frequencia}" ] &&
+      [ "$(jq -er '.schema' <<<"$banco_pre_migracao_esperado")" = "$DATABASE_SCHEMA" ] ||
+      erro "Banco ou schema pré-migração diverge do ambiente."
+    exec_pre_migracao=(docker exec -i "$container_pre_migracao" /usr/bin/env -i PATH=/usr/local/bin:/usr/bin:/bin)
+    conexao_pre_migracao=(-h /var/run/postgresql -p 5432 -U "${POSTGRES_USER:-frequencia}" -d "$banco_esperado")
+    # O transporte precisa conhecer o banco antes de relançar o produtor.
+    if [ -n "${BACKUP_DROPBOX_CONFIG:-}" ]; then
+      observar_banco_pre_migracao >/dev/null || erro "Origem pré-migração não comprovada."
+      export BACKUP_BANCO_VERIFICADO="$banco_esperado"
+    fi
+  else
+    conferir_banco_compose
+  fi
 else
   banco_esperado=$(node --input-type=module - "$APP_DIR/scripts/servidor/validar-banco.mjs" <<'NODE'
 const { validarIdentidadeBanco } = await import(process.argv[2]);
@@ -475,7 +543,9 @@ gerar_dump_cifrado() {
   (
     exec 8>&-
     status=0
-    if [ "$BACKUP_MODO" = "compose" ]; then
+    if [ -n "$pre_migracao" ]; then
+      timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" "${exec_pre_migracao[@]}" pg_restore -l || status=$?
+    elif [ "$BACKUP_MODO" = "compose" ]; then
       timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" "${COMPOSE[@]}" exec -T "$SERVIDOR_SERVICO_DB" pg_restore -l || status=$?
     else
       timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" pg_restore -l || status=$?
@@ -486,7 +556,14 @@ gerar_dump_cifrado() {
   ) <"$fifo" >/dev/null &
   pid=$!
 
-  if [ "$BACKUP_MODO" = "compose" ]; then
+  if [ -n "$pre_migracao" ]; then
+    if timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" "${exec_pre_migracao[@]}" pg_dump \
+      -w "${conexao_pre_migracao[@]}" "${argumentos_dump[@]}" 8>&- | timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" tee "$fifo" 8>&- | cifrar_fluxo "$destino" 8>&-; then
+      status_pipeline=0
+    else
+      status_pipeline=$?
+    fi
+  elif [ "$BACKUP_MODO" = "compose" ]; then
     if timeout -k 10 "$BACKUP_TIMEOUT_DUMP_SEGUNDOS" "${COMPOSE[@]}" exec -T "$SERVIDOR_SERVICO_DB" pg_dump \
       -U "${POSTGRES_USER:-frequencia}" \
       -d "${POSTGRES_DB:-frequencia}" \
@@ -516,7 +593,18 @@ gerar_dump_cifrado() {
 log "Gerando dump do schema $DATABASE_SCHEMA em modo $BACKUP_MODO, com cifra em fluxo."
 base="frequenciapp-$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"
 arquivo="$tmp/${base}.dump.${extensao}"
+if [ -n "$pre_migracao" ]; then
+  origem_antes=$(observar_banco_pre_migracao) || erro "Origem pré-migração não comprovada antes do dump."
+fi
 gerar_dump_cifrado "$arquivo"
+if [ -n "$pre_migracao" ]; then
+  origem_depois=$(observar_banco_pre_migracao) || erro "Origem pré-migração não comprovada depois do dump."
+  [ "$origem_antes" = "$origem_depois" ] || erro "Origem pré-migração mudou durante o dump."
+  origem_recibo=$(jq -ce --arg operacao "$SERVIDOR_CONTROLADOR_OPERACAO" \
+    'del(.inicio,.inicioContainer,.primario) + {operacao:$operacao}' <<<"$origem_depois")
+  BACKUP_BANCO_VERIFICADO=$(jq -er '.banco' <<<"$origem_recibo")
+  export BACKUP_BANCO_VERIFICADO
+fi
 
 [ -s "$arquivo" ] || erro "O arquivo cifrado saiu vazio."
 
@@ -597,7 +685,11 @@ aplicar_retencao_remota() {
 
 # O catÃ¡logo independente nÃ£o Ã© baixado do provedor e sobrevive ao expurgo local.
 recibo="${base}.confirmado.json"
-RECIBO_REMOTO_VERIFICADO="$verificado_remoto" node "$DIR/recibos.mjs" criar "$BACKUP_BANCO_DIR" "$base" >"$tmp/$recibo" ||
+prova_dump=()
+if [ -n "$pre_migracao" ]; then
+  prova_dump=("$origem_recibo" "$sha")
+fi
+RECIBO_REMOTO_VERIFICADO="$verificado_remoto" node "$DIR/recibos.mjs" criar "$BACKUP_BANCO_DIR" "$base" "${prova_dump[@]}" >"$tmp/$recibo" ||
   erro "NÃ£o foi possÃ­vel confirmar o conjunto."
 if [ -n "${BACKUP_REMOTO:-}" ]; then
   rclone_limpo copyto "$tmp/$recibo" "${BACKUP_REMOTO%/}/$recibo" || erro "PublicaÃ§Ã£o remota do recibo falhou."

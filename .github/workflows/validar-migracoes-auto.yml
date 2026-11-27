@@ -1,0 +1,57 @@
+# Ensaiar o upgrade da integração da main sem conexão com bancos externos.
+name: Validação de migrações automáticas
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "prisma/migrations/**"
+
+permissions:
+  contents: read
+
+jobs:
+  ensaiar:
+    name: Ensaio PostgreSQL de migrações automáticas
+    if: >-
+      github.repository == 'eemtijca/frequenciapp' &&
+      github.ref == 'refs/heads/main' &&
+      github.event.deleted == false && github.event.forced == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout da revisão integrada
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Conferir o intervalo do push
+        env:
+          BASE: ${{ github.event.before }}
+          ALVO: ${{ github.sha }}
+        shell: bash
+        run: |
+          [[ "$BASE" =~ ^[0-9a-f]{40}$ && "$ALVO" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$(git rev-parse HEAD)" == "$ALVO" && "$(git rev-parse HEAD^1)" == "$BASE" ]]
+
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26.13.1
+
+      - name: Preparar dependências fixadas
+        run: |
+          pnpm install --frozen-lockfile --ignore-scripts --prod
+          docker pull postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994
+
+      - name: Exercitar recusas, rollback e concorrência em PostgreSQL isolado
+        run: bash tests/servidor/ensaio-migracoes-auto.sh --regressoes
+
+      - name: Ensaiar migração no PostgreSQL descartável
+        env:
+          BASE: ${{ github.event.before }}
+          ALVO: ${{ github.sha }}
+        shell: bash
+        run: bash tests/servidor/ensaio-migracoes-auto.sh "$BASE" "$ALVO" >> "$GITHUB_STEP_SUMMARY"

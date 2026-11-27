@@ -38,6 +38,8 @@ O instalador orquestra os scripts existentes do servidor: `compose.sh`, `identid
 | `dropbox`     | não         | sim     | Escola que usa Dropbox para o banco.              |
 | `completo`    | sim         | sim     | Escola que adota controlador e Dropbox.           |
 
+Nos perfis com controlador, a [política de migrações automáticas](auto-hospedagem.md#política-automática-sem-manifesto-por-lote) é opcional, separada da instalação do cron e desativada por padrão. A adoção do controlador e a ativação da política exigem verificações distintas.
+
 O perfil `simples` não pode ser bloqueado por artefato do controlador. Os perfis `controlador`, `dropbox` e `completo` são opt-in e exigem configuração explícita.
 
 O perfil `controlador` exige `--operador-controlador` com uma conta existente sem privilégio administrativo e instala as rotinas estáveis em cron. O perfil `dropbox` exige `--config-dropbox`, `--arquivo-token-dropbox`, `--config-rclone` e `--destino`; o upload continua no rclone e a verificação nativa fica no backup. O perfil `completo` executa os dois. Os campos obrigatórios são conferidos no preflight; a validação dos arquivos Dropbox e a adoção do controlador ocorrem nas respectivas etapas, depois da configuração da pilha.

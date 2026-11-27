@@ -211,6 +211,16 @@
       "estado": "pinado"
     },
     {
+      "arquivo": ".github/workflows/validar-migracoes-auto.yml",
+      "trecho": "postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994",
+      "estado": "pinado"
+    },
+    {
+      "arquivo": "tests/servidor/ensaio-migracoes-auto.sh",
+      "trecho": "postgres:17-bookworm@sha256:665dc7b37ac52a17e298511414c21d23ffa4e6a6ef6225b3e5d59c7afb35e994",
+      "estado": "pinado"
+    },
+    {
       "arquivo": "infra/servidor/validar.sh",
       "trecho": "koalaman/shellcheck:stable@sha256:bb596a0d169b85ddd81d8b6d3a2ff6d5baf5fca10b97f575ebc647c3dff62b3d",
       "estado": "pinado"

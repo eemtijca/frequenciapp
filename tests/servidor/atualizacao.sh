@@ -221,6 +221,7 @@ preparar_repositorio() {
   mkdir -p "$REPO/scripts/servidor"
   cp "$RAIZ/scripts/servidor/atualizar.sh" "$RAIZ/scripts/servidor/comum.sh" \
     "$RAIZ/scripts/servidor/identidade.mjs" "$RAIZ/scripts/servidor/identidade.sh" \
+    "$RAIZ/scripts/servidor/ambiente-seguro.mjs" \
     "$RAIZ/scripts/servidor/aprovacao-migracoes.mjs" \
     "$REPO/scripts/servidor/"
   cp "$FAKE_BIN/backup-falso.sh" "$REPO/scripts/servidor/backup-banco.sh"
@@ -424,6 +425,13 @@ recibo_usado="$ESTADO_DIR/aprovacao-migracoes-$COMMIT_APROVADO.usada.json"
 inicio=$(date -u -d '1 minute ago' +%FT%TZ)
 fim=$(date -u -d '10 minutes' +%FT%TZ)
 node "$REPO/scripts/servidor/aprovacao-migracoes.mjs" preparar "$REPO" "$COMMIT_ANTERIOR" "$COMMIT_APROVADO" "$inicio" "$fim" >"$TMP_RAIZ/aprovacao-correta"
+install -m 600 "$TMP_RAIZ/aprovacao-correta" "$aprovacao"
+printf 'ATUALIZAR_APROVAR_MIGRACOES_AUTOMATICAMENTE=true\n' >"$OPS_ENV_FILE"
+status=$(executar_atualizacao --agendado)
+exigir_falha "$status" "a política automática sem controlador caiu no caminho do manifesto manual."
+grep -q 'controlador adotado' "$TMP_RAIZ/saida.log" || falhar "faltou a recusa explícita por perfil."
+[ ! -e "$BACKUP_CHAMADAS" ] && [ ! -e "$recibo_usado" ] || falhar "a recusa chegou a uma mutação."
+: >"$OPS_ENV_FILE"
 jq '.migracoes[0].sha256 = "divergente"' "$TMP_RAIZ/aprovacao-correta" >"$aprovacao"
 chmod 600 "$aprovacao"
 status=$(executar_atualizacao --agendado)
@@ -458,7 +466,7 @@ grep -q 'já foi usada' "$TMP_RAIZ/saida.log" || falhar "o uso anterior não foi
 git -C "$REPO" push -q --force origin "$COMMIT_ALVO:refs/heads/main"
 status=$(executar_atualizacao --agendado --ref "$COMMIT_APROVADO")
 exigir_falha "$status" "o cron aceitou um SHA aprovado fora da ponta da main."
-grep -q 'main não corresponde' "$TMP_RAIZ/saida.log" || falhar "a divergência da main não foi identificada."
+grep -q 'não é mais a ponta da main' "$TMP_RAIZ/saida.log" || falhar "a divergência da main não foi identificada."
 
 # MIGRAR_NA_PARTIDA=false não pode trocar a imagem sem confirmação externa.
 preparar_instalacao

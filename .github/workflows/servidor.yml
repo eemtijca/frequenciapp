@@ -16,6 +16,7 @@ on:
       - "infra/kubernetes/**"
       - "scripts/servidor/**"
       - "tests/servidor/**"
+      - ".github/workflows/validar-migracoes-auto.yml"
       - "tests/kubernetes/**"
       - "package.json"
       - "docs/auto-hospedagem.md"
@@ -114,6 +115,9 @@ jobs:
 
       - name: Ensaio de atualização com dublês
         run: bash tests/servidor/atualizacao.sh
+
+      - name: Testar a política e a evidência de migrações automáticas
+        run: node --test tests/servidor/{politica,evidencia,alvo}-migracoes-auto.test.mjs
 
       - name: Ensaio de backup e restauração em Compose
         run: bash tests/servidor/backup-restauracao.sh

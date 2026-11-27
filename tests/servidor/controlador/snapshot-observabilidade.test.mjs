@@ -104,6 +104,10 @@ function preparar({
   copiar(`${repo}/scripts/servidor`, `${app}/scripts/servidor`);
   fs.chmodSync(`${app}/scripts`, 0o700);
   gravar(`${app}/docker/app/migrar.mjs`, fs.readFileSync(`${repo}/docker/app/migrar.mjs`));
+  gravar(
+    `${app}/src/infra/schema-postgres.mjs`,
+    fs.readFileSync(`${repo}/src/infra/schema-postgres.mjs`),
+  );
   gravar(`${app}/compose.yml`, composeBase);
   gravar(`${app}/compose.servidor.yml`, composeServidor);
   if (proxy === "caddy") {

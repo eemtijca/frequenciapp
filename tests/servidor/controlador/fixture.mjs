@@ -39,6 +39,10 @@ export function fixture({ instalador = false, adotar = true } = {}) {
   for (const p of fs.globSync(`${app}/scripts/servidor/**/*`))
     fs.chmodSync(p, fs.statSync(p).isDirectory() ? 0o700 : 0o600);
   gravar(`${app}/docker/app/migrar.mjs`, fs.readFileSync(`${repo}/docker/app/migrar.mjs`));
+  gravar(
+    `${app}/src/infra/schema-postgres.mjs`,
+    fs.readFileSync(`${repo}/src/infra/schema-postgres.mjs`),
+  );
   gravar(`${app}/compose.yml`, "services: {}\n");
   ok(executar("/usr/bin/git", ["-C", app, "init", "-q"]));
   gravar(
