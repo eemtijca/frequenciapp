@@ -41,9 +41,13 @@ fi
 
 # A expectativa vem do atualizador, não dos arquivos de ambiente nem do recibo.
 readonly pre_migracao="${BACKUP_MIGRACOES_AUTO_ESPERADO+x}"
+readonly operacao_manual_backup="${BACKUP_MIGRACAO_MANUAL_OPERACAO:-}"
+readonly inicio_manual_backup="${BACKUP_MIGRACAO_MANUAL_INICIO:-}"
+readonly trava_manual_backup="${SERVIDOR_LOCK_HERDADO:-}"
 readonly banco_pre_migracao_esperado="${BACKUP_MIGRACOES_AUTO_ESPERADO:-}"
 carregar_ambiente
-unset BACKUP_MIGRACOES_AUTO_ESPERADO
+unset BACKUP_MIGRACOES_AUTO_ESPERADO BACKUP_MIGRACAO_MANUAL_OPERACAO BACKUP_MIGRACAO_MANUAL_INICIO
+[ -z "$operacao_manual_backup" ] || [ -n "$pre_migracao" ] || erro "Backup manual sem expectativa de origem."
 
 BACKUP_MODO="${BACKUP_MODO:-compose}"
 BACKUP_CRIPTOGRAFIA="${BACKUP_CRIPTOGRAFIA:-gpg}"
@@ -73,7 +77,7 @@ DATABASE_SCHEMA="${DATABASE_SCHEMA:-public}"
 export DATABASE_SCHEMA
 
 if [ -n "${DATABASE_URL:-}${DIRECT_URL:-}${BACKUP_DATABASE_URL:-}" ]; then
-  node "$APP_DIR/scripts/servidor/validar-banco.mjs" || erro "A identidade do banco não confere."
+  node "$DIR/validar-banco.mjs" || erro "A identidade do banco não confere."
 fi
 
 case "$BACKUP_MODO" in
@@ -87,10 +91,22 @@ case "$BACKUP_CRIPTOGRAFIA" in
 esac
 
 if [ -n "$pre_migracao" ]; then
-  [ "$BACKUP_MODO" = compose ] && [ "$verificar_somente" = false ] && [ "$(id -u)" = 0 ] &&
-    [ "${SERVIDOR_CONTROLADOR_ACAO:-}" = atualizar ] && [ -n "${SERVIDOR_CONTROLADOR_PERFIL:-}" ] &&
-    [[ "${SERVIDOR_CONTROLADOR_OPERACAO:-}" =~ ^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$ ]] ||
-    erro "Backup pré-migração exige operação Compose ativa do controlador."
+  [ "$BACKUP_MODO" = compose ] && [ "$verificar_somente" = false ] ||
+    erro "Backup pré-migração exige geração em modo Compose."
+  if [ -n "$operacao_manual_backup" ]; then
+    [ -n "$trava_manual_backup" ] && [ "${SERVIDOR_LOCK_HERDADO:-}" = "$trava_manual_backup" ] &&
+      [ -z "${SERVIDOR_CONTROLADOR_PERFIL:-}${SERVIDOR_CONTROLADOR_OPERACAO:-}" ] ||
+      erro "Backup pré-migração manual exige a trava herdada do atualizador no perfil simples."
+    operacao_backup="$operacao_manual_backup"
+    export BACKUP_MIGRACAO_MANUAL_OPERACAO="$operacao_manual_backup" BACKUP_MIGRACAO_MANUAL_INICIO="$inicio_manual_backup"
+  else
+    [ "$(id -u)" = 0 ] && [ "${SERVIDOR_CONTROLADOR_ACAO:-}" = atualizar ] &&
+      [ -n "${SERVIDOR_CONTROLADOR_PERFIL:-}" ] ||
+      erro "Backup pré-migração exige operação Compose ativa do controlador."
+    operacao_backup="${SERVIDOR_CONTROLADOR_OPERACAO:-}"
+  fi
+  [[ "$operacao_backup" =~ ^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$ ]] ||
+    erro "Identificador da operação de backup pré-migração inválido."
   node "$DIR/recibos.mjs" banco-pre-migracao "$banco_pre_migracao_esperado" >/dev/null ||
     erro "Identidade esperada do banco pré-migração inválida."
   # O pai Dropbox relança este mesmo produtor sob a autoridade de transporte.
@@ -266,11 +282,12 @@ verificar_ultimo_backup() {
 
   if [ -n "${BACKUP_REMOTO:-}" ]; then
     if [ "$sem_escrita" = true ]; then
-      [ -n "${BACKUP_RCLONE_CONFIG:-}" ] || erro "Defina BACKUP_RCLONE_CONFIG."
-      verificar_permissao_arquivo "$BACKUP_RCLONE_CONFIG"
-    else
-      preparar_rclone
+      # O transporte pode renovar o OAuth mesmo em uma leitura. A cópia
+      # descartável protege o arquivo adotado e não vive na instalação.
+      tmp=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-verificar-backup.XXXXXXXX") ||
+        erro "Não foi possível criar a cópia descartável da configuração remota."
     fi
+    preparar_rclone
     # O escopo já foi conferido contra o alvo; todos os membros precisam conferir hoje.
     local lista_remota
     lista_remota=$(node --input-type=module - "$BACKUP_BANCO_DIR/$recibo" <<'NODE'
@@ -434,7 +451,7 @@ SELECT json_build_object(
   'cluster', (SELECT system_identifier::text FROM pg_catalog.pg_control_system()),
   'banco', current_database(), 'bancoOid', d.oid::text,
   'schema', n.nspname, 'schemaOid', n.oid::text,
-  'primario', NOT pg_is_in_recovery(), 'inicio', pg_postmaster_start_time()::text
+  'primario', NOT pg_is_in_recovery(), 'inicio', EXTRACT(epoch FROM pg_postmaster_start_time())::text
 )
 FROM pg_catalog.pg_database d CROSS JOIN pg_catalog.pg_namespace n
 WHERE d.datname = current_database() AND n.nspname = :'schema'
@@ -468,7 +485,7 @@ if [ "$BACKUP_MODO" = "compose" ]; then
     conferir_banco_compose
   fi
 else
-  banco_esperado=$(node --input-type=module - "$APP_DIR/scripts/servidor/validar-banco.mjs" <<'NODE'
+  banco_esperado=$(node --input-type=module - "$DIR/validar-banco.mjs" <<'NODE'
 const { validarIdentidadeBanco } = await import(process.argv[2]);
 process.stdout.write(validarIdentidadeBanco().database);
 NODE
@@ -595,12 +612,16 @@ base="frequenciapp-$(date -u +%Y%m%dT%H%M%SZ)-$(openssl rand -hex 4)"
 arquivo="$tmp/${base}.dump.${extensao}"
 if [ -n "$pre_migracao" ]; then
   origem_antes=$(observar_banco_pre_migracao) || erro "Origem pré-migração não comprovada antes do dump."
+  if [ -n "$operacao_manual_backup" ]; then
+    jq -e --argjson inicio "$inicio_manual_backup" '{inicio,inicioContainer} == $inicio' <<<"$origem_antes" >/dev/null ||
+      erro "Origem pré-migração manual reiniciou antes do dump."
+  fi
 fi
 gerar_dump_cifrado "$arquivo"
 if [ -n "$pre_migracao" ]; then
   origem_depois=$(observar_banco_pre_migracao) || erro "Origem pré-migração não comprovada depois do dump."
   [ "$origem_antes" = "$origem_depois" ] || erro "Origem pré-migração mudou durante o dump."
-  origem_recibo=$(jq -ce --arg operacao "$SERVIDOR_CONTROLADOR_OPERACAO" \
+  origem_recibo=$(jq -ce --arg operacao "$operacao_backup" \
     'del(.inicio,.inicioContainer,.primario) + {operacao:$operacao}' <<<"$origem_depois")
   BACKUP_BANCO_VERIFICADO=$(jq -er '.banco' <<<"$origem_recibo")
   export BACKUP_BANCO_VERIFICADO
@@ -718,8 +739,10 @@ if [ -n "${BACKUP_DROPBOX_CONFIG:-}" ]; then
     erro "Publicação Dropbox não durável; expurgo suspenso."
 fi
 
-aplicar_retencao_remota
-aplicar_retencao_local
+if [ -z "$operacao_manual_backup" ]; then
+  aplicar_retencao_remota
+  aplicar_retencao_local
+fi
 
 publicar_metrica_ultimo_backup "$(ler_instante_backup)"
 

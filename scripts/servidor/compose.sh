@@ -45,5 +45,13 @@ montar_compose
 if [ "$controlador_ativo" = true ]; then
   conferir_identidade conferir
   travar compose 0
+else
+  case "${1:-}" in
+    config | ps | images | version | logs) ;;
+    *)
+      conferir_identidade auto
+      travar compose 0
+      ;;
+  esac
 fi
 exec "${COMPOSE[@]}" "$@"

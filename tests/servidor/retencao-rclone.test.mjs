@@ -137,6 +137,16 @@ const conferir = (resultado, status) => {
   assert.equal(resultado.status, status, resultado.stderr);
 };
 
+test("expurgo remoto não toca nos artefatos de uma atualização manual pendente", (t) => {
+  const f = fixture();
+  t.after(() => fs.rmSync(f.tmp, { recursive: true, force: true }));
+  const antes = fs.readdirSync(f.remoto);
+  fs.writeFileSync(path.join(f.tmp, "atualizacao-manual-pendente.json"), "{}", { mode: 0o600 });
+  conferir(f.executar({ BACKUP_RETER_MINIMO: "0" }), 1);
+  assert.deepEqual(fs.readdirSync(f.remoto), antes);
+  assert.equal(fs.existsSync(f.log), false);
+});
+
 test("sem BACKUP_DROPBOX_CONFIG a retenção rclone existente expurga o conjunto antigo", () => {
   const f = fixture();
   try {

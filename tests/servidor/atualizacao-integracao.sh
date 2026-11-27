@@ -54,6 +54,9 @@ services:
       args:
         COMMIT_SHA: ${COMMIT_SHA:-}
     image: ${APP_IMAGEM:-frequenciapp:local}
+    environment:
+      # O serviço Python deste ensaio não possui migrador Prisma.
+      MIGRAR_NA_PARTIDA: "false"
     depends_on:
       db:
         condition: service_healthy
@@ -121,6 +124,7 @@ export SERVIDOR_AMBIENTE_INJETADO=true
 export COMPOSE_ARQUIVOS=compose.yml
 export PROXY_TIPO=caddy
 export BACKUP_PLANILHAS_HABILITADO=false
+export MIGRAR_NA_PARTIDA=false
 export POSTGRES_USER=frequencia
 export POSTGRES_PASSWORD=frequencia
 export POSTGRES_DB=frequencia

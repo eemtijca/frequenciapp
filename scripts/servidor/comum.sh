@@ -68,7 +68,7 @@ verificar_permissao_arquivo() {
 }
 
 validar_ambiente() {
-  local validador="$APP_DIR/scripts/servidor/ambiente-seguro.mjs"
+  local validador="$SERVIDOR_SCRIPTS_DIR/ambiente-seguro.mjs"
   [ -f "$validador" ] || erro "Validador de ambiente não encontrado: $validador"
   command -v node >/dev/null || erro "Instale Node.js para validar os arquivos de ambiente."
   node "$validador" "$APP_ENV_FILE" "$OPS_ENV_FILE" ||
@@ -367,6 +367,10 @@ travar() {
   if [ "${#COMPOSE[@]}" -gt 0 ]; then
     conferir_identidade auto
     [ "$SERVIDOR_ALVO_CHAVE" = "$chave" ] || erro "A identidade mudou enquanto a trava era adquirida."
+  fi
+  if [ -e "$ESTADO_DIR/atualizacao-manual-pendente.json" ] ||
+    [ -L "$ESTADO_DIR/atualizacao-manual-pendente.json" ]; then
+    erro "Atualização manual pendente ou incerta; mutações bloqueadas até revisão da recuperação."
   fi
   local perfil_controlador="${SERVIDOR_CONTROLADOR_PERFIL:-/opt/frequenciapp-controlador/perfil.json}"
   local controlador_ativo=false

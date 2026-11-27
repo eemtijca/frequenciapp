@@ -411,6 +411,8 @@ async function expurgarDropbox(catalogo, diarios, e) {
 }
 
 export async function expurgar(catalogo, diarios, e) {
+  // O catálogo persistente vive dentro do mesmo estado protegido pelas rotinas.
+  exigir(!existe(path.join(path.dirname(catalogo), "atualizacao-manual-pendente.json")));
   if (!e.BACKUP_DROPBOX_CONFIG) return expurgarRclone(catalogo, diarios, e);
   return expurgarDropbox(catalogo, diarios, e);
 }

@@ -68,7 +68,7 @@ class Client {
 module.exports = {Client};
 `;
 
-async function executar(registros) {
+async function executar(registros, ambiente = {}) {
   const pasta = await mkdtemp(path.join(os.tmpdir(), "migrador-sintetico-"));
   try {
     for (const dir of ["docker/app", "src/infra", `prisma/migrations/${nome}`, "node_modules/pg"]) {
@@ -93,10 +93,20 @@ async function executar(registros) {
         DIRECT_URL: "postgresql://sintetico@invalido/sintetico",
         REGISTROS_SINTETICOS: JSON.stringify(registros),
         CONSULTAS_SINTETICAS: consultas,
+        ...ambiente,
       },
     });
     assert.ifError(resultado.error);
-    const log = (await readFile(consultas, "utf8")).trim().split("\n").map(JSON.parse);
+    const log = (
+      await readFile(consultas, "utf8").catch((erro) => {
+        if (erro.code !== "ENOENT") throw erro;
+        return "";
+      })
+    )
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .map(JSON.parse);
     return { ...resultado, consultas: log.map((entrada) => entrada.q) };
   } finally {
     await rm(pasta, { recursive: true, force: true });
@@ -176,4 +186,11 @@ test("registro revertido não impede reaplicação da migração", async () => {
   assert.match(resultado.stdout, /Aplicada:/);
   assert.ok(resultado.consultas.includes("select 123;"));
   assert.ok(resultado.consultas.some((q) => q.startsWith("insert into _prisma_migrations")));
+});
+
+test("modo manual sem envelope não usa o caminho legado nem abre conexão para escrever", async () => {
+  const resultado = await executar([], { MIGRACAO_MANUAL_PROTEGIDA: "true" });
+  assert.equal(resultado.status, 4, resultado.stdout);
+  assert.match(resultado.stderr, /Aprovação do lote ausente ou inválida/);
+  assert.deepEqual(resultado.consultas, []);
 });

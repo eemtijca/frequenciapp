@@ -75,6 +75,8 @@ const pasta = path.join(raiz, "prisma", "migrations");
 
 const url = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
 const automatica = process.env.MIGRACAO_AUTOMATICA === "true";
+const manual = process.env.MIGRACAO_MANUAL_PROTEGIDA === "true";
+const protegida = automatica || manual;
 if (!url) {
   console.error("[migrar] DIRECT_URL ou DATABASE_URL não definida.");
   process.exit(1);
@@ -95,7 +97,7 @@ async function conectar() {
   try {
     await cliente.connect();
   } catch (erro) {
-    const motivo = automatica ? codigoDoErro(erro) : descreverErro(erro);
+    const motivo = protegida ? codigoDoErro(erro) : descreverErro(erro);
     console.error(`[migrar] Sem conexão com o banco (${motivo})`);
     process.exit(2);
   }
@@ -127,7 +129,10 @@ function lerAprovacao(codificada) {
     throw new RecusaAutomatica(recusa);
   }
   const confere = (padrao, valor) => typeof valor === "string" && padrao.exec(valor)?.[0] === valor;
-  exigirAprovacao(lote && typeof lote === "object" && Object.keys(lote).length === 11, recusa);
+  exigirAprovacao(
+    lote && typeof lote === "object" && Object.keys(lote).length === (manual ? 12 : 11),
+    recusa,
+  );
   const {
     cluster,
     banco,
@@ -147,6 +152,7 @@ function lerAprovacao(codificada) {
       [banco, usuario].every((nome) => confere(/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/, nome)) &&
       typeof ip === "string" &&
       isIPv4(ip) &&
+      (manual ? confere(/^[0-9]+\.[0-9]{6}$/, lote.inicio) : !Object.hasOwn(lote, "inicio")) &&
       confere(/^[a-z_][a-z0-9_]{0,62}$/, schema) &&
       !schema.startsWith("pg_") &&
       schema !== "information_schema" &&
@@ -155,24 +161,26 @@ function lerAprovacao(codificada) {
       Array.isArray(aplicadas) &&
       aplicadas.length > 0 &&
       Array.isArray(pendentes) &&
-      pendentes.length > 0 &&
-      pendentes.length <= 64 &&
+      (manual || (pendentes.length > 0 && pendentes.length <= 64)) &&
       aplicadas.length + pendentes.length <= 2048,
     recusa,
   );
+  const nomes = new Set();
   let ultimo = "";
   for (const entrada of [...aplicadas, ...pendentes]) {
     exigirAprovacao(
       entrada &&
         Object.keys(entrada).length === 2 &&
         confere(/^[0-9]{14}_[a-z0-9_]{1,120}$/, entrada.nome) &&
-        entrada.nome > ultimo &&
+        (manual ? !nomes.has(entrada.nome) : entrada.nome > ultimo) &&
         confere(/^[0-9a-f]{64}$/, entrada.sha256),
       recusa,
     );
     ultimo = entrada.nome;
+    nomes.add(entrada.nome);
   }
-  exigirAprovacao(pendentes[0].nome.slice(0, 14) > aplicadas.at(-1).nome.slice(0, 14), recusa);
+  if (!manual)
+    exigirAprovacao(pendentes[0].nome.slice(0, 14) > aplicadas.at(-1).nome.slice(0, 14), recusa);
   return lote;
 }
 
@@ -204,7 +212,10 @@ async function conferirAutorizacaoEscrita(envelope) {
 }
 
 async function lerSqlAprovado(lote) {
-  const arquivos = [...lote.aplicadas, ...lote.pendentes];
+  const arquivos = [...lote.aplicadas, ...lote.pendentes].sort((a, b) =>
+    a.nome < b.nome ? -1 : a.nome === b.nome ? 0 : 1,
+  );
+  const pendentes = new Map(lote.pendentes.map(({ nome }, i) => [nome, i]));
   const pastas = await listar();
   const recusa = "Os arquivos de migração não correspondem ao lote aprovado.";
   exigirAprovacao(
@@ -213,11 +224,11 @@ async function lerSqlAprovado(lote) {
   );
   const sqls = [];
   const decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
-  for (const [i, { nome, sha256 }] of arquivos.entries()) {
+  for (const { nome, sha256 } of arquivos) {
     const bytes = await readFile(path.join(pasta, nome, "migration.sql"));
     exigirAprovacao(createHash("sha256").update(bytes).digest("hex") === sha256, recusa);
     // Executar a mesma leitura verificada, sem buscar novamente o arquivo.
-    if (i >= lote.aplicadas.length) sqls.push(decoder.decode(bytes));
+    if (pendentes.has(nome)) sqls[pendentes.get(nome)] = decoder.decode(bytes);
   }
   return sqls;
 }
@@ -246,7 +257,7 @@ async function esperarEscritasAnteriores() {
   throw new RecusaAutomatica("Escrita concorrente não concluída antes da conferência do catálogo.");
 }
 
-async function conferirBaseBloqueada(lote, historico) {
+async function conferirBaseBloqueada(lote, historico, progresso = 0) {
   // Os locks e a leitura não podem compartilhar o mesmo snapshot: uma escrita
   // que terminou enquanto LOCK aguardava precisa aparecer na primeira leitura.
   await cliente.query(
@@ -262,6 +273,7 @@ async function conferirBaseBloqueada(lote, historico) {
       (SELECT oid::text FROM pg_catalog.pg_database WHERE datname = current_database()) AS "bancoOid",
       nspname AS schema, n.oid::text AS "schemaOid", current_user AS usuario,
       pg_catalog.host(pg_catalog.inet_server_addr()) AS ip,
+      ${manual ? "EXTRACT(epoch FROM pg_catalog.pg_postmaster_start_time())::text AS inicio," : ""}
       NOT pg_catalog.pg_is_in_recovery() AS primario,
       NOT EXISTS (SELECT FROM pg_catalog.pg_event_trigger WHERE evtenabled <> 'D') AS sem_gatilhos,
       EXISTS (
@@ -277,9 +289,15 @@ async function conferirBaseBloqueada(lote, historico) {
   exigirAprovacao(
     atual?.primario === true &&
       atual.sem_gatilhos === true &&
-      ["cluster", "banco", "bancoOid", "schema", "schemaOid", "usuario", "ip"].every(
-        (campo) => atual[campo] === lote[campo],
-      ),
+      [
+        "cluster",
+        "banco",
+        "bancoOid",
+        "schema",
+        "schemaOid",
+        "usuario",
+        ...(!manual ? ["ip"] : []),
+      ].every((campo) => atual[campo] === lote[campo]),
     "Identidade do PostgreSQL divergente ou gatilho de evento habilitado.",
   );
   exigirAprovacao(
@@ -291,10 +309,30 @@ async function conferirBaseBloqueada(lote, historico) {
       (rolled_back_at IS NULL AND finished_at IS NOT NULL AND finished_at >= started_at
         AND pg_catalog.isfinite(started_at) AND pg_catalog.isfinite(finished_at)
         AND applied_steps_count > 0 AND count(*) OVER (PARTITION BY started_at) = 1) AS completa
-      FROM ONLY ${historico} ORDER BY started_at LIMIT $1`,
+      FROM ONLY ${historico} ${manual ? "WHERE rolled_back_at IS NULL" : ""}
+      ORDER BY started_at LIMIT $1`,
     [lote.aplicadas.length + lote.pendentes.length + 1],
   );
   const completas = [...lote.aplicadas, ...lote.pendentes];
+  if (manual) {
+    const porNome = new Map(registros.map((r) => [r.migration_name, r]));
+    const confere = (esperadas) =>
+      registros.length === esperadas.length &&
+      esperadas.every(({ nome, sha256 }) => {
+        const r = porNome.get(nome);
+        return r?.completa === true && r.checksum === sha256;
+      });
+    if (progresso === 0 && confere(completas)) return true;
+    exigirAprovacao(
+      atual.ip === lote.ip && atual.inicio === lote.inicio,
+      "O endpoint ou a partida do PostgreSQL mudou antes da migração manual.",
+    );
+    exigirAprovacao(
+      confere(completas.slice(0, lote.aplicadas.length + progresso)),
+      "O histórico diverge da base ou do progresso desta execução manual.",
+    );
+    return false;
+  }
   exigirAprovacao(
     (registros.length === lote.aplicadas.length || registros.length === completas.length) &&
       registros.every(
@@ -342,9 +380,44 @@ async function aplicarLoteAutomatico(lote, sqls, envelope) {
   }
 }
 
+async function aplicarLoteManual(lote, sqls, envelope) {
+  const schema = identificadorPostgres(lote.schema);
+  const historico = `${schema}._prisma_migrations`;
+  // Só esta invocação avança sobre seu próprio progresso; outra partida não
+  // adota um histórico parcial. O commit continua sendo feito por migração.
+  for (let i = 0; i < Math.max(1, lote.pendentes.length); i += 1) {
+    await cliente.query("BEGIN ISOLATION LEVEL READ COMMITTED READ WRITE");
+    try {
+      if (await conferirBaseBloqueada(lote, historico, i)) {
+        await cliente.query("ROLLBACK");
+        console.log("[migrar] Banco já está na última revisão.");
+        return;
+      }
+      await cliente.query("SELECT pg_catalog.set_config('search_path', $1, true)", [
+        `${schema}, pg_temp`,
+      ]);
+      await conferirAutorizacaoEscrita(envelope);
+      const { nome, sha256 } = lote.pendentes[i];
+      await cliente.query(sqls[i]);
+      await cliente.query(
+        `INSERT INTO ${historico}
+          (id, checksum, finished_at, migration_name, logs, started_at, applied_steps_count)
+        VALUES ($1, $2, now(), $3, NULL, now(), 1)`,
+        [randomUUID(), sha256, nome],
+      );
+      await cliente.query("COMMIT");
+      console.log(`[migrar] Aplicada: ${nome}`);
+    } catch (erro) {
+      await cliente.query("ROLLBACK").catch(() => undefined);
+      throw erro;
+    }
+  }
+}
+
 async function main() {
   const envelope = process.env.MIGRACAO_LOTE_APROVADO;
-  const lote = automatica ? lerAprovacao(envelope) : undefined;
+  exigirAprovacao(!(manual && automatica), "Modos manual e automático incompatíveis.");
+  const lote = protegida ? lerAprovacao(envelope) : undefined;
   const sqls = lote ? await lerSqlAprovado(lote) : undefined;
   if (lote) {
     exigirAprovacao(
@@ -366,7 +439,8 @@ async function main() {
   await cliente.query("select pg_advisory_lock($1)", [CHAVE_TRAVA]);
 
   if (lote) {
-    await aplicarLoteAutomatico(lote, sqls, envelope);
+    if (manual) await aplicarLoteManual(lote, sqls, envelope);
+    else await aplicarLoteAutomatico(lote, sqls, envelope);
     await cliente.end();
     return;
   }
@@ -455,7 +529,7 @@ async function main() {
 }
 
 main().catch(async (erro) => {
-  const motivo = automatica
+  const motivo = protegida
     ? erro instanceof RecusaAutomatica
       ? erro.message
       : codigoDoErro(erro)

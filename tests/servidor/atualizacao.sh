@@ -14,6 +14,18 @@ export BACKUP_CHAMADAS="$TMP_RAIZ/backup-chamadas"
 export SERVIDOR_AMBIENTE_INJETADO=true
 export PROXY_TIPO=caddy
 export BACKUP_PLANILHAS_HABILITADO=true
+export MIGRAR_NA_PARTIDA=false
+export ID_APP ID_DB IMAGEM_BASE IMAGEM_ALVO
+ID_APP=$(printf 'a%.0s' {1..64})
+ID_DB=$(printf 'b%.0s' {1..64})
+IMAGEM_BASE="sha256:$(printf 'c%.0s' {1..64})"
+IMAGEM_ALVO="sha256:$(printf 'd%.0s' {1..64})"
+export INICIO_DB=2026-01-01T00:00:00Z INICIO_PG=1767225600.000000
+export BACKUP_CRIPTOGRAFIA=age BACKUP_INCLUIR_AMBIENTE=false BACKUP_ESPACO_MINIMO_MB=0
+export BACKUP_AGE_DESTINATARIOS="$TMP_RAIZ/destinatarios"
+printf 'age sintético\n' >"$BACKUP_AGE_DESTINATARIOS"
+export BACKUP_AGE_DESTINATARIOS_SHA256
+BACKUP_AGE_DESTINATARIOS_SHA256=$(sha256sum "$BACKUP_AGE_DESTINATARIOS" | cut -d' ' -f1)
 export COMPOSE_PROJECT_NAME=teste
 export SERVIDOR_CONFIG_DIR="$TMP_RAIZ/config"
 export SERVIDOR_IDENTIDADE_ARQUIVO="$SERVIDOR_CONFIG_DIR/identidade.json"
@@ -48,6 +60,90 @@ cat >"$FAKE_BIN/docker" <<'DOCKER'
 set -Eeuo pipefail
 printf '%s\n' "$*" >>"$DOCKER_LOG"
 projeto="${COMPOSE_PROJECT_NAME:-teste}"
+subiu=false
+[ ! -s "$DOCKER_UP_COUNTER" ] || subiu=true
+imagem_ativa="$IMAGEM_BASE"
+revisao_ativa=$(git -C "${APP_DIR:-$PWD}" rev-parse HEAD 2>/dev/null || true)
+reinicio=unless-stopped
+if [ "$subiu" = true ]; then
+  imagem_ativa="$IMAGEM_ALVO"
+  revisao_ativa="$DOCKER_REVISAO_IMAGEM"
+  [ -f "$DOCKER_UP_COUNTER.reinicio" ] && reinicio=no
+fi
+inicio="$INICIO_PG"
+cluster=7654321098765432100
+origem() {
+  local registros="${1:-[]}"
+  jq -cn --arg cluster "$cluster" --arg inicio "$inicio" --argjson registros "$registros" '
+    {cluster:$cluster,banco:"frequencia",bancoOid:"16384",schema:"public",schemaOid:"2200",usuario:"frequencia",primario:true,gatilhos:false,inicio:$inicio,registros:$registros}
+  '
+}
+historico() {
+  local consulta registros
+  consulta=$(cat)
+  [[ "$consulta" == *"pg_control_system"* && "$consulta" == *"_prisma_migrations"* ]] || exit 1
+  if [ "$subiu" = true ]; then
+    registros="${HISTORICO_FINAL:-$HISTORICO_MANUAL_ALVO}"
+  else
+    registros="${HISTORICO_BASE:-$HISTORICO_MANUAL_BASE}"
+  fi
+  origem "$registros"
+}
+
+if [ "$1" = update ]; then
+  [ "$2" = --restart=unless-stopped ] && [ "$3" = "$ID_APP" ]
+  [ ! -e "$(jq -er .autorizacao "$ESTADO_DIR/atualizacao-manual-pendente.json")" ]
+  rm -- "$DOCKER_UP_COUNTER.reinicio"
+  exit 0
+fi
+
+if [ "$1" = run ]; then
+  [[ " $* " == *" --network none "* && " $* " == *" $IMAGEM_ALVO "* ]]
+  cat >/dev/null
+  while IFS= read -r arquivo; do
+    hash=$(git -C "$APP_DIR" show "$DOCKER_REVISAO_IMAGEM:$arquivo" | sha256sum | cut -d' ' -f1)
+    jq -cn --arg nome "$arquivo" --arg hash "$hash" '{($nome):$hash}'
+  done < <(git -C "$APP_DIR" ls-tree -r --name-only "$DOCKER_REVISAO_IMAGEM" -- prisma/migrations \
+    docker/app/entrypoint.sh docker/app/migrar.mjs src/infra/schema-postgres.mjs) | jq -cs add
+  exit
+fi
+
+if [ "$1" = exec ]; then
+  [ "${DOCKER_MANUAL:-false}" = true ] || exit 90
+  if [ "$2" = "$ID_APP" ]; then
+    if [ "$subiu" = false ]; then revisao_ativa="$DOCKER_REVISAO_BASE"; fi
+    jq -cn --arg commit "$revisao_ativa" '{ok:true,commit:$commit}'
+  elif [ "$3" = "$ID_APP" ]; then
+    [ "${BANCO_DIFERENTE:-false}" = false ] || cluster=9654321098765432100
+    historico
+  elif [ "$3" = "$ID_DB" ]; then
+    case " $* " in
+      *" psql "*)
+        if [[ " $* " == *" -v schema=public "* ]]; then
+          cat >/dev/null
+          if [ -f "$DOCKER_UP_COUNTER.dump" ]; then
+            case "${DUMP_VARIANTE:-ok}" in
+              reinicio) inicio=1767225601.000000 ;;
+              homonimo) cluster=9654321098765432100 ;;
+            esac
+          fi
+          origem | jq -c 'del(.usuario,.gatilhos,.registros)'
+        else
+          historico
+        fi ;;
+      *" pg_dump "*)
+        [[ " $* " == *" -h /var/run/postgresql -p 5432 -U frequencia -d frequencia "* ]]
+        : >"$DOCKER_UP_COUNTER.dump"
+        [ "${DUMP_VARIANTE:-ok}" != falha ] || exit 91
+        printf 'dados sintéticos\n' ;;
+      *" pg_restore -l "*) cat >/dev/null ;;
+      *) exit 92 ;;
+    esac
+  else
+    exit 93
+  fi
+  exit
+fi
 
 if [ "$1" = "tag" ]; then
   exit 0
@@ -61,9 +157,26 @@ if [ "$1" = "info" ]; then
 fi
 
 if [ "$1" = "inspect" ]; then
-  if [ "$2" = "--format" ] && [ "$3" = '{{.Image}}' ]; then
-    printf 'imagem-anterior-id\n'
-    exit 0
+  if [ "$2" = --format ]; then
+    case "$3" in
+      '{{.Image}}') printf '%s\n' "$imagem_ativa" ;;
+      '{{.Image}}/{{.HostConfig.RestartPolicy.Name}}') printf '%s/%s\n' "$imagem_ativa" "$reinicio" ;;
+      '{{.HostConfig.RestartPolicy.Name}}') printf '%s\n' "$reinicio" ;;
+      '{{.State.StartedAt}}') printf '%s\n' "$INICIO_DB" ;;
+      *) exit 94 ;;
+    esac
+    exit
+  fi
+  if [ "${DOCKER_MANUAL:-false}" = true ]; then
+    app=$(jq -cn --arg id "$ID_APP" --arg projeto "$projeto" --arg imagem "$imagem_ativa" '
+      {Id:$id,Image:$imagem,State:{Running:true},Mounts:[],Config:{Env:["DATABASE_URL=postgresql://frequencia:fixture@db:5432/frequencia","DIRECT_URL=postgresql://frequencia:fixture@db:5432/frequencia","MIGRAR_NA_PARTIDA=true"],Labels:{"com.docker.compose.project":$projeto,"com.docker.compose.service":"app"}}}')
+    db=$(jq -cn --arg id "$ID_DB" --arg projeto "$projeto" --arg inicio "$INICIO_DB" '
+      {Id:$id,State:{Running:true,StartedAt:$inicio},Mounts:[{Type:"volume",Name:($projeto+"-dados"),Source:("/var/lib/docker/volumes/"+$projeto+"-dados/_data"),Destination:"/var/lib/postgresql/data"}],Config:{Env:[],Labels:{"com.docker.compose.project":$projeto,"com.docker.compose.service":"db"}},NetworkSettings:{Networks:{"teste-interna":{IPAddress:"172.19.0.2"}}}}')
+    if [ "$#" -eq 3 ]; then jq -cn --argjson app "$app" --argjson db "$db" '[$app,$db]'
+    elif [ "$2" = "$ID_APP" ]; then jq -c '[.]' <<<"$app"
+    elif [ "$2" = "$ID_DB" ]; then jq -c '[.]' <<<"$db"
+    else exit 95; fi
+    exit
   fi
   printf '[{"Id":"container-app","Config":{"Labels":{"com.docker.compose.project":"%s","com.docker.compose.service":"app"}},"Mounts":[]},{"Id":"container-db","Config":{"Labels":{"com.docker.compose.project":"%s","com.docker.compose.service":"db"}},"Mounts":[{"Type":"volume","Name":"%s-dados","Source":"/var/lib/docker/volumes/%s-dados/_data","Destination":"/var/lib/postgresql/data"}]}]\n' \
     "$projeto" "$projeto" "$projeto" "$projeto"
@@ -71,7 +184,11 @@ if [ "$1" = "inspect" ]; then
 fi
 
 if [ "$1" = "image" ] && [ "$2" = "inspect" ]; then
-  if [ "${DOCKER_REVISAO_FALSA:-}" = "true" ]; then
+  if [ "${3:-}" = --format ] && [ "$4" = '{{.Id}}' ]; then
+    printf '%s\n' "$IMAGEM_ALVO"
+  elif [ "${5:-}" = "$IMAGEM_BASE" ] || [[ "${5:-}" == frequenciapp-rollback:* ]]; then
+    printf '%s\n' "$DOCKER_REVISAO_BASE"
+  elif [ "${DOCKER_REVISAO_FALSA:-}" = "true" ]; then
     printf 'revisao-falsa\n'
   elif [ -n "${DOCKER_REVISAO_IMAGEM:-}" ]; then
     printf '%s\n' "$DOCKER_REVISAO_IMAGEM"
@@ -82,9 +199,23 @@ fi
 [ "$1" = "compose" ] || { echo "docker inesperado: $*" >&2; exit 1; }
 shift
 perfil_backup=false
+config_manual=null
+bind_manual=null
+raiz_compose=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --project-directory | --project-name | --env-file | -f)
+    --project-directory)
+      raiz_compose="$2"
+      shift 2
+      ;;
+    -f)
+      case "$2" in
+        */migracao-partida.*/manual.json) config_manual=$(jq -ce '.services.app.environment' "$2") ;;
+        */migracao-partida.*/compose.json) bind_manual=$(jq -ce '.services.app.volumes' "$2") ;;
+      esac
+      shift 2
+      ;;
+    --project-name | --env-file)
       shift 2
       ;;
     --profile)
@@ -101,9 +232,28 @@ shift
 
 case "$comando" in
   config)
+    if [ "${ABATER_APOS_TROCA:-false}" = true ] && [[ " $* " == *" --format json "* ]] &&
+      [ "$(git -C "$APP_DIR" rev-parse HEAD)" = "$DOCKER_REVISAO_IMAGEM" ] &&
+      [ -f "$ESTADO_DIR/atualizacao-manual-pendente.json" ]; then
+      # O sinal precisa atingir o executor, não o subshell da captura de identidade.
+      pai=$PPID
+      while [[ "$(tr '\0' ' ' <"/proc/$pai/cmdline")" != *"$EXECUTOR/atualizar.sh"* ||
+        "$(awk '{print $4}' "/proc/$pai/stat")" != "$PID_HARNESS" ]]; do
+        pai=$(awk '{print $4}' "/proc/$pai/stat")
+        [ "$pai" -gt 1 ] || exit 97
+      done
+      kill -KILL "$pai"
+      exit 97
+    fi
     if [[ " $* " == *" --format json "* ]]; then
-      printf '{"name":"%s","services":{"app":{},"db":{"volumes":[{"type":"volume","source":"dados","target":"/var/lib/postgresql/data"}]},"caddy":{}},"volumes":{"dados":{"name":"%s-dados"}}}\n' \
-        "$projeto" "$projeto"
+      periodo_saude=10s
+      if [ "${TOPOLOGIA_ALVO_DIVERGENTE:-false}" = true ] && [ "$raiz_compose" != "$APP_DIR" ]; then
+        periodo_saude=60s
+      fi
+      jq -cn --arg projeto "$projeto" --arg migrar "$MIGRAR_NA_PARTIDA" \
+        --arg imagem "${APP_IMAGEM:-teste/local}" --arg reinicio "${MIGRACAO_POLITICA_REINICIO:-unless-stopped}" \
+        --argjson manual "$config_manual" --argjson bind "$bind_manual" --arg periodo "$periodo_saude" '
+        {name:$projeto,services:{app:{image:$imagem,restart:$reinicio,command:["./docker/app/entrypoint.sh"],healthcheck:{interval:$periodo},networks:{interna:null},environment:({MIGRAR_NA_PARTIDA:$migrar,DATABASE_URL:"postgresql://frequencia:fixture@db:5432/frequencia",DIRECT_URL:"postgresql://frequencia:fixture@db:5432/frequencia"} + ($manual // {})),volumes:$bind},db:{networks:{interna:null},environment:{POSTGRES_DB:"frequencia",POSTGRES_USER:"frequencia"},volumes:[{type:"volume",source:"dados",target:"/var/lib/postgresql/data"}]},caddy:{}},networks:{interna:{name:"teste-interna",internal:true}},volumes:{dados:{name:($projeto+"-dados")}}}'
     elif [[ " $* " == *" --services "* ]]; then
       printf 'app\ndb\ncaddy\n'
       if [ "$perfil_backup" = true ] && [ "${BACKUP_PLANILHAS_HABILITADO:-true}" = "true" ]; then
@@ -123,7 +273,9 @@ case "$comando" in
   ps)
     if [[ " $* " == *" -aq "* ]]; then
       [ "${DOCKER_SEM_CONTAINERS:-false}" = "true" ] && exit 0
-      printf 'container-app\ncontainer-db\n'
+      if [ "${DOCKER_MANUAL:-false}" = true ]; then printf '%s\n' "$ID_APP" "$ID_DB"; else printf 'container-app\ncontainer-db\n'; fi
+    elif [ "${DOCKER_MANUAL:-false}" = true ]; then
+      case "${*: -1}" in app) printf '%s\n' "$ID_APP" ;; db) printf '%s\n' "$ID_DB" ;; *) exit 96 ;; esac
     else
       printf 'container-app\n'
     fi
@@ -134,12 +286,26 @@ case "$comando" in
     [ -f "$DOCKER_UP_COUNTER" ] && contador=$(cat "$DOCKER_UP_COUNTER")
     contador=$((contador + 1))
     printf '%s\n' "$contador" >"$DOCKER_UP_COUNTER"
+    if [ "${DOCKER_MANUAL:-false}" = true ]; then
+      [[ " $* " == *" --no-deps --no-build --pull never "* && "${*: -1}" = app ]]
+      [ "${APP_IMAGEM:-}" = "$IMAGEM_ALVO" ] && [ "${MIGRACAO_POLITICA_REINICIO:-}" = no ]
+      jq -e --arg alvo "$DOCKER_REVISAO_IMAGEM" '.fase == "partida" and .alvo == $alvo' \
+        "$ESTADO_DIR/atualizacao-manual-pendente.json" >/dev/null
+      arquivo=$(jq -er .autorizacao "$ESTADO_DIR/atualizacao-manual-pendente.json")
+      [ "$(<"$arquivo")" = "$(jq -er .MIGRACAO_LOTE_APROVADO <<<"$config_manual")" ]
+      : >"$DOCKER_UP_COUNTER.reinicio"
+      if [ "${ABATER_APOS_PARTIDA:-false}" = true ]; then
+        [[ "$(tr '\0' ' ' <"/proc/$PPID/cmdline")" == *"$EXECUTOR/atualizar.sh"* ]]
+        kill -KILL "$PPID"
+      fi
+    fi
     if [ "${DOCKER_FALHA_UP:-false}" = "true" ] && [ "$contador" -eq 1 ]; then
       exit 1
     fi
     exit 0
     ;;
   exec)
+    if [[ " $* " == *"SELECT current_database();"* ]]; then printf 'frequencia\n'; exit; fi
     if [[ " $* " == *" psql -XwqAt "* ]]; then
       consulta=$(cat)
       [[ "$consulta" == *"BEGIN READ ONLY"* && "$consulta" == *"_prisma_migrations"* ]] || exit 1
@@ -147,7 +313,7 @@ case "$comando" in
     fi
     exit 0
     ;;
-  stop)
+  stop | down)
     exit 0
     ;;
   *)
@@ -158,10 +324,38 @@ esac
 DOCKER
 chmod +x "$FAKE_BIN/docker"
 
+cat >"$FAKE_BIN/age" <<'AGE'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+[[ "$#" == 4 && "$1" == --recipients-file && "$3" == --output ]]
+{ printf 'cifra sintética:'; cat; } >"$4"
+AGE
+chmod +x "$FAKE_BIN/age"
+
 cat >"$FAKE_BIN/backup-falso.sh" <<'BACKUP'
 #!/usr/bin/env bash
 set -Eeuo pipefail
 printf 'backup\n' >>"$BACKUP_CHAMADAS"
+if [ -n "${BACKUP_MIGRACAO_MANUAL_OPERACAO:-}" ] && [ "${RECIBO_VARIANTE:-ok}" != legado ]; then
+  if [ "${TESTAR_CONCORRENCIA:-false}" = true ]; then
+    # Outra entrada não herda o descritor nem o contrato do filho de backup.
+    if env -u SERVIDOR_LOCK_HERDADO -u BACKUP_MIGRACAO_MANUAL_OPERACAO \
+      -u BACKUP_MIGRACOES_AUTO_ESPERADO -u BACKUP_MIGRACAO_MANUAL_INICIO \
+      bash "$(dirname "$0")/compose.sh" up -d app 9>&- >"$ESTADO_DIR/concorrente.log" 2>&1; then
+      exit 98
+    fi
+    grep -q 'Outra operação incompatível com compose' "$ESTADO_DIR/concorrente.log" || exit 99
+  fi
+  "$(dirname "$0")/backup-real.sh" "$@"
+  if [ "${RECIBO_VARIANTE:-ok}" = adulterado ]; then
+    arquivo=$(jq -er '.arquivo' "$ESTADO_DIR/ultimo-backup.json")
+    printf 'adulterado\n' >>"$BACKUP_BANCO_DIR/$arquivo"
+  fi
+  exit 0
+fi
+if [ "${1:-}" = --verificar ]; then
+  exec "$(dirname "$0")/backup-real.sh" "$@"
+fi
 mkdir -p "$ESTADO_DIR" "$BACKUP_BANCO_DIR"
 arquivo="frequenciapp-teste.dump.gpg"
 printf 'dados sinteticos\n' >"$BACKUP_BANCO_DIR/$arquivo"
@@ -244,9 +438,10 @@ preparar_repositorio() {
   COMMIT_ANTERIOR=$(git -C "$REPO" rev-parse HEAD~1)
   COMMIT_ALVO=$(git -C "$REPO" rev-parse HEAD)
   git -C "$REPO" reset -q --hard "$COMMIT_ANTERIOR"
-  export DOCKER_REVISAO_IMAGEM="$COMMIT_ALVO"
-  rm -f "$DOCKER_LOG" "$DOCKER_UP_COUNTER" "$BACKUP_CHAMADAS" \
+  export DOCKER_REVISAO_IMAGEM="$COMMIT_ALVO" DOCKER_REVISAO_BASE="$COMMIT_ANTERIOR"
+  rm -f "$DOCKER_LOG" "$DOCKER_UP_COUNTER" "$DOCKER_UP_COUNTER.dump" "$DOCKER_UP_COUNTER.reinicio" "$BACKUP_CHAMADAS" \
     "$ESTADO_DIR/falha.json" "$ESTADO_DIR/estado.json" "$SERVIDOR_IDENTIDADE_ARQUIVO" \
+    "$ESTADO_DIR/atualizacao-manual-pendente.json" "$ESTADO_DIR/ultimo-backup.json" \
     "$ESTADO_DIR/aprovacao-migracoes.json" "$ESTADO_DIR"/aprovacao-migracoes-*.usada.json
   rm -rf "$SERVIDOR_LOCK_DIR"
 }
@@ -262,7 +457,7 @@ preparar_instalacao() {
 
 executar_atualizacao() {
   local status
-  if bash "$REPO/scripts/servidor/atualizar.sh" "$@" >"$TMP_RAIZ/saida.log" 2>&1; then
+  if APP_DIR="$REPO" PID_HARNESS="$BASHPID" bash "${EXECUTOR:-$REPO/scripts/servidor}/atualizar.sh" "$@" >"$TMP_RAIZ/saida.log" 2>&1; then
     status=0
   else
     status=$?
@@ -375,34 +570,189 @@ unset DOCKER_FALHA_BUILD
 exigir_falha "$status" "a falha de build foi ignorada."
 [ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_ANTERIOR" ] || falhar "a falha de build alterou o commit."
 
-# Falha de saúde aciona rollback de imagem e commit.
+# Sem histórico atestado, desligar o migrador não autoriza rollback.
 preparar_instalacao
 export DOCKER_FALHA_UP=true
 status=$(executar_atualizacao)
 unset DOCKER_FALHA_UP
 exigir_falha "$status" "a falha de saúde foi ignorada."
-[ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_ANTERIOR" ] || falhar "o rollback não voltou o commit."
-grep -q 'rollback' "$TMP_RAIZ/saida.log" || falhar "o log não registrou o rollback."
+[ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_ALVO" ] || falhar "houve rollback sem histórico atestado."
+grep -q 'Nenhuma imagem anterior será iniciada' "$TMP_RAIZ/saida.log" || falhar "faltou a orientação de recuperação."
 [ -f "$ESTADO_DIR/falha.json" ] || falhar "a falha não foi registrada."
-[ "$(cat "$DOCKER_UP_COUNTER")" -ge 2 ] || falhar "o rollback não tentou subir a versão anterior."
+[ "$(cat "$DOCKER_UP_COUNTER")" -eq 1 ] || falhar "uma imagem anterior foi iniciada."
 
-# Migração nova bloqueia por padrão e é liberada com a opção explícita.
-preparar_instalacao
-git -C "$REPO" reset -q --hard "$COMMIT_ALVO"
-mkdir -p "$REPO/prisma/migrations/0002_nova"
-printf 'select 1;\n' >"$REPO/prisma/migrations/0002_nova/migration.sql"
-git -C "$REPO" add prisma
-git -C "$REPO" commit -qm "migracao nova"
-git -C "$REPO" push -q origin main
-COMMIT_MIGRACAO=$(git -C "$REPO" rev-parse HEAD)
-git -C "$REPO" reset -q --hard "$COMMIT_ANTERIOR"
-export DOCKER_REVISAO_IMAGEM="$COMMIT_MIGRACAO"
+# O executor revisado fica fora do checkout. A revisão instalada não fornece os validadores.
+preparar_manual() {
+  local sem_migracoes="${1:-false}" alvo_legado="${2:-false}"
+  export DOCKER_MANUAL=true
+  preparar_instalacao
+  EXECUTOR="$TMP_RAIZ/executor/scripts/servidor"
+  export EXECUTOR
+  mkdir -p "$(dirname "$EXECUTOR")" "$TMP_RAIZ/executor/src/infra" "$TMP_RAIZ/executor/docker/app"
+  cp -r "$RAIZ/scripts/servidor" "$(dirname "$EXECUTOR")/"
+  cp "$RAIZ/src/infra/schema-postgres.mjs" "$TMP_RAIZ/executor/src/infra/"
+  cp "$RAIZ/docker/app/"{entrypoint.sh,migrar.mjs} "$TMP_RAIZ/executor/docker/app/"
+  mv "$EXECUTOR/backup-banco.sh" "$EXECUTOR/backup-real.sh"
+  cp "$FAKE_BIN/backup-falso.sh" "$EXECUTOR/backup-banco.sh"
+  mkdir -p "$REPO/prisma/migrations/20260101000000_base" "$REPO/docker/app" "$REPO/src/infra"
+  printf 'CREATE TABLE prova (id integer PRIMARY KEY);\n' >"$REPO/prisma/migrations/20260101000000_base/migration.sql"
+  # A rodada local pode montar os bytes da revisão antiga, sem copiá-los para
+  # o executor ou exigir histórico Git completo no checkout raso do CI.
+  if [ -n "${ATUALIZACAO_FONTE_LEGADA:-}" ]; then
+    cp "$ATUALIZACAO_FONTE_LEGADA/docker/app/"{entrypoint.sh,migrar.mjs} "$REPO/docker/app/"
+    cp "$ATUALIZACAO_FONTE_LEGADA/scripts/servidor/"{atualizar.sh,ambiente-seguro.mjs,comum.sh} "$REPO/scripts/servidor/"
+  else
+    printf '// Migrador legado sintético.\n' >"$REPO/docker/app/migrar.mjs"
+    cp "$RAIZ/docker/app/entrypoint.sh" "$REPO/docker/app/"
+  fi
+  cp "$RAIZ/src/infra/schema-postgres.mjs" "$REPO/src/infra/"
+  git -C "$REPO" add .
+  git -C "$REPO" commit -qm "base com histórico"
+  COMMIT_ANTERIOR=$(git -C "$REPO" rev-parse HEAD)
+  if [ "$alvo_legado" = false ]; then cp "$RAIZ/docker/app/"{entrypoint.sh,migrar.mjs} "$REPO/docker/app/"; fi
+  if [ "$sem_migracoes" = false ]; then
+    mkdir -p "$REPO/prisma/migrations/20260102000000_nova"
+    printf 'ALTER TABLE prova ADD COLUMN uid uuid DEFAULT gen_random_uuid();\n' \
+      >"$REPO/prisma/migrations/20260102000000_nova/migration.sql"
+  fi
+  printf 'nova revisão\n' >"$REPO/README.md"
+  git -C "$REPO" add .
+  git -C "$REPO" commit -qm "alvo manual"
+  git -C "$REPO" push -q --force origin HEAD:main
+  COMMIT_MIGRACAO=$(git -C "$REPO" rev-parse HEAD)
+  export DOCKER_REVISAO_IMAGEM="$COMMIT_MIGRACAO" DOCKER_REVISAO_BASE="$COMMIT_ANTERIOR"
+  historico_git() {
+    local revisao="$1" arquivo nome hash
+    while IFS= read -r arquivo; do
+      nome=${arquivo%/migration.sql}
+      hash=$(git -C "$REPO" show "$revisao:$arquivo" | sha256sum | cut -d' ' -f1)
+      jq -cn --arg nome "${nome##*/}" --arg hash "$hash" '[$nome,$hash,true]'
+    done < <(git -C "$REPO" ls-tree -r --name-only "$revisao" -- prisma/migrations) | jq -cs '.'
+  }
+  export HISTORICO_MANUAL_BASE HISTORICO_MANUAL_ALVO
+  HISTORICO_MANUAL_BASE=$(historico_git "$COMMIT_ANTERIOR")
+  HISTORICO_MANUAL_ALVO=$(historico_git "$COMMIT_MIGRACAO")
+  git -C "$REPO" reset -q --hard "$COMMIT_ANTERIOR"
+  export MIGRAR_NA_PARTIDA=true
+  # Força a validação do ambiente pela cópia revisada na primeira invocação.
+  unset SERVIDOR_AMBIENTE_INJETADO
+}
+
+exigir_recusa_manual() {
+  local mensagem="$1"
+  exigir_falha "$status" "$mensagem"
+  grep -q "$mensagem" "$TMP_RAIZ/saida.log" || { cat "$TMP_RAIZ/saida.log"; falhar "$mensagem"; }
+  [ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_ANTERIOR" ] && [ ! -s "$DOCKER_UP_COUNTER" ] &&
+    [ ! -e "$ESTADO_DIR/atualizacao-manual-pendente.json" ] || falhar "a recusa chegou à troca ou à partida."
+}
+
+preparar_manual
 status=$(executar_atualizacao)
-exigir_falha "$status" "a migração nova foi aceita sem opção explícita."
-! grep -q 'build ' "$DOCKER_LOG" || falhar "a migração bloqueada chegou ao build."
-status=$(executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'Há migrações novas'
+status=$(ATUALIZAR_PERMITIR_MIGRACOES=true executar_atualizacao --simular)
+if [ "$status" -ne 0 ] || ! grep -q 'bloqueariam a atualização' "$TMP_RAIZ/saida.log"; then
+  falhar "a simulação prometeu migrar sem a flag."
+fi
+status=$(ATUALIZAR_PERMITIR_MIGRACOES=true executar_atualizacao)
+exigir_recusa_manual 'Há migrações novas'
+status=$(RECIBO_VARIANTE=legado executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'sem recibo de origem'
+status=$(RECIBO_VARIANTE=adulterado executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'sem recibo de origem'
+status=$(BANCO_DIFERENTE=true executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'não correspondem à base instalada'
+for desvio in reinicio homonimo falha; do
+  rm -f "$DOCKER_UP_COUNTER.dump"
+  status=$(DUMP_VARIANTE="$desvio" executar_atualizacao --permitir-migracoes)
+  exigir_recusa_manual 'backup pré-migração manual falhou'
+done
+rm -f "$DOCKER_UP_COUNTER.dump"
+status=$(TOPOLOGIA_ALVO_DIVERGENTE=true executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'destino Compose diverge'
+status=$(TESTAR_CONCORRENCIA=true executar_atualizacao --permitir-migracoes)
 [ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a migração liberada falhou."; }
-[ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_MIGRACAO" ] || falhar "a migração liberada não foi aplicada."
+grep -q 'Outra operação incompatível com compose' "$ESTADO_DIR/concorrente.log"
+[ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_MIGRACAO" ] &&
+  [ ! -e "$ESTADO_DIR/atualizacao-manual-pendente.json" ] && [ "$(cat "$DOCKER_UP_COUNTER")" = 1 ] ||
+  falhar "o alvo não foi concluído depois das verificações finais."
+
+# A revisão já servida não deve ser recriada pelo protocolo pré-migração.
+chamadas_antes=$(wc -l <"$BACKUP_CHAMADAS")
+status=$(executar_atualizacao)
+if [ "$status" -ne 0 ] || ! grep -q 'Nenhuma mudança a aplicar' "$TMP_RAIZ/saida.log"; then
+  falhar "a mesma revisão sem --forcar não ficou em repouso."
+fi
+status=$(executar_atualizacao --forcar)
+exigir_falha "$status" "--forcar aceitou recriar a mesma revisão com o migrador ativo."
+grep -q 'não reaplica a revisão instalada com o migrador ativo' "$TMP_RAIZ/saida.log" ||
+  { cat "$TMP_RAIZ/saida.log"; falhar "faltou a recusa explícita da reaplicação."; }
+[ "$(wc -l <"$BACKUP_CHAMADAS")" -eq "$chamadas_antes" ] &&
+  [ "$(cat "$DOCKER_UP_COUNTER")" = 1 ] && [ ! -e "$ESTADO_DIR/atualizacao-manual-pendente.json" ] ||
+  falhar "a recusa de --forcar executou backup, gravou intenção ou iniciou outra partida."
+
+preparar_manual false true
+status=$(executar_atualizacao --permitir-migracoes)
+exigir_recusa_manual 'não implementa o protocolo manual compatível'
+
+for caso in saude historico sinal troca; do
+  preparar_manual
+  case "$caso" in
+    saude) status=$(DOCKER_FALHA_UP=true executar_atualizacao --permitir-migracoes) ;;
+    historico) status=$(HISTORICO_FINAL="$HISTORICO_MANUAL_BASE" executar_atualizacao --permitir-migracoes) ;;
+    sinal) status=$(ABATER_APOS_PARTIDA=true executar_atualizacao --permitir-migracoes) ;;
+    troca) status=$(ABATER_APOS_TROCA=true executar_atualizacao --permitir-migracoes) ;;
+  esac
+  exigir_falha "$status" "o resultado incerto foi tratado como sucesso: $caso"
+  fase=partida
+  partidas=1
+  if [ "$caso" = troca ]; then fase=troca; partidas=0; fi
+  [ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_MIGRACAO" ] &&
+    [ "$(cat "$DOCKER_UP_COUNTER" 2>/dev/null || printf 0)" = "$partidas" ] ||
+    falhar "houve partida ou rollback não previsto: $caso."
+  if [ "$caso" = troca ] || [ "$caso" = sinal ]; then
+    [ "$status" -eq 137 ] || falhar "a interrupção não atingiu o atualizador: $caso."
+  fi
+  pendente="$ESTADO_DIR/atualizacao-manual-pendente.json"
+  jq -e --arg commit "$COMMIT_MIGRACAO" --arg fase "$fase" \
+    '.fase == $fase and .alvo == $commit and (.backup.sha256 | length == 64)' "$pendente" >/dev/null
+  antes=$(sha256sum "$ESTADO_DIR/ultimo-backup.json" "$BACKUP_BANCO_DIR/$(jq -r '.backup.arquivo' "$pendente")")
+  status=$(executar_atualizacao --permitir-migracoes --forcar)
+  exigir_falha "$status" "uma nova atualização ignorou o marcador."
+  grep -q 'Atualização manual pendente ou incerta' "$TMP_RAIZ/saida.log" || falhar "a repetição não encontrou a guarda."
+  for entrada in backup-real.sh restaurar.sh controlador/retencao.sh compose.sh; do
+    args=()
+    if [ "$entrada" = restaurar.sh ]; then
+      args=(--arquivo "$(jq -r '.backup.arquivo' "$pendente")" --confirmar --sem-copia)
+    fi
+    if [ "$entrada" = compose.sh ]; then args=(up -d app); fi
+    if APP_DIR="$REPO" bash "$EXECUTOR/$entrada" "${args[@]}" >"$TMP_RAIZ/entrada.log" 2>&1; then
+      falhar "a entrada $entrada ignorou o marcador."
+    fi
+    grep -q 'Atualização manual pendente ou incerta' "$TMP_RAIZ/entrada.log" ||
+      { cat "$TMP_RAIZ/entrada.log"; falhar "a entrada $entrada não encontrou a guarda."; }
+  done
+  [ "$antes" = "$(sha256sum "$ESTADO_DIR/ultimo-backup.json" "$BACKUP_BANCO_DIR/$(jq -r '.backup.arquivo' "$pendente")")" ] ||
+    falhar "o conjunto protegido mudou."
+  [ "$(cat "$DOCKER_UP_COUNTER" 2>/dev/null || printf 0)" = "$partidas" ] ||
+    falhar "uma nova partida ocorreu após a recusa."
+done
+
+preparar_manual true
+for historico in '[]' '[["20260101000000_base","divergente",true]]' '[["20260101000000_base","divergente",false]]'; do
+  status=$(HISTORICO_BASE="$historico" executar_atualizacao)
+  exigir_recusa_manual 'não correspondem à base instalada'
+done
+status=$(executar_atualizacao)
+[ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a atualização sem pendências falhou."; }
+unset EXECUTOR DOCKER_MANUAL
+export MIGRAR_NA_PARTIDA=true SERVIDOR_AMBIENTE_INJETADO=true
+
+preparar_instalacao
+status=$(MIGRAR_NA_PARTIDA=false executar_atualizacao --agendado)
+if [ "$status" -ne 0 ] || [ "$(cat "$DOCKER_UP_COUNTER")" -ne 1 ] ||
+  [ "$(jq -er .commit "$ESTADO_DIR/estado.json")" != "$COMMIT_ALVO" ]; then
+  falhar "o agendado simples sem diferença e sem migrador deixou de aplicar."
+fi
 
 # O cron não aceita permissão geral e só consome uma aprovação no momento de aplicar.
 preparar_instalacao
@@ -486,7 +836,8 @@ exigir_falha "$status" "a atualização aceitou migração implícita com MIGRAR
 grep -q 'MIGRAR_NA_PARTIDA' "$TMP_RAIZ/saida.log" || falhar "a recusa de migração implícita não apareceu."
 export ATUALIZAR_MIGRACAO_EXTERNA=true
 status=$(executar_atualizacao --permitir-migracoes)
-unset ATUALIZAR_MIGRACAO_EXTERNA MIGRAR_NA_PARTIDA
+unset ATUALIZAR_MIGRACAO_EXTERNA
+export MIGRAR_NA_PARTIDA=false
 [ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a migração externa não foi aceita."; }
 
 # Sem backup remoto, a atualização exige opt-in explícito para a cópia local.
