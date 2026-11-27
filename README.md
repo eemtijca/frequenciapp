@@ -84,7 +84,7 @@ A demonstração pública fica em https://frequenciappjca.vercel.app. Para exper
 
 - Next.js 16 (App Router) com TypeScript estrito.
 - PostgreSQL 17 com Prisma ORM 7, conexão do runtime em `DATABASE_URL` e conexão do CLI em `DIRECT_URL`, com adaptador oficial `pg`.
-- Autenticação própria: scrypt para senhas, sessões opacas em cookies HttpOnly e papéis de administração e coordenação.
+- Autenticação própria: scrypt para senhas, sessões opacas em cookies HttpOnly e papéis de administração, coordenação e secretaria.
 - Transações ACID com isolamento serializável e repetição automática em conflitos.
 - Material UI 9 com tema próprio em CSS variables, componentes MUI compartilhados, gráficos MUI X e Recharts restrito ao FrequenciBI.
 - Service worker próprio para a experiência instalável e o aviso offline.
@@ -393,7 +393,7 @@ As próximas mudanças são discutidas nas [issues do repositório](https://gith
 Sim, é de código aberto sob licença MIT.
 
 **Quem pode usar?**
-A coordenação e a direção da escola. As contas são criadas pela administração, sem cadastro público.
+A coordenação, a direção e a secretaria da escola. As contas são criadas pela administração, sem cadastro público.
 
 **Funciona instalado no celular?**
 Sim. O aplicativo é um PWA instalável, com atalhos para Chamada e Painel, aviso de conexão e atualização com um toque.

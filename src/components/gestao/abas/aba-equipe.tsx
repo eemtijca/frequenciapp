@@ -1,7 +1,7 @@
 "use client";
 
-// Aba de equipe: contas da coordenação e da administração, com papel,
-// senha e situação. Sem atribuições de turma.
+// Aba de equipe: contas da coordenação, da secretaria e da administração, com
+// papel, senha e situação. Sem atribuições de turma.
 import { useEffect, useMemo, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";

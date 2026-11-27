@@ -1,6 +1,6 @@
 # Modelo de dados
 
-Entidades, invariantes e derivações. A coordenação faz uma chamada por turma e dia, compartilhada pela equipe, com todos os presentes por padrão e apenas as faltas registradas. Cada falta pode ter um código de justificativa (FJ). A saída antecipada é um registro separado da chamada, com momento, horário, justificativa e responsável pela liberação. A administração cuida das contas, dos cadastros e dos recursos ligados.
+Entidades, invariantes e derivações. A coordenação faz uma chamada por turma e dia, compartilhada pela equipe, com todos os presentes por padrão e apenas as faltas registradas. Cada falta pode ter um código de justificativa (FJ). A saída antecipada é um registro separado da chamada, com momento, horário, justificativa e responsável pela liberação. A administração cuida das contas, dos cadastros e dos recursos ligados; a secretaria consulta o Painel e as grades de relatório.
 
 ## Usuário (usuario)
 

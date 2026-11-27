@@ -1,5 +1,5 @@
-// Configurações de recursos: leitura por qualquer sessão e atualização pela
-// administração, com auditoria.
+// Configurações de recursos: leitura pela capacidade consultar e atualização
+// pela administração, com auditoria.
 import { atualizarConfiguracoes, lerConfiguracoes } from "@/application/configuracoes";
 import {
   corpoJson,

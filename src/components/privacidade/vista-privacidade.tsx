@@ -317,8 +317,8 @@ export default function VistaPrivacidade() {
                 <Lista>
                   <li>
                     E-mail ou identificador de acesso, nome de tratamento, papel (administração,
-                    coordenação ou diretor de turma), situação da conta e hash da senha. A senha em
-                    claro não é gravada.
+                    coordenação, secretaria ou diretor de turma), situação da conta e hash da senha.
+                    A senha em claro não é gravada.
                   </li>
                   <li>
                     Sessão: token aleatório no cookie HttpOnly, guardado no servidor só como hash
@@ -576,9 +576,9 @@ export default function VistaPrivacidade() {
                 </Paragrafo>
                 <Lista>
                   <li>
-                    Sessão da administração e da coordenação: 30 dias se a opção de manter conectado
-                    estiver marcada, ou 12 horas sem essa opção. O cookie some ao fechar o navegador
-                    quando a sessão não é persistente.
+                    Sessão da administração, da coordenação e da secretaria: 30 dias se a opção de
+                    manter conectado estiver marcada, ou 12 horas sem essa opção. O cookie some ao
+                    fechar o navegador quando a sessão não é persistente.
                   </li>
                   <li>
                     Sessão do diretor de turma: o prazo configurado pela administração, com padrão
@@ -627,8 +627,9 @@ export default function VistaPrivacidade() {
                 </Paragrafo>
                 <Paragrafo>
                   Papéis separam as funções: a administração configura a escola e as contas; a
-                  coordenação opera a frequência; o diretor de turma apenas lê agregados das
-                  próprias turmas. O repositório não contém dados reais de alunos.
+                  coordenação opera a frequência; a secretaria consulta o Painel e as grades de
+                  relatório; o diretor de turma apenas lê agregados das próprias turmas. O
+                  repositório não contém dados reais de alunos.
                 </Paragrafo>
               </SecaoPolitica>
 

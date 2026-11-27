@@ -3,7 +3,7 @@
   "info": {
     "title": "API do FrequenciApp",
     "summary": "Gestão de frequência escolar",
-    "description": "Rotas HTTP do aplicativo de frequência escolar. Todas respondem JSON com `Cache-Control: no-store`.\n\n## Visão geral\n\nO aplicativo cobre chamada diária, frequências parciais e personalizadas, entradas atrasadas,\nsaídas antecipadas, justificativas, calendário letivo, notificações push, integração com o\nGoogle Planilhas, indicadores externos, chaves do FrequenciBI, exportações e cópia de segurança.\n\n## Como autenticar\n\n- Cookie de sessão `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com\n  `PERMITIR_HTTP=true`). O esquema `sessao` da especificação representa esse cookie.\n- Diretor de turma entra com identificador e palavra-chave; o cookie é de sessão e a validade no\n  servidor é a menor entre a sessão do diretor e a validade da palavra-chave.\n- As guardas por capacidade são: `administrar` (papel ADMIN), `operar` (ADMIN e COORDENACAO),\n  `consultar` (ADMIN, COORDENACAO e SECRETARIA, só leitura do Painel e das grades de relatório),\n  `alterarPropriaSenha`, `verEstatisticasDasTurmas` (papel DIRETOR_TURMA) e `receberNotificacoes`.\n- Sem sessão, 401; com sessão sem a capacidade, 403. Mutações também exigem origem confiável.\n- `GET /api/notificacoes/resumo`, `GET /api/notificacoes/agenda`, `GET /api/planilha/fila/agenda`\n  e `GET /api/indicadores/agenda` usam `Authorization: Bearer <CRON_SECRET>`, sem sessão.\n- `GET /api/bi` usa somente `Authorization: Bearer fbi_...`, sem sessão nem chave na URL.\n\n## Envelope de erro\n\nErros seguem `{ \"error\": string, \"codigo\"?: string, ...campos extras }`, em português claro e sem\ndetalhes internos. Alguns conflitos trazem campos extras, como `conflito` e `frequencia`.\nCorpos malformados respondem 400 e corpos acima de 200 kB respondem 413.\nStatus usados: 400, 401, 403, 404, 405, 409, 410, 413, 429, 500, 502 e 503.\n\n## Convenções\n\n- Datas civis usam `YYYY-MM-DD`; instantes usam ISO 8601; o fuso padrão é `America/Fortaleza` (`TZ_APP`).\n- A chamada guarda apenas as faltas, com revisão otimista; conflito de revisão responde 409 com a\n  versão vigente e nunca sobrescreve.\n- Um arquivo próprio de especificação fica em `docs/openapi.json` e a página interativa em `/api/docs`.\n\n## Referências\n\n- Documentação narrativa: https://github.com/eemtijca/frequenciapp/blob/main/docs/api.md\n- Contexto para modelos de linguagem: https://github.com/eemtijca/frequenciapp/blob/main/public/llms.txt\n",
+    "description": "Rotas HTTP do aplicativo de frequência escolar. Todas respondem JSON com `Cache-Control: no-store`.\n\n## Visão geral\n\nO aplicativo cobre chamada diária, frequências parciais e personalizadas, entradas atrasadas,\nsaídas antecipadas, justificativas, calendário letivo, notificações push, integração com o\nGoogle Planilhas, indicadores externos, chaves do FrequenciBI, exportações e cópia de segurança.\n\n## Como autenticar\n\n- Cookie de sessão `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com\n  `PERMITIR_HTTP=true`). O esquema `sessao` da especificação representa esse cookie.\n- Diretor de turma entra com identificador e palavra-chave; o cookie é de sessão e a validade no\n  servidor é a menor entre a sessão do diretor e a validade da palavra-chave.\n- As guardas por capacidade são: `administrar` (papel ADMIN), `operar` (ADMIN e COORDENACAO),\n  `consultar` (ADMIN, COORDENACAO e SECRETARIA, leitura do Painel e das grades de relatório e registro do download da Grade),\n  `alterarPropriaSenha`, `verEstatisticasDasTurmas` (papel DIRETOR_TURMA) e `receberNotificacoes`.\n- Sem sessão, 401; com sessão sem a capacidade, 403. Mutações também exigem origem confiável.\n- `GET /api/notificacoes/resumo`, `GET /api/notificacoes/agenda`, `GET /api/planilha/fila/agenda`\n  e `GET /api/indicadores/agenda` usam `Authorization: Bearer <CRON_SECRET>`, sem sessão.\n- `GET /api/bi` usa somente `Authorization: Bearer fbi_...`, sem sessão nem chave na URL.\n\n## Envelope de erro\n\nErros seguem `{ \"error\": string, \"codigo\"?: string, ...campos extras }`, em português claro e sem\ndetalhes internos. Alguns conflitos trazem campos extras, como `conflito` e `frequencia`.\nCorpos malformados respondem 400 e corpos acima de 200 kB respondem 413.\nStatus usados: 400, 401, 403, 404, 405, 409, 410, 413, 429, 500, 502 e 503.\n\n## Convenções\n\n- Datas civis usam `YYYY-MM-DD`; instantes usam ISO 8601; o fuso padrão é `America/Fortaleza` (`TZ_APP`).\n- A chamada guarda apenas as faltas, com revisão otimista; conflito de revisão responde 409 com a\n  versão vigente e nunca sobrescreve.\n- Um arquivo próprio de especificação fica em `docs/openapi.json` e a página interativa em `/api/docs`.\n\n## Referências\n\n- Documentação narrativa: https://github.com/eemtijca/frequenciapp/blob/main/docs/api.md\n- Contexto para modelos de linguagem: https://github.com/eemtijca/frequenciapp/blob/main/public/llms.txt\n",
     "version": "0.1.0",
     "contact": {
       "name": "FrequenciApp no GitHub",
@@ -1072,7 +1072,7 @@
       "get": {
         "operationId": "listarSeries",
         "summary": "Listar as séries",
-        "description": "Qualquer sessão. As séries vêm na ordem de exibição.",
+        "description": "Capacidade operar. As séries vêm na ordem de exibição.",
         "tags": ["series"],
         "responses": {
           "200": {
@@ -1317,7 +1317,7 @@
       "get": {
         "operationId": "listarTurmas",
         "summary": "Listar as turmas com as aulas",
-        "description": "Qualquer sessão. Cada turma traz o rótulo composto e as aulas configuradas.",
+        "description": "Capacidade operar. Cada turma traz o rótulo composto e as aulas configuradas.",
         "tags": ["turmas"],
         "responses": {
           "200": {
@@ -2007,7 +2007,7 @@
       "get": {
         "operationId": "lerOrdemAlmoco",
         "summary": "Consultar a ordem do almoço",
-        "description": "Qualquer sessão. Sempre os seis dias, de segunda (1) a sábado (6); dia sem ordem vem com a lista vazia. A posição começa em 1.",
+        "description": "Capacidade operar. Sempre os seis dias, de segunda (1) a sábado (6); dia sem ordem vem com a lista vazia. A posição começa em 1.",
         "tags": ["horarios"],
         "responses": {
           "200": {
@@ -2163,7 +2163,7 @@
       "get": {
         "operationId": "listarAlunos",
         "summary": "Listar os alunos",
-        "description": "Qualquer sessão. O parâmetro turmaId limita a consulta a uma turma.",
+        "description": "Capacidade operar. O parâmetro turmaId limita a consulta a uma turma.",
         "tags": ["alunos"],
         "parameters": [
           {
@@ -2679,7 +2679,7 @@
       "get": {
         "operationId": "listarUsuarios",
         "summary": "Listar as contas da equipe",
-        "description": "Apenas administração. Traz administração e coordenação.",
+        "description": "Apenas administração. Traz administração, coordenação e Secretaria.",
         "tags": ["usuarios"],
         "responses": {
           "200": {
@@ -3335,7 +3335,7 @@
       "get": {
         "operationId": "obterAlertasBeneficios",
         "summary": "Consultar alunos acima do limite de faltas dos benefícios",
-        "description": "Qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício: o inteiro de (100 - percentual mínimo)% das aulas do mês. As aulas do mês somam as das chamadas salvas e as previstas pela grade da turma nos demais dias úteis sem feriado. A carga diária opcional projeta os dias com aulas na grade e sem feriado. Chamadas antigas sem retrato de aulas usam a carga diária configurada ou a grade da turma da chamada como estimativa, inclusive sábado letivo salvo. O alerta conta aulas, inclui os dias letivos e a carga de referência para traduzir aulas em dias, e não determina pagamento nem verifica a média anual. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia.",
+        "description": "Capacidade operar. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício: o inteiro de (100 - percentual mínimo)% das aulas do mês. As aulas do mês somam as das chamadas salvas e as previstas pela grade da turma nos demais dias úteis sem feriado. A carga diária opcional projeta os dias com aulas na grade e sem feriado. Chamadas antigas sem retrato de aulas usam a carga diária configurada ou a grade da turma da chamada como estimativa, inclusive sábado letivo salvo. O alerta conta aulas, inclui os dias letivos e a carga de referência para traduzir aulas em dias, e não determina pagamento nem verifica a média anual. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia.",
         "tags": ["frequencias"],
         "parameters": [
           {
@@ -3404,7 +3404,7 @@
       "get": {
         "operationId": "listarBeneficiosFrequencia",
         "summary": "Listar os benefícios e suas regras de frequência",
-        "description": "Qualquer sessão. A ordem é alfabética pelo nome, com benefícios ativos e inativos.",
+        "description": "Capacidade operar. A ordem é alfabética pelo nome, com benefícios ativos e inativos.",
         "tags": ["beneficios-frequencia"],
         "responses": {
           "200": {
@@ -5214,7 +5214,7 @@
       "get": {
         "operationId": "listarJustificativas",
         "summary": "Listar as justificativas",
-        "description": "Qualquer sessão. A ordem é alfabética pelo rótulo.",
+        "description": "Capacidade operar. A ordem é alfabética pelo rótulo.",
         "tags": ["justificativas"],
         "responses": {
           "200": {
@@ -5453,7 +5453,7 @@
       "get": {
         "operationId": "listarLiberadores",
         "summary": "Listar quem pode liberar saídas",
-        "description": "Qualquer sessão. A ordem é alfabética pelo rótulo.",
+        "description": "Capacidade operar. A ordem é alfabética pelo rótulo.",
         "tags": ["liberadores"],
         "responses": {
           "200": {
@@ -5692,7 +5692,7 @@
       "get": {
         "operationId": "listarResponsaveis",
         "summary": "Listar quem pode liberar saídas",
-        "description": "Qualquer sessão. Traz a equipe ativa que pode liberar saídas.",
+        "description": "Capacidade operar. Traz a equipe ativa que pode liberar saídas.",
         "tags": ["responsaveis"],
         "responses": {
           "200": {
@@ -6583,7 +6583,7 @@
       "get": {
         "operationId": "obterEstadoPlanilha",
         "summary": "Consultar o estado da planilha de frequência",
-        "description": "Qualquer sessão da operação. Usada pelo selo e pelo envio da Grade; alteradasDepois conta chamadas pendentes por dia e origem.",
+        "description": "Capacidade operar. Usada pelo selo e pelo envio da Grade; alteradasDepois conta chamadas pendentes por dia e origem.",
         "tags": ["planilhas"],
         "responses": {
           "200": {
@@ -7639,7 +7639,7 @@
       "post": {
         "operationId": "definirModoConservador",
         "summary": "Voltar ao modo conservador",
-        "description": "Qualquer sessão da operação. Encerra o modo completo da planilha de frequência.",
+        "description": "Capacidade operar. Encerra o modo completo da planilha de frequência.",
         "tags": ["planilhas"],
         "responses": {
           "200": {
@@ -8586,7 +8586,7 @@
       "get": {
         "operationId": "obterEstadoPlanilhaSaidas",
         "summary": "Consultar o estado da planilha de saídas",
-        "description": "Qualquer sessão da operação. Usada pelo registro de saídas e entradas.",
+        "description": "Capacidade operar. Usada pelo registro de saídas e entradas.",
         "tags": ["planilhas"],
         "responses": {
           "200": {
@@ -9174,7 +9174,7 @@
       "post": {
         "operationId": "definirModoConservadorSaidas",
         "summary": "Voltar ao modo conservador das saídas",
-        "description": "Qualquer sessão da operação. Encerra o modo completo da planilha de saídas.",
+        "description": "Capacidade operar. Encerra o modo completo da planilha de saídas.",
         "tags": ["planilhas"],
         "responses": {
           "200": {
@@ -11437,7 +11437,7 @@
       "post": {
         "operationId": "registrarExportacao",
         "summary": "Registrar a preparação de uma exportação",
-        "description": "Exige sessão e origem válida. A grade é liberada à administração e coordenação; a relação, somente à administração.",
+        "description": "Exige sessão e origem válida. A grade é liberada à administração, à coordenação e à Secretaria; a relação, somente à administração.",
         "tags": ["exportacoes"],
         "requestBody": {
           "required": true,
@@ -12545,7 +12545,7 @@
       "get": {
         "operationId": "listarProvasBimestrais",
         "summary": "Consultar o horário de provas bimestrais",
-        "description": "Qualquer sessão. Provas de hoje em diante, de todas as turmas; datas passadas não aparecem.",
+        "description": "Capacidade operar. Provas de hoje em diante, de todas as turmas; datas passadas não aparecem.",
         "tags": ["horarios"],
         "responses": {
           "200": {
@@ -13437,7 +13437,7 @@
         "type": "apiKey",
         "in": "cookie",
         "name": "frequenciapp_sessao",
-        "description": "Cookie de sessão da aplicação. As guardas por capacidade decidem o acesso: administrar (papel ADMIN), operar (ADMIN e COORDENACAO), consultar (ADMIN, COORDENACAO e SECRETARIA), alterarPropriaSenha, verEstatisticasDasTurmas (papel DIRETOR_TURMA) e receberNotificacoes. Sem sessão, 401; com sessão sem a capacidade, 403; mutações também exigem origem confiável."
+        "description": "Cookie de sessão da aplicação. As guardas por capacidade decidem o acesso: administrar (papel ADMIN), operar (ADMIN e COORDENACAO), consultar (ADMIN, COORDENACAO e SECRETARIA, incluindo o registro do download da Grade), alterarPropriaSenha, verEstatisticasDasTurmas (papel DIRETOR_TURMA) e receberNotificacoes. Sem sessão, 401; com sessão sem a capacidade, 403; mutações também exigem origem confiável."
       },
       "segredoAgendador": {
         "type": "apiKey",
@@ -15051,7 +15051,7 @@
           },
           "papel": {
             "type": "string",
-            "enum": ["ADMIN", "COORDENACAO"],
+            "enum": ["ADMIN", "COORDENACAO", "SECRETARIA"],
             "example": "COORDENACAO"
           }
         }

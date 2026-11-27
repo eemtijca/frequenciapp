@@ -1,8 +1,8 @@
 # API
 
-Rotas HTTP do aplicativo. Todas respondem JSON com `Cache-Control: no-store`. Mutações exigem sessão e origem confiável; consultas exigem sessão. Erros seguem o formato `{"error": "mensagem", "codigo"?: "CODIGO"}` com o código HTTP adequado, em português claro e sem detalhes internos (ADR-009). O campo `codigo` é estável e ajuda a interface a escolher o título e a ação, sem depender do texto da mensagem.
+Rotas HTTP do aplicativo. Todas respondem JSON com `Cache-Control: no-store`. Mutações exigem sessão e origem confiável; consultas exigem sessão com a capacidade correspondente. Erros seguem o formato `{"error": "mensagem", "codigo"?: "CODIGO"}` com o código HTTP adequado, em português claro e sem detalhes internos (ADR-009). O campo `codigo` é estável e ajuda a interface a escolher o título e a ação, sem depender do texto da mensagem.
 
-Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com `PERMITIR_HTTP=true`). Guardas por capacidade ([ADR-021](adr/021-acesso-de-leitura-dos-diretores-de-turma.md)): rotas de cadastro, de contas, de configurações de recursos, dos catálogos, das integrações e de cópia de segurança exigem `administrar` (papel `ADMIN`); chamada, saídas, entradas, relatório de saídas e entradas e as demais operações escolares exigem `operar` (`ADMIN` e `COORDENACAO`); as leituras do Painel, da Grade e do Por aluno (`GET /api/frequencias`, `GET /api/frequencias/resumo`, `GET /api/saidas`, `GET /api/configuracoes` e `GET /api/relatorios/grade/retrato`) exigem `consultar` (`ADMIN`, `COORDENACAO` e `SECRETARIA`, que só consulta; [ADR-087](adr/087-perfil-secretaria-e-capacidade-consultar.md)); a troca da própria senha exige `alterarPropriaSenha`; as estatísticas do diretor de turma exigem `verEstatisticasDasTurmas` (papel `DIRETOR_TURMA`). Sem sessão, 401; com sessão sem a capacidade, 403.
+Autenticação por cookie `frequenciapp_sessao` (HttpOnly, SameSite=Lax, Secure em produção, salvo com `PERMITIR_HTTP=true`). Guardas por capacidade ([ADR-021](adr/021-acesso-de-leitura-dos-diretores-de-turma.md)): rotas de cadastro, de contas, de configurações de recursos, dos catálogos, das integrações e de cópia de segurança exigem `administrar` (papel `ADMIN`); as escritas de chamada, saídas e entradas, o relatório de movimentações e as demais operações escolares exigem `operar` (`ADMIN` e `COORDENACAO`); as leituras do Painel, da Grade e do Por aluno (`GET /api/frequencias`, `GET /api/frequencias/resumo`, `GET /api/saidas`, `GET /api/configuracoes` e `GET /api/relatorios/grade/retrato`) exigem `consultar` (`ADMIN`, `COORDENACAO` e `SECRETARIA`, que só consulta; [ADR-087](adr/087-perfil-secretaria-e-capacidade-consultar.md)) e o registro de preparação do download da Grade (`POST /api/exportacoes/registro`, para grade e relatório; a relação de alunos continua exigindo `administrar`); a troca da própria senha exige `alterarPropriaSenha`; as estatísticas do diretor de turma exigem `verEstatisticasDasTurmas` (papel `DIRETOR_TURMA`). Sem sessão, 401; com sessão sem a capacidade, 403.
 
 Corpos malformados respondem 400 com leitura amigável; corpos acima de 200 kB respondem 413.
 
@@ -146,7 +146,7 @@ Respostas:
 
 ### GET /api/series
 
-- 200 `{"series": Serie[]}` na ordem de exibição. Qualquer sessão.
+- 200 `{"series": Serie[]}` na ordem de exibição. Capacidade operar.
 
 ### POST /api/series
 
@@ -169,7 +169,7 @@ Corpo parcial: `{ nome?, ordem? }`.
 
 ### GET /api/turmas
 
-- 200 `{"turmas": Turma[]}` com as aulas de cada turma. Qualquer sessão.
+- 200 `{"turmas": Turma[]}` com as aulas de cada turma. Capacidade operar.
 
 Turma: `{ id, nome, serieId, serieNome, rotulo, horarios }`, com rótulo composto, por exemplo "1º ano A".
 
@@ -238,7 +238,7 @@ A cópia inclui todas as aulas da origem, preservando ordem, início, fim, dias,
 
 ### GET /api/ordem-almoco
 
-Permissão: qualquer sessão. Ordem das turmas no almoço de segunda (1) a sábado (6), usada pela consulta diária da aba Horários.
+Permissão: capacidade operar. Ordem das turmas no almoço de segunda (1) a sábado (6), usada pela consulta diária da aba Horários.
 
 - 200 `{"dias": [{"diaSemana", "itens": [{"turmaId", "posicao", "inicio"}]}]}`, sempre com os seis dias; dia sem ordem vem com `itens` vazio. `posicao` começa em 1 e vem renumerada; `inicio` é `HH:MM` ou `null`.
 
@@ -253,7 +253,7 @@ Excluir uma turma a retira da ordem de todos os dias. A cópia JSON inclui a ord
 
 ### GET /api/provas-bimestrais
 
-Permissão: qualquer sessão da equipe. Devolve `{"provas": [{"id", "turmaId", "dia", "inicio", "fim", "disciplina"}]}` com as provas de hoje em diante, de todas as turmas, em ordem de data, início e disciplina. Datas passadas não aparecem. Ver [ADR-080](adr/080-horario-de-provas-bimestrais.md).
+Permissão: capacidade operar. Devolve `{"provas": [{"id", "turmaId", "dia", "inicio", "fim", "disciplina"}]}` com as provas de hoje em diante, de todas as turmas, em ordem de data, início e disciplina. Datas passadas não aparecem. Ver [ADR-080](adr/080-horario-de-provas-bimestrais.md).
 
 ### POST /api/provas-bimestrais
 
@@ -330,7 +330,7 @@ As provas específicas não entram na cópia JSON.
 
 ### GET /api/alunos
 
-Parâmetro opcional `turmaId`. Qualquer sessão.
+Parâmetro opcional `turmaId`. Capacidade operar.
 
 - 200 `{"alunos": Aluno[]}` de todas as turmas, ordenados por turma e ordem.
 - 400 quando `turmaId` não é um identificador válido.
@@ -435,11 +435,11 @@ Frequencia: `{ dia, turmaId, revisao, atualizadoEm, atualizadoPorNome, faltas, a
 
 ### GET /api/frequencias?dia=YYYY-MM-DD&turmaId=uuid&verificarHistorico=true
 
-Uma sessão com permissão de operação pode verificar se a primeira chamada de uma data passada precisa de confirmação. A consulta não grava a frequência, não registra auditoria e não aciona a fila. A mesma regra é verificada novamente no POST.
+Uma sessão com a capacidade `consultar` pode verificar se a primeira chamada de uma data passada precisa de confirmação. A consulta não grava a frequência, não registra auditoria e não aciona a fila. A mesma regra é verificada novamente no POST.
 
 - 200 `{"requerConfirmacaoHistorica": boolean}`. Uma chamada existente ou data que não seja passada dispensa essa confirmação.
 - 400 se o dia ou a turma forem inválidos ou ausentes, ou se a consulta incluir `mes`, `de`, `ate` ou `registradoPor`.
-- 401/403 sem sessão ativa ou sem permissão de operação; 404 se a turma não existir.
+- 401/403 sem sessão ativa ou sem a capacidade `consultar`; 404 se a turma não existir.
 
 ### GET /api/frequencias?mes=YYYY-MM
 
@@ -523,7 +523,7 @@ Um dia com faltas justificadas conta em `faltasJustificadas`; um dia com falta s
 
 ### GET /api/frequencias/alertas-beneficios?mes=YYYY-MM
 
-Permissão: qualquer sessão da operação. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício, que é o inteiro de `(100 - percentualMinimoFrequencia)%` das aulas do mês. As aulas do mês somam o retrato das chamadas salvas e a projeção dos demais dias úteis com aulas na grade da turma atual, sem feriados do calendário e sem os dias depois da desistência, usando a carga diária configurada ou a própria grade. Chamadas antigas sem retrato de aulas usam uma estimativa pela carga diária configurada ou pela grade da turma da chamada, inclusive sábado letivo salvo; a lista histórica de alunos permanece respeitada. O alerta conta aulas, enquanto os contadores F e FJ da linha contam dias, e não determina pagamento nem verifica a média anual. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia. A regra e o cálculo estão em [beneficios-frequencia.md](beneficios-frequencia.md).
+Permissão: capacidade operar. Devolve um item por aluno ativo e benefício ativo cujas faltas do mês passam do limite da regra do benefício, que é o inteiro de `(100 - percentualMinimoFrequencia)%` das aulas do mês. As aulas do mês somam o retrato das chamadas salvas e a projeção dos demais dias úteis com aulas na grade da turma atual, sem feriados do calendário e sem os dias depois da desistência, usando a carga diária configurada ou a própria grade. Chamadas antigas sem retrato de aulas usam uma estimativa pela carga diária configurada ou pela grade da turma da chamada, inclusive sábado letivo salvo; a lista histórica de alunos permanece respeitada. O alerta conta aulas, enquanto os contadores F e FJ da linha contam dias, e não determina pagamento nem verifica a média anual. A regra de cada benefício define se as faltas justificadas contam. Sem benefício ativo, a lista vem vazia. A regra e o cálculo estão em [beneficios-frequencia.md](beneficios-frequencia.md).
 
 - 200 `{"mes", "alertas": [{"beneficioId", "beneficioNome", "percentualMinimoFrequencia", "aulasPorDia", "faltasJustificadasContam", "alunoId", "aulasFaltadas", "aulasJustificadas", "horasLetivas", "limiteFaltas", "diasLetivos", "aulasDeReferencia"}]}`. `aulasFaltadas` conta o que a regra manda contar, `aulasJustificadas` informa as justificadas de qualquer forma, e exatamente o percentual mínimo de frequência ainda é permitido. `diasLetivos` são os dias com aula que compõem `horasLetivas`. `aulasDeReferencia` é a carga configurada ou, sem ela, a quantidade comum desses dias; fica nula quando os dias não coincidem, e por isso `horasLetivas` pode não ser `diasLetivos` vezes essa carga.
 - 400 quando `mes` falta ou não é um mês válido; 401 sem sessão.
@@ -532,7 +532,7 @@ Permissão: qualquer sessão da operação. Devolve um item por aluno ativo e be
 
 `aulasPorDia` aceita inteiro de 1 a 30 ou nulo (padrão). Uma quantidade projeta aulas somente nos dias úteis com aulas na grade e sem feriado; nulo usa a quantidade da própria grade. Chamadas salvas mantêm o retrato de aulas e faltas. Chamadas antigas sem retrato usam a carga configurada ou a grade da turma da chamada. O PATCH omitindo o campo mantém a configuração e, com nulo, volta à grade. Leitura, escrita e cópia JSON incluem o campo.
 
-Configuração dos benefícios que alimentam o alerta. Leitura por qualquer sessão; escrita só pela administração, com origem confiável e auditoria. Um benefício é `{ "id", "nome", "percentualMinimoFrequencia", "aulasPorDia", "faltasJustificadasContam", "ativo" }`: nome de 2 a 60 caracteres, único sem diferenciar caixa; percentual inteiro de 1 a 100; `faltasJustificadasContam` falso por padrão; `ativo` verdadeiro por padrão. A migração inicial cadastra uma linha com a regra do incentivo-frequência do Pé-de-Meia, editável como qualquer outra.
+Configuração dos benefícios que alimentam o alerta. Leitura pela capacidade operar; escrita só pela administração, com origem confiável e auditoria. Um benefício é `{ "id", "nome", "percentualMinimoFrequencia", "aulasPorDia", "faltasJustificadasContam", "ativo" }`: nome de 2 a 60 caracteres, único sem diferenciar caixa; percentual inteiro de 1 a 100; `faltasJustificadasContam` falso por padrão; `ativo` verdadeiro por padrão. A migração inicial cadastra uma linha com a regra do incentivo-frequência do Pé-de-Meia, editável como qualquer outra.
 
 - `GET /api/beneficios-frequencia`: 200 `{ "beneficios": [...] }` em ordem alfabética pelo nome, ativos e inativos.
 - `POST /api/beneficios-frequencia`: corpo `{ nome, percentualMinimoFrequencia, aulasPorDia?, faltasJustificadasContam?, ativo? }`; 201 `{ "beneficio" }`; 400 em corpo inválido (percentual fora de 1 a 100, fracionado ou em texto, nome curto); 403 sem ser administração; 409 com nome repetido.
@@ -661,7 +661,7 @@ O hash é SHA-256 do modelo, sem o instante do retrato, e serve como recibo na a
 
 ### GET /api/configuracoes
 
-- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean, "origemNaChamada": boolean, "origemNaChamadaSerieIds": string[], "origemNaChamadaTurmaIds": string[], "infrequenciaAtencaoPercentual": number, "infrequenciaCriticaPercentual": number, "feriados": Feriado[], "atualizadoEm": string}}`. Qualquer sessão. O calendário traz todos os anos, em ordem de data. Os limites de infrequência são inteiros de 0 a 100, com atenção menor que crítica, e começam em 10 e 20. `atualizadoEm` é a versão da última gravação.
+- 200 `{"configuracoes": {"frequenciaPorAula": boolean, "saidaAntecipada": boolean, "origemNaChamada": boolean, "origemNaChamadaSerieIds": string[], "origemNaChamadaTurmaIds": string[], "infrequenciaAtencaoPercentual": number, "infrequenciaCriticaPercentual": number, "feriados": Feriado[], "atualizadoEm": string}}`. Capacidade consultar. O calendário traz todos os anos, em ordem de data. Os limites de infrequência são inteiros de 0 a 100, com atenção menor que crítica, e começam em 10 e 20. `atualizadoEm` é a versão da última gravação.
 
 ### PATCH /api/configuracoes
 
@@ -718,7 +718,7 @@ Cada seção enviada traz o estado completo desejado, inclusive catálogos. A gr
 
 | Rota                                  | Permissão e contrato                                                                                                                                                                             |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `GET /api/calendario-letivo?ano=YYYY` | Sessão da equipe. 200 `{ feriados: Feriado[] }`, em ordem de data; sem `ano`, lista todos os anos. Ano inválido responde 400.                                                                    |
+| `GET /api/calendario-letivo?ano=YYYY` | Capacidade operar. 200 `{ feriados: Feriado[] }`, em ordem de data; sem `ano`, lista todos os anos. Ano inválido responde 400.                                                                   |
 | `POST /api/calendario-letivo`         | Administração e origem confiável. Corpo estrito `{ dia, nome }`; 201 `{ feriado: Feriado }`. Data já cadastrada ou com chamada regular ou parcial salva responde 409, sem modificar o histórico. |
 | `DELETE /api/calendario-letivo/{dia}` | Administração e origem confiável. 200 `{ ok: true }`; 400 para data inválida e 404 quando não existe feriado nessa data. Remove somente o feriado.                                               |
 
@@ -740,7 +740,7 @@ Administração e origem confiável. Corpo estrito `{ ano, senha }`. 200 `{ prov
 
 ### GET /api/justificativas
 
-- 200 `{"justificativas": [{"codigo", "rotulo", "ativo"}]}` em ordem alfabética pelo rótulo. Qualquer sessão.
+- 200 `{"justificativas": [{"codigo", "rotulo", "ativo"}]}` em ordem alfabética pelo rótulo. Capacidade operar.
 
 ### POST /api/justificativas
 
@@ -766,7 +766,7 @@ Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico g
 
 ### GET /api/liberadores
 
-- 200 `{"liberadores": [{"codigo", "rotulo", "ativo"}]}` em ordem alfabética pelo rótulo. Qualquer sessão.
+- 200 `{"liberadores": [{"codigo", "rotulo", "ativo"}]}` em ordem alfabética pelo rótulo. Capacidade operar.
 
 ### POST /api/liberadores
 
@@ -792,11 +792,11 @@ Corpo parcial: `{ rotulo?, ativo? }`. O código não muda, porque o histórico g
 
 ### GET /api/responsaveis
 
-- 200 `{"responsaveis": [{"id", "nome", "papel"}]}` com a equipe ativa que pode liberar saídas. Qualquer sessão.
+- 200 `{"responsaveis": [{"id", "nome", "papel"}]}` com a equipe ativa que pode liberar saídas. Exige a capacidade `operar`.
 
 ## Planilha
 
-Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na conexão OAuth, o token de atualização nunca sai do servidor; um token de acesso breve chega ao navegador somente para o Picker. Mutações exigem origem confiável; a configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
+Integração opcional com Google Planilhas (ver [planilha.md](planilha.md)). Na conexão OAuth, o token de atualização nunca sai do servidor; um token de acesso breve chega ao navegador somente para o Picker. Mutações exigem origem confiável; a configuração é restrita à administração, e o envio exige a capacidade operar.
 
 ### Conexão OAuth das três finalidades
 
@@ -809,7 +809,7 @@ Erros externos de autorização usam `{ "error": string, "codigo": string }`: `G
 
 ### GET /api/planilha/estado
 
-- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "alteradasDepois"}}`. `alteradasDepois` conta chamadas ainda pendentes, considerando confirmação por dia, origem e destino atual. Qualquer sessão.
+- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "alteradasDepois"}}`. `alteradasDepois` conta chamadas ainda pendentes, considerando confirmação por dia, origem e destino atual. Capacidade operar.
 
 ### GET /api/planilha e PATCH /api/planilha
 
@@ -907,7 +907,7 @@ Corpo: `{ "frase": "EDITAR PLANILHA", "senha": string, "duracaoMinutos"?: 5 | 15
 
 ### POST /api/planilha/modo-conservador
 
-Volta ao modo conservador. Qualquer sessão.
+Volta ao modo conservador. Capacidade operar.
 
 - 200 `{"modo": "conservador"}`.
 
@@ -949,11 +949,11 @@ Apaga a autorização OAuth e o esquema e desliga a integração. Apenas adminis
 
 ## Planilha de saídas
 
-Segunda finalidade da integração, em aba única de registro das saídas antecipadas. Usa o OAuth e a Sheets API descritos acima. A seleção da planilha, o modo e o mapa são próprios desta finalidade. A configuração é restrita à administração, e o envio aceita qualquer sessão ativa.
+Segunda finalidade da integração, em aba única de registro das saídas antecipadas. Usa o OAuth e a Sheets API descritos acima. A seleção da planilha, o modo e o mapa são próprios desta finalidade. A configuração é restrita à administração, e o envio exige a capacidade operar.
 
 ### GET /api/planilha-saidas/estado
 
-- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "configurada"}}`. Qualquer sessão.
+- 200 `{"estado": {"ativa", "modo", "modoCompletoAte", "podeEnviar", "configurada"}}`. Capacidade operar.
 
 ### GET /api/planilha-saidas e PATCH /api/planilha-saidas
 
@@ -993,7 +993,7 @@ Corpo: `{ "frase": "EDITAR PLANILHA", "senha": string, "duracaoMinutos"?: 5 | 15
 
 ### POST /api/planilha-saidas/modo-conservador
 
-Volta ao modo conservador. Qualquer sessão.
+Volta ao modo conservador. Capacidade operar.
 
 - 200 `{"modo": "conservador"}`.
 
@@ -1078,7 +1078,7 @@ Apenas administração. Desconecta a integração e desliga o envio; não altera
 
 ### GET /api/planilha-parcial/estado
 
-Sessão da equipe. Retorna `{ podeEnviar, planilhaNome, aba }`. O envio só libera depois de conexão, ativação e preparação da aba.
+Capacidade operar. Retorna `{ podeEnviar, planilhaNome, aba }`. O envio só libera depois de conexão, ativação e preparação da aba.
 
 ### POST /api/planilha-parcial/preparar
 
@@ -1086,7 +1086,7 @@ Apenas administração. Corpo `{ "confirmacao": true }`. Cria a aba `Chamada Par
 
 ### POST /api/planilha-parcial/simular e /api/planilha-parcial/enviar
 
-Sessão da equipe. Corpo estrito `{ de, ate, turmaId?, atualizarExistentes?: boolean, planoHash? }`, com datas `YYYY-MM-DD` e período inclusivo de até 92 dias. `turmaId` filtra a turma histórica. A simulação devolve a prévia e o `planoHash`; o envio exige o hash corrente e relê dados locais, valores, fórmulas e marcadores externos antes de escrever.
+Capacidade operar. Corpo estrito `{ de, ate, turmaId?, atualizarExistentes?: boolean, planoHash? }`, com datas `YYYY-MM-DD` e período inclusivo de até 92 dias. `turmaId` filtra a turma histórica. A simulação devolve a prévia e o `planoHash`; o envio exige o hash corrente e relê dados locais, valores, fórmulas e marcadores externos antes de escrever.
 
 O plano usa os registros efetivos de `/api/frequencias-personalizadas`, com no máximo uma linha por aluno e dia. Novas linhas usam `chamada:<alunoId>:<dia>` na coluna Código, tanto para a base como para personalizações. UUIDs de personalizações enviados anteriormente são reconhecidos e preservados ao atualizar; encontrar tanto o código canônico como o UUID bloqueia a escrita. Uma linha de personalização removida sem correspondência segura exige conferência, sem acrescentar outra para o mesmo nome e dia. Por padrão, o plano acrescenta somente registros novos. `atualizarExistentes: true` autoriza explicitamente correções e confirmações já enviadas, somente nas nove colunas de linhas criadas e marcadas pela integração, com código único e sem fórmula. Divergências sem essa autorização, fórmulas ou códigos repetidos bloqueiam a escrita e exigem conferência. Linhas manuais sem código, com mesmo nome e data, são preservadas e aparecem como pendência.
 
@@ -1124,7 +1124,7 @@ Corpo: o documento exportado pela própria aplicação, com até 25 MB.
 Corpo estrito: `{ "tipo": "grade" | "relacao" | "relatorio", "formato": "original" | "zip", "retrato"?: string }`.
 
 - 200 `{"ok": true}` após registrar `download.preparar` com alvo do tipo `grade:zip`, conta e data. No relatório, o alvo inclui o hash do retrato (`relatorio:zip:<hash>`) e o campo `retrato` é obrigatório; nos demais tipos, é proibido. O registro indica preparação, sem comprovar que o navegador salvou o arquivo. Não recebe nomes, conteúdo nem senhas.
-- Grade e relatório da Grade disponíveis à administração e coordenação; relação restrita à administração. Diretores não têm acesso. Exige sessão e origem válida, com 400 para corpo inválido e 403 para escopo não permitido.
+- Grade e relatório da Grade disponíveis à administração, à coordenação e à Secretaria; relação restrita à administração. Diretores não têm acesso. Exige sessão e origem válida, com 400 para corpo inválido e 403 para escopo não permitido.
 - A interface registra depois de preparar o CSV, PDF ou ZIP e antes de iniciar o download. Falha no registro permite tentar novamente e não inicia download.
 
 ## Saúde

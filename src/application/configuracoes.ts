@@ -1,4 +1,4 @@
-// Configurações de recursos: leitura por qualquer sessão e escrita pela
+// Configurações de recursos: leitura pela capacidade consultar e escrita pela
 // administração, com auditoria na mesma transação.
 import { z } from "zod";
 import { banco } from "@/infra/banco";
