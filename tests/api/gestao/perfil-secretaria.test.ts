@@ -119,6 +119,11 @@ const recusas: Array<[string, string, string, unknown?]> = [
   ["ler as provas bimestrais", "GET", "/api/provas-bimestrais"],
   ["listar as provas específicas", "GET", "/api/provas"],
   ["cadastrar uma prova específica", "POST", "/api/provas", {}],
+  [
+    "ler a ocupação de um local de prova",
+    "GET",
+    "/api/provas/ocupacao?latitude=-3.7&longitude=-38.5",
+  ],
   ["alterar as configurações", "PATCH", "/api/configuracoes", { saidaAntecipada: false }],
   ["listar a equipe", "GET", "/api/usuarios"],
   [
