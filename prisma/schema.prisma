@@ -30,11 +30,14 @@ model ChaveBi {
 }
 
 // Papel do usuário. ADMIN cuida de contas e cadastros; COORDENACAO faz a
-// frequência, consulta o histórico e a grade do mês; DIRETOR_TURMA só lê as
-// estatísticas das turmas do seu vínculo (ADR-021).
+// frequência, consulta o histórico e a grade do mês; SECRETARIA só consulta o
+// Painel e as grades de relatório; DIRETOR_TURMA só lê as estatísticas das
+// turmas do seu vínculo (ADR-021). As capacidades de cada papel ficam em
+// src/domain/usuarios.ts.
 enum Papel {
   ADMIN
   COORDENACAO
+  SECRETARIA
   DIRETOR_TURMA
 
   @@map("papel")

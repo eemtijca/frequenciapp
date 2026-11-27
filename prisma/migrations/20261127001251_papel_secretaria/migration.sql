@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "papel" ADD VALUE 'SECRETARIA';
