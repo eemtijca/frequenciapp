@@ -1,5 +1,5 @@
-// Perfil Secretaria (RBAC por capacidade): lê o Painel e as grades de relatório e nada além disso.
-// Confere o que o servidor permite e o que recusa, por rota, com uma conta real criada pela administração.
+// Perfil Secretaria (RBAC por capacidade): lê o Painel e as grades de relatório,
+// registra o preparo do download e nada além disso, com uma conta real criada pela administração.
 import { afterAll, beforeAll, expect, it } from "vitest";
 import pg from "pg";
 import { diaLocal } from "@/domain/frequencia";
@@ -100,11 +100,35 @@ it("a Secretaria chega ao retrato da Grade: sem parâmetros recebe 400 da rota, 
   expect(resposta.status).toBe(400);
 });
 
+it("a Secretaria registra o preparo do download da Grade e do relatório", async () => {
+  const grade = await chamar("/api/exportacoes/registro", "POST", cookieSecretaria, {
+    tipo: "grade",
+    formato: "zip",
+  });
+  expect(grade.status).toBe(200);
+  expect((await grade.json()) as { ok: boolean }).toEqual({ ok: true });
+
+  const relatorio = await chamar("/api/exportacoes/registro", "POST", cookieSecretaria, {
+    tipo: "relatorio",
+    formato: "zip",
+    retrato: "a".repeat(64),
+  });
+  expect(relatorio.status).toBe(200);
+  expect((await relatorio.json()) as { ok: boolean }).toEqual({ ok: true });
+});
+
 const recusas: Array<[string, string, string, unknown?]> = [
   ["salvar uma chamada", "POST", "/api/frequencias", {}],
   ["registrar uma saída", "POST", "/api/saidas", {}],
   ["registrar uma entrada", "POST", "/api/entradas", {}],
+  ["ler as entradas", "GET", `/api/entradas?de=${hoje}&ate=${hoje}`],
   ["lançar presença parcial", "POST", "/api/frequencias-parciais", {}],
+  [
+    "ler a frequência personalizada",
+    "GET",
+    `/api/frequencias-personalizadas?de=${hoje}&ate=${hoje}`,
+  ],
+  ["ler o estado da planilha", "GET", "/api/planilha/estado"],
   [
     "ler o relatório de saídas e entradas",
     "GET",
@@ -136,6 +160,12 @@ const recusas: Array<[string, string, string, unknown?]> = [
   ["listar os diretores", "GET", "/api/diretores"],
   ["mudar as preferências de aviso", "PATCH", "/api/notificacoes/preferencias", {}],
   ["exportar a cópia de segurança", "POST", "/api/backup/exportar", {}],
+  [
+    "registrar a exportação da relação de alunos",
+    "POST",
+    "/api/exportacoes/registro",
+    { tipo: "relacao", formato: "zip" },
+  ],
 ];
 
 it.each(recusas)("a Secretaria não pode %s (403)", async (_rotulo, metodo, caminho, corpo) => {
