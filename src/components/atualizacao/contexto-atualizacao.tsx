@@ -21,6 +21,7 @@ const VISOES = [
   "horarios",
   "saidas",
   "relatorios",
+  "provas",
   "alunos",
   "gestao",
 ] as const;

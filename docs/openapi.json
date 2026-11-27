@@ -62,6 +62,10 @@
       "description": "Aulas, dias e disciplinas de cada turma."
     },
     {
+      "name": "provas",
+      "description": "Provas específicas, como Enem e vestibulares, com alunos inscritos e frequência."
+    },
+    {
       "name": "frequencias",
       "description": "Chamada diária, confirmação da Seduc e resumo acumulado."
     },
@@ -12770,6 +12774,549 @@
           }
         }
       }
+    },
+    "/api/provas": {
+      "get": {
+        "operationId": "listarProvasEspecificas",
+        "summary": "Listar as provas específicas",
+        "description": "Administração e coordenação (capacidade de operação). Da data mais recente para a mais antiga, com as contagens de presentes e ausentes.",
+        "tags": ["provas"],
+        "responses": {
+          "200": {
+            "description": "Provas cadastradas.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProvasEspecificas"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "provas": [
+                        {
+                          "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
+                          "nome": "Enem 2026",
+                          "local": "Escola Estadual Central",
+                          "dia": "2026-11-29",
+                          "total": 14,
+                          "presentes": 7,
+                          "ausentes": 2
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      },
+      "post": {
+        "operationId": "criarProvaEspecifica",
+        "summary": "Cadastrar uma prova específica",
+        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria. Cria a prova sem alunos; a data pode ser passada ou cair no domingo.",
+        "tags": ["provas"],
+        "requestBody": {
+          "required": true,
+          "description": "Nome, local opcional e data da prova.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NovaProvaEspecifica"
+              },
+              "examples": {
+                "Prova": {
+                  "summary": "Prova",
+                  "value": {
+                    "nome": "Enem 2026",
+                    "local": "Escola Estadual Central",
+                    "dia": "2026-11-29"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Prova cadastrada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CriacaoProvaEspecifica"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "prova": {
+                        "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
+                        "nome": "Enem 2026",
+                        "local": "Escola Estadual Central",
+                        "dia": "2026-11-29",
+                        "total": 0,
+                        "presentes": 0,
+                        "ausentes": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/provas/{id}": {
+      "get": {
+        "operationId": "lerProvaEspecifica",
+        "summary": "Ler uma prova com os alunos",
+        "description": "Administração e coordenação (capacidade de operação). Devolve a prova e os alunos inscritos, em ordem alfabética, com a marca de cada um.",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da prova.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Prova e alunos inscritos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalheProvaEspecifica"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "prova": {
+                        "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
+                        "nome": "Enem 2026",
+                        "local": "Escola Estadual Central",
+                        "dia": "2026-11-29",
+                        "total": 14,
+                        "presentes": 7,
+                        "ausentes": 2
+                      },
+                      "participantes": [
+                        {
+                          "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                          "nome": "Ana Rodrigues Barros",
+                          "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "presente": true
+                        },
+                        {
+                          "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "nome": "Arthur Lima",
+                          "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "presente": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "editarProvaEspecifica",
+        "summary": "Editar nome, local e data da prova",
+        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria. Não altera os alunos nem a frequência.",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da prova.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Nome, local opcional e data da prova.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NovaProvaEspecifica"
+              },
+              "examples": {
+                "Prova": {
+                  "summary": "Prova",
+                  "value": {
+                    "nome": "Enem 2026",
+                    "local": "Escola Estadual Central",
+                    "dia": "2026-11-29"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prova atualizada.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalheProvaEspecifica"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "prova": {
+                        "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
+                        "nome": "Enem 2026",
+                        "local": "Escola Estadual Central",
+                        "dia": "2026-11-29",
+                        "total": 14,
+                        "presentes": 7,
+                        "ausentes": 2
+                      },
+                      "participantes": [
+                        {
+                          "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                          "nome": "Ana Rodrigues Barros",
+                          "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "presente": true
+                        },
+                        {
+                          "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "nome": "Arthur Lima",
+                          "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "presente": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removerProvaEspecifica",
+        "summary": "Remover uma prova específica",
+        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria. Remove também os alunos inscritos e a frequência da prova.",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da prova.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Prova removida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Ok"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "ok": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/provas/{id}/participantes": {
+      "put": {
+        "operationId": "definirParticipantesDaProva",
+        "summary": "Definir os alunos da prova",
+        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria. Recebe a lista completa: quem continua mantém a marca, quem sai perde a inscrição e quem entra precisa estar ativo e sem desistência (400 caso contrário).",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da prova.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Identificadores de todos os alunos da prova.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ParticipantesDaProva"
+              },
+              "examples": {
+                "Alunos": {
+                  "summary": "Alunos",
+                  "value": {
+                    "alunoIds": [
+                      "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                      "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prova e alunos inscritos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalheProvaEspecifica"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "prova": {
+                        "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
+                        "nome": "Enem 2026",
+                        "local": "Escola Estadual Central",
+                        "dia": "2026-11-29",
+                        "total": 14,
+                        "presentes": 7,
+                        "ausentes": 2
+                      },
+                      "participantes": [
+                        {
+                          "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                          "nome": "Ana Rodrigues Barros",
+                          "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "presente": true
+                        },
+                        {
+                          "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "nome": "Arthur Lima",
+                          "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "presente": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/provas/{id}/frequencia": {
+      "put": {
+        "operationId": "registrarFrequenciaDaProva",
+        "summary": "Registrar a frequência na prova",
+        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria. Cada marca é presente (`true`), ausente (`false`) ou sem registro (`null`); só vale para aluno já inscrito (400 caso contrário).",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da prova.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Marcas por aluno inscrito.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MarcasDaProva"
+              },
+              "examples": {
+                "Marcas": {
+                  "summary": "Marcas",
+                  "value": {
+                    "marcas": [
+                      {
+                        "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                        "presente": true
+                      },
+                      {
+                        "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                        "presente": false
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prova e alunos inscritos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalheProvaEspecifica"
+                },
+                "examples": {
+                  "Exemplo": {
+                    "summary": "Exemplo",
+                    "value": {
+                      "prova": {
+                        "id": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01",
+                        "nome": "Enem 2026",
+                        "local": "Escola Estadual Central",
+                        "dia": "2026-11-29",
+                        "total": 14,
+                        "presentes": 7,
+                        "ausentes": 2
+                      },
+                      "participantes": [
+                        {
+                          "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                          "nome": "Ana Rodrigues Barros",
+                          "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "presente": true
+                        },
+                        {
+                          "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "nome": "Arthur Lima",
+                          "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                          "presente": null
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -21013,6 +21560,190 @@
             "type": "integer",
             "description": "Provas apagadas, de todas as turmas.",
             "example": 12
+          }
+        }
+      },
+      "ProvaEspecifica": {
+        "type": "object",
+        "title": "Prova específica",
+        "description": "Prova como o Enem ou um vestibular, com as contagens de frequência.",
+        "required": ["id", "nome", "local", "dia", "total", "presentes", "ausentes"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01"
+          },
+          "nome": {
+            "type": "string",
+            "maxLength": 120,
+            "example": "Enem 2026"
+          },
+          "local": {
+            "type": ["string", "null"],
+            "maxLength": 120,
+            "description": "Local de realização; nulo quando não foi informado.",
+            "example": "Escola Estadual Central"
+          },
+          "dia": {
+            "type": "string",
+            "format": "date",
+            "description": "Data civil da prova.",
+            "example": "2026-11-29"
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Alunos inscritos.",
+            "example": 14
+          },
+          "presentes": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 7
+          },
+          "ausentes": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 2
+          }
+        }
+      },
+      "ProvasEspecificas": {
+        "type": "object",
+        "title": "Provas específicas",
+        "description": "Provas da mais recente para a mais antiga.",
+        "required": ["provas"],
+        "properties": {
+          "provas": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProvaEspecifica"
+            }
+          }
+        }
+      },
+      "CriacaoProvaEspecifica": {
+        "type": "object",
+        "title": "Prova específica criada",
+        "required": ["prova"],
+        "properties": {
+          "prova": {
+            "$ref": "#/components/schemas/ProvaEspecifica"
+          }
+        }
+      },
+      "NovaProvaEspecifica": {
+        "type": "object",
+        "title": "Nova prova específica",
+        "description": "Nome, local opcional e data. Os espaços das pontas são removidos e o local vazio vira nulo.",
+        "additionalProperties": false,
+        "required": ["nome", "dia"],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120,
+            "example": "Enem 2026"
+          },
+          "local": {
+            "type": ["string", "null"],
+            "maxLength": 120,
+            "example": "Escola Estadual Central"
+          },
+          "dia": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-29"
+          }
+        }
+      },
+      "ParticipanteDaProva": {
+        "type": "object",
+        "title": "Aluno da prova",
+        "required": ["alunoId", "nome", "turmaId", "presente"],
+        "properties": {
+          "alunoId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+          },
+          "nome": {
+            "type": "string",
+            "example": "Ana Rodrigues Barros"
+          },
+          "turmaId": {
+            "type": "string",
+            "format": "uuid",
+            "example": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d"
+          },
+          "presente": {
+            "type": ["boolean", "null"],
+            "description": "`true` presente, `false` ausente, `null` sem registro.",
+            "example": true
+          }
+        }
+      },
+      "DetalheProvaEspecifica": {
+        "type": "object",
+        "title": "Prova específica com alunos",
+        "required": ["prova", "participantes"],
+        "properties": {
+          "prova": {
+            "$ref": "#/components/schemas/ProvaEspecifica"
+          },
+          "participantes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParticipanteDaProva"
+            }
+          }
+        }
+      },
+      "ParticipantesDaProva": {
+        "type": "object",
+        "title": "Alunos da prova",
+        "additionalProperties": false,
+        "required": ["alunoIds"],
+        "properties": {
+          "alunoIds": {
+            "type": "array",
+            "maxItems": 3000,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "format": "uuid",
+              "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+            }
+          }
+        }
+      },
+      "MarcasDaProva": {
+        "type": "object",
+        "title": "Marcas de frequência da prova",
+        "additionalProperties": false,
+        "required": ["marcas"],
+        "properties": {
+          "marcas": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["alunoId", "presente"],
+              "properties": {
+                "alunoId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+                },
+                "presente": {
+                  "type": ["boolean", "null"],
+                  "example": true
+                }
+              }
+            }
           }
         }
       }

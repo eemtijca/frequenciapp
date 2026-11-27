@@ -176,6 +176,8 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - Relatórios, Grade: as colunas do período mostram F, FJ e S por aluno, a célula de presença parcial informa as aulas faltadas e a linha do aluno abre o detalhamento com datas, aulas e justificativas. O novo relatório em PDF reúne o resumo e o detalhamento das faltas da turma de origem até hoje, com retrato consistente do banco, hash completo no rodapé, download protegido e registro de auditoria com o hash do retrato.
 
+- A gaveta ganha o botão Provas para a administração e a coordenação registrarem a frequência em provas como o Enem e vestibulares. A equipe define o nome, o local opcional e a data (passada ou no domingo), escolhe os alunos por turma e marca Presente ou Ausente por aluno, com a contagem na lista. Novas rotas `GET` e `POST /api/provas`, `GET`, `PATCH` e `DELETE /api/provas/{id}`, `PUT /api/provas/{id}/participantes` e `PUT /api/provas/{id}/frequencia`, e as tabelas `provas_especificas` e `participantes_prova` ([ADR-085](docs/adr/085-provas-especificas.md)).
+
 - A página pública `/privacidade` descreve o tratamento de dados da EEMTI José Cláudio de Araújo, inclusive o escopo `drive.file` da integração Google, e abre sem sessão. `/politica-de-privacidade` redireciona para ela. A entrada e o diálogo Sobre apontam para a página.
 
 - O atualizador agendado da `main` aceita migrações novas apenas com autorização protegida, vinculada à revisão instalada, ao commit candidato, aos SHA-256 dos SQLs e a uma janela de uso único.
