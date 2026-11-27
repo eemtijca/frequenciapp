@@ -19,6 +19,10 @@ A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalaç�
 - Falhas de geração ou transporte não publicam recibo. Falha de expurgo pode ocorrer após a confirmação do novo conjunto e retorna erro sem anunciar limpeza completa.
 - Nenhum teste usa dados reais.
 
+Na atualização manual do perfil simples com o migrador na partida, o recibo precisa vincular o dump cifrado ao contêiner, cluster, banco, schema e à operação corrente. O produtor usa o ID completo do contêiner e o socket local; o atualizador compara essa origem às conexões da aplicação antes de autorizar a partida. Um recibo legado pode servir ao diagnóstico de integridade, mas não comprova origem. A cópia remota configurada deve ser verificada; aceitar apenas a cópia local quando não há destino remoto exige `ATUALIZAR_PERMITIR_BACKUP_LOCAL=true`.
+
+Esse backup não executa expurgo. Após a intenção de troca, as rotinas revisadas que usam o mesmo estado e trava recusam novo backup, retenção e restauração até a conclusão verificada ou a análise manual. A validação dos bytes e do destino não comprova que a chave privada está disponível ou que a restauração foi ensaiada. A proteção não abrange scripts antigos ou operações diretas fora dessas rotinas.
+
 ## Modos do banco
 
 ### `BACKUP_MODO=compose`

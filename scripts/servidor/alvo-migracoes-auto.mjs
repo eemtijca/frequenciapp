@@ -1,7 +1,7 @@
 // Confere a configuração Compose, os bytes da imagem e a base PostgreSQL da migração automática.
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { readSync, realpathSync } from "node:fs";
+import { readFileSync, readSync, realpathSync } from "node:fs";
 import { isIPv4 } from "node:net";
 import { pathToFileURL } from "node:url";
 import { identidadeDaConexao, resolverSchema } from "../../src/infra/schema-postgres.mjs";
@@ -72,7 +72,32 @@ function conferirUrl(url, db, banco, schema, usuario, schemaExplicito) {
   );
 }
 
-function conferirCompose(config, app, db, banco, schema, imagem, envelope, diretorio) {
+function digestConfig(valor) {
+  const ordenado = (v) => {
+    if (Array.isArray(v)) return v.map(ordenado);
+    if (!objeto(v)) return v;
+    return Object.fromEntries(
+      Object.keys(v)
+        .sort()
+        .map((k) => [k, ordenado(v[k])]),
+    );
+  };
+  return createHash("sha256")
+    .update(JSON.stringify(ordenado(valor)))
+    .digest("hex");
+}
+
+function conferirCompose(
+  config,
+  app,
+  db,
+  banco,
+  schema,
+  imagem,
+  envelope,
+  diretorio,
+  manual = false,
+) {
   exigir(identificador(idCompose, app) && identificador(idCompose, db) && app !== db);
   exigir(identificador(idBanco, banco) && schemaValido(schema));
   exigir(
@@ -85,9 +110,25 @@ function conferirCompose(config, app, db, banco, schema, imagem, envelope, diret
   const usuario = postgres.environment.POSTGRES_USER;
   exigir(postgres.environment.POSTGRES_DB === banco && identificador(idBanco, usuario));
   exigir(amb.MIGRAR_NA_PARTIDA === "true");
-  const modoAuto = imagem !== undefined;
+  const modoAuto = !manual && imagem !== undefined;
+  const partidaManual = manual && imagem !== undefined;
   exigir(
-    (!modoAuto && aplicacao.restart === "unless-stopped") ||
+    [undefined, "", "false", ...(partidaManual ? ["true"] : [])].includes(
+      amb.MIGRACAO_MANUAL_PROTEGIDA,
+    ),
+  );
+  if (manual) {
+    exigir([undefined, "", "false"].includes(amb.MIGRACAO_AUTOMATICA));
+    if (partidaManual) {
+      exigir(identificador(/^sha256:[0-9a-f]{64}$/, imagem) && aplicacao.image === imagem);
+      exigir(amb.MIGRACAO_MANUAL_PROTEGIDA === "true" && amb.MIGRACAO_LOTE_APROVADO === envelope);
+      exigir(identificador(/^[a-zA-Z0-9_-]{1,65536}$/, envelope) && diretorio?.startsWith("/"));
+      // O entrypoint não pode criar contas na partida protegida.
+      exigir(amb.ADMIN_EMAIL === "" && amb.ADMIN_SENHA === "");
+    } else exigir([undefined, ""].includes(amb.MIGRACAO_LOTE_APROVADO));
+  }
+  exigir(
+    (!modoAuto && aplicacao.restart === (manual && imagem ? "no" : "unless-stopped")) ||
       (modoAuto &&
         amb.MIGRACAO_AUTOMATICA === "true" &&
         aplicacao.restart === "no" &&
@@ -137,7 +178,7 @@ function conferirCompose(config, app, db, banco, schema, imagem, envelope, diret
     );
   }
   exigir(semOpcoes(aplicacao, ["post_start", "pre_stop"]));
-  if (modoAuto) {
+  if (modoAuto || partidaManual) {
     exigir(Array.isArray(aplicacao.volumes) && aplicacao.volumes.length === 1);
     const [mount] = aplicacao.volumes;
     exigir(
@@ -183,7 +224,34 @@ function conferirCompose(config, app, db, banco, schema, imagem, envelope, diret
       exigir(nome === db || ![nome, servico.container_name, ...aliases].some(podeResolver));
     }
   }
-  return { projeto: config.name, rede: rede.name, banco, schema, usuario };
+  let topologia;
+  if (manual) {
+    const servico = { ...aplicacao, environment: { ...amb } };
+    for (const chave of ["image", "build", "restart", "volumes"]) delete servico[chave];
+    for (const chave of [
+      "COMMIT_SHA",
+      "MIGRACAO_AUTOMATICA",
+      "MIGRACAO_MANUAL_PROTEGIDA",
+      "MIGRACAO_LOTE_APROVADO",
+      "ADMIN_EMAIL",
+      "ADMIN_SENHA",
+    ])
+      delete servico.environment[chave];
+    topologia = digestConfig({
+      app: servico,
+      db: postgres,
+      redes: config.networks,
+      volumes: config.volumes,
+    });
+  }
+  return {
+    projeto: config.name,
+    rede: rede.name,
+    banco,
+    schema,
+    usuario,
+    ...(manual ? { topologia } : {}),
+  };
 }
 
 function git(repo, limite, ...args) {
@@ -322,14 +390,22 @@ async function sondarImagem(raiz) {
   return { ...saida };
 }
 
-function conferirImagem(prova, repo, revisao) {
+function conferirImagem(prova, repo, revisao, manual = false) {
   exigir(objeto(prova));
   const esperados = hashesGit(repo, revisao, true);
   exigir(Object.keys(prova).length === esperados.size);
   for (const [nome, hash] of esperados) exigir(Object.hasOwn(prova, nome) && prova[nome] === hash);
+  if (manual) {
+    // O alvo precisa executar o protocolo reconhecido pelo executor, não só
+    // provar que sua imagem corresponde a fontes possivelmente legadas.
+    for (const nome of scripts) {
+      const local = readFileSync(new URL(`../../${nome}`, import.meta.url));
+      exigir(createHash("sha256").update(local).digest("hex") === esperados.get(nome));
+    }
+  }
 }
 
-function sqlHistorico(schema) {
+function sqlHistorico(schema, manual = false) {
   exigir(schemaValido(schema));
   return `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
 SET LOCAL search_path = pg_catalog;
@@ -341,6 +417,7 @@ WITH historico AS (
       AND pg_catalog.isfinite(started_at) AND pg_catalog.isfinite(finished_at) AND applied_steps_count > 0
       AND count(*) OVER (PARTITION BY started_at) = 1) AS completa
   FROM "${schema}"._prisma_migrations
+  ${manual ? "WHERE rolled_back_at IS NULL" : ""}
   LIMIT ${maxMigracoes + 1}
 )
 SELECT pg_catalog.json_build_object(
@@ -351,6 +428,7 @@ SELECT pg_catalog.json_build_object(
   'schemaOid', oid::text,
   'usuario', current_user,
   'primario', NOT pg_catalog.pg_is_in_recovery(),
+  ${manual ? "'inicio', EXTRACT(epoch FROM pg_catalog.pg_postmaster_start_time())::text," : ""}
   'gatilhos', EXISTS (SELECT 1 FROM pg_catalog.pg_event_trigger WHERE evtenabled <> 'D'),
   'registros', (SELECT coalesce(json_agg(json_build_array(migration_name, checksum, completa)
     ORDER BY started_at), '[]'::json) FROM historico)
@@ -360,7 +438,7 @@ ROLLBACK;
 `;
 }
 
-function conferirHistorico(prova, repo, revisao, banco, schema) {
+function conferirHistorico(prova, repo, revisao, banco, schema, manual = false) {
   exigir(objeto(prova) && identificador(idBanco, banco) && schemaValido(schema));
   const { cluster, bancoOid, schemaOid, usuario, primario, gatilhos, registros } = prova;
   exigir(identificador(/^[1-9][0-9]{0,19}$/, cluster));
@@ -369,8 +447,13 @@ function conferirHistorico(prova, repo, revisao, banco, schema) {
   exigir(primario === true && gatilhos === false && Array.isArray(registros));
   const esperados = [...hashesGit(repo, revisao, false)].filter(([nome]) => caminhoSql.test(nome));
   exigir(registros.length === esperados.length);
+  const observados = manual ? new Map(registros.map((r) => [r[0], r])) : null;
+  if (manual)
+    exigir(
+      observados.size === esperados.length && identificador(/^[0-9]+\.[0-9]{6}$/, prova.inicio),
+    );
   for (const [i, [caminho, hash]] of esperados.entries()) {
-    const registro = registros[i];
+    const registro = manual ? observados.get(caminho.split("/")[2]) : registros[i];
     exigir(
       Array.isArray(registro) &&
         registro.length === 3 &&
@@ -379,11 +462,22 @@ function conferirHistorico(prova, repo, revisao, banco, schema) {
         registro[2] === true,
     );
   }
-  return { cluster, banco, bancoOid, schema, schemaOid, usuario, primario, gatilhos };
+  return {
+    cluster,
+    banco,
+    bancoOid,
+    schema,
+    schemaOid,
+    usuario,
+    primario,
+    gatilhos,
+    ...(manual ? { inicio: prova.inicio } : {}),
+  };
 }
 
-function prepararEnvelope(prova, repo, base, alvo) {
-  const lote = inventariarLoteAutomatico(repo, base, alvo);
+function prepararEnvelope(prova, repo, base, alvo, manual = false) {
+  const anteriores = manual ? hashesGit(repo, base, false) : null;
+  const lote = manual ? null : inventariarLoteAutomatico(repo, base, alvo);
   const { cluster, banco, bancoOid, schema, schemaOid, usuario, primario, gatilhos, ip } = prova;
   exigir(primario === true && gatilhos === false && schemaValido(schema));
   exigir(typeof ip === "string" && isIPv4(ip));
@@ -391,10 +485,18 @@ function prepararEnvelope(prova, repo, base, alvo) {
   exigir(identificador(/^[1-9][0-9]{0,19}$/, cluster));
   exigir([bancoOid, schemaOid].every((oid) => identificador(/^[1-9][0-9]{0,9}$/, oid)));
   const nome = (caminho) => caminho.split("/")[2];
-  const aplicadas = [...hashesGit(repo, base, false)]
+  const aplicadas = [...(anteriores ?? hashesGit(repo, base, false))]
     .filter(([caminho]) => caminhoSql.test(caminho))
     .map(([caminho, sha256]) => ({ nome: nome(caminho), sha256 }));
-  const pendentes = lote.migracoes.map(({ caminho, sha256 }) => ({ nome: nome(caminho), sha256 }));
+  let pendentes;
+  if (manual) {
+    const novos = hashesGit(repo, alvo, false);
+    for (const [caminho, sha256] of anteriores) exigir(novos.get(caminho) === sha256);
+    exigir(identificador(/^[0-9]+\.[0-9]{6}$/, prova.inicio));
+    pendentes = [...novos]
+      .filter(([caminho]) => caminhoSql.test(caminho) && !anteriores.has(caminho))
+      .map(([caminho, sha256]) => ({ nome: nome(caminho), sha256 }));
+  } else pendentes = lote.migracoes.map(({ caminho, sha256 }) => ({ nome: nome(caminho), sha256 }));
   const envelope = Buffer.from(
     JSON.stringify({
       cluster,
@@ -404,6 +506,7 @@ function prepararEnvelope(prova, repo, base, alvo) {
       schemaOid,
       usuario,
       ip,
+      ...(manual ? { inicio: prova.inicio } : {}),
       base,
       alvo,
       aplicadas,
@@ -429,8 +532,21 @@ function lerEntrada() {
 function cli(acao, args) {
   if (acao === "compose" && [4, 7].includes(args.length)) {
     console.log(JSON.stringify(conferirCompose(lerEntrada(), ...args)));
+  } else if (acao === "compose-manual" && [4, 7].includes(args.length)) {
+    console.log(
+      JSON.stringify(
+        conferirCompose(lerEntrada(), ...Array.from({ length: 7 }, (_, i) => args[i]), true),
+      ),
+    );
+  } else if (acao === "transicao-manual" && args.length === 3) {
+    const [repo, base, alvo] = args;
+    const anteriores = arquivosGit(repo, base, false);
+    const novos = arquivosGit(repo, alvo, false);
+    for (const [nome, oid] of anteriores) exigir(novos.get(nome) === oid);
   } else if (acao === "imagem" && args.length === 2) {
     conferirImagem(lerEntrada(), ...args);
+  } else if (acao === "imagem-manual" && args.length === 2) {
+    conferirImagem(lerEntrada(), ...args, true);
   } else if (acao === "sondar-imagem" && args.length === 0) {
     process.stdout.write(
       `(${sondarImagem.toString()})("/app").then(\n` +
@@ -440,10 +556,16 @@ function cli(acao, args) {
     );
   } else if (acao === "sql-historico" && args.length === 1) {
     process.stdout.write(sqlHistorico(...args));
+  } else if (acao === "sql-historico-manual" && args.length === 1) {
+    process.stdout.write(sqlHistorico(args[0], true));
   } else if (acao === "historico" && args.length === 4) {
     console.log(JSON.stringify(conferirHistorico(lerEntrada(), ...args)));
+  } else if (acao === "historico-manual" && args.length === 4) {
+    console.log(JSON.stringify(conferirHistorico(lerEntrada(), ...args, true)));
   } else if (acao === "envelope" && args.length === 3) {
     console.log(prepararEnvelope(lerEntrada(), ...args));
+  } else if (acao === "envelope-manual" && args.length === 3) {
+    console.log(prepararEnvelope(lerEntrada(), ...args, true));
   } else {
     throw new Error();
   }
@@ -464,6 +586,10 @@ if (
     const mensagens = new Map([
       ["compose", "Compose: configuração ou destino da migração não conferido."],
       ["imagem", "Imagem: inventário ou bytes não correspondem ao commit alvo."],
+      [
+        "imagem-manual",
+        "Imagem: o alvo não contém o protocolo manual compatível e os bytes conferidos.",
+      ],
       ["sql-historico", "PostgreSQL: schema não suportado pela guarda automática."],
       ["historico", "PostgreSQL: identidade ou histórico não corresponde à revisão esperada."],
       ["envelope", "Não foi possível vincular o lote à identidade do banco e às revisões."],

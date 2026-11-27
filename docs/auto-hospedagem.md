@@ -516,7 +516,7 @@ Antes de aplicar:
 6. O rótulo OCI da imagem é comparado com o commit alvo.
 7. A configuração do Compose do alvo é validada antes de alterar o checkout principal.
 8. A aplicação sobe com `--wait` e a saúde pública é conferida quando configurada.
-9. Em falha, a imagem e o commit anteriores são restaurados.
+9. Se a partida falhar, a imagem anterior não é iniciada automaticamente. Desativar o migrador ou não ter diferença no Git não comprova a compatibilidade do banco com a imagem anterior.
 
 No modo `main`, o Dockerfile ajusta as permissões dos arquivos copiados para execução. A imagem precisa passar na verificação de acesso como usuário `node`, mesmo quando a worktree é criada com `umask 077`. Essa verificação ocorre durante o build, antes de substituir o contêiner, e não altera as permissões de credenciais ou backups no host. A saúde do aplicativo e a conexão com o banco continuam sendo verificadas após a partida.
 
@@ -557,7 +557,15 @@ Adote primeiro a revisão e o agendamento confiáveis com a opção desligada. S
 
 Quando o healthcheck usa HTTPS com CA interna, defina `ATUALIZAR_SAUDE_CA` e `RESTAURAR_SAUDE_CA` com o caminho do certificado. Sem a CA, o `curl` usa o repositório do sistema.
 
-O rollback da imagem e do commit não desfaz uma migração já aplicada. Em caso de falha após uma migração, use o backup gerado antes da atualização e o procedimento de restauração. O arquivo `falha.json` registra se havia migrações novas.
+No perfil simples, a atualização manual com o migrador na partida confere a revisão servida, a identidade física das conexões do aplicativo e o histórico da base, mesmo sem diferenças em `prisma/migrations`. Histórico incompleto, ilegível ou divergente impede a troca; a ausência de diferenças no Git não comprova que o banco esteja atualizado. `--permitir-migracoes` autoriza novos SQLs que preservem as migrações da base, mas não dispensa a conferência da imagem nem ativa a política agendada. A partida aplica apenas o serviço do aplicativo, sem recriar dependências.
+
+A imagem alvo precisa incluir esse protocolo, mesmo que a instalação atual seja mais antiga. Na partida, o próprio migrador confere o histórico, a conexão e os SQLs autorizados antes de gravar. O reinício automático só volta depois da revogação da autorização de escrita. O mesmo contêiner pode reiniciar com o lote completo, sem reaplicar SQL; se o banco voltar à base após uma restauração, o contêiner não pode reaplicar o lote sem nova autorização. Com o migrador ativo, o modo manual protegido recusa `--forcar` para a mesma revisão antes de gerar backup ou trocar o contêiner.
+
+Uma recusa anterior à troca não exige restauração. Depois de persistir a intenção de troca, a operação só é liberada após confirmar histórico, identidade do banco, revisão servida e saúde do aplicativo. Em caso de interrupção ou resultado incerto, as rotinas compatíveis bloqueiam novas mutações e preservam o backup; não há rollback automático da imagem nem do banco. O marcador `atualizacao-manual-pendente.json` identifica as revisões, a fase e o conjunto de recuperação. Não repetir com `--forcar` nem remover o marcador como forma de retomar. A recuperação exige primeiro uma avaliação da instalação e das escritas posteriores ao backup.
+
+A primeira invocação sobre um checkout antigo exige uma cópia separada da árvore fonte da revisão alvo. Execute `scripts/servidor/atualizar.sh` dessa cópia, com `APP_DIR` apontando para a instalação e usando a configuração, o estado e a trava das rotinas adotadas. Não copie apenas `scripts/servidor`: o verificador usa também `docker/app` e `src/infra` da revisão confiável. Scripts antigos, agendadores que ainda os chamem e acesso direto ao Docker ou ao banco não respeitam o novo marcador. Antes de usar esse fluxo numa instalação existente, a adoção precisa impedir esses caminhos durante toda a intervenção, inclusive após uma falha. A cópia não altera nem desativa agendamentos por conta própria.
+
+Em uma janela de manutenção autorizada, inventarie agendamentos, serviços e invocações manuais de atualização, backup, retenção, restauração e Compose. Impeça novas chamadas legadas e confirme o término das já iniciadas antes de invocar a cópia revisada. Preserve o mesmo projeto Compose, os arquivos de ambiente e a identidade, o diretório de estado e o arquivo de trava adotados. Não autorize partida direta do contêiner após perda do atualizador: a partida automática segue desativada em fase incerta e a autorização efêmera pode ainda existir. Mantenha as entradas antigas indisponíveis até reconciliar o marcador, o banco, o aplicativo e o backup; só então retome rotinas por entradas compatíveis. Esse procedimento não é executado por `atualizar.sh`.
 
 A restauração e o backup de planilhas usam `imagem` e `imagemBackup` de `estado.json` quando o processo não recebe `APP_IMAGEM` ou `APP_IMAGEM_BACKUP` explicitamente. O estado gravado pelo último update evita voltar para a imagem local inicial.
 

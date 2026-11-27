@@ -82,7 +82,9 @@ envelope_migracoes_auto=""
 pasta_lote_auto=""
 subida_lote_auto=false
 app_final_auto=""
+envelope_manual=""
 permissao_manual=false
+protecao_manual=false
 tag_override=""
 ref_override=""
 permitir_migracoes="$ATUALIZAR_PERMITIR_MIGRACOES"
@@ -159,6 +161,7 @@ estado="$ESTADO_DIR/estado.json"
 falha="$ESTADO_DIR/falha.json"
 estado_backup="$ESTADO_DIR/ultimo-backup.json"
 operacao="$ESTADO_DIR/atualizacao-em-andamento.json"
+operacao_manual="$ESTADO_DIR/atualizacao-manual-pendente.json"
 operacao_iniciada=false
 lote_auto_iniciado=false
 
@@ -254,7 +257,7 @@ limpar_atualizacao() {
       printf 'ERRO: Não foi possível revogar a autorização de partida.\n' >&2
       status=1
     elif [ "$subida_lote_auto" = false ]; then
-      rm -f -- "$pasta_lote_auto/compose.json"
+      rm -f -- "$pasta_lote_auto/compose.json" "$pasta_lote_auto/manual.json"
       rmdir -- "$pasta_lote_auto/entrada" "$pasta_lote_auto" || status=1
     fi
   fi
@@ -313,14 +316,25 @@ executar_backup_obrigatorio() {
       rm -f "$marco"
       recusar_pre_troca "O backup pré-migração falhou; nenhuma troca foi iniciada."
     fi
+  elif [ "$protecao_manual" = true ]; then
+    if ! BACKUP_MIGRACAO_MANUAL_OPERACAO="$id_manual" BACKUP_MIGRACOES_AUTO_ESPERADO="$origem_manual" \
+      BACKUP_MIGRACAO_MANUAL_INICIO="$inicio_manual" "$DIR/backup-banco.sh"; then
+      rm -f "$marco"
+      erro "O backup pré-migração manual falhou; nenhuma troca foi iniciada."
+    fi
   elif ! "$DIR/backup-banco.sh"; then
     rm -f "$marco"
     erro "O backup falhou; a atualização foi cancelada."
   fi
-  validar_backup_obrigatorio "$marco"
+  if [ "$protecao_manual" = true ]; then
+    rm -f "$marco"
+    backup_manual=$(conferir_backup_manual) || erro "Backup desta operação sem recibo de origem e artefatos conferidos."
+  else
+    validar_backup_obrigatorio "$marco"
+    rm -f "$marco"
+  fi
   fixar_backup_controlador ||
     erro "Não foi possível fixar backup, recibo e checksums fora da retenção."
-  rm -f "$marco"
 }
 
 revisao_da_imagem() {
@@ -373,62 +387,12 @@ validar_compose_na_worktree() {
   )
 }
 
-garantir_imagem_anterior() {
-  local commit="$1"
-  local imagem_estado="$2"
-  local imagem_backup_estado="$3"
-  local container
-  local imagem_container
-  local destino
-
-  container=$(compose ps -q "$SERVIDOR_SERVICO_APP" 2>/dev/null || true)
-  if [ -n "$container" ]; then
-    imagem_container=$(docker inspect --format '{{.Image}}' "$container" 2>/dev/null || true)
-    if [ -n "$imagem_container" ]; then
-      destino="${APP_IMAGEM_ANTERIOR:-frequenciapp-rollback:${commit:0:12}}"
-      docker tag "$imagem_container" "$destino" >/dev/null
-      ANTERIOR_IMAGEM="$destino"
-      ANTERIOR_BACKUP="$imagem_backup_estado"
-      log "Imagem anterior preservada como $destino."
-      return 0
-    fi
-  fi
-
-  if [ -n "$imagem_estado" ] && docker image inspect "$imagem_estado" >/dev/null 2>&1; then
-    ANTERIOR_IMAGEM="$imagem_estado"
-    ANTERIOR_BACKUP="$imagem_backup_estado"
-    return 0
-  fi
-
-  log "A imagem anterior não está disponível; construindo a partir do commit $commit."
-  criar_worktree "$commit"
-  destino="${APP_IMAGEM_ANTERIOR:-frequenciapp-rollback:${commit:0:12}}"
-  construir_app_na_worktree "$destino" "$commit"
-  verificar_imagem_alvo "$destino" "$commit"
-  ANTERIOR_IMAGEM="$destino"
-  ANTERIOR_BACKUP="$imagem_backup_estado"
-}
-
 falhar_atualizacao() {
   local motivo="$1"
   local migracoes="$2"
-  if [ "$controlador_ativo" = true ]; then
-    log "$motivo As migrações não são revertidas; revisão manual do banco e da aplicação é obrigatória. Nenhuma imagem anterior será iniciada automaticamente."
-    escrever_falha "$alvo_ref" "$alvo_commit" "$motivo" "$migracoes"
-    notificar falha "Atualização falhou; intervenção manual necessária."
-    exit 1
-  fi
-  log "$motivo Iniciando rollback."
-  git -C "$APP_DIR" checkout --detach "$ANTERIOR_COMMIT"
-  APP_IMAGEM="$ANTERIOR_IMAGEM" APP_IMAGEM_BACKUP="$ANTERIOR_BACKUP" \
-    COMMIT_SHA="$ANTERIOR_COMMIT" conferir_identidade auto
-  if ! APP_IMAGEM="$ANTERIOR_IMAGEM" APP_IMAGEM_BACKUP="$ANTERIOR_BACKUP" \
-    COMMIT_SHA="$ANTERIOR_COMMIT" compose up -d --wait --no-build \
-    --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE"; then
-    log "O rollback também falhou; intervenção manual necessária."
-  fi
+  log "$motivo As migrações não são revertidas; revisão manual do banco e da aplicação é obrigatória. Nenhuma imagem anterior será iniciada automaticamente."
   escrever_falha "$alvo_ref" "$alvo_commit" "$motivo" "$migracoes"
-  notificar falha "Atualização falhou e o rollback foi tentado."
+  notificar falha "Atualização falhou; intervenção manual necessária."
   exit 1
 }
 
@@ -489,13 +453,10 @@ if [ -n "$tag_estavel" ] &&
   tag_estavel=""
 fi
 
-modo_atual=""; ref_atual=""; commit_atual=""; imagem_atual=""; imagem_backup_atual=""
+modo_atual=""; commit_atual=""
 if [ -f "$estado" ]; then
   modo_atual=$(ler_campo_json "$estado" "modo")
-  ref_atual=$(ler_campo_json "$estado" "ref")
   commit_atual=$(ler_campo_json "$estado" "commit")
-  imagem_atual=$(ler_campo_json "$estado" "imagem")
-  imagem_backup_atual=$(ler_campo_json "$estado" "imagemBackup")
 fi
 
 head_commit=$(git -C "$APP_DIR" rev-parse HEAD)
@@ -503,15 +464,6 @@ if [ -z "$commit_atual" ]; then
   commit_atual="$head_commit"
 elif [ "$commit_atual" != "$head_commit" ] && [ "$forcar" = false ]; then
   erro "O estado registrado aponta para $commit_atual, mas o checkout está em $head_commit. Registre o estado ou use --forcar."
-fi
-if [ -z "$ref_atual" ]; then
-  ref_atual=$(git -C "$APP_DIR" describe --tags --always 2>/dev/null || printf '%s' "${commit_atual:0:12}")
-fi
-if [ -z "$imagem_atual" ]; then
-  imagem_atual="${APP_IMAGEM:-}"
-fi
-if [ -z "$imagem_backup_atual" ]; then
-  imagem_backup_atual="${APP_IMAGEM_BACKUP:-}"
 fi
 
 alvo_modo=""
@@ -649,6 +601,8 @@ conferir_saude_migracoes_auto() {
 
 conferir_banco_migracoes_auto() {
   local revisao="$1" banco app rede ip_banco servidor observacao_db observacao_app
+  local perfil="${2:-auto}" sufixo="" inicio_container=""
+  if [ "$perfil" = manual ]; then sufixo=-manual; fi
   banco=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_DB") || return 1
   app=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_APP") || return 1
   [[ "$banco" =~ ^[0-9a-f]{64}$ && "$app" =~ ^[0-9a-f]{64}$ && "$banco" != "$app" ]] || return 1
@@ -663,6 +617,11 @@ conferir_banco_migracoes_auto() {
       all(.Config.Env[]; test("^PG(HOST|HOSTADDR|DATABASE|PORT|USER|SERVICE|SERVICEFILE|OPTIONS)=") | not)) |
       .NetworkSettings.Networks[$rede].IPAddress | select(type == "string" and test("^[0-9.]+$"))
     ') || return 1
+
+  if [ "$perfil" = manual ]; then
+    inicio_container=$(docker inspect --format '{{.State.StartedAt}}' "$banco") || return 1
+    [ -n "$inicio_container" ] || return 1
+  fi
 
   # A conexão do app em uso precisa ser a rota efetiva do Compose, não uma URL alternativa.
   # Compare em pipe, sem ecoar ambiente ou credenciais.
@@ -681,12 +640,12 @@ conferir_banco_migracoes_auto() {
 
   servidor=$(jq -er '.usuario' <<<"$alvo_compose_auto") || return 1
   [ "$servidor" = "${POSTGRES_USER:-frequencia}" ] || return 1
-  observacao_db=$(node "$DIR/alvo-migracoes-auto.mjs" sql-historico "$schema_auto" |
+  observacao_db=$(node "$DIR/alvo-migracoes-auto.mjs" "sql-historico$sufixo" "$schema_auto" |
     timeout -k 3 18 docker exec -i "$banco" env -i PATH=/usr/local/bin:/usr/bin:/bin \
       PGCONNECT_TIMEOUT=4 psql -XwqAt -h /var/run/postgresql -p 5432 \
       -U "$servidor" -d "$banco_auto" -v ON_ERROR_STOP=1 -f - 2>/dev/null |
-    node "$DIR/alvo-migracoes-auto.mjs" historico "$APP_DIR" "$revisao" "$banco_auto" "$schema_auto") || return 1
-  observacao_app=$(node "$DIR/alvo-migracoes-auto.mjs" sql-historico "$schema_auto" |
+    node "$DIR/alvo-migracoes-auto.mjs" "historico$sufixo" "$APP_DIR" "$revisao" "$banco_auto" "$schema_auto") || return 1
+  observacao_app=$(node "$DIR/alvo-migracoes-auto.mjs" "sql-historico$sufixo" "$schema_auto" |
     timeout -k 3 22 docker exec -i "$app" node --input-type=module -e '
       import fs from "node:fs";
       import pg from "pg";
@@ -711,26 +670,117 @@ conferir_banco_migracoes_auto() {
         process.stdout.write(primeiro);
       } catch { process.exitCode = 1; }
     ' -- "$ip_banco" 2>/dev/null |
-    node "$DIR/alvo-migracoes-auto.mjs" historico "$APP_DIR" "$revisao" "$banco_auto" "$schema_auto") || return 1
+    node "$DIR/alvo-migracoes-auto.mjs" "historico$sufixo" "$APP_DIR" "$revisao" "$banco_auto" "$schema_auto") || return 1
   [ "$observacao_app" = "$observacao_db" ] || return 1
   [ "$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_DB")" = "$banco" ] &&
     [ "$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_APP")" = "$app" ] || return 1
-  jq -ce --arg container "$banco" --arg ip "$ip_banco" '. + {container:$container,ip:$ip}' <<<"$observacao_db"
+  if [ "$perfil" = manual ]; then
+    [ "$(docker inspect --format '{{.State.StartedAt}}' "$banco")" = "$inicio_container" ] || return 1
+  fi
+  jq -ce --arg container "$banco" --arg ip "$ip_banco" --arg inicio "$inicio_container" '
+    . + {container:$container,ip:$ip} + (if $inicio == "" then {} else {inicioContainer:$inicio} end)
+  ' <<<"$observacao_db"
 }
 
 projetar_banco_pre_migracao() {
   jq -ce '{container,cluster,banco,bancoOid,schema,schemaOid}' <<<"$1"
 }
 
-fixar_imagem_migracoes_auto() {
-  imagem_migracoes_auto=$(docker image inspect --format '{{.Id}}' "$alvo_imagem") || return 1
-  [[ "$imagem_migracoes_auto" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
-  [ "$(revisao_da_imagem "$imagem_migracoes_auto")" = "$alvo_commit" ] || return 1
+conferir_imagem_migradora() {
+  local imagem="$1" acao="${2:-imagem}"
+  [[ "$imagem" =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+  [ "$(revisao_da_imagem "$imagem")" = "$alvo_commit" ] || return 1
   node "$DIR/alvo-migracoes-auto.mjs" sondar-imagem |
     timeout -k 5 40 docker run --rm -i --pull=never --network none --read-only \
       --cap-drop ALL --security-opt no-new-privileges --pids-limit 64 --memory 128m \
-      --entrypoint /usr/local/bin/node "$imagem_migracoes_auto" --input-type=module - |
-    node "$DIR/alvo-migracoes-auto.mjs" imagem "$APP_DIR" "$alvo_commit"
+      --entrypoint /usr/local/bin/node "$imagem" --input-type=module - |
+    node "$DIR/alvo-migracoes-auto.mjs" "$acao" "$APP_DIR" "$alvo_commit"
+}
+
+fixar_imagem_migracoes_auto() {
+  imagem_migracoes_auto=$(docker image inspect --format '{{.Id}}' "$alvo_imagem") || return 1
+  conferir_imagem_migradora "$imagem_migracoes_auto"
+}
+
+conferir_compose_manual() {
+  local opcoes=("$SERVIDOR_SERVICO_APP" "$SERVIDOR_SERVICO_DB" "$banco_auto" "$schema_auto")
+  if [ "$#" -eq 0 ]; then
+    compose config --format json | node "$DIR/alvo-migracoes-auto.mjs" compose-manual "${opcoes[@]}"
+  else
+    compose_manual_alvo config --format json | node "$DIR/alvo-migracoes-auto.mjs" compose-manual \
+      "${opcoes[@]}" "$imagem_manual" "$envelope_manual" "$pasta_lote_auto/entrada"
+  fi
+}
+
+compose_manual_alvo() {
+  APP_IMAGEM="$imagem_manual" APP_IMAGEM_BACKUP="$alvo_backup" COMMIT_SHA="$alvo_commit" \
+    MIGRACAO_POLITICA_REINICIO=no compose -f "$pasta_lote_auto/compose.json" \
+      -f "$pasta_lote_auto/manual.json" "$@"
+}
+
+preparar_envelope_manual() {
+  envelope_manual=$(node "$DIR/alvo-migracoes-auto.mjs" envelope-manual \
+    "$APP_DIR" "$commit_atual" "$alvo_commit" <<<"$banco_manual") || return 1
+  preparar_montagem_lote_auto || return 1
+  jq -n --arg app "$SERVIDOR_SERVICO_APP" --arg envelope "$envelope_manual" '
+    {services:{($app):{environment:{MIGRACAO_MANUAL_PROTEGIDA:"true",
+      MIGRACAO_LOTE_APROVADO:$envelope,ADMIN_EMAIL:"",ADMIN_SENHA:""}}}}
+  ' >"$pasta_lote_auto/manual.json"
+}
+
+conferir_backup_manual() {
+  local resultado dir_backup="${BACKUP_BANCO_DIR:-$BACKUP_DIR/banco}"
+  resultado=$(BACKUP_BANCO_VERIFICADO="$banco_auto" DATABASE_SCHEMA="$schema_auto" \
+    BACKUP_REMOTO="${BACKUP_REMOTO:-}" node "$DIR/recibos.mjs" conferir-estado-manual \
+    "$dir_backup" "$estado_backup" "$origem_manual" "$id_manual") || return 1
+  if [ -n "${BACKUP_REMOTO:-}" ]; then
+    "$DIR/backup-banco.sh" --verificar --sem-escrita >&2 || return 1
+  elif [ "${ATUALIZAR_PERMITIR_BACKUP_LOCAL:-false}" != true ]; then
+    return 1
+  fi
+  printf '%s\n' "$resultado"
+}
+
+preparar_migracao_manual() {
+  [ "${BACKUP_MODO:-compose}" = compose ] && [ "$ATUALIZAR_VERIFICAR_IMAGEM" = true ] &&
+    [ "$head_commit" = "$commit_atual" ] || erro "Migração manual exige Compose, verificação da imagem e checkout da base registrada."
+  node "$DIR/alvo-migracoes-auto.mjs" transicao-manual "$APP_DIR" "$commit_atual" "$alvo_commit" ||
+    erro "A transição manual não preserva os SQLs da base instalada."
+  banco_auto="${POSTGRES_DB:-frequencia}"
+  schema_auto="${DATABASE_SCHEMA:-public}"
+  alvo_compose_auto=$(conferir_compose_manual) || erro "Alvo Compose da migração manual não conferido."
+  conferir_saude_migracoes_auto "$commit_atual" || erro "O aplicativo ativo não serve a revisão instalada."
+  banco_manual=$(conferir_banco_migracoes_auto "$commit_atual" manual) ||
+    erro "Banco de backup, conexões da aplicação ou histórico não correspondem à base instalada."
+  origem_manual=$(projetar_banco_pre_migracao "$banco_manual")
+  inicio_manual=$(jq -ce '{inicio,inicioContainer}' <<<"$banco_manual")
+  id_manual=$(node -p 'require("node:crypto").randomUUID()')
+}
+
+registrar_fase_manual() {
+  local fase="$1" temporario
+  [ -d "$ESTADO_DIR" ] && [ ! -L "$ESTADO_DIR" ] && [ "$(stat -c %a "$ESTADO_DIR")" = 700 ] || return 1
+  temporario=$(mktemp "$ESTADO_DIR/.atualizacao-manual.XXXXXXXX") || return 1
+  if ! jq -n --arg fase "$fase" --arg id "$id_manual" --arg base "$commit_atual" \
+    --arg alvo "$alvo_commit" --arg chave "$SERVIDOR_ALVO_CHAVE" --arg imagem "$imagem_manual" \
+    --arg autorizacao "$pasta_lote_auto/entrada/autorizar" \
+    --argjson origem "$origem_manual" --argjson backup "$backup_manual" '
+    {versao:1,operacao:$id,fase:$fase,base:$base,alvo:$alvo,chave:$chave,imagem:$imagem,
+     origem:$origem,backup:$backup,autorizacao:$autorizacao}
+  ' >"$temporario" || ! sync "$temporario" || ! mv -T -- "$temporario" "$operacao_manual"; then
+    rm -f -- "$temporario"
+    return 1
+  fi
+  sync -f "$ESTADO_DIR"
+}
+
+reconferir_base_manual() {
+  local observado backup_atual
+  conferir_saude_migracoes_auto "$commit_atual" || return 1
+  backup_atual=$(conferir_backup_manual) || return 1
+  [ "$backup_atual" = "$backup_manual" ] || return 1
+  observado=$(conferir_banco_migracoes_auto "$commit_atual" manual) || return 1
+  [ "$observado" = "$banco_manual" ]
 }
 
 ler_evidencia_migracoes_auto() {
@@ -838,7 +888,7 @@ if [ "$simular" = true ]; then
       else
         log "Aprovação agendada confere com as referências locais; não foi usada."
       fi
-    elif [ "$permitir_migracoes" = "true" ]; then
+    elif [ "$permissao_manual" = true ] || { [ "$controlador_ativo" = true ] && [ "$permitir_migracoes" = true ]; }; then
       log "Migrações novas serão permitidas por opção explícita."
     else
       log "Migrações novas bloqueariam a atualização; use --permitir-migracoes."
@@ -860,11 +910,21 @@ if [ "$commit_atual" = "$alvo_commit" ] && [ "$forcar" = false ]; then
   exit 0
 fi
 
+if [ "$commit_atual" = "$alvo_commit" ] && [ "$controlador_ativo" = false ] &&
+  [ "$agendado" = false ] && [ "$MIGRAR_NA_PARTIDA" = true ]; then
+  erro "O modo manual protegido não reaplica a revisão instalada com o migrador ativo."
+fi
+
 if [ -f "$falha" ] && [ "$forcar" = false ]; then
   falha_ref=$(ler_campo_json "$falha" "ref")
   if [ "$falha_ref" = "$alvo_ref" ]; then
     erro "A versão $alvo_ref falhou antes. Use --forcar após corrigir."
   fi
+fi
+
+if [ "$controlador_ativo" = false ] && [ "$agendado" = false ] &&
+  [ "$migracoes_novas" = true ] && [ "$permissao_manual" = false ]; then
+  erro "Há migrações novas. Revise o lote desta atualização e execute com --permitir-migracoes."
 fi
 
 if [ "$migracoes_novas" = true ] && [ "$permitir_migracoes" != "true" ]; then
@@ -886,15 +946,14 @@ if [ "${livre:-0}" -lt "$ATUALIZAR_ESPACO_MINIMO_MB" ]; then
   erro "Espaço insuficiente em $APP_DIR: ${livre:-0} MB livres."
 fi
 
+if [ "$controlador_ativo" = false ] && [ "$agendado" = false ] && [ "$MIGRAR_NA_PARTIDA" = true ]; then
+  protecao_manual=true
+  preparar_migracao_manual
+fi
 registrar_operacao || erro "Não foi possível registrar a operação; nenhuma atualização será iniciada."
 executar_backup_obrigatorio
 
 ANTERIOR_COMMIT="$commit_atual"
-ANTERIOR_IMAGEM=""
-ANTERIOR_BACKUP="$imagem_backup_atual"
-if [ "$controlador_ativo" = false ]; then
-  garantir_imagem_anterior "$ANTERIOR_COMMIT" "$imagem_atual" "$imagem_backup_atual"
-fi
 
 log "Preparando o commit alvo em worktree isolada."
 criar_worktree "$alvo_commit"
@@ -946,6 +1005,24 @@ if [ "$agendado" = true ] && [ "$migracoes_novas" = true ]; then
   aprovar_migracoes_agendadas consumir
 fi
 
+if [ "$protecao_manual" = true ]; then
+  imagem_manual=$(docker image inspect --format '{{.Id}}' "$alvo_imagem") || erro "Imagem alvo indisponível."
+  conferir_imagem_migradora "$imagem_manual" imagem-manual || erro "A imagem alvo não implementa o protocolo manual compatível."
+  preparar_envelope_manual || erro "Não foi possível vincular o lote manual ao banco e à autorização de partida."
+  compose_alvo=$(
+    montar_compose_em "$worktree" && conferir_compose_manual partida
+  ) || erro "O Compose alvo não permite partida isolada do app."
+  [ "$compose_alvo" = "$alvo_compose_auto" ] || erro "O destino Compose diverge entre base e alvo."
+  reconferir_base_manual || erro "Banco, histórico ou backup mudou antes da troca."
+  sync -f "${BACKUP_BANCO_DIR:-$BACKUP_DIR/banco}" || erro "O conjunto de recuperação não pôde ser sincronizado."
+  registrar_fase_manual troca || erro "A intenção da troca não pôde ser persistida."
+elif [ "$controlador_ativo" = false ] && [ "$agendado" = false ]; then
+  # O seletor do shell não basta se um override reativar o migrador no alvo.
+  (montar_compose_em "$worktree"; APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" COMMIT_SHA="$alvo_commit" compose config --format json) |
+    jq -e --arg app "$SERVIDOR_SERVICO_APP" '.services[$app].environment.MIGRAR_NA_PARTIDA == "false"' >/dev/null ||
+    erro "O Compose alvo precisa manter o migrador na partida desativado nesta execução."
+fi
+
 log "Aplicando $alvo_ref."
 git -C "$APP_DIR" checkout --detach "$alvo_commit"
 
@@ -954,15 +1031,12 @@ APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
 
 if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
   COMMIT_SHA="$alvo_commit" compose config --quiet; then
-  git -C "$APP_DIR" checkout --detach "$ANTERIOR_COMMIT"
+  if [ "$protecao_manual" = false ]; then git -C "$APP_DIR" checkout --detach "$ANTERIOR_COMMIT"; fi
   erro "A configuração do Compose não é válida no checkout alvo."
 fi
 
-# Mesmo sem diff de migração, a imagem pode aplicar migrações pendentes.
-migracao_possivel="$migracoes_novas"
-if [ "$controlador_ativo" = true ]; then
-  migracao_possivel=true
-fi
+# Sem atestado do histórico, não se presume compatibilidade para rollback.
+migracao_possivel=true
 if [ -n "${imagem_migracoes_auto:-}" ]; then
   [ "$(conferir_compose_do_lote_auto)" = "$alvo_compose_auto" ] ||
     falhar_atualizacao "O Compose de partida divergiu da configuração aprovada." true
@@ -987,9 +1061,40 @@ if [ -n "${imagem_migracoes_auto:-}" ]; then
     [ "$(docker inspect --format '{{.Image}}/{{.HostConfig.RestartPolicy.Name}}' "$app_final_auto")" = "$imagem_migracoes_auto/no" ] &&
     [ "$(docker image inspect --format '{{.Id}}' "$alvo_imagem")" = "$imagem_migracoes_auto" ] ||
     falhar_atualizacao "O contêiner ou a tag deixou de corresponder à imagem aprovada." true
-elif ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
-  COMMIT_SHA="$alvo_commit" compose up -d --wait --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE"; then
-  falhar_atualizacao "Falha de saúde após a atualização." "$migracao_possivel"
+elif [ "$protecao_manual" = true ]; then
+  [ "$(conferir_compose_manual partida)" = "$alvo_compose_auto" ] ||
+    erro "O Compose efetivo divergiu antes da partida; a recuperação permanece protegida."
+  reconferir_base_manual || erro "Banco, histórico ou backup mudou antes da partida; a recuperação permanece protegida."
+  registrar_fase_manual partida || erro "A intenção da partida não pôde ser persistida."
+  if ! (umask 022 && set -o noclobber && printf '%s' "$envelope_manual" >"$pasta_lote_auto/entrada/autorizar") ||
+    ! chmod 0444 "$pasta_lote_auto/entrada/autorizar"; then
+    falhar_atualizacao "A autorização efêmera da partida manual não pôde ser preparada." true
+  fi
+  subida_lote_auto=true
+  if ! compose_manual_alvo up -d --no-deps --no-build --pull never \
+    --wait --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE" "$SERVIDOR_SERVICO_APP"; then
+    falhar_atualizacao "Falha de saúde após a partida manual." true
+  fi
+  banco_final_manual=$(conferir_banco_migracoes_auto "$alvo_commit" manual) ||
+    falhar_atualizacao "O histórico final da migração manual não confere." true
+  [ "$banco_final_manual" = "$banco_manual" ] ||
+    falhar_atualizacao "A identidade do banco após a migração manual mudou." true
+  conferir_saude_migracoes_auto "$alvo_commit" || falhar_atualizacao "A revisão alvo não foi servida." true
+  app_final_manual=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_APP") ||
+    falhar_atualizacao "Não foi possível identificar o aplicativo atualizado." true
+  [[ "$app_final_manual" =~ ^[a-f0-9]{64}$ ]] &&
+    [ "$(docker inspect --format '{{.Image}}/{{.HostConfig.RestartPolicy.Name}}' "$app_final_manual")" = "$imagem_manual/no" ] ||
+    falhar_atualizacao "O aplicativo não corresponde à imagem e política de reinício conferidas." true
+else
+  if [ "$controlador_ativo" = false ] && [ "$agendado" = false ]; then
+    APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" COMMIT_SHA="$alvo_commit" compose config --format json |
+      jq -e --arg app "$SERVIDOR_SERVICO_APP" '.services[$app].environment.MIGRAR_NA_PARTIDA == "false"' >/dev/null ||
+      erro "O Compose efetivo reativou o migrador; nenhuma partida foi iniciada."
+  fi
+  if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
+    COMMIT_SHA="$alvo_commit" compose up -d --wait --wait-timeout "$ATUALIZAR_TIMEOUT_SAUDE"; then
+    falhar_atualizacao "Falha de saúde após a atualização." "$migracao_possivel"
+  fi
 fi
 
 if [ -n "${ATUALIZAR_SAUDE_URL:-}" ]; then
@@ -1002,7 +1107,7 @@ if [ -n "${ATUALIZAR_SAUDE_URL:-}" ]; then
     [ -f "$ATUALIZAR_SAUDE_CA" ] || erro "CA de saúde não encontrada: $ATUALIZAR_SAUDE_CA."
     curl_args+=(--cacert "$ATUALIZAR_SAUDE_CA")
   fi
-  if [ -n "$app_final_auto" ]; then
+  if [ -n "$app_final_auto" ] || [ "$protecao_manual" = true ]; then
     curl "${curl_args[@]}" "$ATUALIZAR_SAUDE_URL" |
       jq -e --arg alvo "$alvo_commit" '.ok == true and .commit == $alvo' >/dev/null ||
       falhar_atualizacao "A saúde pública não confirmou a revisão aprovada." true
@@ -1017,8 +1122,21 @@ if [ -n "${app_final_auto:-}" ]; then
     [ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$app_final_auto")" = unless-stopped ] ||
     falhar_atualizacao "Não foi possível restaurar o reinício normal do aplicativo." true
 fi
+if [ "$protecao_manual" = true ]; then
+  [ "$(docker image inspect --format '{{.Id}}' "$alvo_imagem")" = "$imagem_manual" ] ||
+    falhar_atualizacao "A tag alvo divergiu da imagem servida." true
+  revogar_lote_auto || falhar_atualizacao "Não foi possível revogar a autorização de partida manual." true
+  docker update --restart=unless-stopped "$app_final_manual" >/dev/null &&
+    [ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$app_final_manual")" = unless-stopped ] ||
+    falhar_atualizacao "Não foi possível restaurar o reinício normal do aplicativo." true
+fi
 escrever_estado "$alvo_modo" "$alvo_ref" "$alvo_commit" "$alvo_imagem" "$alvo_backup"
 limpar_falha
+if [ "$protecao_manual" = true ]; then
+  if ! sync -f "$ESTADO_DIR" || ! rm -- "$operacao_manual" || ! sync -f "$ESTADO_DIR"; then
+    erro "Não foi possível concluir o registro da atualização manual."
+  fi
+fi
 if [ -n "$app_final_auto" ]; then
   log "Aplicação e histórico conferidos para $alvo_ref; o controlador confirma a conclusão."
 else

@@ -244,7 +244,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     } else if (acao === "banco-pre-migracao" && process.argv.length === 4) {
       const banco = validarBancoPreMigracao(JSON.parse(diretorio));
       process.stdout.write(JSON.stringify(banco) + "\n");
-    } else if (acao === "conferir-estado") {
+    } else if (acao === "conferir-estado" || acao === "conferir-estado-manual") {
+      const manual = acao === "conferir-estado-manual";
       const estado = JSON.parse(readFileSync(base, "utf8"));
       if (
         typeof estado.recibo !== "string" ||
@@ -253,9 +254,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       ) {
         throw new Error("Ponteiro sem recibo individual válido.");
       }
-      const r = validarRecibo(
-        JSON.parse(readFileSync(path.join(diretorio, estado.recibo), "utf8")),
-      );
+      const arquivoRecibo = path.join(diretorio, estado.recibo);
+      if (manual && (!lstatSync(base).isFile() || !lstatSync(arquivoRecibo).isFile()))
+        throw new Error("Ponteiro ou recibo não regular.");
+      const bytes = readFileSync(arquivoRecibo);
+      const r = validarRecibo(JSON.parse(bytes));
       if (
         estado.recibo !== `${r.base}.confirmado.json` ||
         !mesmoEscopo(r, escopoAmbiente(e)) ||
@@ -270,6 +273,29 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
         throw new Error("Ponteiro diverge do recibo ou do alvo.");
       }
       conferirArtefatos(diretorio, r);
+      if (manual) {
+        const esperado = validarBancoPreMigracao(JSON.parse(origem));
+        const id = sha256Produzido;
+        if (
+          !r.origem ||
+          r.origem.operacao !== id ||
+          !camposBancoPreMigracao.every((k) => r.origem[k] === esperado[k]) ||
+          estado.modo !== "compose" ||
+          estado.em !== r.em ||
+          estado.verificadoRemoto !== r.etapas.remotoVerificado ||
+          (r.remoto && !r.etapas.remotoVerificado)
+        )
+          throw new Error("Recibo não comprova o backup desta operação manual.");
+        process.stdout.write(
+          JSON.stringify({
+            recibo: estado.recibo,
+            reciboSha256: hash(bytes),
+            arquivo: estado.arquivo,
+            sha256: estado.sha256,
+            remotoConfirmado: r.etapas.remotoVerificado,
+          }),
+        );
+      }
     } else if (acao === "conferir") {
       conferirArtefatos(diretorio, JSON.parse(readFileSync(base, "utf8")));
     } else if (acao === "planejar-local" || acao === "planejar-remoto") {
