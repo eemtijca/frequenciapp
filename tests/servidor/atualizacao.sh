@@ -61,14 +61,20 @@ set -Eeuo pipefail
 printf '%s\n' "$*" >>"$DOCKER_LOG"
 projeto="${COMPOSE_PROJECT_NAME:-teste}"
 subiu=false
-[ ! -s "$DOCKER_UP_COUNTER" ] || subiu=true
+[ "$(cat "$DOCKER_UP_COUNTER" 2>/dev/null || printf 0)" -le "${DOCKER_SUBIDAS_BASE:-0}" ] || subiu=true
 imagem_ativa="$IMAGEM_BASE"
 revisao_ativa=$(git -C "${APP_DIR:-$PWD}" rev-parse HEAD 2>/dev/null || true)
+app_ativo="$ID_APP"
+if [ -n "${DOCKER_SUBIDAS_BASE:-}" ]; then revisao_ativa="$DOCKER_REVISAO_BASE"; fi
 reinicio=unless-stopped
 if [ "$subiu" = true ]; then
   imagem_ativa="$IMAGEM_ALVO"
   revisao_ativa="$DOCKER_REVISAO_IMAGEM"
+  app_ativo="${ID_APP_ALVO:-$ID_APP}"
   [ -f "$DOCKER_UP_COUNTER.reinicio" ] && reinicio=no
+fi
+if [ "${DOCKER_MANUAL:-false}" = true ] && [ "$subiu" = false ]; then
+  revisao_ativa="$DOCKER_REVISAO_BASE"
 fi
 inicio="$INICIO_PG"
 cluster=7654321098765432100
@@ -95,7 +101,7 @@ historico() {
 }
 
 if [ "$1" = update ]; then
-  [ "$2" = --restart=unless-stopped ] && [ "$3" = "$ID_APP" ]
+  [ "$2" = --restart=unless-stopped ] && [ "$3" = "$app_ativo" ]
   [ ! -e "$(jq -er .autorizacao "$ESTADO_DIR/atualizacao-manual-pendente.json")" ]
   rm -- "$DOCKER_UP_COUNTER.reinicio"
   exit 0
@@ -114,13 +120,13 @@ fi
 
 if [ "$1" = exec ]; then
   [ "${DOCKER_MANUAL:-false}" = true ] || exit 90
-  if [ "$2" = "$ID_APP" ]; then
+  if [ "$2" = "$app_ativo" ]; then
     if [ "${BORDA_LEGADA_TESTE:-false}" = true ] && [ "$subiu" = false ]; then
       printf 'saude-legada\n' >>"$DOCKER_LOG"
     fi
     if [ "$subiu" = false ]; then revisao_ativa="$DOCKER_REVISAO_BASE"; fi
     jq -cn --arg commit "$revisao_ativa" '{ok:true,commit:$commit}'
-  elif [ "$3" = "$ID_APP" ]; then
+  elif [ "$3" = "$app_ativo" ]; then
     [ "${BANCO_DIFERENTE:-false}" = false ] || cluster=9654321098765432100
     historico
   elif [ "$3" = "$ID_DB" ]; then
@@ -177,13 +183,19 @@ if [ "$1" = "inspect" ]; then
   if [ "${DOCKER_MANUAL:-false}" = true ]; then
     migrar_ativo="${MIGRAR_NA_PARTIDA_BASE_TESTE-true}"
     if [ "$subiu" = true ]; then migrar_ativo="${MIGRAR_NA_PARTIDA_ALVO_TESTE-true}"; fi
-    app=$(jq -cn --arg id "$ID_APP" --arg projeto "$projeto" --arg imagem "$imagem_ativa" \
-      --arg migrar "$migrar_ativo" --arg host "${APP_HOST_BANCO_TESTE:-db}" '
-      {Id:$id,Image:$imagem,State:{Running:true},Mounts:[],Config:{Env:(["DATABASE_URL=postgresql://frequencia:fixture@\($host):5432/frequencia","DIRECT_URL=postgresql://frequencia:fixture@db:5432/frequencia"] + (if $migrar == "ausente" then [] else ["MIGRAR_NA_PARTIDA=" + $migrar] end)),Labels:{"com.docker.compose.project":$projeto,"com.docker.compose.service":"app"}}}')
+    montagem_ativa='[]'
+    if [ -s "$DOCKER_UP_COUNTER.bind" ]; then
+      montagem_ativa=$(jq -ce 'map({Type:.type, Source:.source, Destination:.target, RW:(.read_only|not)})' \
+        "$DOCKER_UP_COUNTER.bind")
+    fi
+    app=$(jq -cn --arg id "$app_ativo" --arg projeto "$projeto" --arg imagem "$imagem_ativa" \
+      --arg migrar "$migrar_ativo" --arg host "${APP_HOST_BANCO_TESTE:-db}" \
+      --arg revisao "${DOCKER_ROTULO_APP_TESTE:-$revisao_ativa}" --argjson montagens "$montagem_ativa" '
+      {Id:$id,Image:$imagem,State:{Running:true},Mounts:$montagens,Config:{Env:(["DATABASE_URL=postgresql://frequencia:fixture@\($host):5432/frequencia","DIRECT_URL=postgresql://frequencia:fixture@db:5432/frequencia"] + (if $migrar == "ausente" then [] else ["MIGRAR_NA_PARTIDA=" + $migrar] end)),Labels:{"com.docker.compose.project":$projeto,"com.docker.compose.service":"app","org.opencontainers.image.revision":$revisao}}}')
     db=$(jq -cn --arg id "$ID_DB" --arg projeto "$projeto" --arg inicio "$INICIO_DB" '
       {Id:$id,State:{Running:true,StartedAt:$inicio},Mounts:[{Type:"volume",Name:($projeto+"-dados"),Source:("/var/lib/docker/volumes/"+$projeto+"-dados/_data"),Destination:"/var/lib/postgresql/data"}],Config:{Env:[],Labels:{"com.docker.compose.project":$projeto,"com.docker.compose.service":"db"}},NetworkSettings:{Networks:{"teste-interna":{IPAddress:"172.19.0.2"}}}}')
     if [ "$#" -eq 3 ]; then jq -cn --argjson app "$app" --argjson db "$db" '[$app,$db]'
-    elif [ "$2" = "$ID_APP" ]; then jq -c '[.]' <<<"$app"
+    elif [ "$2" = "$app_ativo" ]; then jq -c '[.]' <<<"$app"
     elif [ "$2" = "$ID_DB" ]; then jq -c '[.]' <<<"$db"
     else exit 95; fi
     exit
@@ -285,9 +297,9 @@ case "$comando" in
   ps)
     if [[ " $* " == *" -aq "* ]]; then
       [ "${DOCKER_SEM_CONTAINERS:-false}" = "true" ] && exit 0
-      if [ "${DOCKER_MANUAL:-false}" = true ]; then printf '%s\n' "$ID_APP" "$ID_DB"; else printf 'container-app\ncontainer-db\n'; fi
+      if [ "${DOCKER_MANUAL:-false}" = true ]; then printf '%s\n' "$app_ativo" "$ID_DB"; else printf 'container-app\ncontainer-db\n'; fi
     elif [ "${DOCKER_MANUAL:-false}" = true ]; then
-      case "${*: -1}" in app) printf '%s\n' "$ID_APP" ;; db) printf '%s\n' "$ID_DB" ;; *) exit 96 ;; esac
+      case "${*: -1}" in app) printf '%s\n' "$app_ativo" ;; db) printf '%s\n' "$ID_DB" ;; *) exit 96 ;; esac
     else
       printf 'container-app\n'
     fi
@@ -305,6 +317,8 @@ case "$comando" in
         "$ESTADO_DIR/atualizacao-manual-pendente.json" >/dev/null
       arquivo=$(jq -er .autorizacao "$ESTADO_DIR/atualizacao-manual-pendente.json")
       [ "$(<"$arquivo")" = "$(jq -er .MIGRACAO_LOTE_APROVADO <<<"$config_manual")" ]
+      if [ "${DOCKER_RESIDUO_PARTIDA:-false}" = true ]; then : >"${arquivo%/*}/.residuo"; fi
+      printf '%s\n' "$bind_manual" >"$DOCKER_UP_COUNTER.bind"
       : >"$DOCKER_UP_COUNTER.reinicio"
       if [ "${ABATER_APOS_PARTIDA:-false}" = true ]; then
         [[ "$(tr '\0' ' ' <"/proc/$PPID/cmdline")" == *"$EXECUTOR/atualizar.sh"* ]]
@@ -318,6 +332,8 @@ case "$comando" in
     ;;
   exec)
     if [[ " $* " == *"SELECT current_database();"* ]]; then printf 'frequencia\n'; exit; fi
+    if [[ " $* " == *" pg_dump "* ]]; then printf 'dados sintéticos pós-atualização\n'; exit; fi
+    if [[ " $* " == *" pg_restore -l "* ]]; then cat >/dev/null; exit; fi
     if [[ " $* " == *" psql -XwqAt "* ]]; then
       consulta=$(cat)
       [[ "$consulta" == *"BEGIN READ ONLY"* && "$consulta" == *"_prisma_migrations"* ]] || exit 1
@@ -451,7 +467,7 @@ preparar_repositorio() {
   COMMIT_ALVO=$(git -C "$REPO" rev-parse HEAD)
   git -C "$REPO" reset -q --hard "$COMMIT_ANTERIOR"
   export DOCKER_REVISAO_IMAGEM="$COMMIT_ALVO" DOCKER_REVISAO_BASE="$COMMIT_ANTERIOR"
-  rm -f "$DOCKER_LOG" "$DOCKER_UP_COUNTER" "$DOCKER_UP_COUNTER.dump" "$DOCKER_UP_COUNTER.reinicio" "$BACKUP_CHAMADAS" \
+  rm -f "$DOCKER_LOG" "$DOCKER_UP_COUNTER" "$DOCKER_UP_COUNTER.dump" "$DOCKER_UP_COUNTER.reinicio" "$DOCKER_UP_COUNTER.bind" "$BACKUP_CHAMADAS" \
     "$ESTADO_DIR/falha.json" "$ESTADO_DIR/estado.json" "$SERVIDOR_IDENTIDADE_ARQUIVO" \
     "$ESTADO_DIR/atualizacao-manual-pendente.json" "$ESTADO_DIR/ultimo-backup.json" \
     "$ESTADO_DIR/aprovacao-migracoes.json" "$ESTADO_DIR"/aprovacao-migracoes-*.usada.json
@@ -692,12 +708,81 @@ done
 rm -f "$DOCKER_UP_COUNTER.dump"
 status=$(TOPOLOGIA_ALVO_DIVERGENTE=true executar_atualizacao --permitir-migracoes)
 exigir_recusa_manual 'destino Compose diverge'
-status=$(TESTAR_CONCORRENCIA=true executar_atualizacao --permitir-migracoes)
+export ESTADO_DIR="$TMP_RAIZ/primeiro-estado"
+[ ! -e "$ESTADO_DIR" ]
+status=$(DOCKER_ROTULO_APP_TESTE=rotulo-compose TESTAR_CONCORRENCIA=true executar_atualizacao --permitir-migracoes)
 [ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar "a migração liberada falhou."; }
+[ "$(stat -c '%a:%u' -- "$ESTADO_DIR")" = "700:$(id -u)" ] ||
+  falhar 'a primeira troca não criou um diretório privado para o estado'
 grep -q 'Outra operação incompatível com compose' "$ESTADO_DIR/concorrente.log"
 [ "$(git -C "$REPO" rev-parse HEAD)" = "$COMMIT_MIGRACAO" ] &&
   [ ! -e "$ESTADO_DIR/atualizacao-manual-pendente.json" ] && [ "$(cat "$DOCKER_UP_COUNTER")" = 1 ] ||
   falhar "o alvo não foi concluído depois das verificações finais."
+
+# O verificador operacional real não deve rejeitar o bind que ficou no app.
+APP_DIR="$REPO" bash "$EXECUTOR/backup-real.sh" --verificar --sem-escrita >"$TMP_RAIZ/backup-pos.log" 2>&1 ||
+  { cat "$TMP_RAIZ/backup-pos.log"; falhar "o backup não passou após a revogação da partida."; }
+recibo_migracao=$(jq -er .recibo "$ESTADO_DIR/ultimo-backup.json")
+APP_DIR="$REPO" bash "$EXECUTOR/backup-real.sh" >"$TMP_RAIZ/backup-pos.log" 2>&1 ||
+  { cat "$TMP_RAIZ/backup-pos.log"; falhar "o próximo backup não foi produzido."; }
+[ "$(jq -er .recibo "$ESTADO_DIR/ultimo-backup.json")" != "$recibo_migracao" ] &&
+  [ -f "$BACKUP_BANCO_DIR/$recibo_migracao" ] || falhar "o conjunto anterior não foi preservado."
+node "$EXECUTOR/recibos.mjs" conferir "$BACKUP_BANCO_DIR" "$BACKUP_BANCO_DIR/$recibo_migracao"
+APP_DIR="$REPO" bash "$EXECUTOR/backup-real.sh" --verificar --sem-escrita >"$TMP_RAIZ/backup-pos.log" 2>&1 ||
+  { cat "$TMP_RAIZ/backup-pos.log"; falhar "o próximo backup não foi verificado."; }
+
+# Um registro manual não deve descartar a prova da montagem ainda usada.
+estado_antes=$(sha256sum "$ESTADO_DIR/estado.json")
+status=$(executar_atualizacao --registrar)
+exigir_falha "$status" 'o registro descartou a prova da partida'
+grep -q 'contém evidência de partida manual' "$TMP_RAIZ/saida.log"
+[ "$(sha256sum "$ESTADO_DIR/estado.json")" = "$estado_antes" ]
+
+# Exercita o verificador remoto real na fase em que o atualizador já trocou o
+# checkout, mas ainda precisa provar o backup com o mesmo app base em serviço.
+cat >"$FAKE_BIN/rclone" <<'RCLONE'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+destino=$(<"$RCLONE_CONFIG")
+case "$1" in
+  copy)
+    [[ "$#" -eq 5 && -d "$2" && "$3" == destino:teste && "$4" == --immutable && "$5" == --checksum ]]
+    cp -- "$2"/* "$destino/" ;;
+  copyto)
+    if [[ "$2" == destino:teste/* ]]; then cp -- "$destino/${2##*/}" "$3"
+    else [[ "$3" == destino:teste/* ]]; cp -- "$2" "$destino/${3##*/}"; fi ;;
+  cat) [[ "$2" == destino:teste/* ]]; cat -- "$destino/${2##*/}" ;;
+  *) printf 'Operação inesperada do transporte sintético: %s\n' "$1" >&2; exit 98 ;;
+esac
+RCLONE
+chmod 700 "$FAKE_BIN/rclone"
+conferir_recusa_de_troca_orfa() {
+  local -x BACKUP_REMOTO=destino:teste BACKUP_VERIFICAR_REMOTO=true APP_DIR="$REPO"
+  local -x BACKUP_RCLONE_CONFIG="$TMP_RAIZ/rclone.conf"
+  mkdir -m 700 "$TMP_RAIZ/copia-remota"
+  (umask 077; printf '%s\n' "$TMP_RAIZ/copia-remota" >"$BACKUP_RCLONE_CONFIG")
+  bash "$EXECUTOR/backup-real.sh"
+  chave=$(jq -er .trava "$SERVIDOR_IDENTIDADE_ARQUIVO")
+  id_troca=12345678-1234-4321-9123-123456789abc
+  (umask 077; jq -cn --arg operacao "$id_troca" --arg base "$COMMIT_MIGRACAO" --arg chave "$chave" \
+    --arg container "$ID_APP" --arg imagem "$IMAGEM_ALVO" \
+    '{versao:1,fase:"troca",$operacao,$base,$chave,appBase:{$container,$imagem},vinculoTroca:("a" * 64)}' >"$ESTADO_DIR/atualizacao-manual-pendente.json")
+  if BACKUP_VERIFICACAO_EM_TROCA="$id_troca" bash "$EXECUTOR/backup-real.sh" --verificar --sem-escrita 2>"$TMP_RAIZ/sem-trava.log"; then
+    falhar 'a leitura durante a troca foi liberada sem a trava'
+  fi
+  grep -q 'exige a trava operacional' "$TMP_RAIZ/sem-trava.log"
+  (
+    export SERVIDOR_LOCK_HERDADO="$SERVIDOR_LOCK_DIR/operacoes-$chave.lock"
+    exec 9<"$SERVIDOR_LOCK_HERDADO"
+    flock -n 9
+    if BACKUP_VERIFICACAO_EM_TROCA="$id_troca" bash "$EXECUTOR/backup-real.sh" --verificar --sem-escrita 2>"$TMP_RAIZ/marcador-orfa.log"; then
+      falhar 'a trava readquirida liberou uma troca órfã'
+    fi
+    grep -q 'exige o vínculo privado do atualizador ativo' "$TMP_RAIZ/marcador-orfa.log"
+  )
+  rm -- "$ESTADO_DIR/atualizacao-manual-pendente.json"
+}
+(conferir_recusa_de_troca_orfa)
 
 # A revisão já servida não deve ser recriada pelo protocolo pré-migração.
 chamadas_antes=$(wc -l <"$BACKUP_CHAMADAS")
@@ -712,6 +797,40 @@ grep -q 'não reaplica a revisão instalada com o migrador ativo' "$TMP_RAIZ/sai
 [ "$(wc -l <"$BACKUP_CHAMADAS")" -eq "$chamadas_antes" ] &&
   [ "$(cat "$DOCKER_UP_COUNTER")" = 1 ] && [ ! -e "$ESTADO_DIR/atualizacao-manual-pendente.json" ] ||
   falhar "a recusa de --forcar executou backup, gravou intenção ou iniciou outra partida."
+
+# Atualiza de novo, sem desmontar o bind da primeira migração. O backup remoto
+# precisa ser conferido também entre o checkout e a segunda partida.
+conferir_segunda_atualizacao() {
+  local -x BACKUP_REMOTO=destino:teste BACKUP_VERIFICAR_REMOTO=true
+  local -x BACKUP_RCLONE_CONFIG="$TMP_RAIZ/rclone.conf" DOCKER_SUBIDAS_BASE=1
+  local -x IMAGEM_BASE="$IMAGEM_ALVO" IMAGEM_ALVO ID_APP_ALVO
+  IMAGEM_ALVO="sha256:$(printf 'e%.0s' {1..64})"
+  ID_APP_ALVO=$(printf 'f%.0s' {1..64})
+  local -x DOCKER_REVISAO_BASE="$COMMIT_MIGRACAO" DOCKER_REVISAO_IMAGEM
+  local -x HISTORICO_MANUAL_BASE="$HISTORICO_MANUAL_ALVO" HISTORICO_MANUAL_ALVO
+  mkdir -p "$REPO/prisma/migrations/20260103000000_segunda"
+  printf 'ALTER TABLE prova ADD COLUMN ativo boolean;\n' >"$REPO/prisma/migrations/20260103000000_segunda/migration.sql"
+  git -C "$REPO" add prisma/migrations
+  git -C "$REPO" commit -qm 'segunda migração manual'
+  DOCKER_REVISAO_IMAGEM=$(git -C "$REPO" rev-parse HEAD)
+  HISTORICO_MANUAL_ALVO=$(historico_git "$DOCKER_REVISAO_IMAGEM")
+  git -C "$REPO" push -q origin HEAD:main
+  git -C "$REPO" checkout --detach -q "$DOCKER_REVISAO_BASE"
+  status=$(executar_atualizacao --permitir-migracoes)
+  [ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar 'a segunda atualização com backup remoto falhou'; }
+  jq -e --arg commit "$DOCKER_REVISAO_IMAGEM" --arg app "$ID_APP_ALVO" \
+    '.commit == $commit and .partidaManual.container == $app' "$ESTADO_DIR/estado.json" >/dev/null
+  [ "$(cat "$DOCKER_UP_COUNTER")" = 2 ] && [ ! -e "$ESTADO_DIR/atualizacao-manual-pendente.json" ]
+  APP_DIR="$REPO" bash "$EXECUTOR/backup-real.sh" --verificar --sem-escrita
+  # Depois de uma recriação externa sintética, a prova anterior não é exigida.
+  rm -- "$DOCKER_UP_COUNTER.bind"
+  ID_APP_ALVO=$(printf '9%.0s' {1..64})
+  status=$(executar_atualizacao --registrar)
+  [ "$status" -eq 0 ] || { cat "$TMP_RAIZ/saida.log"; falhar 'o registro do app canônico foi recusado'; }
+  jq -e --arg commit "$DOCKER_REVISAO_IMAGEM" '.commit == $commit and (has("partidaManual") | not)' \
+    "$ESTADO_DIR/estado.json" >/dev/null
+}
+(conferir_segunda_atualizacao)
 
 # A retomada exige uma opção explícita e o registro da revisão base.
 retomada=(--permitir-migracoes --base-sem-migrador)
@@ -743,13 +862,22 @@ preparar_manual false true
 status=$(executar_atualizacao --permitir-migracoes)
 exigir_recusa_manual 'não implementa o protocolo manual compatível'
 
-for caso in saude historico sinal troca migrador_alvo; do
+for caso in saude historico sinal troca migrador_alvo residuo; do
   preparar_manual
   case "$caso" in
     saude) status=$(DOCKER_FALHA_UP=true executar_atualizacao --permitir-migracoes) ;;
     historico) status=$(HISTORICO_FINAL="$HISTORICO_MANUAL_BASE" executar_atualizacao --permitir-migracoes) ;;
     sinal) status=$(ABATER_APOS_PARTIDA=true executar_atualizacao --permitir-migracoes) ;;
     troca) status=$(ABATER_APOS_TROCA=true executar_atualizacao --permitir-migracoes) ;;
+    residuo)
+      # A enumeração precisa enxergar inclusive o arquivo oculto por GLOBIGNORE.
+      cp -- "$OPS_ENV_FILE" "$TMP_RAIZ/globignore.env"
+      printf "\nGLOBIGNORE='%s/migracao-partida.????????????/entrada/.residuo'\n" "$ESTADO_DIR" >>"$TMP_RAIZ/globignore.env"
+      status=$(DOCKER_RESIDUO_PARTIDA=true SERVIDOR_AMBIENTE_INJETADO=false OPS_ENV_FILE="$TMP_RAIZ/globignore.env" \
+        executar_atualizacao --permitir-migracoes)
+      grep -q 'O diretório revogado da partida manual não está vazio e íntegro' "$TMP_RAIZ/saida.log"
+      [ ! -e "$ESTADO_DIR/estado.json" ] && [ -e "$DOCKER_UP_COUNTER.reinicio" ] ||
+        falhar 'a partida com resíduo foi atestada ou teve o reinício reabilitado' ;;
     migrador_alvo)
       status=$(executar_atualizacao --registrar)
       [ "$status" -eq 0 ] || falhar "não foi possível registrar a base do ensaio de retomada."

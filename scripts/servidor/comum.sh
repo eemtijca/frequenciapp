@@ -214,6 +214,7 @@ compose() {
 }
 
 verificar_instalacao() {
+  local transicao="${1:-}"
   montar_compose
   compose config --quiet || erro "A configuração do Compose não é válida."
 
@@ -235,18 +236,35 @@ verificar_instalacao() {
   fi
 
   if [ "${SERVIDOR_IDENTIDADE_SEM_ARQUIVOS:-false}" = true ]; then
-    conferir_identidade_sem_arquivos auto
+    conferir_identidade_sem_arquivos auto "$transicao"
   else
-    conferir_identidade auto
+    conferir_identidade auto "$transicao"
   fi
   log "Instalação Compose conferida: projeto $COMPOSE_PROJECT_NAME, app $SERVIDOR_SERVICO_APP, banco $SERVIDOR_SERVICO_DB."
 }
 
+descritor_trava_confere() {
+  local arquivo="$1"
+  [ "${SERVIDOR_LOCK_HERDADO:-}" = "$arquivo" ] && [ -f "$arquivo" ] && [ ! -L "$arquivo" ] &&
+    [ "$(stat -Lc '%d:%i' /proc/self/fd/9 2>/dev/null)" = "$(stat -c '%d:%i' "$arquivo")" ]
+}
+
+exigir_trava_transicao() {
+  local registro="$1" chave
+  chave=$(ler_campo_json "$registro" trava)
+  if [[ ! "$chave" =~ ^[0-9a-f]{64}$ ]] ||
+    ! descritor_trava_confere "$SERVIDOR_LOCK_DIR/operacoes-$chave.lock" || ! flock -n 9; then
+    erro "A conferência durante a troca exige a trava operacional."
+  fi
+}
+
 conferir_identidade_sem_arquivos() {
   local acao="${1:-auto}"
+  local transicao="${2:-}"
   local registro="${SERVIDOR_IDENTIDADE_ARQUIVO:-$SERVIDOR_CONFIG_DIR/identidade.json}"
   local config daemon containers ids_texto captura
   local -a ids
+  if [ -n "$transicao" ]; then exigir_trava_transicao "$registro"; fi
   command -v node >/dev/null || erro "Instale Node.js para conferir a identidade operacional."
   # A captura usa memória e pipes, sem arquivos temporários na instalação.
   config=$(compose config --format json) || erro "Não foi possível ler a configuração Compose."
@@ -267,15 +285,17 @@ conferir_identidade_sem_arquivos() {
     ' "$COMPOSE_PROJECT_NAME" "$SERVIDOR_SERVICO_APP" "$SERVIDOR_SERVICO_DB") ||
     erro "Não foi possível montar a identidade a partir da configuração."
   SERVIDOR_ALVO_CHAVE=$(printf '%s' "$captura" |
-    node "$SERVIDOR_SCRIPTS_DIR/identidade.mjs" "$acao" "$registro") ||
+    node "$SERVIDOR_SCRIPTS_DIR/identidade.mjs" "$acao" "$registro" "$ESTADO_DIR" "$transicao") ||
     erro "Identidade não conferida; use a adoção explícita após revisar os recursos."
   export SERVIDOR_ALVO_CHAVE
 }
 
 conferir_identidade() {
   local acao="${1:-auto}"
+  local transicao="${2:-}"
   local registro="${SERVIDOR_IDENTIDADE_ARQUIVO:-$SERVIDOR_CONFIG_DIR/identidade.json}"
   local captura
+  if [ -n "$transicao" ]; then exigir_trava_transicao "$registro"; fi
   command -v node >/dev/null || erro "Instale Node.js para conferir a identidade operacional."
   captura=$(mktemp -d "${TMPDIR:-/tmp}/frequenciapp-identidade.XXXXXX") ||
     erro "Não foi possível criar o diretório privado da conferência."
@@ -303,7 +323,7 @@ conferir_identidade() {
       const ler = nome => JSON.parse(fs.readFileSync(p+"/"+nome+".json", "utf8"));
       process.stdout.write(JSON.stringify({config:ler("config"),daemon:ler("daemon"),containers:ler("containers"),parametros:{projeto,app,db}}));
     ' "$captura" "$COMPOSE_PROJECT_NAME" "$SERVIDOR_SERVICO_APP" "$SERVIDOR_SERVICO_DB" |
-      node "$SERVIDOR_SCRIPTS_DIR/identidade.mjs" "$acao" "$registro" >"$captura/chave" || exit 1
+      node "$SERVIDOR_SCRIPTS_DIR/identidade.mjs" "$acao" "$registro" "$ESTADO_DIR" "$transicao" >"$captura/chave" || exit 1
     cat "$captura/chave"
   ) >"$captura.chave"; then
     rm -rf "$captura" "$captura.chave"
@@ -348,8 +368,7 @@ travar() {
       [ -f "$arquivo" ] || erro "Não foi possível provisionar a trava do operador."
   fi
   if [ -n "${SERVIDOR_LOCK_HERDADO:-}" ]; then
-    [ "$SERVIDOR_LOCK_HERDADO" = "$arquivo" ] && [ -f "$arquivo" ] &&
-      [ "$(stat -Lc '%d:%i' /proc/self/fd/9 2>/dev/null)" = "$(stat -c '%d:%i' "$arquivo")" ] ||
+    descritor_trava_confere "$arquivo" ||
       erro "Descritor herdado não corresponde à trava do alvo."
   else
     exec 9>>"$arquivo"
