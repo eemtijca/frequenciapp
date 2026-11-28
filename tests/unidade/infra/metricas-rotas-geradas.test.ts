@@ -71,9 +71,9 @@ describe("registro gerado de rotas de métricas", () => {
     expect(await gerarConteudo()).toBe(await gerarConteudo());
   });
 
-  it("cobre os 140 route.ts com o template correspondente", async () => {
+  it("cobre os 146 route.ts com o template correspondente", async () => {
     const arquivos = await arquivosDeRota(API);
-    expect(arquivos).toHaveLength(140);
+    expect(arquivos).toHaveLength(146);
 
     const falhas: string[] = [];
     for (const arquivo of arquivos) {

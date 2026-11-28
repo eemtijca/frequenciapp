@@ -140,6 +140,10 @@
     {
       "name": "backup",
       "description": "Cópia de segurança."
+    },
+    {
+      "name": "fila",
+      "description": "Trabalhos assíncronos, transporte BullMQ e worker dedicado."
     }
   ],
   "security": [
@@ -13429,6 +13433,358 @@
           }
         }
       }
+    },
+    "/api/trabalhos": {
+      "get": {
+        "operationId": "listarTrabalhos",
+        "summary": "Listar trabalhos da fila",
+        "description": "Apenas administração. Lista até 100 trabalhos recentes, com total e contagens por estado. Não devolve payload nem dado de aluno.",
+        "tags": ["fila"],
+        "parameters": [
+          {
+            "name": "tipo",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["INDICADORES_ATUALIZAR", "PLANILHA_MENSAL_PREPARAR", "EXPURGO_TRABALHOS"]
+            }
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PENDENTE",
+                "DISPONIVEL",
+                "EM_EXECUCAO",
+                "AGUARDANDO",
+                "CONCLUIDO",
+                "FALHOU",
+                "CONFERENCIA",
+                "CANCELADO"
+              ]
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Trabalhos e contagens.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/TrabalhoResumo"
+                      }
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "contagens": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "integer"
+                      }
+                    }
+                  },
+                  "required": ["itens", "total", "contagens"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/trabalhos/{id}": {
+      "get": {
+        "operationId": "obterTrabalho",
+        "summary": "Consultar um trabalho",
+        "description": "Apenas administração. Devolve o trabalho, o payload mínimo e a trilha de eventos, sem nome de aluno.",
+        "tags": ["fila"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Detalhe do trabalho.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trabalho": {
+                      "$ref": "#/components/schemas/TrabalhoDetalhe"
+                    }
+                  },
+                  "required": ["trabalho"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/trabalhos/{id}/cancelar": {
+      "post": {
+        "operationId": "cancelarTrabalho",
+        "summary": "Cancelar um trabalho",
+        "description": "Apenas administração e origem confiável. Cancela um trabalho que ainda não começou; outro estado responde 409.",
+        "tags": ["fila"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ação concluída.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["ok"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/trabalhos/{id}/reenfileirar": {
+      "post": {
+        "operationId": "reenfileirarTrabalho",
+        "summary": "Reenfileirar um trabalho",
+        "description": "Apenas administração e origem confiável. Reenfileira um trabalho com falha ou cancelado; outro estado responde 409.",
+        "tags": ["fila"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ação concluída.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["ok"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/trabalhos/indicadores": {
+      "post": {
+        "operationId": "enfileirarIndicadores",
+        "summary": "Enfileirar a atualização dos indicadores",
+        "description": "Apenas administração e origem confiável. Grava a intenção no PostgreSQL e devolve o identificador do trabalho para acompanhamento.",
+        "tags": ["fila"],
+        "responses": {
+          "202": {
+            "description": "Trabalho enfileirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trabalhoId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": ["trabalhoId"]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
+    "/api/trabalhos/planilha-mensal": {
+      "post": {
+        "operationId": "enfileirarPlanilhaMensal",
+        "summary": "Enfileirar a preparação mensal",
+        "description": "Apenas administração e origem confiável. Recebe a turma de origem e o mês, grava a intenção no PostgreSQL e devolve o identificador do trabalho.",
+        "tags": ["fila"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "turmaOriginalId": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "mes": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}$"
+                  }
+                },
+                "required": ["turmaOriginalId", "mes"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Trabalho enfileirado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trabalhoId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": ["trabalhoId"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -16514,10 +16870,22 @@
             "type": "object",
             "required": ["alunos", "faltas", "justificadas", "parciais"],
             "properties": {
-              "alunos": { "type": "integer", "example": 40 },
-              "faltas": { "type": "integer", "example": 12 },
-              "justificadas": { "type": "integer", "example": 4 },
-              "parciais": { "type": "integer", "example": 8 }
+              "alunos": {
+                "type": "integer",
+                "example": 40
+              },
+              "faltas": {
+                "type": "integer",
+                "example": 12
+              },
+              "justificadas": {
+                "type": "integer",
+                "example": 4
+              },
+              "parciais": {
+                "type": "integer",
+                "example": 8
+              }
             }
           }
         }
@@ -16538,15 +16906,42 @@
           "ocorrencias"
         ],
         "properties": {
-          "alunoId": { "type": "string", "format": "uuid" },
-          "nome": { "type": "string", "example": "Aluno Exemplo" },
-          "turmaAtual": { "type": "string", "example": "1º ano B" },
-          "desistente": { "type": "boolean", "example": false },
-          "faltas": { "type": "integer", "example": 2 },
-          "justificadas": { "type": "integer", "example": 1 },
-          "parciais": { "type": "integer", "example": 3 },
-          "diasComRegistro": { "type": "integer", "example": 20 },
-          "totalHistorico": { "type": "integer", "example": 12 },
+          "alunoId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nome": {
+            "type": "string",
+            "example": "Aluno Exemplo"
+          },
+          "turmaAtual": {
+            "type": "string",
+            "example": "1º ano B"
+          },
+          "desistente": {
+            "type": "boolean",
+            "example": false
+          },
+          "faltas": {
+            "type": "integer",
+            "example": 2
+          },
+          "justificadas": {
+            "type": "integer",
+            "example": 1
+          },
+          "parciais": {
+            "type": "integer",
+            "example": 3
+          },
+          "diasComRegistro": {
+            "type": "integer",
+            "example": 20
+          },
+          "totalHistorico": {
+            "type": "integer",
+            "example": 12
+          },
           "ocorrencias": {
             "type": "array",
             "items": {
@@ -16568,21 +16963,42 @@
           "referenciaAulas"
         ],
         "properties": {
-          "dia": { "type": "string", "format": "date", "example": "2026-11-05" },
-          "marca": { "type": "string", "enum": ["F", "FJ", "S"] },
+          "dia": {
+            "type": "string",
+            "format": "date",
+            "example": "2026-11-05"
+          },
+          "marca": {
+            "type": "string",
+            "enum": ["F", "FJ", "S"]
+          },
           "aulasPrevistas": {
-            "oneOf": [{ "type": "integer" }, { "type": "null" }],
+            "oneOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "example": 5
           },
-          "aulasFaltadas": { "type": "integer", "example": 2 },
+          "aulasFaltadas": {
+            "type": "integer",
+            "example": 2
+          },
           "aulasFaltadasRotulos": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "example": ["2ª aula · 07:50 às 08:40"]
           },
           "justificativas": {
             "type": "array",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "example": ["Doente"]
           },
           "referenciaAulas": {
@@ -21952,6 +22368,142 @@
             }
           }
         }
+      },
+      "TrabalhoResumo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": ["INDICADORES_ATUALIZAR", "PLANILHA_MENSAL_PREPARAR", "EXPURGO_TRABALHOS"]
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "PENDENTE",
+              "DISPONIVEL",
+              "EM_EXECUCAO",
+              "AGUARDANDO",
+              "CONCLUIDO",
+              "FALHOU",
+              "CONFERENCIA",
+              "CANCELADO"
+            ]
+          },
+          "prioridade": {
+            "type": "integer"
+          },
+          "tentativas": {
+            "type": "integer"
+          },
+          "maxTentativas": {
+            "type": "integer"
+          },
+          "resultado": {
+            "type": ["string", "null"]
+          },
+          "erroCodigo": {
+            "type": ["string", "null"]
+          },
+          "erroResumo": {
+            "type": ["string", "null"]
+          },
+          "criadoEm": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "atualizadoEm": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "disponivelEm": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "concluidoEm": {
+            "type": ["string", "null"],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "tipo",
+          "estado",
+          "prioridade",
+          "tentativas",
+          "maxTentativas",
+          "criadoEm",
+          "atualizadoEm",
+          "disponivelEm"
+        ]
+      },
+      "TrabalhoDetalhe": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/TrabalhoResumo"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "payload": {
+                "type": ["object", "null"]
+              },
+              "detalhes": {
+                "type": ["object", "null"]
+              },
+              "eventos": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "deEstado": {
+                      "type": ["string", "null"],
+                      "enum": [
+                        "PENDENTE",
+                        "DISPONIVEL",
+                        "EM_EXECUCAO",
+                        "AGUARDANDO",
+                        "CONCLUIDO",
+                        "FALHOU",
+                        "CONFERENCIA",
+                        "CANCELADO",
+                        null
+                      ]
+                    },
+                    "paraEstado": {
+                      "type": "string",
+                      "enum": [
+                        "PENDENTE",
+                        "DISPONIVEL",
+                        "EM_EXECUCAO",
+                        "AGUARDANDO",
+                        "CONCLUIDO",
+                        "FALHOU",
+                        "CONFERENCIA",
+                        "CANCELADO"
+                      ]
+                    },
+                    "tentativa": {
+                      "type": "integer"
+                    },
+                    "resultado": {
+                      "type": ["string", "null"]
+                    },
+                    "criadoEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": ["paraEstado", "tentativa", "criadoEm"]
+                }
+              }
+            },
+            "required": ["eventos"]
+          }
+        ]
       }
     }
   }
