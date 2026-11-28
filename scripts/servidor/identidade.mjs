@@ -1,9 +1,22 @@
 // Reduz a configuração efetiva a uma identidade operacional sem segredos.
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const TIPOS_MONTAGEM = new Set(["volume", "bind", "tmpfs"]);
+const DESTINO_PARTIDA = "/run/frequenciapp-migracao";
+const idOperacao = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 
 function exigir(condicao, mensagem) {
   if (!condicao) throw new Error(mensagem);
@@ -166,21 +179,182 @@ function lerRegistro(registro) {
   return JSON.parse(readFileSync(registro, "utf8"));
 }
 
-function compararRegistro(anterior, atual) {
+function lerEstadoPrivado(caminho, dono) {
+  const fd = openSync(caminho, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
+  try {
+    const stat = fstatSync(fd);
+    exigir(
+      stat.isFile() && stat.uid === dono && (stat.mode & 0o777) === 0o600 && stat.size <= 65536,
+      "Evidência da partida manual não é um arquivo privado regular.",
+    );
+    return JSON.parse(readFileSync(fd, "utf8"));
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function conferirVinculoTroca(esperado, dono) {
+  const caminho = "/proc/self/fd/7";
+  if (
+    typeof esperado !== "string" ||
+    !/^[0-9a-f]{64}$/.test(esperado) ||
+    !lstatSync(caminho, { throwIfNoEntry: false })
+  )
+    return false;
+  const fd = openSync(caminho, constants.O_RDONLY | constants.O_NONBLOCK);
+  try {
+    const stat = fstatSync(fd);
+    if (
+      !stat.isFile() ||
+      stat.uid !== dono ||
+      (stat.mode & 0o777) !== 0o600 ||
+      stat.nlink !== 0 ||
+      stat.size !== 32
+    )
+      return false;
+    return createHash("sha256").update(readFileSync(fd)).digest("hex") === esperado;
+  } finally {
+    closeSync(fd);
+  }
+}
+
+function lerDiretorioEstado(dirEstado) {
+  exigir(typeof dirEstado === "string" && dirEstado.length > 0, "Diretório de estado ausente.");
+  const pasta = resolve(dirEstado);
+  const stat = lstatSync(pasta);
+  exigir(
+    stat.isDirectory() && (stat.mode & 0o777) === 0o700 && realpathSync(pasta) === pasta,
+    "O diretório de estado da partida manual não é privado e canônico.",
+  );
+  return { pasta, dono: stat.uid };
+}
+
+function conferirDiretorioRevogado({ pasta, dono }, origem, inode) {
+  const pai = dirname(origem);
+  const erro = "O diretório revogado da partida manual não está vazio e íntegro.";
+  exigir(
+    dirname(pai) === pasta &&
+      /^migracao-partida\.[A-Za-z0-9]{12}$/.test(basename(pai)) &&
+      join(pai, "entrada") === origem,
+    erro,
+  );
+  for (const [dir, modo] of [
+    [pai, 0o700],
+    [origem, 0o755],
+  ]) {
+    const stat = lstatSync(dir);
+    exigir(stat.isDirectory() && stat.uid === dono && (stat.mode & 0o777) === modo, erro);
+  }
+  const alvo = lstatSync(origem, { bigint: true });
+  exigir(inode === `${alvo.dev}:${alvo.ino}` && readdirSync(origem).length === 0, erro);
+}
+
+function conferirTransicao(atual, container, { pasta, dono }, transicao) {
+  // A exceção é da execução ativa, mesmo quando a base não tem bind residual.
+  const operacao = lerEstadoPrivado(join(pasta, "atualizacao-manual-pendente.json"), dono);
+  exigir(
+    idOperacao.test(transicao) &&
+      operacao.versao === 1 &&
+      operacao.fase === "troca" &&
+      operacao.operacao === transicao &&
+      operacao.chave === atual.trava &&
+      typeof operacao.base === "string" &&
+      /^[0-9a-f]{40}$/.test(operacao.base) &&
+      typeof operacao.appBase?.container === "string" &&
+      /^[0-9a-f]{64}$/.test(operacao.appBase.container) &&
+      operacao.appBase.container === container?.Id &&
+      typeof operacao.appBase.imagem === "string" &&
+      /^sha256:[0-9a-f]{64}$/.test(operacao.appBase.imagem) &&
+      operacao.appBase.imagem === container.Image,
+    "Marcador não corresponde à troca e à revisão ativa da base.",
+  );
+  exigir(
+    conferirVinculoTroca(operacao.vinculoTroca, dono),
+    "A conferência durante a troca exige o vínculo privado do atualizador ativo.",
+  );
+  return operacao;
+}
+
+function recursosSemPartidaRevogada(atual, entrada, container, dirEstado, troca) {
+  const { app } = entrada.parametros;
+  if (!container) return atual.recursos;
+  const montagens = container.Mounts.filter((m) => m.Destination === DESTINO_PARTIDA);
+  if (
+    !dirEstado ||
+    montagens.length !== 1 ||
+    declaracoesDoServico(entrada.config, app).some((m) => m.destino === DESTINO_PARTIDA)
+  )
+    return atual.recursos;
+
+  const diretorio = lerDiretorioEstado(dirEstado);
+  const exigirProva = (ok) => exigir(ok, "Montagem de partida manual sem revogação comprovada.");
+  const marcador = join(diretorio.pasta, "atualizacao-manual-pendente.json");
+  const pendente = lstatSync(marcador, { throwIfNoEntry: false });
+  exigir(
+    !pendente || troca,
+    "Atualização manual pendente ou incerta; identidade aguarda revisão da recuperação.",
+  );
+  const estado = lerEstadoPrivado(join(diretorio.pasta, "estado.json"), diretorio.dono);
+  const { partidaManual: prova, commit } = estado;
+  const [montagem] = montagens;
+  exigirProva(
+    prova?.versao === 1 &&
+      typeof prova.operacao === "string" &&
+      idOperacao.test(prova.operacao) &&
+      typeof commit === "string" &&
+      /^[0-9a-f]{40}$/.test(commit) &&
+      prova.revisao === commit &&
+      typeof prova.container === "string" &&
+      /^[0-9a-f]{64}$/.test(prova.container) &&
+      prova.container === container.Id &&
+      typeof prova.imagem === "string" &&
+      /^sha256:[0-9a-f]{64}$/.test(prova.imagem) &&
+      prova.imagem === container.Image &&
+      typeof prova.origem === "string" &&
+      montagem.Type === "bind" &&
+      montagem.RW === false &&
+      montagem.Source === prova.origem,
+  );
+  conferirDiretorioRevogado(diretorio, prova.origem, prova.inode);
+  if (troca) exigirProva(pendente && troca.operacao !== prova.operacao && troca.base === commit);
+  return atual.recursos.map((r) =>
+    r.servico === app
+      ? { ...r, montagens: r.montagens.filter((m) => m.destino !== DESTINO_PARTIDA) }
+      : r,
+  );
+}
+
+function compararRegistro(anterior, atual, entrada, dirEstado, transicao) {
   exigir(
     anterior.versao === atual.versao &&
       anterior.projeto === atual.projeto &&
       anterior.daemon === atual.daemon &&
       anterior.chave === atual.chave &&
-      anterior.trava === atual.trava &&
-      JSON.stringify(anterior.recursos) === JSON.stringify(atual.recursos),
+      anterior.trava === atual.trava,
+    "Identidade efetiva mudou; nenhuma adoção automática é permitida.",
+  );
+  const app = entrada.containers.find(
+    (c) => c.Config?.Labels?.["com.docker.compose.service"] === entrada.parametros.app,
+  );
+  const troca = transicao
+    ? conferirTransicao(atual, app, lerDiretorioEstado(dirEstado), transicao)
+    : null;
+  const esperados = JSON.stringify(anterior.recursos);
+  if (esperados === JSON.stringify(atual.recursos)) return;
+  exigir(
+    esperados === JSON.stringify(recursosSemPartidaRevogada(atual, entrada, app, dirEstado, troca)),
     "Identidade efetiva mudou; nenhuma adoção automática é permitida.",
   );
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
-    const [acao, registro] = process.argv.slice(2);
+    const [acao, registro, dirEstado, transicao] = process.argv.slice(2);
+    if (acao === "conferir-diretorio-partida") {
+      // Nesta ação, os argumentos são diretório de estado, origem e inode.
+      conferirDiretorioRevogado(lerDiretorioEstado(registro), dirEstado, transicao);
+      process.exit(0);
+    }
     const entrada = JSON.parse(readFileSync(0, "utf8"));
     let acaoEfetiva = acao;
     if (acao === "auto") {
@@ -204,6 +378,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     if (!["inicial", "adotar", "conferir"].includes(acaoEfetiva)) {
       throw new Error("Ação de identidade inválida.");
     }
+    exigir(
+      !transicao || acaoEfetiva === "conferir",
+      "Troca exige identidade adotada para conferência.",
+    );
     const identidade = identidadeCompose(
       entrada.config,
       entrada.daemon,
@@ -220,7 +398,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
       }
       writeFileSync(registro, JSON.stringify(identidade) + "\n", { mode: 0o600, flag: "wx" });
     } else if (acaoEfetiva === "conferir") {
-      compararRegistro(lerRegistro(registro), identidade);
+      compararRegistro(lerRegistro(registro), identidade, entrada, dirEstado, transicao);
     }
     process.stdout.write(identidade.trava);
   } catch (erro) {

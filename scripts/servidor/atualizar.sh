@@ -216,12 +216,18 @@ escrever_estado() {
   local commit="$3"
   local imagem="$4"
   local imagem_backup="$5"
+  local partida="${6:-null}" temporario
   mkdir -p "$ESTADO_DIR"
-  printf '{"modo":"%s","ref":"%s","commit":"%s","imagem":"%s","imagemBackup":"%s","atualizadoEm":"%s"}\n' \
-    "$modo" "$ref" "$commit" "$imagem" "$imagem_backup" \
-    "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$estado.tmp"
-  mv "$estado.tmp" "$estado"
-  chmod 600 "$estado"
+  temporario=$(mktemp "$ESTADO_DIR/.estado.XXXXXXXX") || return 1
+  if ! jq -cn --arg modo "$modo" --arg ref "$ref" --arg commit "$commit" --arg imagem "$imagem" \
+    --arg imagemBackup "$imagem_backup" --arg atualizadoEm "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+    --argjson partida "$partida" '
+      {$modo,$ref,$commit,$imagem,$imagemBackup,$atualizadoEm} +
+      (if $partida == null then {} else {partidaManual:$partida} end)
+    ' >"$temporario" || ! sync "$temporario" || ! mv -T -- "$temporario" "$estado"; then
+    rm -f -- "$temporario"
+    return 1
+  fi
 }
 
 escrever_falha() {
@@ -355,6 +361,15 @@ revisao_da_imagem() {
     "$1" 2>/dev/null || true
 }
 
+capturar_app_da_revisao() {
+  local revisao="$1" app imagem
+  app=$(compose ps -q --no-trunc "$SERVIDOR_SERVICO_APP") || return 1
+  [[ "$app" =~ ^[a-f0-9]{64}$ ]] || return 1
+  imagem=$(docker inspect --format '{{.Image}}' "$app") || return 1
+  [[ "$imagem" =~ ^sha256:[a-f0-9]{64}$ ]] && [ "$(revisao_da_imagem "$imagem")" = "$revisao" ] || return 1
+  jq -cn --arg container "$app" --arg imagem "$imagem" '{$container,$imagem}'
+}
+
 verificar_imagem_alvo() {
   local imagem="$1"
   local commit="$2"
@@ -423,6 +438,25 @@ if [ "$registrar" = true ]; then
     erro "A árvore de trabalho tem alterações. Faça commit ou descarte antes de registrar."
   fi
   commit=$(git -C "$APP_DIR" rev-parse HEAD)
+  if [ -e "$estado" ] || [ -L "$estado" ]; then
+    if [ ! -f "$estado" ] || [ -L "$estado" ] || ! jq -e 'type == "object"' "$estado" >/dev/null; then
+      erro "O registro existente é inválido; preserve-o."
+    fi
+    if jq -e 'has("partidaManual")' "$estado" >/dev/null; then
+      anterior=$(jq -er '.partidaManual.container | select(test("^[a-f0-9]{64}$"))' "$estado") ||
+        erro "A evidência de partida manual existente é inválida; preserve-a."
+      app_registro=$(capturar_app_da_revisao "$commit") ||
+        erro "A revisão da imagem ativa não confirma o checkout; preserve a evidência de partida manual."
+      app_registro_id=$(jq -er .container <<<"$app_registro")
+      app_registro_imagem=$(jq -er .imagem <<<"$app_registro")
+      docker inspect "$app_registro_id" | jq -e --arg id "$app_registro_id" --arg img "$app_registro_imagem" \
+        --arg anterior "$anterior" '
+        length == 1 and (.[0] | .Id == $id and .Id != $anterior and .Image == $img and
+          .State.Running == true and (.Mounts | type == "array" and
+          all(.[]; .Destination != "/run/frequenciapp-migracao")))
+      ' >/dev/null || erro "O registro existente contém evidência de partida manual ainda necessária; preserve-o."
+    fi
+  fi
   ref=$(git -C "$APP_DIR" describe --tags --exact-match 2>/dev/null || git -C "$APP_DIR" rev-parse --short HEAD)
   modo_registro="main"
   imagem="${APP_IMAGEM:-frequenciapp:main-${commit:0:12}}"
@@ -432,7 +466,8 @@ if [ "$registrar" = true ]; then
     imagem="${APP_IMAGEM_REPOSITORIO}:${ref#v}"
     imagem_backup="${APP_IMAGEM_BACKUP_REPOSITORIO}:${ref#v}"
   fi
-  escrever_estado "$modo_registro" "$ref" "$commit" "$imagem" "$imagem_backup"
+  escrever_estado "$modo_registro" "$ref" "$commit" "$imagem" "$imagem_backup" ||
+    erro "Não foi possível registrar a implantação."
   log "Estado registrado em $estado."
   exit 0
 fi
@@ -576,6 +611,7 @@ conferir_compose_migracoes_auto() {
 preparar_montagem_lote_auto() {
   pasta_lote_auto=$(mktemp -d "$ESTADO_DIR/migracao-partida.XXXXXXXXXXXX") || return 1
   mkdir -m 0755 -- "$pasta_lote_auto/entrada" || return 1
+  inode_entrada_lote=$(stat -c '%d:%i' -- "$pasta_lote_auto/entrada") || return 1
   (umask 077; jq -n --arg app "$SERVIDOR_SERVICO_APP" --arg origem "$pasta_lote_auto/entrada" '
     {services:{($app):{volumes:[{type:"bind",source:$origem,target:"/run/frequenciapp-migracao",
       read_only:true,bind:{create_host_path:false}}]}}}
@@ -818,12 +854,12 @@ preparar_envelope_manual() {
 }
 
 conferir_backup_manual() {
-  local resultado dir_backup="${BACKUP_BANCO_DIR:-$BACKUP_DIR/banco}"
+  local transicao="${1:-}" resultado dir_backup="${BACKUP_BANCO_DIR:-$BACKUP_DIR/banco}"
   resultado=$(BACKUP_BANCO_VERIFICADO="$banco_auto" DATABASE_SCHEMA="$schema_auto" \
     BACKUP_REMOTO="${BACKUP_REMOTO:-}" node "$DIR/recibos.mjs" conferir-estado-manual \
     "$dir_backup" "$estado_backup" "$origem_manual" "$id_manual") || return 1
   if [ -n "${BACKUP_REMOTO:-}" ]; then
-    "$DIR/backup-banco.sh" --verificar --sem-escrita >&2 || return 1
+    BACKUP_VERIFICACAO_EM_TROCA="$transicao" "$DIR/backup-banco.sh" --verificar --sem-escrita >&2 || return 1
   elif [ "${ATUALIZAR_PERMITIR_BACKUP_LOCAL:-false}" != true ]; then
     return 1
   fi
@@ -831,6 +867,16 @@ conferir_backup_manual() {
 }
 
 preparar_migracao_manual() {
+  # A trava já foi adquirida. Não conserta propriedade nem permissões antigas.
+  if [ ! -e "$ESTADO_DIR" ] && [ ! -L "$ESTADO_DIR" ]; then
+    if [ "$(realpath -m -- "$ESTADO_DIR")" != "$ESTADO_DIR" ] || ! (umask 077; mkdir -p -- "$ESTADO_DIR"); then
+      erro "Não foi possível criar o diretório privado de estado da atualização manual."
+    fi
+  fi
+  [ -d "$ESTADO_DIR" ] && [ ! -L "$ESTADO_DIR" ] &&
+    [ "$(realpath -e -- "$ESTADO_DIR")" = "$ESTADO_DIR" ] &&
+    [ "$(stat -c '%a:%u' -- "$ESTADO_DIR")" = "700:$(id -u)" ] ||
+    erro "A atualização manual exige o diretório de estado privado do executor."
   [ "${BACKUP_MODO:-compose}" = compose ] && [ "$ATUALIZAR_VERIFICAR_IMAGEM" = true ] &&
     [ "$head_commit" = "$commit_atual" ] || erro "Migração manual exige Compose, verificação da imagem e checkout da base registrada."
   node "$DIR/alvo-migracoes-auto.mjs" transicao-manual "$APP_DIR" "$commit_atual" "$alvo_commit" ||
@@ -858,10 +904,11 @@ registrar_fase_manual() {
   temporario=$(mktemp "$ESTADO_DIR/.atualizacao-manual.XXXXXXXX") || return 1
   if ! jq -n --arg fase "$fase" --arg id "$id_manual" --arg base "$commit_atual" \
     --arg alvo "$alvo_commit" --arg chave "$SERVIDOR_ALVO_CHAVE" --arg imagem "$imagem_manual" \
-    --arg autorizacao "$pasta_lote_auto/entrada/autorizar" \
-    --argjson origem "$origem_manual" --argjson backup "$backup_manual" '
+    --arg autorizacao "$pasta_lote_auto/entrada/autorizar" --arg vinculo "${vinculo_troca_manual:-}" \
+    --argjson origem "$origem_manual" --argjson backup "$backup_manual" --argjson appBase "$app_base_manual" '
     {versao:1,operacao:$id,fase:$fase,base:$base,alvo:$alvo,chave:$chave,imagem:$imagem,
-     origem:$origem,backup:$backup,autorizacao:$autorizacao}
+     origem:$origem,backup:$backup,autorizacao:$autorizacao} +
+     (if $fase == "troca" then {vinculoTroca:$vinculo,$appBase} else {} end)
   ' >"$temporario" || ! sync "$temporario" || ! mv -T -- "$temporario" "$operacao_manual"; then
     rm -f -- "$temporario"
     return 1
@@ -869,10 +916,25 @@ registrar_fase_manual() {
   sync -f "$ESTADO_DIR"
 }
 
+abrir_vinculo_troca_manual() {
+  local arquivo verificador
+  arquivo=$(mktemp "$ESTADO_DIR/.vinculo-troca.XXXXXXXX") || return 1
+  if ! exec 7<>"$arquivo"; then
+    rm -f -- "$arquivo"
+    return 1
+  fi
+  # O marcador guarda só o hash. Mesmo se a trava puder ser adquirida depois
+  # de uma queda, o descritor anônimo desta execução não pode ser reaberto.
+  rm -- "$arquivo" || return 1
+  node -e 'process.stdout.write(require("node:crypto").randomBytes(32))' >&7 || return 1
+  verificador=$(sha256sum /proc/self/fd/7) || return 1
+  vinculo_troca_manual=${verificador%% *}
+}
+
 reconferir_base_manual() {
-  local observado backup_atual
+  local transicao="${1:-}" observado backup_atual
   if [ "$perfil_manual" = simples ]; then conferir_saude_migracoes_auto "$commit_atual" || return 1; fi
-  backup_atual=$(conferir_backup_manual) || return 1
+  backup_atual=$(conferir_backup_manual "$transicao") || return 1
   [ "$backup_atual" = "$backup_manual" ] || return 1
   observado=$(conferir_banco_migracoes_auto "$commit_atual" manual base) || return 1
   [ "$observado" = "$banco_manual" ]
@@ -1110,6 +1172,8 @@ if [ "$protecao_manual" = true ]; then
   [ "$compose_alvo" = "$alvo_compose_auto" ] || erro "O destino Compose diverge entre base e alvo."
   reconferir_base_manual || erro "Banco, histórico ou backup mudou antes da troca."
   sync -f "${BACKUP_BANCO_DIR:-$BACKUP_DIR/banco}" || erro "O conjunto de recuperação não pôde ser sincronizado."
+  app_base_manual=$(capturar_app_da_revisao "$commit_atual") || erro "A imagem ativa não confirma a revisão da base antes da troca."
+  abrir_vinculo_troca_manual || erro "O vínculo privado da troca não pôde ser aberto."
   registrar_fase_manual troca || erro "A intenção da troca não pôde ser persistida."
 elif [ "$controlador_ativo" = false ] && [ "$agendado" = false ]; then
   # O seletor do shell não basta se um override reativar o migrador no alvo.
@@ -1121,8 +1185,10 @@ fi
 log "Aplicando $alvo_ref."
 git -C "$APP_DIR" checkout --detach "$alvo_commit"
 
+transicao_base=""
+if [ "$protecao_manual" = true ]; then transicao_base="$id_manual"; fi
 APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
-  COMMIT_SHA="$alvo_commit" conferir_identidade auto
+  COMMIT_SHA="$alvo_commit" conferir_identidade auto "$transicao_base"
 
 if ! APP_IMAGEM="$alvo_imagem" APP_IMAGEM_BACKUP="$alvo_backup" \
   COMMIT_SHA="$alvo_commit" compose config --quiet; then
@@ -1159,7 +1225,8 @@ if [ -n "${imagem_migracoes_auto:-}" ]; then
 elif [ "$protecao_manual" = true ]; then
   [ "$(conferir_compose_manual partida)" = "$alvo_compose_auto" ] ||
     erro "O Compose efetivo divergiu antes da partida; a recuperação permanece protegida."
-  reconferir_base_manual || erro "Banco, histórico ou backup mudou antes da partida; a recuperação permanece protegida."
+  reconferir_base_manual "$transicao_base" || erro "Banco, histórico ou backup mudou antes da partida; a recuperação permanece protegida."
+  exec 7<&-
   registrar_fase_manual partida || erro "A intenção da partida não pôde ser persistida."
   if ! (umask 022 && set -o noclobber && printf '%s' "$envelope_manual" >"$pasta_lote_auto/entrada/autorizar") ||
     ! chmod 0444 "$pasta_lote_auto/entrada/autorizar"; then
@@ -1217,15 +1284,34 @@ if [ -n "${app_final_auto:-}" ]; then
     [ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$app_final_auto")" = unless-stopped ] ||
     falhar_atualizacao "Não foi possível restaurar o reinício normal do aplicativo." true
 fi
+partida_concluida=null
 if [ "$protecao_manual" = true ]; then
   [ "$(docker image inspect --format '{{.Id}}' "$alvo_imagem")" = "$imagem_manual" ] ||
     falhar_atualizacao "A tag alvo divergiu da imagem servida." true
+  docker inspect "$app_final_manual" | jq -e --arg id "$app_final_manual" --arg img "$imagem_manual" \
+    --arg origem "$pasta_lote_auto/entrada" '
+      length == 1 and (.[0] | .Id == $id and .Image == $img and .State.Running == true and
+        (.Mounts | length == 1 and
+          (.[0] | .Type == "bind" and .Source == $origem and
+            .Destination == "/run/frequenciapp-migracao" and .RW == false)))
+    ' >/dev/null || falhar_atualizacao "A montagem efetiva da partida manual divergiu." true
+  [ ! -L "$pasta_lote_auto/entrada" ] &&
+    [ "$(stat -c '%d:%i' -- "$pasta_lote_auto/entrada")" = "$inode_entrada_lote" ] ||
+    falhar_atualizacao "O diretório de autorização não é o mesmo da partida." true
   revogar_lote_auto || falhar_atualizacao "Não foi possível revogar a autorização de partida manual." true
+  node "$DIR/identidade.mjs" conferir-diretorio-partida "$ESTADO_DIR" \
+    "$pasta_lote_auto/entrada" "$inode_entrada_lote" ||
+    falhar_atualizacao "O diretório revogado da partida manual não está vazio e íntegro." true
   docker update --restart=unless-stopped "$app_final_manual" >/dev/null &&
     [ "$(docker inspect --format '{{.HostConfig.RestartPolicy.Name}}' "$app_final_manual")" = unless-stopped ] ||
     falhar_atualizacao "Não foi possível restaurar o reinício normal do aplicativo." true
+  partida_concluida=$(jq -cn --arg operacao "$id_manual" --arg container "$app_final_manual" \
+    --arg imagem "$imagem_manual" --arg origem "$pasta_lote_auto/entrada" --arg inode "$inode_entrada_lote" \
+    --arg revisao "$alvo_commit" '{versao:1,$operacao,$container,$imagem,$origem,$inode,$revisao}') ||
+    falhar_atualizacao "Não foi possível atestar a partida manual revogada." true
 fi
-escrever_estado "$alvo_modo" "$alvo_ref" "$alvo_commit" "$alvo_imagem" "$alvo_backup"
+escrever_estado "$alvo_modo" "$alvo_ref" "$alvo_commit" "$alvo_imagem" "$alvo_backup" "$partida_concluida" ||
+  erro "Não foi possível registrar a implantação."
 limpar_falha
 if [ "$protecao_manual" = true ]; then
   if ! sync -f "$ESTADO_DIR" || ! rm -- "$operacao_manual" || ! sync -f "$ESTADO_DIR"; then

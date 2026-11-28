@@ -145,6 +145,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 - A atualização protegida confere a estrutura do histórico antes de trocar o aplicativo e aceita a segurança por linha (RLS) legada sem desativá-la.
 - A atualização manual protegida aceita o aplicativo recuperado da revisão registrada com o migrador desligado, sem liberar marcadores pendentes nem dispensar a autorização para a nova partida.
+- A verificação operacional reconhece a montagem revogada da partida manual concluída quando o estado registra o contêiner, a imagem e a origem exata. Montagens inesperadas e mudanças no armazenamento do PostgreSQL continuam bloqueadas.
 
 - O atualizador manual no perfil simples confere a origem do backup e preserva o conjunto de recuperação quando uma troca com migração na partida fica incerta, sem rollback automático após possível escrita.
 - A atualização manual preserva a rede de um proxy compartilhado sem conectar o PostgreSQL à borda nem ampliar a aprovação automática de migrações.

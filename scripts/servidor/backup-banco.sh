@@ -42,14 +42,20 @@ fi
 # A expectativa vem do atualizador, não dos arquivos de ambiente nem do recibo.
 readonly pre_migracao="${BACKUP_MIGRACOES_AUTO_ESPERADO+x}"
 readonly operacao_manual_backup="${BACKUP_MIGRACAO_MANUAL_OPERACAO:-}"
+readonly transicao_backup="${BACKUP_VERIFICACAO_EM_TROCA:-}"
 readonly inicio_manual_backup="${BACKUP_MIGRACAO_MANUAL_INICIO:-}"
 readonly trava_manual_backup="${SERVIDOR_LOCK_HERDADO:-}"
 readonly banco_pre_migracao_esperado="${BACKUP_MIGRACOES_AUTO_ESPERADO:-}"
 carregar_ambiente
 unset BACKUP_MIGRACOES_AUTO_ESPERADO BACKUP_MIGRACAO_MANUAL_OPERACAO BACKUP_MIGRACAO_MANUAL_INICIO
+unset BACKUP_VERIFICACAO_EM_TROCA
 [ -z "$operacao_manual_backup" ] || [ -n "$pre_migracao" ] || erro "Backup manual sem expectativa de origem."
 
 BACKUP_MODO="${BACKUP_MODO:-compose}"
+if [ -n "$transicao_backup" ]; then
+  [ "$BACKUP_MODO" = compose ] && [ "$sem_escrita" = true ] && [ -z "$pre_migracao" ] ||
+    erro "A conferência durante a troca exige verificação Compose sem escrita."
+fi
 BACKUP_CRIPTOGRAFIA="${BACKUP_CRIPTOGRAFIA:-gpg}"
 BACKUP_BANCO_DIR="${BACKUP_BANCO_DIR:-$BACKUP_DIR/banco}"
 BACKUP_RETER_DIAS="${BACKUP_RETER_DIAS:-30}"
@@ -130,7 +136,7 @@ if [ "$BACKUP_MODO" = compose ]; then
   else
     unset SERVIDOR_IDENTIDADE_SEM_ARQUIVOS
   fi
-  verificar_instalacao
+  verificar_instalacao "$transicao_backup"
 else
   unset SERVIDOR_IDENTIDADE_SEM_ARQUIVOS
   # Conservador: aliases de URL não comprovam identidade física do servidor.
