@@ -124,6 +124,7 @@ function RotaControlada() {
       <AplicacaoDiretor
         usuario={diretor}
         fuso="America/Fortaleza"
+        diaCorrente="2026-11-23"
         contexto={{
           trocaObrigatoria: false,
           turmas: parametros.has("com-turma")

@@ -58,6 +58,7 @@ import { DialogoAlunosProva } from "@/components/provas/dialogo-alunos-prova";
 import { DialogoColarLocais } from "@/components/provas/dialogo-colar-locais";
 import { DialogoLocalDoAluno } from "@/components/provas/dialogo-local-aluno";
 import { DialogoProva } from "@/components/provas/dialogo-prova";
+import { VistaRota } from "@/components/provas/vista-rota";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
 interface Props {
@@ -65,6 +66,8 @@ interface Props {
   turmas: Turma[];
   diaCorrente: string;
   fuso: string;
+  /** operar edita a prova; acompanhar usa a rota; consultar só lê. */
+  modo?: "operar" | "consultar" | "acompanhar";
 }
 
 interface Detalhe {
@@ -118,6 +121,7 @@ interface LinhaProps {
   onSelecionar: (alunoId: string, marcado: boolean) => void;
   onMarcar: (alunoId: string, marca: MarcaDaProva) => void;
   onEditarLocal: (alunoId: string) => void;
+  somenteLeitura?: boolean;
 }
 
 function textoDoLocal(resolvido: ReturnType<typeof resolverLocalDoAluno>): string {
@@ -139,6 +143,7 @@ function LinhaDoParticipante({
   onSelecionar,
   onMarcar,
   onEditarLocal,
+  somenteLeitura = false,
 }: LinhaProps) {
   const { alunoId, nome, presente } = participante;
   const resolvido = resolverLocalDoAluno(participante, prova);
@@ -160,17 +165,19 @@ function LinhaDoParticipante({
       divider
       sx={{ gap: 1, py: 1, flexWrap: "wrap", "&:last-of-type": { borderBottom: 0 } }}
     >
-      <Checkbox
-        checked={selecionado}
-        disabled={ocupado}
-        onChange={(evento) => onSelecionar(alunoId, evento.target.checked)}
-        slotProps={{ input: { "aria-label": `Selecionar ${nome}` } }}
-        sx={{
-          flexShrink: 0,
-          minWidth: TOKENS_LAYOUT.alvoToque,
-          minHeight: TOKENS_LAYOUT.alvoToque,
-        }}
-      />
+      {somenteLeitura ? null : (
+        <Checkbox
+          checked={selecionado}
+          disabled={ocupado}
+          onChange={(evento) => onSelecionar(alunoId, evento.target.checked)}
+          slotProps={{ input: { "aria-label": `Selecionar ${nome}` } }}
+          sx={{
+            flexShrink: 0,
+            minWidth: TOKENS_LAYOUT.alvoToque,
+            minHeight: TOKENS_LAYOUT.alvoToque,
+          }}
+        />
+      )}
       <Box sx={{ minWidth: 0, flex: "1 1 200px", overflowWrap: "anywhere" }}>
         <Typography sx={{ fontWeight: 500 }}>{nome}</Typography>
         <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
@@ -193,52 +200,63 @@ function LinhaDoParticipante({
             </Box>
           </Link>
         ) : null}
-        <Botao
-          variante="texto"
-          disabled={ocupado}
-          onClick={() => onEditarLocal(alunoId)}
-          sx={{ minHeight: TOKENS_LAYOUT.alvoToque, px: 0 }}
-        >
-          Alterar local
-        </Botao>
+        {somenteLeitura ? null : (
+          <Botao
+            variante="texto"
+            disabled={ocupado}
+            onClick={() => onEditarLocal(alunoId)}
+            sx={{ minHeight: TOKENS_LAYOUT.alvoToque, px: 0 }}
+          >
+            Alterar local
+          </Botao>
+        )}
       </Box>
-      <Stack
-        role="group"
-        aria-label={`Frequência de ${nome}`}
-        direction="row"
-        spacing={1}
-        sx={{ flexShrink: 0 }}
-      >
-        <Botao
-          variante="contorno"
-          aria-pressed={presente === true}
-          disabled={ocupado}
-          onClick={() => onMarcar(alunoId, presente === true ? null : true)}
-          sx={estilo(presente === true, "success")}
+      {somenteLeitura ? (
+        <Typography variant="body2" sx={{ color: "text.secondary" }}>
+          {presente === true ? "Presente" : presente === false ? "Ausente" : "Sem registro"}
+        </Typography>
+      ) : (
+        <Stack
+          role="group"
+          aria-label={`Frequência de ${nome}`}
+          direction="row"
+          spacing={1}
+          sx={{ flexShrink: 0 }}
         >
-          Presente
-        </Botao>
-        <Botao
-          variante="contorno"
-          aria-pressed={presente === false}
-          disabled={ocupado}
-          onClick={() => onMarcar(alunoId, presente === false ? null : false)}
-          sx={estilo(presente === false, "error")}
-        >
-          Ausente
-        </Botao>
-      </Stack>
+          <Botao
+            variante="contorno"
+            aria-pressed={presente === true}
+            disabled={ocupado}
+            onClick={() => onMarcar(alunoId, presente === true ? null : true)}
+            sx={estilo(presente === true, "success")}
+          >
+            Presente
+          </Botao>
+          <Botao
+            variante="contorno"
+            aria-pressed={presente === false}
+            disabled={ocupado}
+            onClick={() => onMarcar(alunoId, presente === false ? null : false)}
+            sx={estilo(presente === false, "error")}
+          >
+            Ausente
+          </Botao>
+        </Stack>
+      )}
     </ListItem>
   );
 }
 
-export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props) {
+export default function VistaProvas({ alunos, turmas, diaCorrente, fuso, modo = "operar" }: Props) {
+  const gerir = modo === "operar";
+  const gravar = modo !== "consultar";
   const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [provas, setProvas] = useState<ProvaEspecifica[]>([]);
   const [carregado, setCarregado] = useState(false);
   const [erroLeitura, setErroLeitura] = useState("");
   useLeituraDaVisao(!carregado && !erroLeitura);
   const [abertaId, setAbertaId] = useState<string | null>(null);
+  const [painel, setPainel] = useState<"frequencia" | "rota">("frequencia");
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
   const [busca, setBusca] = useState("");
   const [filtroLocal, setFiltroLocal] = useState("");
@@ -297,6 +315,7 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
   function abrirProva(id: string) {
     abertaIdRef.current = id;
     setAbertaId(id);
+    setPainel("frequencia");
     setDetalhe(null);
     setBusca("");
     setFiltroLocal("");
@@ -313,6 +332,7 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
     abertaIdRef.current = null;
     pedidoDetalhe.current += 1;
     setAbertaId(null);
+    setPainel("frequencia");
     setDetalhe(null);
     setFiltroLocal("");
     setSelecionados([]);
@@ -344,6 +364,27 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
         if (abertaIdRef.current !== provaId) return;
         setDetalhe(anterior);
         avisarErro(excecao, { contexto: "Não foi possível salvar a frequência." });
+      }
+    });
+  }
+
+  async function marcarAlunosPresentes(alunoIds: string[]) {
+    if (!detalhe || alunoIds.length === 0) return;
+    const provaId = detalhe.prova.id;
+    const marcas = alunoIds.map((alunoId) => ({ alunoId, presente: true as const }));
+    await executarFrequencia("rota", async () => {
+      try {
+        const dados = await pedir<Detalhe>(
+          `/api/provas/${provaId}/frequencia`,
+          corpoAlteracao("PUT", { marcas }),
+        );
+        if (abertaIdRef.current !== provaId) return;
+        setDetalhe(dados);
+        avisarSucesso("Presenças registradas.", `${contarAlunos(marcas.length)} nesta parada.`);
+      } catch (excecao) {
+        if (abertaIdRef.current === provaId) {
+          avisarErro(excecao, { contexto: "Não foi possível salvar a frequência." });
+        }
       }
     });
   }
@@ -574,24 +615,26 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
               titulo={prova.nome}
               descricao={`${rotuloDoDia(prova.dia)}${prova.local ? ` · ${prova.local}` : ""}`}
               acoes={
-                <>
-                  <Botao
-                    variante="contorno"
-                    icone={<EditRoundedIcon />}
-                    onClick={() => abrirDialogo("editar")}
-                    sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
-                  >
-                    Editar
-                  </Botao>
-                  <Botao
-                    variante="contorno"
-                    icone={<DeleteOutlineRoundedIcon />}
-                    onClick={() => abrirDialogo("remover")}
-                    sx={{ minHeight: TOKENS_LAYOUT.alvoToque, color: "falta.texto" }}
-                  >
-                    Remover
-                  </Botao>
-                </>
+                gerir ? (
+                  <>
+                    <Botao
+                      variante="contorno"
+                      icone={<EditRoundedIcon />}
+                      onClick={() => abrirDialogo("editar")}
+                      sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+                    >
+                      Editar
+                    </Botao>
+                    <Botao
+                      variante="contorno"
+                      icone={<DeleteOutlineRoundedIcon />}
+                      onClick={() => abrirDialogo("remover")}
+                      sx={{ minHeight: TOKENS_LAYOUT.alvoToque, color: "falta.texto" }}
+                    >
+                      Remover
+                    </Botao>
+                  </>
+                ) : null
               }
             />
             {prova.latitude !== null && prova.longitude !== null ? (
@@ -621,51 +664,85 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
               </Stack>
             ) : null}
             <ResumoDaProva prova={prova} completo />
-            <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+            <Stack role="group" aria-label="Painel da prova" direction="row" spacing={1} useFlexGap>
               <Botao
-                variante="principal"
-                icone={<GroupAddRoundedIcon />}
-                onClick={() => abrirDialogo("alunos")}
+                variante={painel === "frequencia" ? "principal" : "contorno"}
+                aria-pressed={painel === "frequencia"}
+                onClick={() => setPainel("frequencia")}
                 sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
               >
-                {prova.total === 0 ? "Adicionar alunos" : "Alterar alunos"}
+                Frequência
               </Botao>
-              {pendentes > 0 ? (
-                <Botao
-                  variante="contorno"
-                  disabled={chaveAtiva !== null}
-                  onClick={() => void marcarPendentesComoPresentes()}
-                  sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
-                >
-                  Marcar sem registro como presentes
-                </Botao>
-              ) : null}
-              {prova.total > 0 ? (
-                <Botao
-                  variante="contorno"
-                  icone={<ContentPasteRoundedIcon />}
-                  disabled={chaveAtiva !== null}
-                  onClick={() => abrirDialogo("colar")}
-                  sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
-                >
-                  Colar locais
-                </Botao>
-              ) : null}
-              {selecionados.length > 0 ? (
-                <Botao
-                  variante="principal"
-                  icone={<PlaceRoundedIcon />}
-                  disabled={chaveAtiva !== null}
-                  onClick={() => abrirDialogo("locais")}
-                  sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
-                >
-                  {selecionados.length === 1
-                    ? "Definir local do selecionado"
-                    : `Definir local dos ${selecionados.length} selecionados`}
-                </Botao>
-              ) : null}
+              <Botao
+                variante={painel === "rota" ? "principal" : "contorno"}
+                aria-pressed={painel === "rota"}
+                onClick={() => setPainel("rota")}
+                sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+              >
+                Rota
+              </Botao>
             </Stack>
-            {gruposDeLocal.length > 1 ? (
+            {painel === "rota" && detalhe ? (
+              <VistaRota
+                provaId={prova.id}
+                participantes={detalhe.participantes}
+                prova={prova}
+                podeGravar={gravar}
+                onDefinirPonto={(alunoIds, local) =>
+                  salvarLocais(alunoIds.map((alunoId) => ({ alunoId, ...local })))
+                }
+                onMarcarPresentes={marcarAlunosPresentes}
+              />
+            ) : null}
+            {painel === "frequencia" ? (
+              <Stack direction="row" spacing={1} useFlexGap sx={{ flexWrap: "wrap" }}>
+                {gerir ? (
+                  <Botao
+                    variante="principal"
+                    icone={<GroupAddRoundedIcon />}
+                    onClick={() => abrirDialogo("alunos")}
+                    sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+                  >
+                    {prova.total === 0 ? "Adicionar alunos" : "Alterar alunos"}
+                  </Botao>
+                ) : null}
+                {gravar && pendentes > 0 ? (
+                  <Botao
+                    variante="contorno"
+                    disabled={chaveAtiva !== null}
+                    onClick={() => void marcarPendentesComoPresentes()}
+                    sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+                  >
+                    Marcar sem registro como presentes
+                  </Botao>
+                ) : null}
+                {gerir && prova.total > 0 ? (
+                  <Botao
+                    variante="contorno"
+                    icone={<ContentPasteRoundedIcon />}
+                    disabled={chaveAtiva !== null}
+                    onClick={() => abrirDialogo("colar")}
+                    sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+                  >
+                    Colar locais
+                  </Botao>
+                ) : null}
+                {selecionados.length > 0 ? (
+                  <Botao
+                    variante="principal"
+                    icone={<PlaceRoundedIcon />}
+                    disabled={chaveAtiva !== null}
+                    onClick={() => abrirDialogo("locais")}
+                    sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+                  >
+                    {selecionados.length === 1
+                      ? "Definir local do selecionado"
+                      : `Definir local dos ${selecionados.length} selecionados`}
+                  </Botao>
+                ) : null}
+              </Stack>
+            ) : null}
+            {painel === "frequencia" && gruposDeLocal.length > 1 ? (
               <Stack spacing={1}>
                 <Stack
                   role="group"
@@ -706,7 +783,7 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
                 </Box>
               </Stack>
             ) : null}
-            {detalhe && detalhe.participantes.length > 8 ? (
+            {painel === "frequencia" && detalhe && detalhe.participantes.length > 8 ? (
               <BarraBusca
                 id="busca-participantes-prova"
                 valor={busca}
@@ -714,20 +791,25 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
                 placeholder="Buscar aluno"
               />
             ) : null}
-            {detalhe && detalhe.participantes.length === 0 ? (
+            {painel === "frequencia" && detalhe && detalhe.participantes.length === 0 ? (
               <EstadoVazio
                 icone={<GroupAddRoundedIcon />}
                 titulo="Nenhum aluno nesta prova"
                 nivelTitulo="h3"
                 descricao="Adicione os alunos que vão fazer a prova para registrar presença e ausência."
               />
-            ) : participantesFiltrados.length === 0 ? (
+            ) : null}
+            {painel === "frequencia" &&
+            detalhe &&
+            detalhe.participantes.length > 0 &&
+            participantesFiltrados.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 Nenhum aluno encontrado.
               </Typography>
-            ) : (
+            ) : null}
+            {painel === "frequencia" && participantesFiltrados.length > 0 ? (
               <Paper variant="outlined" sx={{ overflow: "hidden", boxShadow: "none" }}>
-                {idsVisiveis.length > 0 ? (
+                {gravar && idsVisiveis.length > 0 ? (
                   <FormControlLabel
                     sx={{ minHeight: TOKENS_LAYOUT.alvoToque, mx: 0.5, my: 0.5 }}
                     control={
@@ -755,6 +837,7 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
                       turma={rotuloDe.get(participante.turmaId) ?? "Turma"}
                       ocupado={chaveAtiva !== null}
                       selecionado={selecionados.includes(participante.alunoId)}
+                      somenteLeitura={!gravar}
                       onSelecionar={alternarSelecao}
                       onMarcar={(alunoId, marca) => void marcar(alunoId, marca)}
                       onEditarLocal={(alunoId) => {
@@ -765,7 +848,7 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
                   ))}
                 </List>
               </Paper>
-            )}
+            ) : null}
           </>
         ) : (
           <Typography role="status" variant="body2" color="text.secondary">
@@ -790,14 +873,16 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
         acoes={
           <>
             <AtualizadoDaVisao fuso={fuso} sx={{ whiteSpace: "normal" }} />
-            <Botao
-              variante="principal"
-              icone={<AddRoundedIcon />}
-              onClick={() => abrirDialogo("nova")}
-              sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
-            >
-              Nova prova
-            </Botao>
+            {gerir ? (
+              <Botao
+                variante="principal"
+                icone={<AddRoundedIcon />}
+                onClick={() => abrirDialogo("nova")}
+                sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+              >
+                Nova prova
+              </Botao>
+            ) : null}
           </>
         }
       />
@@ -807,8 +892,14 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
       {carregado && !erroLeitura && provas.length === 0 ? (
         <EstadoVazio
           icone={<FactCheckRoundedIcon />}
-          titulo="Nenhuma prova cadastrada"
-          descricao="Cadastre uma prova, como o Enem, escolha os alunos e registre quem compareceu."
+          titulo={modo === "acompanhar" ? "Nenhuma prova das turmas" : "Nenhuma prova cadastrada"}
+          descricao={
+            modo === "acompanhar"
+              ? "As provas das turmas vinculadas aparecem aqui para montar a rota e registrar a presença."
+              : modo === "consultar"
+                ? "As provas cadastradas aparecem aqui para consulta da rota e da frequência."
+                : "Cadastre uma prova, como o Enem, escolha os alunos e registre quem compareceu."
+          }
         />
       ) : null}
       {provas.length > 0 ? (

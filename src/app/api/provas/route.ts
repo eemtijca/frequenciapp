@@ -1,9 +1,11 @@
 // Provas específicas: listagem e cadastro pela equipe (administração e coordenação).
-import { criarProvaEspecifica, listarProvasEspecificas } from "@/application/provas-especificas";
+import { listarProvasVisiveis } from "@/application/acesso-prova";
+import { criarProvaEspecifica } from "@/application/provas-especificas";
 import {
   corpoJson,
   erroApi,
   executarRota,
+  exigirIdentidade,
   exigirSessao,
   json,
   origemPermitida,
@@ -13,9 +15,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(): Promise<Response> {
   return executarRota(async () => {
-    const sessao = await exigirSessao();
+    const sessao = await exigirIdentidade();
     if (!sessao.ok) return sessao.resposta;
-    return json({ provas: await listarProvasEspecificas() });
+    return json({ provas: await listarProvasVisiveis(sessao.usuario) });
   });
 }
 

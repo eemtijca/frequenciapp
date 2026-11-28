@@ -616,7 +616,7 @@ export default function Aplicacao({
   const referenciaSessao = useReferenciaDaSessao();
   const ehAdmin = temCapacidade(usuario.papel, "administrar");
   const podeOperar = temCapacidade(usuario.papel, "operar");
-  // Papel que só consulta (Secretaria): Painel e Relatórios, só a Grade e o Por aluno. O servidor
+  // Papel que só consulta (Secretaria): Painel, Relatórios e Provas em leitura. O servidor
   // recusa o resto pelas capacidades; aqui a interface apenas não oferece o que não abriria.
   const somenteConsulta = ehSomenteConsulta(usuario.papel);
   const destinosDoPapel = somenteConsulta ? DESTINOS_DA_CONSULTA : undefined;
@@ -627,10 +627,10 @@ export default function Aplicacao({
   const pedida = alunosPelaGestao ? "gestao" : visaoPedida;
   const inicial =
     pedida &&
-    (!somenteConsulta || pedida === "painel" || pedida === "relatorios") &&
+    (!somenteConsulta || pedida === "painel" || pedida === "relatorios" || pedida === "provas") &&
     (pedida !== "gestao" || ehAdmin) &&
     (pedida !== "chamada-parcial" || podeOperar) &&
-    (pedida !== "provas" || podeOperar) &&
+    (pedida !== "provas" || podeOperar || somenteConsulta) &&
     (pedida !== "saidas" || configuracoesIniciais.saidaAntecipada)
       ? pedida
       : "painel";
@@ -752,7 +752,7 @@ export default function Aplicacao({
   }
 
   const itens = useMemo<ItemNav[]>(() => {
-    if (somenteConsulta) return [ITEM_PAINEL, ITEM_RELATORIOS];
+    if (somenteConsulta) return [ITEM_PAINEL, ITEM_RELATORIOS, ITEM_PROVAS];
     const lista = [...ITENS_INICIAIS];
     if (podeOperar) lista.splice(2, 0, ITEM_CHAMADA_PARCIAL);
     if (configuracoes.saidaAntecipada) lista.push(ITEM_SAIDAS);
@@ -1172,8 +1172,14 @@ export default function Aplicacao({
             onRecarregar={recarregarFrequencias}
           />
         )}
-        {alvoVisao === "provas" && podeOperar && (
-          <VistaProvas alunos={alunos} turmas={turmas} diaCorrente={diaCorrente} fuso={fuso} />
+        {alvoVisao === "provas" && (podeOperar || somenteConsulta) && (
+          <VistaProvas
+            alunos={alunos}
+            turmas={turmas}
+            diaCorrente={diaCorrente}
+            fuso={fuso}
+            modo={somenteConsulta ? "consultar" : "operar"}
+          />
         )}
         {alvoVisao === "alunos" && !ehAdmin && (
           <VistaAlunos

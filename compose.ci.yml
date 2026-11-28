@@ -38,6 +38,8 @@ services:
       FERIADOS_API_TOKEN: ${FERIADOS_API_TOKEN:-}
       FERIADOS_UF: ${FERIADOS_UF:-}
       FERIADOS_IBGE: ${FERIADOS_IBGE:-}
+      OSRM_URL: ${OSRM_URL:-}
+      NOMINATIM_URL: ${NOMINATIM_URL:-}
       # Na rede do host o banco é alcançado pela porta publicada.
       DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
       DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia

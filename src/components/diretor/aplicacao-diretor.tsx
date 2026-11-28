@@ -1,6 +1,6 @@
 "use client";
 
-// Tela do diretor de turma: só leitura das estatísticas das turmas do vínculo.
+// Tela do diretor de turma: estatísticas das turmas do vínculo e a rota das provas.
 // No primeiro acesso, a troca da palavra-chave vem antes de qualquer dado.
 import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -21,7 +21,7 @@ import { LayoutPagina } from "@/components/layout/layout-pagina";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { AtualizadoEm } from "@/components/ui/mui/atualizado-em";
 import { BotaoAtualizar } from "@/components/ui/mui/botao-atualizar";
-import { BotaoIcone } from "@/components/ui/mui/botao";
+import { Botao, BotaoIcone } from "@/components/ui/mui/botao";
 import { SeletorTema } from "@/components/ui/mui/seletor-tema";
 import { SeletorAnimacoes } from "@/components/conta/seletor-animacoes";
 import DialogoSenha from "@/components/conta/dialogo-senha";
@@ -29,6 +29,7 @@ import DialogoNotificacoes from "@/components/conta/dialogo-notificacoes";
 import DialogoSobre from "@/components/dialogo-sobre";
 import RegistroPwa from "@/components/pwa/registro-pwa";
 import VistaMinhasTurmas from "@/components/diretor/vista-minhas-turmas";
+import VistaProvas from "@/components/provas/vista-provas";
 import { TextoDeCarregamento } from "@/components/ui/mui/texto-de-carregamento";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
@@ -36,12 +37,14 @@ interface Props {
   usuario: Identidade;
   contexto: ContextoDiretor;
   fuso: string;
+  diaCorrente: string;
 }
 
 const ALVO_ACAO = { width: TOKENS_LAYOUT.alvoToque, height: TOKENS_LAYOUT.alvoToque } as const;
 
-export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
+export default function AplicacaoDiretor({ usuario, contexto, fuso, diaCorrente }: Props) {
   const router = useRouter();
+  const [painel, setPainel] = useState<"turmas" | "provas">("turmas");
   const [trocaAberta, setTrocaAberta] = useState(false);
   const [notificacoesAbertas, setNotificacoesAbertas] = useState(false);
   const [sobreAberto, setSobreAberto] = useState(false);
@@ -169,11 +172,41 @@ export default function AplicacaoDiretor({ usuario, contexto, fuso }: Props) {
                 descricao="Crie sua palavra-chave para ver as estatísticas."
               />
             ) : (
-              <VistaMinhasTurmas
-                contexto={contexto}
-                atualizacao={atualizacao}
-                onAtualizado={marcarAtualizado}
-              />
+              <Stack spacing={2}>
+                <Stack role="group" aria-label="Painel do diretor" direction="row" spacing={1}>
+                  <Botao
+                    variante={painel === "turmas" ? "principal" : "contorno"}
+                    aria-pressed={painel === "turmas"}
+                    onClick={() => setPainel("turmas")}
+                    sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+                  >
+                    Turmas
+                  </Botao>
+                  <Botao
+                    variante={painel === "provas" ? "principal" : "contorno"}
+                    aria-pressed={painel === "provas"}
+                    onClick={() => setPainel("provas")}
+                    sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+                  >
+                    Provas
+                  </Botao>
+                </Stack>
+                {painel === "turmas" ? (
+                  <VistaMinhasTurmas
+                    contexto={contexto}
+                    atualizacao={atualizacao}
+                    onAtualizado={marcarAtualizado}
+                  />
+                ) : (
+                  <VistaProvas
+                    alunos={[]}
+                    turmas={[]}
+                    diaCorrente={diaCorrente}
+                    fuso={fuso}
+                    modo="acompanhar"
+                  />
+                )}
+              </Stack>
             )}
           </Box>
         </LayoutConteudo>

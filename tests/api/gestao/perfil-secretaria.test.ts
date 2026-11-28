@@ -1,5 +1,5 @@
-// Perfil Secretaria (RBAC por capacidade): lê o Painel e as grades de relatório,
-// registra o preparo do download e nada além disso, com uma conta real criada pela administração.
+// Perfil Secretaria (RBAC por capacidade): lê o Painel, as grades de relatório e as provas,
+// registra o preparo do download e não grava o resto, com uma conta real criada pela administração.
 import { afterAll, beforeAll, expect, it } from "vitest";
 import pg from "pg";
 import { diaLocal } from "@/domain/frequencia";
@@ -141,7 +141,6 @@ const recusas: Array<[string, string, string, unknown?]> = [
   ["ler quem libera saídas", "GET", "/api/liberadores"],
   ["ler os responsáveis", "GET", "/api/responsaveis"],
   ["ler as provas bimestrais", "GET", "/api/provas-bimestrais"],
-  ["listar as provas específicas", "GET", "/api/provas"],
   ["cadastrar uma prova específica", "POST", "/api/provas", {}],
   [
     "ler a ocupação de um local de prova",
@@ -153,6 +152,18 @@ const recusas: Array<[string, string, string, unknown?]> = [
     "PUT",
     "/api/provas/00000000-0000-4000-8000-000000000001/locais",
     { locais: [] },
+  ],
+  [
+    "salvar a rota da prova",
+    "PUT",
+    "/api/provas/00000000-0000-4000-8000-000000000001/rota",
+    { origem: null, criterio: null, voltar: null, ordem: null },
+  ],
+  [
+    "registrar a frequência da prova",
+    "PUT",
+    "/api/provas/00000000-0000-4000-8000-000000000001/frequencia",
+    { marcas: [] },
   ],
   ["alterar as configurações", "PATCH", "/api/configuracoes", { saidaAntecipada: false }],
   ["listar a equipe", "GET", "/api/usuarios"],
@@ -173,6 +184,11 @@ const recusas: Array<[string, string, string, unknown?]> = [
     { tipo: "relacao", formato: "zip" },
   ],
 ];
+
+it("a Secretaria lista as provas específicas", async () => {
+  const resposta = await chamar("/api/provas", "GET", cookieSecretaria);
+  expect(resposta.status).toBe(200);
+});
 
 it.each(recusas)("a Secretaria não pode %s (403)", async (_rotulo, metodo, caminho, corpo) => {
   const alvo = caminho === "SELF" ? `/api/usuarios/${secretariaId}` : caminho;

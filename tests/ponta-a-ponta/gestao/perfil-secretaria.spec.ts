@@ -112,7 +112,7 @@ test.describe("aplicativo reduzido da Secretaria", () => {
     expect(resposta.status()).toBe(200);
   });
 
-  test("a gaveta tem só Painel e Relatórios, sem caminho para chamada, avisos, cadastros ou gestão", async ({
+  test("a gaveta tem Painel, Relatórios e Provas, sem caminho para chamada, avisos, cadastros ou gestão", async ({
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
@@ -120,12 +120,12 @@ test.describe("aplicativo reduzido da Secretaria", () => {
     const nav = await abrirNavegacao(page);
     await expect(nav.getByRole("button", { name: "Painel", exact: true })).toBeVisible();
     await expect(nav.getByRole("button", { name: "Relatórios", exact: true })).toBeVisible();
+    await expect(nav.getByRole("button", { name: "Provas", exact: true })).toBeVisible();
     for (const fora of [
       "Chamada",
       "Chamada Parcial",
       "Horários",
       "Saídas e Entradas",
-      "Provas",
       "Alunos",
       "Gestão",
     ]) {
@@ -276,12 +276,13 @@ test.describe("aplicativo reduzido da Secretaria", () => {
     expect(registros).toEqual([200]);
   });
 
-  test("no celular, o menu tem as mesmas duas áreas", async ({ page }) => {
+  test("no celular, o menu tem as mesmas três áreas", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");
     const nav = await abrirNavegacao(page);
     await expect(nav.getByRole("button", { name: "Painel", exact: true })).toBeVisible();
     await expect(nav.getByRole("button", { name: "Relatórios", exact: true })).toBeVisible();
+    await expect(nav.getByRole("button", { name: "Provas", exact: true })).toBeVisible();
     await expect(nav.getByRole("button", { name: "Chamada", exact: true })).toHaveCount(0);
     await expect(nav.getByRole("button", { name: "Gestão", exact: true })).toHaveCount(0);
   });

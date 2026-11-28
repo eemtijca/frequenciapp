@@ -336,6 +336,10 @@ export const ROTAS_DE_METRICA: readonly RotaDeMetrica[] = Object.freeze([
     rotulo: "/api/provas-bimestrais/encerrar",
   },
   {
+    padrao: /^\/api\/provas\/geocodificar$/,
+    rotulo: "/api/provas/geocodificar",
+  },
+  {
     padrao: /^\/api\/provas\/ocupacao$/,
     rotulo: "/api/provas/ocupacao",
   },
@@ -480,6 +484,10 @@ export const ROTAS_DE_METRICA: readonly RotaDeMetrica[] = Object.freeze([
     rotulo: "/api/planilha/fila/:id/resolver",
   },
   {
+    padrao: /^\/api\/provas\/[^\/]+\/rota\/calcular$/,
+    rotulo: "/api/provas/:id/rota/calcular",
+  },
+  {
     padrao: /^\/api\/diretores\/[^\/]+\/palavra-chave$/,
     rotulo: "/api/diretores/:id/palavra-chave",
   },
@@ -502,6 +510,10 @@ export const ROTAS_DE_METRICA: readonly RotaDeMetrica[] = Object.freeze([
   {
     padrao: /^\/api\/provas\/[^\/]+\/participantes$/,
     rotulo: "/api/provas/:id/participantes",
+  },
+  {
+    padrao: /^\/api\/provas\/[^\/]+\/rota$/,
+    rotulo: "/api/provas/:id/rota",
   },
   {
     padrao: /^\/api\/saidas\/[^\/]+\/seduc$/,

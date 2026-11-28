@@ -46,6 +46,7 @@ createRoot(raiz).render(
             ativo: true,
           }}
           fuso="America/Fortaleza"
+          diaCorrente="2026-11-23"
           contexto={{
             trocaObrigatoria: parametros.has("obrigatoria"),
             turmas: parametros.has("sem-turmas")

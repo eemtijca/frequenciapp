@@ -547,6 +547,12 @@ export default function VistaPrivacidade() {
                     do OpenStreetMap (openstreetmap.org/copyright).
                   </li>
                   <li>
+                    Serviço de ruas ou de busca de endereço, somente se a escola configurar o
+                    endereço. A consulta de ruas recebe as coordenadas da partida e das paradas. A
+                    busca recebe o texto digitado. Não saem nomes de alunos nem a posição contínua
+                    de quem acompanha o ônibus. Sem essa configuração, a consulta não acontece.
+                  </li>
+                  <li>
                     Base de feriados, só quando a administração aciona a sincronização. O servidor
                     envia o ano e, se estiverem configurados, a unidade da federação ou o código
                     IBGE. O padrão do código consulta feriadosapi.com. Não saem alunos, frequências

@@ -1,4 +1,5 @@
 // Uma prova específica: leitura com os alunos, edição de nome, local e data, e remoção.
+import { exigirAcessoAProva } from "@/application/acesso-prova";
 import {
   editarProvaEspecifica,
   lerProvaEspecifica,
@@ -8,6 +9,7 @@ import {
   corpoJson,
   erroApi,
   executarRota,
+  exigirIdentidade,
   exigirSessao,
   json,
   origemPermitida,
@@ -21,9 +23,10 @@ interface Contexto {
 
 export async function GET(_requisicao: Request, contexto: Contexto): Promise<Response> {
   return executarRota(async () => {
-    const sessao = await exigirSessao();
+    const sessao = await exigirIdentidade();
     if (!sessao.ok) return sessao.resposta;
     const { id } = await contexto.params;
+    await exigirAcessoAProva(sessao.usuario, id, "ler");
     return json(await lerProvaEspecifica(id));
   });
 }

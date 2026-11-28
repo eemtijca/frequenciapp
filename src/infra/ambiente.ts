@@ -6,12 +6,12 @@ import { configuracaoPushDe } from "@/infra/configuracao-push";
 
 const ausenteSeVazio = (valor: unknown) => (valor === "" ? undefined : valor);
 
-/** Aceita a origem da base de feriados sem usuário, consulta ou caminho embutido. */
-function urlFeriadosValida(valor: string): boolean {
+/** Aceita HTTPS, ou HTTP só em localhost, sem usuário, senha, consulta ou fragmento. */
+function urlOpcionalValida(valor: string, caminhoLivre: boolean): boolean {
   try {
     const url = new URL(valor);
     if (url.username || url.password || url.search || url.hash) return false;
-    if (url.pathname !== "/" && url.pathname !== "") return false;
+    if (!caminhoLivre && url.pathname !== "/" && url.pathname !== "") return false;
     if (url.protocol === "https:") return true;
     const local = url.hostname === "localhost" || url.hostname === "127.0.0.1";
     return url.protocol === "http:" && local;
@@ -94,8 +94,30 @@ const esquema = z.object({
     z
       .string()
       .refine(
-        urlFeriadosValida,
+        (valor) => urlOpcionalValida(valor, false),
         "FERIADOS_API_URL deve ser HTTPS sem caminho, usuário ou consulta. HTTP só é aceito em localhost.",
+      )
+      .optional(),
+  ),
+  // Malha viária da rota da prova. Sem ela, a ordem usa linha reta. Sem chave.
+  OSRM_URL: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .refine(
+        (valor) => urlOpcionalValida(valor, true),
+        "OSRM_URL deve ser HTTPS, sem usuário ou consulta. HTTP só é aceito em localhost.",
+      )
+      .optional(),
+  ),
+  // Busca de endereço da origem da rota. Sem ela, o mapa e o GPS continuam. Sem chave.
+  NOMINATIM_URL: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .refine(
+        (valor) => urlOpcionalValida(valor, true),
+        "NOMINATIM_URL deve ser HTTPS, sem usuário ou consulta. HTTP só é aceito em localhost.",
       )
       .optional(),
   ),
@@ -218,6 +240,8 @@ export const ambiente = {
     uf: resultado.data.FERIADOS_UF,
     ibge: resultado.data.FERIADOS_IBGE,
   },
+  osrmUrl: resultado.data.OSRM_URL ?? null,
+  nominatimUrl: resultado.data.NOMINATIM_URL ?? null,
   fuso: resultado.data.TZ_APP,
   ehProducao,
   permitirHttp,
