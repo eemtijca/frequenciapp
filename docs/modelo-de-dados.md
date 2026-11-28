@@ -330,3 +330,9 @@ A consulta de grade monta linhas com os alunos ativos da turma de origem escolhi
 Novos registros também guardam o momento (aula ou pausa) e o código/nome do responsável selecionado no catálogo de Quem libera. Esses campos são anuláveis para os históricos e opcionais nas cópias antigas. O nome do responsável é um retrato do registro e não acompanha renomeações; a autoria autenticada permanece separada.
 
 O registro guarda aluno, turma e rótulo da turma no momento do registro, data civil, horário `HH:mm`, motivo de até 200 caracteres, nome de quem registrou, autoria anulável e criação. A chave (aluno, dia) impede duplicação, independentemente de saída registrada no mesmo dia. Transferências não alteram a turma histórica. A entrada não gera falta ou presença. Alunos desativados e desistentes na data não podem receber novo registro. Remoção para correção é auditada; linhas já enviadas ao Google permanecem intactas.
+
+## Trabalho (trabalho)
+
+A fila genérica guarda tipo, chave de idempotência, estado, prioridade, payload mínimo, tentativas, disponibilidade, reserva, resultado e um código curto de erro. O payload contém apenas identificadores, datas e escopos, nunca nome, matrícula, justificativa ou conteúdo de planilha. `trabalho_eventos` registra cada transição e tentativa, sem repetir o payload.
+
+Estados: `PENDENTE`, `DISPONIVEL`, `EM_EXECUCAO`, `AGUARDANDO`, `CONCLUIDO`, `FALHOU`, `CONFERENCIA` e `CANCELADO`. A reserva usa `reserva_id` e prazo de dez minutos, com heartbeat de um minuto. Um worker vencido não finaliza o item de outro. A chave de idempotência é o SHA-256 do tipo e do escopo canônico; um índice único parcial funde pedidos iguais enquanto o trabalho está aberto. `CONFERENCIA` exige ação humana e não é reenfileirada automaticamente. O histórico é expurgado pelo trabalho `EXPURGO_TRABALHOS`.

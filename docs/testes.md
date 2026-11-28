@@ -212,3 +212,15 @@ A cobertura protege o essencial do domínio (derivação de marcas e grade), a s
 `bi-analise.test.ts` cobre taxas ponderadas e denominador zero, homônimos, situação atual em turma histórica, expansão de aulas parciais, comparações bissextas, estimativa de cobertura, limites de amostra, limiares, CSV contra fórmulas, migração e rejeição de configurações com segredo. A massa de 100 mil linhas verifica agrupamentos de vários anos.
 
 `bi.spec.ts` cobre portão sem cookie, recusa, gráficos, construtor, painéis, teclado, persistência, CSV e PNG com confirmação, revogação e limpeza, falha em página intermediária, armazenamento bloqueado, importação incompatível e links sem chave. `pwa-bi.spec.ts` usa chave e turma sintéticas com aluno e chamada, contra o service worker real: guarda a casca pública, reabre os indicadores e tabelas offline, mantém APIs fora do CacheStorage e retorna ao portão após revogação e reconexão.
+
+## Fila de processamento
+
+`tests/unidade/fila/trabalho.test.ts` cobre a máquina de estados, as esperas de 30 segundos, 2, 10 e 30 minutos, o esgotamento de tentativas, a conferência, o cancelamento, o reenfileiramento e o escopo canônico da chave de idempotência.
+
+`tests/integracao/fila/fila-trabalhos.test.ts` roda contra PostgreSQL migrado e cobre intenção transacional, fusão de duplicatas, despacho, reserva com prazo, conclusão, reagendamento, esgotamento, conferência, cancelamento e reenfileiramento. `tests/integracao/fila/bullmq.test.ts` roda contra Redis e cobre publicação, jobId determinístico e consumo.
+
+```bash
+pnpm exec vitest run --config vitest.fila.config.ts
+```
+
+O ensaio exige `DATABASE_URL` de um banco descartável, `AUTH_SECRET`, `FILA_DRIVER=redis` e `REDIS_URL`. Nenhum teste usa dados reais. A suíte padrão `pnpm run test:unit` continua sem banco e sem rede.

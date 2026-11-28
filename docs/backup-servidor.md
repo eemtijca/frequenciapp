@@ -2,7 +2,7 @@
 
 Rotina de backup do banco e das planilhas em servidor auto-hospedado ou Kubernetes. O desenho separa o dump lógico do PostgreSQL da cópia das planilhas Google, porque os dois cobrem riscos diferentes.
 
-O banco é a fonte de verdade do aplicativo. As planilhas contêm fórmulas e edições manuais que não existem no banco. A cópia JSON da Gestão serve para migração e conferência, mas não substitui o `pg_dump`.
+O banco é a fonte de verdade do aplicativo. As planilhas contêm fórmulas e edições manuais que não existem no banco. A cópia JSON da Gestão serve para migração e conferência, mas não substitui o `pg_dump`. O Redis da fila não entra no backup: ele é transporte recuperável, e o PostgreSQL reconstrói os trabalhos quando o volume é recriado.
 
 A decisão está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A instalação do servidor está em [auto-hospedagem.md](auto-hospedagem.md). O perfil Dropbox opt-in, com token, pasta exclusiva, autoridade e journal próprios, está em [dropbox-retencao.md](dropbox-retencao.md).
 

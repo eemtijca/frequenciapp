@@ -49,6 +49,28 @@ docker compose -p frequenciapp-test down -v --remove-orphans
 
 Se a migration inicial for recriada durante o desenvolvimento, bancos antigos precisam ser removidos ou recriados. O comando `pnpm exec prisma migrate reset --force` também serve para um ambiente local descartável.
 
+## Fila de processamento no Compose
+
+O overlay `compose.fila.yml` sobe Redis e o worker na rede interna. Ele é opcional e não altera o caminho simples:
+
+```bash
+docker compose -f compose.yml -f compose.fila.yml up --build
+```
+
+Definir `REDIS_PASSWORD`, `AUTH_SECRET` e as variáveis Google já usadas. O `app` recebe `FILA_DRIVER=redis`, `FILA_PLANILHA_TRANSPORTE=bullmq` e `FILA_TRABALHOS_HABILITADA=true`. O worker usa a mesma imagem, com `node dist/worker.mjs`, sem portas publicadas.
+
+O Redis usa AOF, `maxmemory-policy noeviction` e senha. Não é fonte da verdade e não entra no backup do banco. Se o Redis for perdido, recriar o volume e reiniciar o worker; o PostgreSQL reconstrói a fila.
+
+Na Vercel e nos previews, manter o caminho simples:
+
+```text
+FILA_DRIVER=postgres
+FILA_PLANILHA_TRANSPORTE=direto
+FILA_TRABALHOS_HABILITADA=false
+```
+
+O worker não roda na Vercel. A operação completa está em [fila-processamento.md](fila-processamento.md).
+
 ## Servidor auto-hospedado
 
 O repositório inclui referências para VPS, servidor dedicado e máquina on-premises, com Caddy ou Nginx, TLS público ou interno, backup do banco e atualização por cron. O guia está em [auto-hospedagem.md](auto-hospedagem.md) e o backup em [backup-servidor.md](backup-servidor.md).

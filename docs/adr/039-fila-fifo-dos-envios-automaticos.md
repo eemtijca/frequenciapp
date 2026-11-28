@@ -29,3 +29,7 @@ Manter `after()` e a promessa em memória deixa a perda silenciosa e a ordem sem
 - A agenda depende do segredo `CRON_SECRET` no repositório e do GitHub Actions, que pode atrasar; sem agenda, a fila é esvaziada pela tentativa imediata e pelo botão Processar agora.
 - O limitador de envios por conta (30 a cada 15 minutos) continua valendo e, ao ser atingido, vira falha confirmada com nova tentativa, em vez de perda.
 - A migração `fila_planilha` precisa ser aplicada em produção pelo workflow de migrações.
+
+## Adendo de 2026-11-28
+
+O transporte e o consumidor passam a ser Redis com BullMQ e um worker dedicado, conforme a [ADR-085](085-fila-de-processamento-com-redis-e-bullmq.md). A tabela `fila_planilha`, a ordem por `sequencia`, a reserva, as esperas, a retentativa segura, a conferência e a UI permanecem. A reserva passa a valer dez minutos, com heartbeat a cada minuto. O BullMQ publica somente a cabeça da fila e usa `attempts: 1`; a política de retentativa continua nesta ADR. A agenda de cinco minutos e o botão Processar agora continuam como fallback. O caminho `FILA_PLANILHA_TRANSPORTE=direto` preserva o comportamento anterior para Vercel e previews.

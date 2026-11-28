@@ -8,6 +8,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ## [Não publicado]
 
+### Adicionado
+
+- A fila de processamento ganha Redis com BullMQ, um worker dedicado, a tabela `trabalhos` e o overlay `compose.fila.yml`. A fila FIFO de planilhas mantém a tabela, a ordem, a reserva e a conferência; o PostgreSQL continua sendo a fonte da verdade. A Vercel e os previews permanecem no caminho PostgreSQL mais cron.
+
 ### Alterado
 
 - A gaveta da administração deixa de mostrar Alunos, que já existe como cadastro dentro de Gestão; a coordenação mantém a consulta. Um link antigo com `visao=alunos` aberto pela administração leva ao cadastro de Alunos na Gestão.

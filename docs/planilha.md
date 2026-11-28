@@ -210,7 +210,7 @@ O envio automático é mais estreito que o manual, porque ninguém revisa a pré
 
 ## Fila FIFO dos envios automáticos
 
-Todo envio automático (chamada salva, saída e entrada registradas) vira um item da tabela `fila_planilha` antes de a resposta sair, e só quando a integração está ativa, o envio automático ligado e o modo conservador em vigor. Itens iguais que aguardam a vez são fundidos, porque o envio lê o estado atual. O processamento começa logo depois da resposta e o item aberto de menor sequência é reservado por cinco minutos, de modo que só um consumidor trabalha por vez, mesmo com várias instâncias.
+Todo envio automático (chamada salva, saída e entrada registradas) vira um item da tabela `fila_planilha` antes de a resposta sair, e só quando a integração está ativa, o envio automático ligado e o modo conservador em vigor. Itens iguais que aguardam a vez são fundidos, porque o envio lê o estado atual. O processamento começa logo depois da resposta e o item aberto de menor sequência é reservado por dez minutos, com heartbeat enquanto o worker executa, de modo que só um consumidor trabalha por vez, mesmo com várias instâncias.
 
 - Falha confirmada tenta de novo depois de 30 segundos, 2, 10 e 30 minutos, até cinco tentativas; esgotadas, o item fica como `FALHOU` e a fila segue.
 - Enquanto o item da frente espera a nova tentativa, os de trás aguardam, para as linhas chegarem à planilha na ordem dos registros.

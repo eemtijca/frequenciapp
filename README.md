@@ -88,6 +88,7 @@ A demonstração pública fica em https://frequenciappjca.vercel.app. Para exper
 - Transações ACID com isolamento serializável e repetição automática em conflitos.
 - Material UI 9 com tema próprio em CSS variables, componentes MUI compartilhados, gráficos MUI X e Recharts restrito ao FrequenciBI.
 - Service worker próprio para a experiência instalável e o aviso offline.
+- Fila de processamento opcional com Redis e BullMQ, worker dedicado e PostgreSQL como fonte da verdade.
 - Vitest para testes de unidade e contratos de API.
 
 ## Pré-requisitos
@@ -187,6 +188,8 @@ O VPS Linux é o destino de produção do FrequenciApp. A Vercel fica como ambie
 O instalador `instalar.sh` é o caminho recomendado em VPS. Ele segue o contrato de [docs/instalador.md](docs/instalador.md), com comandos, flags, JSON e códigos de erro estáveis, e orquestra os scripts de servidor já existentes.
 
 No caminho de nuvem, o build da Vercel apenas gera o cliente Prisma; as migrações são aplicadas pelo workflow de implantação em cada push na `main` ou manualmente com `pnpm run db:deploy`. A agenda de notificações usa o `CRON_SECRET`. As demais formas de publicação estão em [docs/deploy.md](docs/deploy.md) e a implantação em AWS, Azure ou GCP com Terraform está em [docs/implantacao-nuvem.md](docs/implantacao-nuvem.md).
+
+A fila de processamento é opcional. No VPS, o overlay `compose.fila.yml` sobe Redis e o worker dedicado; a Vercel e os previews continuam no caminho PostgreSQL mais cron. A operação está em [docs/fila-processamento.md](docs/fila-processamento.md).
 
 A auto-hospedagem inclui a coleta Prometheus opcional, com a rota interna `/api/metricas` protegida por token, e o chart Helm oferece o ServiceMonitor opcional para clusters com Prometheus Operator. O guia está em [docs/observabilidade.md](docs/observabilidade.md) e [docs/kubernetes.md](docs/kubernetes.md).
 

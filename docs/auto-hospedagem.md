@@ -19,6 +19,7 @@ A aplicação exige apenas:
 | Proxy     | HTTPS à frente, com `X-Forwarded-For`, `X-Forwarded-Proto` e `X-Forwarded-Host` |
 | Migrações | `node ./docker/app/migrar.mjs` ou `prisma migrate deploy`                       |
 | Agenda    | Endpoints autenticados com `CRON_SECRET`                                        |
+| Fila      | Opcional: Redis compatível, worker e `FILA_DRIVER=redis`                        |
 | Backup    | `pg_dump` formato custom e `pg_restore`                                         |
 
 Caddy, Nginx, cron, rclone, GPG e age são escolhas de referência. Outra infraestrutura pode usar o mesmo contrato sem os arquivos de `infra/servidor`.
@@ -388,6 +389,16 @@ scripts/servidor/compose.sh --profile alertas up -d alertmanager
 ```
 
 O Prometheus já envia alertas para `alertmanager:9093`. Sem o perfil, os alertas aparecem apenas no painel. O detalhamento dos receptores, do teste com `amtool` e do desligamento está em [observabilidade.md](observabilidade.md#alertas).
+
+## Fila de processamento
+
+A fila é opt-in. No `ops.env`, definir `FILA_HABILITADA=true`; no `app.env`, definir `REDIS_PASSWORD` com um valor longo. O `compose.fila.yml` entra automaticamente na lista efetiva quando a flag está ligada. Com `COMPOSE_ARQUIVOS` explícita, incluir o overlay na lista.
+
+O overlay sobe `redis` e `worker` na rede interna, sem portas publicadas. O worker usa a mesma imagem da aplicação, executa `node dist/worker.mjs` e encerra em até 60 segundos. O Redis usa AOF, `maxmemory-policy noeviction` e senha.
+
+A fila não substitui o backup do banco. O PostgreSQL continua sendo a fonte da verdade. Se o volume do Redis for perdido, recriar o volume e reiniciar o worker; o pump e o reconciliador reconstroem a fila. O guia completo está em [fila-processamento.md](fila-processamento.md).
+
+No perfil controlador, a inclusão de `redis` e `worker` altera a topologia e exige readoção revisada. A agenda de cinco minutos continua como fallback da fila de planilhas e dos indicadores.
 
 ## Agenda
 

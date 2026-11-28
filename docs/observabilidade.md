@@ -7,6 +7,9 @@ Guia da coleta Prometheus do FrequenciApp na auto-hospedagem. A aplicação exp�
 - Requisições HTTP da API: contagem por método, rota e status, duração e requisições em andamento.
 - Pool de conexões do PostgreSQL, latência das consultas e falhas de coleta.
 - Fila de envio às planilhas: itens por estado, idade do item aberto mais antigo e instante da última leitura válida.
+- Fila genérica: trabalhos por tipo e estado, idade do mais antigo, tentativas, duração e conferências pendentes.
+- BullMQ: jobs por fila e estado, publicados e consumidos pelo worker dedicado.
+- Worker: saúde, conectividade com Redis, execuções em andamento e última atividade por fila.
 - Ações de domínio: salvamentos de frequência e conflitos de revisão, itens processados da fila de planilhas e avisos da agenda de notificações, por resultado.
 - Processo Node.js: CPU, memória, descritores de arquivo, event loop, coletas de lixo e versão do runtime.
 - Coleta no cluster: quando o chart Helm habilita o ServiceMonitor, o Prometheus Operator coleta `/api/metricas` pela porta `http` do Service, com o token lido do Secret.
