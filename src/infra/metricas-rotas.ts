@@ -524,6 +524,10 @@ export const ROTAS_DE_METRICA: readonly RotaDeMetrica[] = Object.freeze([
     rotulo: "/api/trabalhos/:id/reenfileirar",
   },
   {
+    padrao: /^\/api\/trabalhos\/[^\/]+\/resolver$/,
+    rotulo: "/api/trabalhos/:id/resolver",
+  },
+  {
     padrao: /^\/api\/alunos\/[^\/]+$/,
     rotulo: "/api/alunos/:id",
   },

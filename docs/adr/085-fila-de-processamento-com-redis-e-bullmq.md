@@ -40,6 +40,17 @@ Manter o processamento no `after()` e na agenda deixaria a API sujeita a trabalh
 - A agenda de cinco minutos continua como fallback por pelo menos uma versão.
 - A Vercel e os previews continuam no caminho PostgreSQL mais cron.
 
+## Adendo operacional
+
+A revisão do primeiro release confirmou quatro correções de operação e resiliência:
+
+- O worker entra nas redes `interna` e `publica`. A rede interna continua isolando PostgreSQL e Redis; a saída pública é necessária para OAuth e Sheets API.
+- A reserva vencida de `trabalhos` é recuperada pelo reconciliador. Indicadores e expurgo voltam para `AGUARDANDO`; a preparação mensal vai para `CONFERENCIA`; tipo desconhecido falha. A conferência é encerrada por ação administrativa explícita.
+- Falha de publicação no Redis mantém a intenção em `PENDENTE` ou `AGUARDANDO`, com backoff limitado. Indisponibilidade de transporte não vira falha definitiva.
+- O overlay usa interpolação de flags e o worker só inicia as filas compatíveis. O rollback principal remove o overlay com `FILA_HABILITADA=false`; o rollback parcial usa `FILA_PLANILHA_TRANSPORTE=direto` e `FILA_TRABALHOS_HABILITADA=false`.
+
+O `jobId` da reserva de planilhas usa três partes, porque o BullMQ recusa identificadores personalizados com mais de três partes. O timeout do worker encerra a espera e leva o trabalho para conferência; o `AbortSignal` só interrompe manipuladores que o observam.
+
 ## Referências
 
 - [ADR-036](036-implantacao-multinuvem.md)

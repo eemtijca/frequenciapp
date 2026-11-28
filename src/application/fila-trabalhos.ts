@@ -13,8 +13,10 @@ import {
   PRAZO_RESERVA_TRABALHO_MS,
   TIPOS_TRABALHO,
   desfechoDoTrabalho,
+  destinoDaReservaVencida,
   podeCancelar,
   podeReenfileirar,
+  podeResolver,
   serializarEscopo,
   type EstadoTrabalho,
   type ResultadoDoTrabalho,
@@ -29,7 +31,6 @@ const ESTADOS_ABERTOS: EstadoTrabalho[] = [
   "CONFERENCIA",
 ];
 const LIMITE_PAYLOAD = 8 * 1024;
-const MAXIMO_TENTATIVAS_DESPACHO = 5;
 
 export interface PedidoDeTrabalho {
   tipo: TipoTrabalho;
@@ -72,6 +73,7 @@ export interface TrabalhoResumo {
   resultado: string | null;
   erroCodigo: string | null;
   erroResumo: string | null;
+  erroDespacho: string | null;
   criadoEm: string;
   atualizadoEm: string;
   disponivelEm: string;
@@ -168,6 +170,8 @@ export async function enfileirarTrabalho(
 /**
  * Publica os trabalhos pendentes e marca o despacho. A publicação acontece
  * antes da marcação; se a marcação falhar, o mesmo jobId deduplica no BullMQ.
+ * Falha de transporte nunca encerra o trabalho: a intenção continua no
+ * PostgreSQL e volta a ser publicada quando o Redis responder.
  */
 export async function despacharTrabalhosPendentes(
   publicar: PublicadorDeTrabalho,
@@ -181,7 +185,11 @@ export async function despacharTrabalhosPendentes(
           estado: "PENDENTE",
           OR: [{ proximoDespachoEm: null }, { proximoDespachoEm: { lte: agora } }],
         },
-        { estado: "AGUARDANDO", disponivelEm: { lte: agora } },
+        {
+          estado: "AGUARDANDO",
+          disponivelEm: { lte: agora },
+          OR: [{ proximoDespachoEm: null }, { proximoDespachoEm: { lte: agora } }],
+        },
       ],
     },
     orderBy: [{ prioridade: "asc" }, { criadoEm: "asc" }],
@@ -197,6 +205,7 @@ export async function despacharTrabalhosPendentes(
           data: {
             estado: "DISPONIVEL",
             despachadoEm: new Date(),
+            tentativasDespacho: 0,
             erroDespacho: null,
             proximoDespachoEm: null,
           },
@@ -214,37 +223,34 @@ export async function despacharTrabalhosPendentes(
         }
       });
       publicados += 1;
-    } catch {
+    } catch (erro) {
+      console.error(
+        "[fila] falha ao publicar trabalho",
+        erro instanceof Error ? erro.name : "erro",
+      );
       const tentativas = trabalho.tentativasDespacho + 1;
-      const atraso = Math.min(300_000, 30_000 * 2 ** Math.max(0, tentativas - 1));
+      const atraso = Math.min(300_000, 30_000 * 2 ** Math.min(tentativas - 1, 4));
       await comTransacao(async (tx) => {
         const atualizado = await tx.trabalho.updateMany({
-          where: { id: trabalho.id, estado: trabalho.estado },
-          data:
-            tentativas >= MAXIMO_TENTATIVAS_DESPACHO
-              ? {
-                  estado: "FALHOU",
-                  erroCodigo: "despacho",
-                  erroResumo: "Não foi possível publicar o trabalho.",
-                  concluidoEm: new Date(),
-                }
-              : {
-                  tentativasDespacho: { increment: 1 },
-                  proximoDespachoEm: new Date(Date.now() + atraso),
-                  erroDespacho: "Falha temporária ao publicar o trabalho.",
-                },
+          where: {
+            id: trabalho.id,
+            estado: trabalho.estado,
+            OR: [{ proximoDespachoEm: null }, { proximoDespachoEm: { lte: agora } }],
+          },
+          data: {
+            tentativasDespacho: { increment: 1 },
+            proximoDespachoEm: new Date(Date.now() + atraso),
+            erroDespacho: "Falha temporária ao publicar o trabalho.",
+          },
         });
         if (atualizado.count === 1) {
           await tx.trabalhoEvento.create({
             data: {
               trabalhoId: trabalho.id,
               deEstado: trabalho.estado,
-              paraEstado: tentativas >= MAXIMO_TENTATIVAS_DESPACHO ? "FALHOU" : trabalho.estado,
+              paraEstado: trabalho.estado,
               tentativa: trabalho.tentativas,
-              resultado:
-                tentativas >= MAXIMO_TENTATIVAS_DESPACHO
-                  ? "despacho_falhou"
-                  : "despacho_reagendado",
+              resultado: "despacho_reagendado",
             },
           });
         }
@@ -252,6 +258,66 @@ export async function despacharTrabalhosPendentes(
     }
   }
   return publicados;
+}
+
+/**
+ * Retoma trabalhos cuja reserva venceu sem finalização. O fencing exige o
+ * mesmo estado, a mesma reserva e o prazo ainda vencido; um heartbeat ou uma
+ * nova reserva nunca é sobrescrito.
+ */
+export async function recuperarTrabalhosVencidos(limite = 50): Promise<number> {
+  const agora = new Date();
+  const vencidos = await banco().trabalho.findMany({
+    where: { estado: "EM_EXECUCAO", reservadoAte: { lt: agora } },
+    orderBy: { reservadoAte: "asc" },
+    take: limite,
+  });
+  let recuperados = 0;
+  for (const trabalho of vencidos) {
+    const destino = destinoDaReservaVencida(trabalho.tipo);
+    const seguro = destino === "AGUARDANDO";
+    const conferencia = destino === "CONFERENCIA";
+    const recuperado = await comTransacao(async (tx) => {
+      const atualizado = await tx.trabalho.updateMany({
+        where: {
+          id: trabalho.id,
+          estado: "EM_EXECUCAO",
+          reservaId: trabalho.reservaId,
+          reservadoAte: { lt: agora },
+        },
+        data: {
+          estado: destino,
+          resultado: "reserva_vencida",
+          erroCodigo: "reserva_vencida",
+          erroResumo: seguro
+            ? "A reserva venceu; o trabalho voltou para a fila."
+            : conferencia
+              ? "A reserva venceu. Confira o destino antes de resolver."
+              : "A reserva venceu e o tipo de trabalho não está registrado.",
+          ...(seguro ? { disponivelEm: agora } : {}),
+          proximoDespachoEm: null,
+          erroDespacho: null,
+          reservadoAte: null,
+          reservadoPor: null,
+          reservaId: null,
+          concluidoEm: destino === "FALHOU" ? agora : null,
+        },
+      });
+      if (atualizado.count !== 1) return false;
+      await tx.trabalhoEvento.create({
+        data: {
+          trabalhoId: trabalho.id,
+          deEstado: "EM_EXECUCAO",
+          paraEstado: destino,
+          tentativa: trabalho.tentativas,
+          resultado: "reserva_vencida",
+        },
+      });
+      return true;
+    });
+    if (recuperado) recuperados += 1;
+  }
+  return recuperados;
 }
 
 /** Reserva atômica do próximo trabalho disponível, sem dois consumidores. */
@@ -365,10 +431,17 @@ export async function executarTrabalhos(
     if (!trabalho) break;
     resumo.reivindicados += 1;
     const controlador = new AbortController();
-    const temporizador = setTimeout(
-      () => controlador.abort(),
-      Math.max(30_000, opcoes.timeoutMs ?? 240_000),
-    );
+    const marcadorDeTimeout = Symbol("timeout");
+    let temporizador: ReturnType<typeof setTimeout> | undefined;
+    const estouro = new Promise<typeof marcadorDeTimeout>((resolver) => {
+      temporizador = setTimeout(
+        () => {
+          controlador.abort();
+          resolver(marcadorDeTimeout);
+        },
+        Math.max(1_000, opcoes.timeoutMs ?? 240_000),
+      );
+    });
     const heartbeat = setInterval(() => {
       void estenderReservaDoTrabalho(trabalho, opcoes.workerId).catch(() => undefined);
     }, PRAZO_HEARTBEAT_TRABALHO_MS);
@@ -391,18 +464,33 @@ export async function executarTrabalhos(
             erroResumo: "O tipo de trabalho não está registrado.",
           };
         } else {
-          resultado = await manipulador({ trabalho, sinal: controlador.signal });
+          const execucao = manipulador({ trabalho, sinal: controlador.signal });
+          // O manipulador pode terminar depois do timeout; a rejeição tardia
+          // não pode derrubar o processo nem alterar o desfecho já registrado.
+          void execucao.catch(() => undefined);
+          const vencedor = await Promise.race([execucao, estouro]);
+          resultado =
+            vencedor === marcadorDeTimeout
+              ? {
+                  situacao: "conferencia",
+                  resultado: "timeout",
+                  erroCodigo: "timeout",
+                  erroResumo:
+                    "O trabalho excedeu o tempo máximo. Confira o destino antes de resolver.",
+                }
+              : vencedor;
         }
       }
     } catch (erro) {
+      console.error(
+        "[worker] falha inesperada ao executar trabalho",
+        erro instanceof Error ? erro.name : "erro",
+      );
       resultado = {
         situacao: "falhou",
         resultado: "falhou",
         erroCodigo: "excecao",
-        erroResumo:
-          erro instanceof Error
-            ? erro.message.slice(0, 300)
-            : "O trabalho terminou com erro inesperado.",
+        erroResumo: "O trabalho terminou com erro inesperado.",
       };
     } finally {
       clearTimeout(temporizador);
@@ -499,6 +587,7 @@ function resumirTrabalho(trabalho: Trabalho): TrabalhoResumo {
     resultado: trabalho.resultado,
     erroCodigo: trabalho.erroCodigo,
     erroResumo: trabalho.erroResumo,
+    erroDespacho: trabalho.erroDespacho,
     criadoEm: trabalho.criadoEm.toISOString(),
     atualizadoEm: trabalho.atualizadoEm.toISOString(),
     disponivelEm: trabalho.disponivelEm.toISOString(),
@@ -597,6 +686,55 @@ export async function reenfileirarTrabalho(id: string, autorId: string | null): 
       },
     });
     await auditar(tx, autorId, "trabalho.reenfileirar", trabalho.tipo);
+  });
+}
+
+export type DecisaoDeResolucao = "concluido" | "falhou";
+
+/**
+ * Encerra uma conferência por decisão explícita da administração. Não repete
+ * o efeito externo: apenas registra o resultado e libera a chave de idempotência.
+ */
+export async function resolverTrabalho(
+  id: string,
+  autorId: string | null,
+  decisao: DecisaoDeResolucao,
+): Promise<void> {
+  await comTransacao(async (tx) => {
+    const trabalho = await tx.trabalho.findUnique({
+      where: { id },
+      select: { id: true, tipo: true, estado: true },
+    });
+    if (!trabalho) throw new ErroHttp("Trabalho não encontrado.", 404);
+    if (!podeResolver(trabalho.estado))
+      throw new ErroHttp("Este trabalho não está em conferência.", 409);
+    const concluido = decisao === "concluido";
+    const atualizado = await tx.trabalho.updateMany({
+      where: { id, estado: "CONFERENCIA" },
+      data: {
+        estado: concluido ? "CONCLUIDO" : "FALHOU",
+        resultado: concluido ? "resolvido" : "resolvido_sem_sucesso",
+        erroCodigo: concluido ? null : "resolvido_sem_sucesso",
+        erroResumo: concluido ? null : "A conferência foi encerrada sem sucesso.",
+        disponivelEm: new Date(),
+        reservadoAte: null,
+        reservadoPor: null,
+        reservaId: null,
+        concluidoEm: new Date(),
+      },
+    });
+    if (atualizado.count !== 1)
+      throw new ErroHttp("A conferência mudou. Recarregue a fila antes de resolver.", 409);
+    await tx.trabalhoEvento.create({
+      data: {
+        trabalhoId: id,
+        deEstado: "CONFERENCIA",
+        paraEstado: concluido ? "CONCLUIDO" : "FALHOU",
+        tentativa: 0,
+        resultado: decisao,
+      },
+    });
+    await auditar(tx, autorId, "trabalho.resolver", `${trabalho.tipo}:${decisao}`);
   });
 }
 

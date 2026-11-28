@@ -8296,7 +8296,7 @@
       "post": {
         "operationId": "processarFila",
         "summary": "Processar a fila de envios agora",
-        "description": "Apenas administração e origem confiável. Despacha as intenções escolares ainda pendentes, processa até 20 itens e devolve o resumo, com aguardandoAte quando há espera.",
+        "description": "Apenas administração e origem confiável. Despacha as intenções escolares ainda pendentes. No transporte BullMQ, publica a cabeça e devolve despachado verdadeiro; no caminho direto, processa até 20 itens e devolve o resumo, com aguardandoAte quando há espera.",
         "tags": ["planilhas"],
         "responses": {
           "200": {
@@ -8307,14 +8307,26 @@
                   "$ref": "#/components/schemas/FilaResumo"
                 },
                 "examples": {
-                  "Exemplo": {
-                    "summary": "Exemplo",
+                  "Direto": {
+                    "summary": "Processamento direto",
                     "value": {
                       "processados": 5,
                       "concluidos": 4,
                       "falhas": 1,
                       "abertos": 0,
-                      "aguardandoAte": null
+                      "aguardandoAte": null,
+                      "despachado": false
+                    }
+                  },
+                  "BullMQ": {
+                    "summary": "Publicação para o worker",
+                    "value": {
+                      "processados": 0,
+                      "concluidos": 0,
+                      "falhas": 0,
+                      "abertos": 2,
+                      "aguardandoAte": null,
+                      "despachado": true
                     }
                   }
                 }
@@ -8532,7 +8544,7 @@
       "get": {
         "operationId": "obterAgendaFila",
         "summary": "Processar a fila pela agenda",
-        "description": "Autenticada pelo segredo do agendador; cookie, mesmo de administrador, não autoriza. Processa até 50 itens.",
+        "description": "Autenticada pelo segredo do agendador; cookie, mesmo de administrador, não autoriza. No caminho direto, processa até 50 itens; no transporte BullMQ, publica a cabeça para o worker.",
         "tags": ["planilhas"],
         "security": [
           {
@@ -8555,7 +8567,8 @@
                       "concluidos": 12,
                       "falhas": 0,
                       "abertos": 0,
-                      "aguardandoAte": null
+                      "aguardandoAte": null,
+                      "despachado": false
                     }
                   }
                 }
@@ -11001,7 +11014,7 @@
       "get": {
         "operationId": "obterAgendaIndicadores",
         "summary": "Atualizar os indicadores pela agenda",
-        "description": "Autenticada pelo segredo do agendador. Atualiza as fontes ativas sem criar arquivo; sem novidade devolve atualizado falso.",
+        "description": "Autenticada pelo segredo do agendador. Com a fila habilitada, grava a intenção e devolve 202; sem a fila, atualiza as fontes ativas sem criar arquivo e devolve atualizado falso quando não há novidade.",
         "tags": ["indicadores"],
         "security": [
           {
@@ -11027,6 +11040,26 @@
                       }
                     }
                   }
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Trabalho enfileirado para o worker.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "trabalhoId": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "despachado": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["trabalhoId", "despachado"]
                 }
               }
             }
@@ -13690,6 +13723,78 @@
         }
       }
     },
+    "/api/trabalhos/{id}/resolver": {
+      "post": {
+        "operationId": "resolverTrabalhoConferencia",
+        "summary": "Resolver uma conferência de trabalho",
+        "description": "Apenas administração e origem confiável. Encerra uma conferência como concluída ou falha, sem repetir o efeito externo. Outro estado responde 409.",
+        "tags": ["fila"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decisao": {
+                    "type": "string",
+                    "enum": ["concluido", "falhou"]
+                  }
+                },
+                "required": ["decisao"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Ação concluída.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["ok"]
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Erro409"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
     "/api/trabalhos/indicadores": {
       "post": {
         "operationId": "enfileirarIndicadores",
@@ -13730,7 +13835,7 @@
       "post": {
         "operationId": "enfileirarPlanilhaMensal",
         "summary": "Enfileirar a preparação mensal",
-        "description": "Apenas administração e origem confiável. Recebe a turma de origem e o mês, grava a intenção no PostgreSQL e devolve o identificador do trabalho.",
+        "description": "Apenas administração e origem confiável. Recebe a turma de origem e o mês civil válido, grava a intenção no PostgreSQL e devolve o identificador do trabalho.",
         "tags": ["fila"],
         "requestBody": {
           "required": true,
@@ -13745,7 +13850,8 @@
                   },
                   "mes": {
                     "type": "string",
-                    "pattern": "^\\d{4}-\\d{2}$"
+                    "pattern": "^(20\\d{2}|2100)-(0[1-9]|1[0-2])$",
+                    "example": "2026-11"
                   }
                 },
                 "required": ["turmaOriginalId", "mes"]
@@ -18746,7 +18852,7 @@
       "FilaResumo": {
         "type": "object",
         "title": "Resumo do processamento",
-        "description": "Contagens de uma rodada da fila e o próximo instante em que ela volta a andar.",
+        "description": "Contagens de uma rodada da fila e o próximo instante em que ela volta a andar. No transporte BullMQ, despachado é verdadeiro e as contagens ficam zeradas porque o worker continua em segundo plano.",
         "properties": {
           "processados": {
             "type": "integer",
@@ -18775,6 +18881,11 @@
               }
             ],
             "example": null
+          },
+          "despachado": {
+            "type": "boolean",
+            "description": "Verdadeiro quando a chamada apenas publicou a cabeça para o worker.",
+            "example": false
           }
         }
       },
@@ -22409,6 +22520,9 @@
             "type": ["string", "null"]
           },
           "erroResumo": {
+            "type": ["string", "null"]
+          },
+          "erroDespacho": {
             "type": ["string", "null"]
           },
           "criadoEm": {

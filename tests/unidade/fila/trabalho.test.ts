@@ -4,10 +4,14 @@ import {
   ESPERAS_TRABALHO_MS,
   MAXIMO_TENTATIVAS_TRABALHO,
   desfechoDoTrabalho,
+  destinoDaReservaVencida,
   esperaDaTentativa,
   estadoAberto,
+  filasAtivas,
+  janelaDeCincoMinutos,
   podeCancelar,
   podeReenfileirar,
+  podeResolver,
   serializarEscopo,
   type ResultadoDoTrabalho,
 } from "@/domain/trabalho";
@@ -177,6 +181,66 @@ describe("ações por estado", () => {
         (estado) => podeReenfileirar(estado as never),
       ),
     ).toEqual([false, false, false, false, false, false]);
+  });
+
+  it("só resolve o que está em conferência", () => {
+    expect(podeResolver("CONFERENCIA")).toBe(true);
+    expect(
+      [
+        "PENDENTE",
+        "DISPONIVEL",
+        "EM_EXECUCAO",
+        "AGUARDANDO",
+        "CONCLUIDO",
+        "FALHOU",
+        "CANCELADO",
+      ].map((estado) => podeResolver(estado as never)),
+    ).toEqual([false, false, false, false, false, false, false]);
+  });
+});
+
+describe("recuperação de reserva vencida", () => {
+  it("repete apenas os tipos com efeito idempotente", () => {
+    expect(destinoDaReservaVencida("INDICADORES_ATUALIZAR")).toBe("AGUARDANDO");
+    expect(destinoDaReservaVencida("EXPURGO_TRABALHOS")).toBe("AGUARDANDO");
+  });
+
+  it("leva escrita incerta para conferência e tipo desconhecido para falha", () => {
+    expect(destinoDaReservaVencida("PLANILHA_MENSAL_PREPARAR")).toBe("CONFERENCIA");
+    expect(destinoDaReservaVencida("TIPO_NOVO")).toBe("FALHOU");
+  });
+});
+
+describe("filas do worker", () => {
+  it("só ativa consumidores compatíveis com as flags", () => {
+    expect(
+      filasAtivas({
+        driver: "redis",
+        planilhaTransporte: "bullmq",
+        trabalhosHabilitada: true,
+      }),
+    ).toEqual({ planilha: true, trabalhos: true });
+    expect(
+      filasAtivas({
+        driver: "redis",
+        planilhaTransporte: "direto",
+        trabalhosHabilitada: false,
+      }),
+    ).toEqual({ planilha: false, trabalhos: false });
+    expect(
+      filasAtivas({
+        driver: "postgres",
+        planilhaTransporte: "bullmq",
+        trabalhosHabilitada: true,
+      }),
+    ).toEqual({ planilha: false, trabalhos: false });
+  });
+});
+
+describe("janela da agenda", () => {
+  it("arredonda para o bloco de cinco minutos", () => {
+    expect(janelaDeCincoMinutos(new Date("2026-11-28T12:07:42Z"))).toBe("2026-11-28T12:05:00.000Z");
+    expect(janelaDeCincoMinutos(new Date("2026-11-28T12:10:00Z"))).toBe("2026-11-28T12:10:00.000Z");
   });
 });
 

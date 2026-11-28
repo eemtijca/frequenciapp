@@ -2,6 +2,7 @@
 
 // Fila genérica de trabalhos: contagens, itens recentes e ações administrativas.
 import { useCallback, useEffect, useState } from "react";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
 import PlayArrowRoundedIcon from "@mui/icons-material/PlayArrowRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
@@ -18,6 +19,7 @@ import { Acordeao } from "@/components/ui/mui/acordeao";
 import { AlertaCompacto } from "@/components/ui/mui/tela-estado";
 import { Botao } from "@/components/ui/mui/botao";
 import { CaixasDeInfo } from "@/components/ui/mui/caixas-de-info";
+import { DialogoConfirmacao } from "@/components/ui/mui/dialogo-confirmacao";
 import { Selo, type TomSelo } from "@/components/ui/mui/selo";
 
 const ATUALIZAR_A_CADA_MS = 15_000;
@@ -68,11 +70,17 @@ interface Resposta {
   contagens: ContagensDeTrabalhos;
 }
 
+type DecisaoDeConferencia = "concluido" | "falhou";
+
 export default function SecaoFilaTrabalhos() {
   const { avisarErro, avisarSucesso } = useAvisosDaSessao();
   const [aberto, setAberto] = useState(false);
   const [dados, setDados] = useState<Resposta | null>(null);
   const [erro, setErro] = useState("");
+  const [resolucao, setResolucao] = useState<{
+    item: TrabalhoResumo;
+    decisao: DecisaoDeConferencia;
+  } | null>(null);
   const { chaveAtiva, executar } = useAcoesPorChave();
   const [recarga, setRecarga] = useState(0);
 
@@ -124,6 +132,21 @@ export default function SecaoFilaTrabalhos() {
         carregar();
       } catch (excecao) {
         avisarErro(excecao, { contexto: "Não foi possível concluir a ação." });
+      }
+    });
+  }
+
+  function resolver(item: TrabalhoResumo, decisao: DecisaoDeConferencia) {
+    void executar(`resolver:${item.id}`, async () => {
+      try {
+        await pedir(`/api/trabalhos/${item.id}/resolver`, corpoJson({ decisao }));
+        setResolucao(null);
+        avisarSucesso(
+          decisao === "concluido" ? "Conferência concluída." : "Conferência encerrada com falha.",
+        );
+        carregar();
+      } catch (excecao) {
+        avisarErro(excecao, { contexto: "Não foi possível resolver a conferência." });
       }
     });
   }
@@ -229,6 +252,10 @@ export default function SecaoFilaTrabalhos() {
                     >
                       <Typography variant="subtitle2">{ROTULO_TIPO[item.tipo]}</Typography>
                       <Selo tom={TOM_ESTADO[item.estado]}>{ROTULO_ESTADO[item.estado]}</Selo>
+                      {item.erroDespacho &&
+                      (item.estado === "PENDENTE" || item.estado === "AGUARDANDO") ? (
+                        <Selo tom="atencao">Aguardando publicação</Selo>
+                      ) : null}
                     </Stack>
                     <Typography variant="caption" sx={{ color: "text.secondary" }}>
                       Criado em {horaLocal(item.criadoEm)}
@@ -242,8 +269,35 @@ export default function SecaoFilaTrabalhos() {
                         {item.erroResumo}
                       </Typography>
                     ) : null}
+                    {item.erroDespacho ? (
+                      <Typography variant="caption" sx={{ color: "text.secondary" }}>
+                        {item.erroDespacho}
+                      </Typography>
+                    ) : null}
                   </Stack>
                   <Stack direction="row" spacing={1} sx={{ flexShrink: 0, alignItems: "center" }}>
+                    {item.estado === "CONFERENCIA" ? (
+                      <>
+                        <Botao
+                          type="button"
+                          variante="contorno"
+                          icone={<CheckCircleOutlineRoundedIcon />}
+                          disabled={chaveAtiva === `resolver:${item.id}`}
+                          onClick={() => setResolucao({ item, decisao: "concluido" })}
+                        >
+                          Concluir
+                        </Botao>
+                        <Botao
+                          type="button"
+                          variante="texto"
+                          icone={<StopCircleOutlinedIcon />}
+                          disabled={chaveAtiva === `resolver:${item.id}`}
+                          onClick={() => setResolucao({ item, decisao: "falhou" })}
+                        >
+                          Marcar falha
+                        </Botao>
+                      </>
+                    ) : null}
                     {item.estado === "FALHOU" || item.estado === "CANCELADO" ? (
                       <Botao
                         type="button"
@@ -277,6 +331,26 @@ export default function SecaoFilaTrabalhos() {
           </Typography>
         </Stack>
       </Acordeao>
+      <DialogoConfirmacao
+        aberto={resolucao !== null}
+        titulo={
+          resolucao?.decisao === "concluido"
+            ? "Concluir a conferência"
+            : "Encerrar a conferência com falha"
+        }
+        descricao={
+          resolucao?.decisao === "concluido"
+            ? "Confirme apenas depois de verificar o destino. O trabalho não será reenviado."
+            : "O trabalho será encerrado sem nova tentativa e a chave voltará a aceitar um pedido novo."
+        }
+        rotuloConfirmar={resolucao?.decisao === "concluido" ? "Concluir" : "Marcar falha"}
+        destrutivo={resolucao?.decisao === "falhou"}
+        operacaoEmAndamento={resolucao !== null && chaveAtiva === `resolver:${resolucao.item.id}`}
+        onConfirmar={() => {
+          if (resolucao) resolver(resolucao.item, resolucao.decisao);
+        }}
+        onCancelar={() => setResolucao(null)}
+      />
     </Box>
   );
 }

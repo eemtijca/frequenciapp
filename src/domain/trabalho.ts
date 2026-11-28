@@ -155,3 +155,44 @@ export function podeCancelar(estado: EstadoTrabalho): boolean {
 export function podeReenfileirar(estado: EstadoTrabalho): boolean {
   return estado === "FALHOU" || estado === "CANCELADO";
 }
+
+/** Uma conferência só termina por decisão explícita da administração. */
+export function podeResolver(estado: EstadoTrabalho): boolean {
+  return estado === "CONFERENCIA";
+}
+
+export type DestinoDaReservaVencida = "AGUARDANDO" | "CONFERENCIA" | "FALHOU";
+
+/**
+ * Decide o destino de um trabalho cuja reserva venceu sem finalização.
+ * Indicadores e expurgo são seguros para repetir; a preparação mensal pode
+ * ter escrito no Google; um tipo desconhecido não tem manipulador seguro.
+ */
+export function destinoDaReservaVencida(tipo: string): DestinoDaReservaVencida {
+  if (tipo === "INDICADORES_ATUALIZAR" || tipo === "EXPURGO_TRABALHOS") return "AGUARDANDO";
+  if (tipo === "PLANILHA_MENSAL_PREPARAR") return "CONFERENCIA";
+  return "FALHOU";
+}
+
+/** Identificador estável da janela de cinco minutos usada pela agenda. */
+export function janelaDeCincoMinutos(agora: Date): string {
+  return new Date(Math.floor(agora.getTime() / 300_000) * 300_000).toISOString();
+}
+
+export interface FilasAtivas {
+  planilha: boolean;
+  trabalhos: boolean;
+}
+
+/** Decide quais consumidores podem existir com a configuração atual. */
+export function filasAtivas(config: {
+  driver: string;
+  planilhaTransporte: string;
+  trabalhosHabilitada: boolean;
+}): FilasAtivas {
+  const redis = config.driver === "redis";
+  return {
+    planilha: redis && config.planilhaTransporte === "bullmq",
+    trabalhos: redis && config.trabalhosHabilitada,
+  };
+}
