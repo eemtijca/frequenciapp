@@ -1,5 +1,5 @@
 # Sobreposição opcional da fila de processamento.
-# Sobe Redis e o worker na rede interna, sem portas publicadas.
+# Sobe Redis na rede interna e o worker nas redes interna e pública, sem portas publicadas.
 
 services:
   app:
