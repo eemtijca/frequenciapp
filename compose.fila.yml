@@ -1,0 +1,108 @@
+# Sobreposição opcional da fila de processamento.
+# Sobe Redis e o worker na rede interna, sem portas publicadas.
+
+services:
+  app:
+    environment:
+      FILA_DRIVER: redis
+      FILA_PLANILHA_TRANSPORTE: bullmq
+      FILA_TRABALHOS_HABILITADA: "true"
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Defina REDIS_PASSWORD}@redis:6379/0
+      WORKER_TIMEOUT: ${WORKER_TIMEOUT:-240}
+      WORKER_SHUTDOWN_TIMEOUT: ${WORKER_SHUTDOWN_TIMEOUT:-30}
+
+  redis:
+    image: valkey/valkey:9-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Defina REDIS_PASSWORD}
+    command:
+      - valkey-server
+      - --appendonly
+      - "yes"
+      - --appendfsync
+      - everysec
+      - --maxmemory-policy
+      - noeviction
+      - --requirepass
+      - ${REDIS_PASSWORD:?Defina REDIS_PASSWORD}
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD valkey-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks:
+      - interna
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  worker:
+    image: ${APP_IMAGEM:-frequenciapp:local}
+    restart: unless-stopped
+    command: ["node", "dist/worker.mjs"]
+    read_only: true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-frequencia}:${POSTGRES_PASSWORD:-frequencia}@db:5432/${POSTGRES_DB:-frequencia}
+      AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
+      FILA_DRIVER: redis
+      FILA_PLANILHA_TRANSPORTE: bullmq
+      FILA_TRABALHOS_HABILITADA: "true"
+      REDIS_URL: redis://:${REDIS_PASSWORD:?Defina REDIS_PASSWORD}@redis:6379/0
+      WORKER_PORTA: ${WORKER_PORTA:-3001}
+      WORKER_CONCORRENCIA: ${WORKER_CONCORRENCIA:-2}
+      WORKER_PLANILHA_CONCORRENCIA: "1"
+      WORKER_TIMEOUT: ${WORKER_TIMEOUT:-240}
+      WORKER_SHUTDOWN_TIMEOUT: ${WORKER_SHUTDOWN_TIMEOUT:-30}
+      POOL_MAX_CONEXOES: ${WORKER_POOL_MAX_CONEXOES:-5}
+      METRICAS_TOKEN: ${METRICAS_TOKEN:-}
+      TZ_APP: ${TZ_APP:-America/Fortaleza}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      GOOGLE_PICKER_API_KEY: ${GOOGLE_PICKER_API_KEY:-}
+      GOOGLE_PROJECT_NUMBER: ${GOOGLE_PROJECT_NUMBER:-}
+      GOOGLE_LEITURAS_POR_MINUTO: ${GOOGLE_LEITURAS_POR_MINUTO:-}
+      FERIADOS_API_URL: ${FERIADOS_API_URL:-}
+      FERIADOS_API_TOKEN: ${FERIADOS_API_TOKEN:-}
+      FERIADOS_UF: ${FERIADOS_UF:-}
+      FERIADOS_IBGE: ${FERIADOS_IBGE:-}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:' + (process.env.WORKER_PORTA ?? 3001) + '/saude').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - interna
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  redisdata:

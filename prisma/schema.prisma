@@ -444,10 +444,10 @@ model Falta {
 // Quem libera é um código do catálogo de liberadores; a conta antiga fica em
 // liberadoPor.
 model SaidaAntecipada {
-  turmaHistoricaId String? @map("turma_historica_id") @db.Uuid
-  turmaHistoricaNome String? @map("turma_historica_nome") @db.VarChar(200)
-  aulasReferencia Json? @map("aulas_referencia")
-  origemReferencia String @default("DESCONHECIDA") @map("origem_referencia") @db.VarChar(40)
+  turmaHistoricaId       String?   @map("turma_historica_id") @db.Uuid
+  turmaHistoricaNome     String?   @map("turma_historica_nome") @db.VarChar(200)
+  aulasReferencia        Json?     @map("aulas_referencia")
+  origemReferencia       String    @default("DESCONHECIDA") @map("origem_referencia") @db.VarChar(40)
   id                     String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   alunoId                String    @map("aluno_id") @db.Uuid
   dia                    DateTime  @db.Date
@@ -569,17 +569,17 @@ model ParametrosAcesso {
 // configurações é única, criada na migração; as justificativas nascem com os
 // códigos padrão e podem ser editadas pela administração.
 model Configuracao {
-  id                String                    @id @default("principal")
-  frequenciaPorAula Boolean                   @default(false) @map("frequencia_por_aula")
-  saidaAntecipada   Boolean                   @default(true) @map("saida_antecipada")
-  origemNaChamada   Boolean                   @default(false) @map("origem_na_chamada")
-  infrequenciaAtencaoPercentual Int           @default(10) @map("infrequencia_atencao_percentual")
-  infrequenciaCriticaPercentual Int           @default(20) @map("infrequencia_critica_percentual")
-  origemSeries      ConfiguracaoOrigemSerie[]
-  origemTurmas      ConfiguracaoOrigemTurma[]
-  atualizadoEm      DateTime                  @updatedAt @map("atualizado_em") @db.Timestamptz
-  atualizadoPorId   String?                   @map("atualizado_por_id") @db.Uuid
-  atualizadoPor     Usuario?                  @relation("ConfiguracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
+  id                            String                    @id @default("principal")
+  frequenciaPorAula             Boolean                   @default(false) @map("frequencia_por_aula")
+  saidaAntecipada               Boolean                   @default(true) @map("saida_antecipada")
+  origemNaChamada               Boolean                   @default(false) @map("origem_na_chamada")
+  infrequenciaAtencaoPercentual Int                       @default(10) @map("infrequencia_atencao_percentual")
+  infrequenciaCriticaPercentual Int                       @default(20) @map("infrequencia_critica_percentual")
+  origemSeries                  ConfiguracaoOrigemSerie[]
+  origemTurmas                  ConfiguracaoOrigemTurma[]
+  atualizadoEm                  DateTime                  @updatedAt @map("atualizado_em") @db.Timestamptz
+  atualizadoPorId               String?                   @map("atualizado_por_id") @db.Uuid
+  atualizadoPor                 Usuario?                  @relation("ConfiguracaoAtualizadaPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 
   @@map("configuracoes")
 }
@@ -873,17 +873,17 @@ model SincronizacaoPlanilha {
 
 // Intenção mínima no mesmo commit escolar; não inclui conteúdo da planilha nem nomes.
 model IntencaoEnvioEscolar {
-  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tipo TipoEnvioFila
-  dia DateTime @db.Date
-  turmaId String? @map("turma_id") @db.Uuid
-  autorId String? @map("autor_id") @db.Uuid
-  eventoId String @map("evento_id") @db.Uuid
-  revisaoEvento Int @map("revisao_evento")
-  sequencia BigInt @unique @default(autoincrement())
-  politica String @db.VarChar(40)
-  criadoEm DateTime @default(now()) @map("criado_em") @db.Timestamptz
-  despachadoEm DateTime? @map("despachado_em") @db.Timestamptz
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo          TipoEnvioFila
+  dia           DateTime      @db.Date
+  turmaId       String?       @map("turma_id") @db.Uuid
+  autorId       String?       @map("autor_id") @db.Uuid
+  eventoId      String        @map("evento_id") @db.Uuid
+  revisaoEvento Int           @map("revisao_evento")
+  sequencia     BigInt        @unique @default(autoincrement())
+  politica      String        @db.VarChar(40)
+  criadoEm      DateTime      @default(now()) @map("criado_em") @db.Timestamptz
+  despachadoEm  DateTime?     @map("despachado_em") @db.Timestamptz
 
   @@unique([tipo, eventoId, revisaoEvento])
   @@index([despachadoEm, sequencia])
@@ -904,6 +904,7 @@ model FilaPlanilha {
   tentativas         Int           @default(0)
   proximaTentativaEm DateTime?     @map("proxima_tentativa_em") @db.Timestamptz
   reservadoAte       DateTime?     @map("reservado_ate") @db.Timestamptz
+  reservadoPor       String?       @map("reservado_por") @db.VarChar(100)
   resultado          String?       @db.VarChar(40)
   requerConferencia  Boolean       @default(false) @map("requer_conferencia")
   detalhes           Json?
@@ -915,6 +916,7 @@ model FilaPlanilha {
   autor              Usuario?      @relation("FilaCriadaPor", fields: [autorId], references: [id], onDelete: SetNull)
 
   @@index([estado, sequencia])
+  @@index([estado, reservadoAte])
   @@index([criadoEm])
   @@map("fila_planilha")
 }
@@ -936,4 +938,68 @@ model PainelIndicadores {
   atualizadoPor     Usuario?  @relation("PainelAtualizadoPor", fields: [atualizadoPorId], references: [id], onDelete: SetNull)
 
   @@map("paineis_indicadores")
+}
+
+// Fila genérica de trabalhos pesados. O PostgreSQL guarda a intenção, o estado,
+// a reserva e o resultado; o BullMQ é apenas transporte e temporizador.
+enum EstadoTrabalho {
+  PENDENTE
+  DISPONIVEL
+  EM_EXECUCAO
+  AGUARDANDO
+  CONCLUIDO
+  FALHOU
+  CONFERENCIA
+  CANCELADO
+
+  @@map("estado_trabalho")
+}
+
+model Trabalho {
+  id                 String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tipo               String           @db.VarChar(60)
+  chaveIdempotencia  String           @map("chave_idempotencia") @db.VarChar(64)
+  estado             EstadoTrabalho   @default(PENDENTE)
+  prioridade         Int              @default(100)
+  payload            Json             @default("{}")
+  tentativas         Int              @default(0)
+  maxTentativas      Int              @default(5) @map("max_tentativas")
+  disponivelEm       DateTime         @default(now()) @map("disponivel_em") @db.Timestamptz
+  reservadoAte       DateTime?        @map("reservado_ate") @db.Timestamptz
+  reservadoPor       String?          @map("reservado_por") @db.VarChar(100)
+  reservaId          String?          @map("reserva_id") @db.Uuid
+  resultado          String?          @db.VarChar(60)
+  detalhes           Json?
+  erroCodigo         String?          @map("erro_codigo") @db.VarChar(60)
+  erroResumo         String?          @map("erro_resumo") @db.VarChar(300)
+  origem             String           @default("sistema") @db.VarChar(20)
+  autorId            String?          @map("autor_id") @db.Uuid
+  despachadoEm       DateTime?        @map("despachado_em") @db.Timestamptz
+  tentativasDespacho Int              @default(0) @map("tentativas_despacho")
+  proximoDespachoEm  DateTime?        @map("proximo_despacho_em") @db.Timestamptz
+  erroDespacho       String?          @map("erro_despacho") @db.VarChar(300)
+  criadoEm           DateTime         @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm       DateTime         @updatedAt @map("atualizado_em") @db.Timestamptz
+  concluidoEm        DateTime?        @map("concluido_em") @db.Timestamptz
+  eventos            TrabalhoEvento[]
+
+  @@index([estado, disponivelEm, prioridade, criadoEm])
+  @@index([tipo, estado])
+  @@index([estado, reservadoAte])
+  @@map("trabalhos")
+}
+
+model TrabalhoEvento {
+  id         String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  trabalhoId String          @map("trabalho_id") @db.Uuid
+  deEstado   EstadoTrabalho? @map("de_estado")
+  paraEstado EstadoTrabalho  @map("para_estado")
+  tentativa  Int             @default(0)
+  resultado  String?         @db.VarChar(60)
+  detalhe    Json?
+  criadoEm   DateTime        @default(now()) @map("criado_em") @db.Timestamptz
+  trabalho   Trabalho        @relation(fields: [trabalhoId], references: [id], onDelete: Cascade)
+
+  @@index([trabalhoId, criadoEm])
+  @@map("trabalho_eventos")
 }

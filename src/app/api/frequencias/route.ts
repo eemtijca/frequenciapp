@@ -3,7 +3,7 @@
 import { listarJustificativasAntecipadas } from "@/application/justificativas-antecipadas";
 import { after } from "next/server";
 import { feriadoDoDia } from "@/application/calendario-letivo";
-import { processarFilaDaAgenda } from "@/application/fila-planilha";
+import { despacharFilaPlanilha } from "@/infra/fila/despacho-planilha";
 import {
   carregarFrequencia,
   diaValidoOuParametro,
@@ -127,9 +127,11 @@ export async function POST(requisicao: Request): Promise<Response> {
       );
     }
     registrarFrequencia("salvo");
-    after(async () => {
-      await processarFilaDaAgenda();
-    });
+    after(() =>
+      despacharFilaPlanilha().catch(() =>
+        console.error("A fila de planilhas aguarda nova tentativa de despacho."),
+      ),
+    );
     return json({ frequencia: resultado.frequencia });
   });
 }

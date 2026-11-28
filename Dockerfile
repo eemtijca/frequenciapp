@@ -30,7 +30,8 @@ RUN DATABASE_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
     DIRECT_URL=postgresql://frequencia:frequencia@localhost:5432/frequencia \
     AUTH_SECRET=segredo-dummy-de-32-bytes-para-build-0000 \
     TZ_APP=America/Fortaleza \
-    pnpm run build
+    pnpm run build \
+  && pnpm run build:worker
 
 # 3. Dependências de produção (o migrador e os scripts administrativos rodam
 # fora da árvore do standalone e usam pg e dotenv).
@@ -59,6 +60,8 @@ COPY --from=compilacao /app/.next/standalone/.next ./.next
 # Documentação em Markdown lida em tempo de execução por /api/docs/api.md.
 COPY --from=compilacao /app/.next/standalone/docs ./docs
 COPY --from=compilacao /app/.next/static ./.next/static
+# Processo worker compilado, usado pelo serviço opcional da fila.
+COPY --from=compilacao /app/dist ./dist
 COPY --from=compilacao /app/public ./public
 COPY --from=compilacao /app/prisma ./prisma
 COPY --from=compilacao /app/generated ./generated
@@ -68,10 +71,10 @@ COPY --from=compilacao /app/src/infra/schema-postgres.mjs ./src/infra/schema-pos
 # A atualização pode construir de uma worktree com umask 077. Ajusta apenas
 # os artefatos copiados da fonte, sem seguir links ou dar escrita a node.
 # A imagem de backup de planilhas também herda os scripts de execução.
-RUN chmod u=rwx,go=rx ./docker ./scripts ./scripts/backup ./scripts/servidor \
-  && find -P ./docker/app ./scripts/administracao ./prisma ./public ./docs \
+RUN chmod u=rwx,go=rx ./docker ./scripts ./scripts/backup ./scripts/servidor ./dist \
+  && find -P ./docker/app ./scripts/administracao ./prisma ./public ./docs ./dist \
     -type d -exec chmod u=rwx,go=rx {} + \
-  && find -P ./docker/app ./scripts/administracao ./prisma ./public ./docs \
+  && find -P ./docker/app ./scripts/administracao ./prisma ./public ./docs ./dist \
     ./scripts/servidor/agenda.mjs ./scripts/servidor/backup-planilhas-interno.sh \
     ./scripts/backup/backup-externo.mjs ./scripts/backup/pacote-backup.mjs \
     ./src/infra/schema-postgres.mjs -type f -exec chmod a+rX,go-w {} + \
@@ -89,7 +92,7 @@ RUN --network=none set -eu; \
     ./scripts/servidor/agenda.mjs ./scripts/servidor/backup-planilhas-interno.sh \
     ./scripts/backup/backup-externo.mjs ./scripts/backup/pacote-backup.mjs ./src/infra/schema-postgres.mjs \
     ./prisma/migrations ./prisma/migrations/migration_lock.toml \
-    ./public/manifest.webmanifest ./docs/api.md ./server.js; do \
+    ./public/manifest.webmanifest ./docs/api.md ./server.js ./dist/worker.mjs; do \
     exigir_leitura "$caminho"; \
   done; \
   for pasta in ./prisma/migrations/*/; do \

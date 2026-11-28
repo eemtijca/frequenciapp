@@ -5,7 +5,7 @@ export const MAXIMO_TENTATIVAS_FILA = 5;
 /** Esperas depois da 1ª, 2ª, 3ª e 4ª falhas; a última vale para as seguintes. */
 export const ESPERAS_FILA_MS = [30_000, 120_000, 600_000, 1_800_000] as const;
 /** Prazo da reserva de um item em andamento; vencida, outro consumidor retoma. */
-export const PRAZO_RESERVA_MS = 5 * 60_000;
+export const PRAZO_RESERVA_MS = 10 * 60_000;
 export const DIAS_GUARDAR_CONCLUIDOS = 7;
 export const DIAS_GUARDAR_ENCERRADOS = 30;
 

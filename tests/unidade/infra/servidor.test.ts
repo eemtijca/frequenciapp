@@ -235,7 +235,8 @@ describe("servidor auto-hospedado", () => {
 
     expect(token).toMatch(/^[A-Za-z0-9_-]{32,200}$/);
     expect(validar).toContain("export PROMETHEUS_PORTA=9090");
-    expect(validar.match(/compose\.observabilidade\.yml/g)).toHaveLength(4);
+    expect(validar.match(/compose\.observabilidade\.yml/g)).toHaveLength(6);
+    expect(validar.match(/compose\.fila\.yml/g)).toHaveLength(2);
     expect(validar.match(/--profile alertas/g)).toHaveLength(2);
     expect(validar).toContain("infra/observabilidade/prometheus/entrypoint.sh");
     expect(validar).toContain(

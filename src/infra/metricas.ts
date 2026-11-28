@@ -28,6 +28,8 @@ export interface Metricas {
   frequenciasSalvas: Counter<"resultado">;
   filaPlanilhaProcessados: Counter<"resultado">;
   notificacoesEnviadas: Counter<"resultado">;
+  trabalhosProcessados: Counter<"resultado">;
+  bullmqJobs: Gauge<"fila" | "estado">;
 }
 
 function criarMetricas(): Metricas {
@@ -84,6 +86,20 @@ function criarMetricas(): Metricas {
     registers: [registro],
   });
 
+  const trabalhosProcessados = new Counter({
+    name: "frequenciapp_trabalhos_processados_total",
+    help: "Trabalhos genéricos processados por resultado.",
+    labelNames: ["resultado"] as const,
+    registers: [registro],
+  });
+
+  const bullmqJobs = new Gauge({
+    name: "frequenciapp_bullmq_jobs",
+    help: "Jobs do BullMQ por fila e estado.",
+    labelNames: ["fila", "estado"] as const,
+    registers: [registro],
+  });
+
   return {
     registro,
     requisicoes,
@@ -92,6 +108,8 @@ function criarMetricas(): Metricas {
     frequenciasSalvas,
     filaPlanilhaProcessados,
     notificacoesEnviadas,
+    trabalhosProcessados,
+    bullmqJobs,
   };
 }
 
@@ -186,6 +204,27 @@ export function registrarNotificacoes(totais: TotaisDeNotificacoes): void {
     }
   } catch {
     // Métrica nunca derruba a rota.
+  }
+}
+
+/** Conta o desfecho de um trabalho genérico sem derrubar o worker. */
+export function registrarTrabalhoProcessado(resultado: string): void {
+  try {
+    metricas().trabalhosProcessados.inc({ resultado });
+  } catch {
+    // Métrica nunca derruba o worker.
+  }
+}
+
+/** Atualiza as contagens do BullMQ por fila e estado. */
+export function atualizarContagensBullmq(fila: string, contagens: Record<string, number>): void {
+  try {
+    const gauge = metricas().bullmqJobs;
+    for (const [estado, valor] of Object.entries(contagens)) {
+      if (Number.isFinite(valor)) gauge.set({ fila, estado }, valor);
+    }
+  } catch {
+    // Métrica nunca derruba o worker.
   }
 }
 

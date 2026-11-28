@@ -5,6 +5,7 @@ public/vendor/
 out/
 build/
 generated/
+dist/
 coverage/
 analysis/
 .postgres/

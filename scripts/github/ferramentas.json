@@ -73,6 +73,10 @@
       "permitido": true,
       "motivo": "O postinstall valida o binário da plataforma, exigido por Vite, Vitest e pela CLI da Vercel."
     },
+    "msgpackr-extract": {
+      "permitido": false,
+      "motivo": "Aceleração nativa opcional do msgpackr usado pelo BullMQ; o fallback em JavaScript basta."
+    },
     "prisma": {
       "permitido": true,
       "motivo": "Executa o preinstall oficial do Prisma."

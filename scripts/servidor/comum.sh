@@ -107,18 +107,22 @@ carregar_imagens_do_estado() {
 }
 
 # Imprime a lista efetiva de arquivos Compose, um caminho absoluto por linha.
-# Uma lista explícita em COMPOSE_ARQUIVOS é autoritativa: o overlay só entra se
-# estiver citado. Sem lista explícita, a base vem de PROXY_TIPO e o overlay é
-# acrescentado quando a observabilidade está habilitada. Caminhos são
-# resolvidos por readlink -f para impedir duplicata por relativo, absoluto ou link.
+# Uma lista explícita em COMPOSE_ARQUIVOS é autoritativa: os overlays só entram
+# se estiverem citados. Sem lista explícita, a base vem de PROXY_TIPO e os
+# overlays entram quando a observabilidade ou a fila estão habilitadas.
+# Caminhos são resolvidos por readlink -f para impedir duplicata por relativo,
+# absoluto ou link.
 listar_compose_em() {
   local raiz="${1:-}"
   [ -n "$raiz" ] || erro "Raiz Compose obrigatória."
   raiz=$(cd "$raiz" && pwd -P) || erro "Diretório do projeto Compose inválido: $1"
   local overlay="$raiz/compose.observabilidade.yml"
+  local overlay_fila="$raiz/compose.fila.yml"
   local overlay_resolvido
+  local overlay_fila_resolvido
   local explicita=false
   local tem_overlay=false
+  local tem_overlay_fila=false
   local item
   local resolvido
   local -a lista=()
@@ -127,8 +131,10 @@ listar_compose_em() {
 
   if command -v readlink >/dev/null; then
     overlay_resolvido=$(readlink -f -- "$overlay" 2>/dev/null || true)
+    overlay_fila_resolvido=$(readlink -f -- "$overlay_fila" 2>/dev/null || true)
   fi
   [ -n "${overlay_resolvido:-}" ] || overlay_resolvido="$overlay"
+  [ -n "${overlay_fila_resolvido:-}" ] || overlay_fila_resolvido="$overlay_fila"
 
   if [ -n "${COMPOSE_ARQUIVOS:-}" ]; then
     explicita=true
@@ -152,6 +158,9 @@ listar_compose_em() {
     if [ "${OBSERVABILIDADE_HABILITADA:-false}" = "true" ]; then
       lista+=("$overlay")
     fi
+    if [ "${FILA_HABILITADA:-false}" = "true" ]; then
+      lista+=("$overlay_fila")
+    fi
   fi
 
   for item in "${lista[@]}"; do
@@ -170,6 +179,11 @@ listar_compose_em() {
       # a mesma sobreposição sem reintroduzir o caminho do checkout mutável.
       tem_overlay=true
     fi
+    if [ "$resolvido" = "$overlay_fila_resolvido" ]; then
+      tem_overlay_fila=true
+    elif [ -f "$resolvido" ] && [ -f "$overlay_fila" ] && cmp -s -- "$resolvido" "$overlay_fila"; then
+      tem_overlay_fila=true
+    fi
     printf '%s\n' "$resolvido"
     resolvido=""
   done
@@ -178,6 +192,11 @@ listar_compose_em() {
     [ "${OBSERVABILIDADE_HABILITADA:-false}" = "true" ] &&
     [ "$tem_overlay" = false ]; then
     erro "OBSERVABILIDADE_HABILITADA=true exige compose.observabilidade.yml em COMPOSE_ARQUIVOS."
+  fi
+  if [ "$explicita" = true ] &&
+    [ "${FILA_HABILITADA:-false}" = "true" ] &&
+    [ "$tem_overlay_fila" = false ]; then
+    erro "FILA_HABILITADA=true exige compose.fila.yml em COMPOSE_ARQUIVOS."
   fi
 }
 

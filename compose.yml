@@ -17,6 +17,8 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks:
+      - interna
     healthcheck:
       test:
         ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-frequencia} -d ${POSTGRES_DB:-frequencia}"]
@@ -37,6 +39,8 @@ services:
         condition: service_healthy
     ports:
       - "3000:3000"
+    networks:
+      - interna
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-frequencia}:${POSTGRES_PASSWORD:-frequencia}@db:5432/${POSTGRES_DB:-frequencia}
       DIRECT_URL: postgresql://${POSTGRES_USER:-frequencia}:${POSTGRES_PASSWORD:-frequencia}@db:5432/${POSTGRES_DB:-frequencia}
@@ -90,3 +94,8 @@ services:
 
 volumes:
   pgdata:
+
+networks:
+  # No Compose local, a rede permite saída. A sobreposição de servidor a torna
+  # interna e mantém a saída pública apenas pelo proxy.
+  interna:

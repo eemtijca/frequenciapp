@@ -95,7 +95,8 @@ it.each(["enviado", "falhou"])("o dono vencido não finaliza o novo dono: %s", a
   const a = await import("@/application/fila-planilha");
   const trabalhoA = a.processarFila({ limite: 1 });
   await inicioA;
-  vi.setSystemTime(new Date("2026-06-15T12:06:00Z"));
+  // A reserva passou a valer dez minutos com o worker dedicado.
+  vi.setSystemTime(new Date("2026-06-15T12:11:00Z"));
   vi.resetModules();
   const b = await import("@/application/fila-planilha");
   const trabalhoB = b.processarFila({ limite: 1 });

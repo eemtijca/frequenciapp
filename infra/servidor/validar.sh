@@ -12,6 +12,7 @@ export PROMETHEUS_PORTA=9090
 export POSTGRES_USER="frequencia"
 export POSTGRES_PASSWORD="frequencia"
 export POSTGRES_DB="frequencia"
+export REDIS_PASSWORD="senha-sintetica-de-validacao"
 export DOMINIO="frequencia.exemplo.br"
 export ACME_EMAIL="administracao@escola.exemplo.br"
 export ACME_CA="https://acme-v02.api.letsencrypt.org/directory"
@@ -26,6 +27,7 @@ AUTH_SECRET=$AUTH_SECRET
 POSTGRES_USER=$POSTGRES_USER
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 POSTGRES_DB=$POSTGRES_DB
+REDIS_PASSWORD=$REDIS_PASSWORD
 EOF
 chmod 600 "$APP_ENV_FILE"
 
@@ -73,6 +75,22 @@ docker compose \
   -f "$REPO/compose.servidor.yml" \
   -f "$REPO/compose.servidor-nginx.yml" \
   -f "$REPO/compose.observabilidade.yml" \
+  config --quiet
+
+docker compose \
+  -f "$REPO/compose.yml" \
+  -f "$REPO/compose.servidor.yml" \
+  -f "$REPO/compose.servidor-caddy.yml" \
+  -f "$REPO/compose.observabilidade.yml" \
+  -f "$REPO/compose.fila.yml" \
+  config --quiet
+
+docker compose \
+  -f "$REPO/compose.yml" \
+  -f "$REPO/compose.servidor.yml" \
+  -f "$REPO/compose.servidor-nginx.yml" \
+  -f "$REPO/compose.observabilidade.yml" \
+  -f "$REPO/compose.fila.yml" \
   config --quiet
 
 docker compose \

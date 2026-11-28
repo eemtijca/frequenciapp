@@ -1,0 +1,30 @@
+{{/* ServiceMonitor opcional do worker. Requer o Prometheus Operator. */}}
+{{- $metricasWorker := default (dict) .Values.worker }}
+{{- $metricas := default (dict) $metricasWorker.metrics }}
+{{- $serviceMonitor := default (dict) $metricas.serviceMonitor }}
+{{- if and .Values.worker.enabled $serviceMonitor.enabled }}
+{{- include "frequenciapp.validateMetrics" . }}
+{{- $rotulos := include "frequenciapp.labels" . | fromYaml }}
+{{- $rotulos = merge $rotulos (default (dict) $serviceMonitor.labels) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "frequenciapp.fullname" . }}-worker
+  labels:
+    {{- toYaml $rotulos | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "frequenciapp.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  endpoints:
+    - port: metrics
+      path: /metricas
+      interval: {{ $serviceMonitor.interval | quote }}
+      scrapeTimeout: {{ $serviceMonitor.scrapeTimeout | quote }}
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ include "frequenciapp.metricsTokenSecretName" . | quote }}
+          key: {{ include "frequenciapp.metricsTokenKey" . | quote }}
+{{- end }}

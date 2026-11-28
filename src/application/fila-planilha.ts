@@ -170,17 +170,23 @@ function somarResumos(
  * a mesma promessa e recebem `compartilhado: true`. A métrica é incrementada pelo
  * consumidor em cada transição efetivada, independentemente de quem liderou.
  */
-export function processarFila(opcoes: { limite?: number } = {}): Promise<ResultadoDoProcessamento> {
+export function processarFila(
+  opcoes: { limite?: number; workerId?: string } = {},
+): Promise<ResultadoDoProcessamento> {
   if (emProcessamento) {
     novaRodada = true;
     const rodada = emProcessamento;
     return rodada.then((resumo) => ({ resumo, compartilhado: true }));
   }
+  const workerId = opcoes.workerId ?? `processo:${process.pid}`;
   const rodada = (async () => {
-    let resumo = await processarRodada(opcoes.limite ?? LIMITE_PADRAO);
+    let resumo = await processarRodada(opcoes.limite ?? LIMITE_PADRAO, workerId);
     while (novaRodada) {
       novaRodada = false;
-      resumo = somarResumos(resumo, await processarRodada(opcoes.limite ?? LIMITE_PADRAO));
+      resumo = somarResumos(
+        resumo,
+        await processarRodada(opcoes.limite ?? LIMITE_PADRAO, workerId),
+      );
     }
     return resumo;
   })().finally(() => {
@@ -198,7 +204,7 @@ export async function processarFilaDaAgenda(): Promise<ResultadoDoProcessamento>
   return processarFila({ limite: LIMITE_AGENDA });
 }
 
-async function processarRodada(limite: number): Promise<ResumoDoProcessamento> {
+async function processarRodada(limite: number, workerId: string): Promise<ResumoDoProcessamento> {
   const resumo: ResumoDoProcessamento = {
     processados: 0,
     concluidos: 0,
@@ -236,12 +242,27 @@ async function processarRodada(limite: number): Promise<ResumoDoProcessamento> {
       data: {
         estado: "EM_ANDAMENTO",
         reservadoAte,
+        reservadoPor: workerId,
         tentativas: { increment: 1 },
       },
     });
     // Outro consumidor reservou primeiro: a vez dele, não a nossa.
     if (reservado.count === 0) break;
     const tentativas = item.tentativas + 1;
+    const heartbeat = setInterval(() => {
+      void banco()
+        .filaPlanilha.updateMany({
+          where: {
+            id: item.id,
+            estado: "EM_ANDAMENTO",
+            tentativas,
+            reservadoPor: workerId,
+            reservadoAte: { gt: new Date() },
+          },
+          data: { reservadoAte: new Date(Date.now() + PRAZO_RESERVA_MS) },
+        })
+        .catch(() => undefined);
+    }, 60_000);
     let situacao = "falhou";
     let erro: string | null = null;
     let detalhes: Awaited<ReturnType<typeof executar>>["detalhes"] | undefined;
@@ -261,10 +282,17 @@ async function processarRodada(limite: number): Promise<ResumoDoProcessamento> {
       situacao = "sem_confirmacao";
       erro = excecao instanceof Error ? excecao.name.slice(0, 120) : "Erro";
     }
+    clearInterval(heartbeat);
     const fim = new Date();
     const desfecho = desfechoDoItem(situacao, tentativas, fim);
     const finalizado = await banco().filaPlanilha.updateMany({
-      where: { id: item.id, estado: "EM_ANDAMENTO", tentativas, reservadoAte },
+      where: {
+        id: item.id,
+        estado: "EM_ANDAMENTO",
+        tentativas,
+        reservadoPor: workerId,
+        reservadoAte: { gt: fim },
+      },
       data: {
         estado: desfecho.estado,
         resultado: desfecho.resultado,
@@ -273,6 +301,7 @@ async function processarRodada(limite: number): Promise<ResumoDoProcessamento> {
         erro: desfecho.estado === "CONCLUIDO" ? null : erro,
         proximaTentativaEm: desfecho.proximaTentativaEm,
         reservadoAte: null,
+        reservadoPor: null,
         concluidoEm: desfecho.estado === "AGUARDANDO" ? null : fim,
       },
     });

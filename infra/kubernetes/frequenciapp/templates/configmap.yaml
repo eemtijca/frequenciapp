@@ -8,4 +8,7 @@ data:
   TZ_APP: {{ .Values.config.TZ_APP | quote }}
   PERMITIR_HTTP: {{ .Values.config.PERMITIR_HTTP | quote }}
   MIGRAR_NA_PARTIDA: {{ .Values.config.MIGRAR_NA_PARTIDA | quote }}
+  FILA_DRIVER: {{ .Values.config.FILA_DRIVER | quote }}
+  FILA_PLANILHA_TRANSPORTE: {{ .Values.config.FILA_PLANILHA_TRANSPORTE | quote }}
+  FILA_TRABALHOS_HABILITADA: {{ .Values.config.FILA_TRABALHOS_HABILITADA | quote }}
   TMPDIR: /tmp

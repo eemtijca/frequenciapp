@@ -11,6 +11,8 @@ allowBuilds:
   "@swc/core": true
   # O postinstall confere o binário da plataforma, exigido por Vite, Vitest e Vercel.
   esbuild: true
+  # Aceleração nativa opcional do msgpackr usado pelo BullMQ; o fallback em JS basta.
+  msgpackr-extract: false
   prisma: true
   sharp: true
   unrs-resolver: true
