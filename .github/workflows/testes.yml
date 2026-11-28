@@ -132,6 +132,7 @@ jobs:
           DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
           AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
           FILA_DRIVER: redis
+          FILA_PLANILHA_TRANSPORTE: bullmq
           REDIS_URL: redis://127.0.0.1:6379/0
           NODE_ENV: test
         run: |
