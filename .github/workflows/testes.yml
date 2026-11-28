@@ -127,6 +127,32 @@ jobs:
           DIRECT_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
         run: node --test tests/servidor/migrar-real.test.mjs
 
+      - name: Testes de integração da fila
+        env:
+          DATABASE_URL: postgresql://frequencia:frequencia@localhost:5432/frequencia
+          AUTH_SECRET: segredo-dummy-de-32-bytes-para-testes-00
+          FILA_DRIVER: redis
+          FILA_PLANILHA_TRANSPORTE: bullmq
+          REDIS_URL: redis://127.0.0.1:6379/0
+          NODE_ENV: test
+        run: |
+          docker run -d --rm --name frequenciapp-fila-redis \
+            -p 127.0.0.1:6379:6379 redis:7-alpine
+          trap 'docker stop frequenciapp-fila-redis >/dev/null 2>&1 || true' EXIT
+          pronto=false
+          for tentativa in $(seq 1 30); do
+            if docker exec frequenciapp-fila-redis redis-cli ping | grep -q PONG; then
+              pronto=true
+              break
+            fi
+            sleep 1
+          done
+          [ "$pronto" = true ] || {
+            echo "Redis não respondeu após ${tentativa} tentativas."
+            exit 1
+          }
+          pnpm exec vitest run --config vitest.fila.config.ts
+
       - name: Validar scripts administrativos no contêiner
         run: |
           # Exercita o dotenv e o driver pg dentro da imagem, além do

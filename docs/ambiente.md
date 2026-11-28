@@ -49,6 +49,27 @@ O cadastro Web Push funciona sem configuração manual: o servidor deriva um par
 
 Trocar `AUTH_SECRET` quando o par é automático exige reativar as notificações nos dispositivos. `CRON_SECRET`, com pelo menos 32 caracteres, autoriza a agenda automática e não é necessário para ativar um dispositivo. No plano Vercel Hobby, o workflow de Actions consulta periodicamente a agenda com o mesmo segredo cadastrado no GitHub. A Gestão define tipos e horários; cada conta escolhe seus avisos. Preparação e compatibilidade estão em [notificacoes.md](notificacoes.md). O mesmo segredo autoriza `GET /api/planilha/fila/agenda`, que o workflow `fila-planilha.yml` consulta a cada cinco minutos para esvaziar a fila de envios às planilhas ([ADR-039](adr/039-fila-fifo-dos-envios-automaticos.md)).
 
+## Fila de processamento
+
+A fila é opcional. O padrão preserva o caminho simples e a Vercel.
+
+| Variável                       | Padrão           | Papel                                    |
+| ------------------------------ | ---------------- | ---------------------------------------- |
+| `FILA_DRIVER`                  | `postgres`       | `postgres` ou `redis`.                   |
+| `FILA_PLANILHA_TRANSPORTE`     | `direto`         | `direto` ou `bullmq`.                    |
+| `FILA_TRABALHOS_HABILITADA`    | `false`          | Liga os trabalhos genéricos.             |
+| `FILA_TIPOS_HABILITADOS`       | vazio            | Lista de tipos para canário.             |
+| `REDIS_URL`                    | vazio            | Obrigatória com `FILA_DRIVER=redis`.     |
+| `REDIS_PASSWORD`               | vazio            | Senha do serviço Redis do Compose.       |
+| `BULLMQ_PREFIX`                | `{frequenciapp}` | Prefixo das chaves, sempre entre chaves. |
+| `WORKER_PORTA`                 | `3001`           | Saúde e métricas do worker.              |
+| `WORKER_CONCORRENCIA`          | `2`              | Concorrência da fila genérica.           |
+| `WORKER_PLANILHA_CONCORRENCIA` | `1`              | Deve ser 1.                              |
+| `WORKER_TIMEOUT`               | `240`            | Tempo máximo de um trabalho.             |
+| `WORKER_SHUTDOWN_TIMEOUT`      | `30`             | Encerramento gracioso.                   |
+
+`FILA_DRIVER=redis` exige `REDIS_URL`. `FILA_PLANILHA_TRANSPORTE=bullmq` e `FILA_TRABALHOS_HABILITADA=true` exigem o driver Redis. A Vercel e os previews usam `postgres` e `direto`. O guia está em [fila-processamento.md](fila-processamento.md).
+
 ## HTTP sem TLS
 
 O padrão é HTTPS terminado à frente (proxy reverso ou plataforma). Para instalações internas em rede confiável, `PERMITIR_HTTP=true` libera a operação sem TLS:

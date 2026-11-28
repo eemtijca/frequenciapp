@@ -35,6 +35,17 @@ scrape_configs:
           - app:3000
     sample_limit: 20000
 
+  - job_name: frequenciapp-worker
+    metrics_path: /metricas
+    scheme: http
+    authorization:
+      type: Bearer
+      credentials_file: /tmp/metricas-token
+    static_configs:
+      - targets:
+          - worker:3001
+    sample_limit: 20000
+
   - job_name: prometheus
     static_configs:
       - targets:

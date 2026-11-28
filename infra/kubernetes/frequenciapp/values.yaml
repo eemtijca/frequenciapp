@@ -74,6 +74,9 @@ config:
   PERMITIR_HTTP: "false"
   MIGRAR_NA_PARTIDA: "false"
   COMMIT_SHA: ""
+  FILA_DRIVER: "postgres"
+  FILA_PLANILHA_TRANSPORTE: "direto"
+  FILA_TRABALHOS_HABILITADA: "false"
 
 # Nome do Secret com DATABASE_URL, DIRECT_URL, AUTH_SECRET, CRON_SECRET
 # e os opcionais GOOGLE_*, PUSH_VAPID_*, FERIADOS_* e ADMIN_*.
@@ -162,6 +165,24 @@ agenda:
   failedJobsHistoryLimit: 3
   resources: {}
   extraEnv: []
+
+# Worker dedicado da fila. O Redis não é instalado pelo chart; use um serviço
+# externo e coloque REDIS_URL no Secret existente ou no Secret abaixo.
+worker:
+  enabled: false
+  replicaCount: 1
+  resources: {}
+  terminationGracePeriodSeconds: 60
+  redis:
+    # Quando preenchido, REDIS_URL vem deste Secret e desta chave.
+    existingSecret: ""
+    key: REDIS_URL
+  metrics:
+    serviceMonitor:
+      enabled: false
+      interval: 30s
+      scrapeTimeout: 10s
+      labels: {}
 
 # Bloqueio de migração e rollout sem backup confirmado. O gate é sempre
 # renderizado; o modo de ensaio é a única exceção explícita.

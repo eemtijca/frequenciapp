@@ -8,6 +8,10 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ## [Não publicado]
 
+### Adicionado
+
+- A fila de processamento ganha Redis com BullMQ, um worker dedicado, a tabela `trabalhos` e o overlay `compose.fila.yml`. A fila FIFO de planilhas mantém a tabela, a ordem, a reserva e a conferência; o PostgreSQL continua sendo a fonte da verdade. A Vercel e os previews permanecem no caminho PostgreSQL mais cron.
+
 ### Alterado
 
 - A gaveta da administração deixa de mostrar Alunos, que já existe como cadastro dentro de Gestão; a coordenação mantém a consulta. Um link antigo com `visao=alunos` aberto pela administração leva ao cadastro de Alunos na Gestão.
@@ -143,6 +147,7 @@ Enquanto a primeira versão pública não é lançada, a versão do projeto perm
 
 ### Corrigido
 
+- A fila de processamento corrige a topologia do worker, a recuperação de reservas vencidas, a indisponibilidade do Redis, o rollback por flags, o contrato de Processar agora, o identificador de reserva no BullMQ, as agendas de indicadores e expurgo, o timeout, as mensagens públicas de erro, a validação de mês e o isolamento do prefixo Redis nos testes.
 - A atualização protegida confere a estrutura do histórico antes de trocar o aplicativo e aceita a segurança por linha (RLS) legada sem desativá-la.
 - A atualização manual protegida aceita o aplicativo recuperado da revisão registrada com o migrador desligado, sem liberar marcadores pendentes nem dispensar a autorização para a nova partida.
 - A verificação operacional reconhece a montagem revogada da partida manual concluída quando o estado registra o contêiner, a imagem e a origem exata. Montagens inesperadas e mudanças no armazenamento do PostgreSQL continuam bloqueadas.

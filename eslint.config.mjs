@@ -109,6 +109,7 @@ const eslintConfig = [
       ".next/**",
       "out/**",
       "generated/**",
+      "dist/**",
       "next-env.d.ts",
       ".postgres/**",
       ".sandbox-tools/**",

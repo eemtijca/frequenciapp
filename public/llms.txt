@@ -42,6 +42,7 @@ A API responde JSON sob `/api` e usa o formato de erro `{ "error": mensagem, "co
 ## Optional
 
 - [Arquitetura](https://github.com/eemtijca/frequenciapp/blob/main/docs/arquitetura.md) e [planilha](https://github.com/eemtijca/frequenciapp/blob/main/docs/planilha.md).
+- [Fila de processamento](https://github.com/eemtijca/frequenciapp/blob/main/docs/fila-processamento.md): Redis, BullMQ, worker, trabalhos e operação.
 - [Segurança](https://github.com/eemtijca/frequenciapp/blob/main/docs/seguranca.md): controles, decisões e lacunas conhecidas.
 - [Observabilidade](https://github.com/eemtijca/frequenciapp/blob/main/docs/observabilidade.md): Prometheus local, métricas agregadas e painel restrito ao loopback.
 

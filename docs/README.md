@@ -14,6 +14,7 @@
 | [interface.md](interface.md)                           | Interface, movimento, PWA e acessibilidade.                            |
 | [textos.md](textos.md)                                 | Regras de texto, glossário e exemplos antes e depois.                  |
 | [planilha.md](planilha.md)                             | Integração com Planilhas por OAuth e Sheets API.                       |
+| [fila-processamento.md](fila-processamento.md)         | Fila genérica, worker, Redis, BullMQ e operação.                       |
 | [testes.md](testes.md)                                 | Suítes, convenções e cobertura.                                        |
 | [deploy.md](deploy.md)                                 | Docker Compose, Vercel e outras formas de publicar.                    |
 | [auto-hospedagem.md](auto-hospedagem.md)               | Servidor próprio com Caddy, Nginx, agenda e atualização.               |
@@ -99,6 +100,7 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-082](adr/082-navegacao-lateral-gestao.md): destinos de Gestão e Configurações na gaveta, com foco e preferência de movimento independentes do conteúdo.
 - [ADR-083](adr/083-confirmacao-historica-da-chamada.md): consulta antes da gravação, motivo opcional e preservação da auditoria da chamada histórica.
 - [ADR-084](adr/084-relatorio-pdf-da-grade.md): retrato consistente da Grade e relatório em PDF no navegador.
+- [ADR-085](adr/085-fila-de-processamento-com-redis-e-bullmq.md): fila de processamento com Redis, BullMQ e worker dedicado, mantendo o PostgreSQL como fonte da verdade.
 - [ADR-085](adr/085-provas-especificas.md): provas externas como Enem e vestibulares, com alunos inscritos e frequência própria, fora da Chamada.
 - [ADR-086](adr/086-mapa-openstreetmap-para-locais-de-prova.md): mapa do OpenStreetMap com GPS opcional para o local da prova, coordenadas no banco e cabeçalhos de segurança ajustados.
 - [ADR-087](adr/087-perfil-secretaria-e-capacidade-consultar.md): papel Secretaria, só de consulta, e a capacidade consultar na matriz de acesso, com o aplicativo reduzido ao Painel e a duas grades de relatório.

@@ -2,7 +2,7 @@
 // direção ou coordenação.
 import { after } from "next/server";
 import { criarSaida, listarSaidas } from "@/application/saidas";
-import { processarFilaDaAgenda } from "@/application/fila-planilha";
+import { despacharFilaPlanilha } from "@/infra/fila/despacho-planilha";
 import {
   corpoJson,
   ehUuid,
@@ -63,7 +63,11 @@ export async function POST(requisicao: Request): Promise<Response> {
     const sessao = await exigirSessao();
     if (!sessao.ok) return sessao.resposta;
     const saida = await criarSaida(sessao.usuario, await corpoJson(requisicao));
-    after(() => processarFilaDaAgenda());
+    after(() =>
+      despacharFilaPlanilha().catch(() =>
+        console.error("A fila de planilhas aguarda nova tentativa de despacho."),
+      ),
+    );
     return json({ saida }, 201);
   });
 }

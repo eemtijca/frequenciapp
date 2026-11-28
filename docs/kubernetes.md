@@ -19,8 +19,17 @@ O contrato portátil está na [ADR-064](adr/064-auto-hospedagem-servidor.md). A 
 - PVC próprio para o backup do banco e para o backup das planilhas.
 - HPA e PDB opcionais.
 - ServiceMonitor opcional para a coleta Prometheus, dependente do Prometheus Operator.
+- Deployment, Service e ServiceMonitor opcionais do worker da fila, com Redis externo.
 
-O chart não instala PostgreSQL, cert-manager, ingress controller, External Secrets, operador de backup, Prometheus Operator nem a CRD `monitoring.coreos.com/v1`. Essas escolhas ficam com a organização.
+O chart não instala PostgreSQL, Redis, cert-manager, ingress controller, External Secrets, operador de backup, Prometheus Operator nem a CRD `monitoring.coreos.com/v1`. Essas escolhas ficam com a organização.
+
+## Worker da fila
+
+Com `worker.enabled=true`, o chart cria um Deployment separado, um Service ClusterIP na porta 3001 e um ServiceMonitor opcional. O worker usa a mesma imagem e o mesmo Secret da aplicação, executa `node dist/worker.mjs` e não aplica migrações.
+
+O Redis não é instalado pelo chart. Colocar `REDIS_URL` no Secret da aplicação ou apontar `worker.redis.existingSecret` e `worker.redis.key` para outro Secret. A aplicação precisa usar `FILA_DRIVER=redis`, `FILA_PLANILHA_TRANSPORTE=bullmq` e `FILA_TRABALHOS_HABILITADA=true`. O `terminationGracePeriodSeconds` padrão é 60 e deve ser maior que `WORKER_TIMEOUT`.
+
+A fila não substitui o backup do banco. O Redis é recuperável a partir do PostgreSQL. O guia completo está em [fila-processamento.md](fila-processamento.md).
 
 ## Instalação
 

@@ -344,6 +344,14 @@ export const ROTAS_DE_METRICA: readonly RotaDeMetrica[] = Object.freeze([
     rotulo: "/api/relatorios/movimentacoes",
   },
   {
+    padrao: /^\/api\/trabalhos\/indicadores$/,
+    rotulo: "/api/trabalhos/indicadores",
+  },
+  {
+    padrao: /^\/api\/trabalhos\/planilha-mensal$/,
+    rotulo: "/api/trabalhos/planilha-mensal",
+  },
+  {
     padrao: /^\/api\/turmas\/ordenar$/,
     rotulo: "/api/turmas/ordenar",
   },
@@ -460,6 +468,10 @@ export const ROTAS_DE_METRICA: readonly RotaDeMetrica[] = Object.freeze([
     rotulo: "/api/series",
   },
   {
+    padrao: /^\/api\/trabalhos$/,
+    rotulo: "/api/trabalhos",
+  },
+  {
     padrao: /^\/api\/turmas$/,
     rotulo: "/api/turmas",
   },
@@ -502,6 +514,18 @@ export const ROTAS_DE_METRICA: readonly RotaDeMetrica[] = Object.freeze([
   {
     padrao: /^\/api\/saidas\/[^\/]+\/seduc$/,
     rotulo: "/api/saidas/:id/seduc",
+  },
+  {
+    padrao: /^\/api\/trabalhos\/[^\/]+\/cancelar$/,
+    rotulo: "/api/trabalhos/:id/cancelar",
+  },
+  {
+    padrao: /^\/api\/trabalhos\/[^\/]+\/reenfileirar$/,
+    rotulo: "/api/trabalhos/:id/reenfileirar",
+  },
+  {
+    padrao: /^\/api\/trabalhos\/[^\/]+\/resolver$/,
+    rotulo: "/api/trabalhos/:id/resolver",
   },
   {
     padrao: /^\/api\/alunos\/[^\/]+$/,
@@ -558,6 +582,10 @@ export const ROTAS_DE_METRICA: readonly RotaDeMetrica[] = Object.freeze([
   {
     padrao: /^\/api\/series\/[^\/]+$/,
     rotulo: "/api/series/:id",
+  },
+  {
+    padrao: /^\/api\/trabalhos\/[^\/]+$/,
+    rotulo: "/api/trabalhos/:id",
   },
   {
     padrao: /^\/api\/turmas\/[^\/]+$/,

@@ -1174,14 +1174,14 @@ Apenas administração e origem válida. `{}` retorna `{ previa: { copias: strin
 
 ## Indicadores externos (administração)
 
-| Método e caminho                | Efeito                                                                                  |
-| ------------------------------- | --------------------------------------------------------------------------------------- |
-| GET /api/indicadores            | Estado seguro do painel, sem token Google                                               |
-| PATCH /api/indicadores          | Opções ativa, ano (2000 a 2100 ou null) e urlRelatorio (HTTPS do Looker Studio ou null) |
-| POST /api/indicadores/preparar  | Cria um arquivo exclusivo se ainda não existir, e atualiza as fontes                    |
-| POST /api/indicadores/atualizar | Substitui as quatro fontes agregadas                                                    |
-| POST /api/indicadores/recuperar | Recupera criação pendente com endereco de arquivo marcado desta instalação              |
-| GET /api/indicadores/agenda     | Atualiza fontes ativas com Authorization: Bearer CRON_SECRET, sem criar arquivo         |
+| Método e caminho                | Efeito                                                                                                                                                        |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET /api/indicadores            | Estado seguro do painel, sem token Google                                                                                                                     |
+| PATCH /api/indicadores          | Opções ativa, ano (2000 a 2100 ou null) e urlRelatorio (HTTPS do Looker Studio ou null)                                                                       |
+| POST /api/indicadores/preparar  | Cria um arquivo exclusivo se ainda não existir, e atualiza as fontes                                                                                          |
+| POST /api/indicadores/atualizar | Substitui as quatro fontes agregadas                                                                                                                          |
+| POST /api/indicadores/recuperar | Recupera criação pendente com endereco de arquivo marcado desta instalação                                                                                    |
+| GET /api/indicadores/agenda     | Com a fila habilitada, enfileira a atualização e responde 202; sem a fila, atualiza as fontes ativas com Authorization: Bearer CRON_SECRET, sem criar arquivo |
 
 As rotas administrativas exigem capacidade administrar; mutações verificam origem. Criação incerta bloqueia nova criação até recuperação. Operações concorrentes recebem 409. Erros não expõem dados pessoais ou credenciais. O último sucesso só avança após confirmação. Detalhes de fontes, atualização, compartilhamento e limites em [looker-studio.md](looker-studio.md).
 

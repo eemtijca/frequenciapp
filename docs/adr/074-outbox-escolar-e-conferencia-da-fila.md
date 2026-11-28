@@ -34,3 +34,7 @@ Manter o enfileiramento depois do commit deixa a janela de perda. Gravar a inten
 - [ADR-039](039-fila-fifo-dos-envios-automaticos.md)
 - [ADR-050](050-limite-de-leitura-da-planilha.md)
 - [ADR-052](052-envio-automatico-com-simulacao-unica.md)
+
+## Adendo de 2026-11-28
+
+A intenção escolar e o fencing continuam no PostgreSQL. O dispatcher também publica a cabeça da fila no BullMQ e o worker dedicado consome, conforme a [ADR-085](085-fila-de-processamento-com-redis-e-bullmq.md). A marcação de despacho continua depois da publicação confirmada, e a reserva com prazo mais o heartbeat impedem que um consumidor vencido finalize o item de outro. O Redis não substitui o outbox nem a conferência.

@@ -1,7 +1,7 @@
 // Consulta e registro de entradas atrasadas pela equipe escolar.
 import { after } from "next/server";
 import { criarEntrada, esquemaFiltroEntradas, listarEntradas } from "@/application/entradas";
-import { processarFilaDaAgenda } from "@/application/fila-planilha";
+import { despacharFilaPlanilha } from "@/infra/fila/despacho-planilha";
 import {
   corpoJson,
   erroApi,
@@ -32,7 +32,11 @@ export async function POST(requisicao: Request): Promise<Response> {
     const sessao = await exigirSessao();
     if (!sessao.ok) return sessao.resposta;
     await criarEntrada(sessao.usuario, await corpoJson(requisicao));
-    after(() => processarFilaDaAgenda());
+    after(() =>
+      despacharFilaPlanilha().catch(() =>
+        console.error("A fila de planilhas aguarda nova tentativa de despacho."),
+      ),
+    );
     return json({ ok: true }, 201);
   });
 }

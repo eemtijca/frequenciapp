@@ -1,6 +1,6 @@
 // Registra presenças personalizadas e justificativas por período, com atualização da chamada.
 import { after } from "next/server";
-import { processarFilaDaAgenda } from "@/application/fila-planilha";
+import { despacharFilaPlanilha } from "@/infra/fila/despacho-planilha";
 import { listarFrequenciasParciais, salvarPeriodoParcial } from "@/application/frequencia-parcial";
 import {
   corpoJson,
@@ -35,7 +35,11 @@ export async function POST(requisicao: Request): Promise<Response> {
     const registros = await salvarPeriodoParcial(sessao.usuario, await corpoJson(requisicao));
     // A intenção foi gravada no mesmo commit da chamada; a agenda apenas acelera o envio.
     if (registros.some((registro) => registro.tipo === "JUSTIFICADA"))
-      after(() => processarFilaDaAgenda());
+      after(() =>
+        despacharFilaPlanilha().catch(() =>
+          console.error("A fila de planilhas aguarda nova tentativa de despacho."),
+        ),
+      );
     return json({ registro: registros[0], registros });
   });
 }

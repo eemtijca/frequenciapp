@@ -130,6 +130,51 @@ const esquema = z.object({
         return false;
       }
     }, "TZ_APP deve ser um fuso IANA válido, por exemplo America/Fortaleza."),
+  // Fila de processamento. O padrão preserva o caminho simples e a Vercel.
+  FILA_DRIVER: z.enum(["postgres", "redis"]).default("postgres"),
+  FILA_PLANILHA_TRANSPORTE: z.enum(["direto", "bullmq"]).default("direto"),
+  FILA_TRABALHOS_HABILITADA: z
+    .string()
+    .optional()
+    .transform((valor) => booleanoDeAmbiente(valor, false)),
+  FILA_TIPOS_HABILITADOS: z.preprocess(ausenteSeVazio, z.string().optional()),
+  REDIS_URL: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .refine(
+        (valor) => valor.startsWith("redis://") || valor.startsWith("rediss://"),
+        "REDIS_URL deve começar com redis:// ou rediss://.",
+      )
+      .optional(),
+  ),
+  BULLMQ_PREFIX: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .regex(/^\{[A-Za-z0-9._-]+\}$/, "BULLMQ_PREFIX deve usar chaves, por exemplo {frequenciapp}.")
+      .default("{frequenciapp}"),
+  ),
+  WORKER_PORTA: z.preprocess(
+    ausenteSeVazio,
+    z.coerce.number().int().min(1).max(65535).default(3001),
+  ),
+  WORKER_CONCORRENCIA: z.preprocess(
+    ausenteSeVazio,
+    z.coerce.number().int().min(1).max(32).default(2),
+  ),
+  WORKER_PLANILHA_CONCORRENCIA: z.preprocess(
+    ausenteSeVazio,
+    z.coerce.number().int().min(1).max(1).default(1),
+  ),
+  WORKER_TIMEOUT: z.preprocess(
+    ausenteSeVazio,
+    z.coerce.number().int().min(30).max(900).default(240),
+  ),
+  WORKER_SHUTDOWN_TIMEOUT: z.preprocess(
+    ausenteSeVazio,
+    z.coerce.number().int().min(5).max(120).default(30),
+  ),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   // Quando verdadeiro, aceita implantação sem TLS: cookie sem Secure, sem
   // HSTS e sem upgrade-insecure-requests no CSP. Padrão falso.
@@ -168,6 +213,18 @@ if (
   new URL(resultado.data.GOOGLE_REDIRECT_URI).pathname !== "/api/planilha/google/retorno"
 ) {
   throw new Error("GOOGLE_REDIRECT_URI deve apontar para /api/planilha/google/retorno.");
+}
+if (resultado.data.FILA_DRIVER === "redis" && !resultado.data.REDIS_URL) {
+  throw new Error("FILA_DRIVER=redis exige REDIS_URL.");
+}
+if (
+  resultado.data.FILA_PLANILHA_TRANSPORTE === "bullmq" &&
+  resultado.data.FILA_DRIVER !== "redis"
+) {
+  throw new Error("FILA_PLANILHA_TRANSPORTE=bullmq exige FILA_DRIVER=redis.");
+}
+if (resultado.data.FILA_TRABALHOS_HABILITADA && resultado.data.FILA_DRIVER !== "redis") {
+  throw new Error("FILA_TRABALHOS_HABILITADA=true exige FILA_DRIVER=redis.");
 }
 
 const ehProducao = resultado.data.NODE_ENV === "production";
@@ -217,6 +274,22 @@ export const ambiente = {
     token: resultado.data.FERIADOS_API_TOKEN,
     uf: resultado.data.FERIADOS_UF,
     ibge: resultado.data.FERIADOS_IBGE,
+  },
+  fila: {
+    driver: resultado.data.FILA_DRIVER,
+    planilhaTransporte: resultado.data.FILA_PLANILHA_TRANSPORTE,
+    trabalhosHabilitada: resultado.data.FILA_TRABALHOS_HABILITADA,
+    tiposHabilitados: (resultado.data.FILA_TIPOS_HABILITADOS ?? "")
+      .split(",")
+      .map((tipo) => tipo.trim())
+      .filter(Boolean),
+    redisUrl: resultado.data.REDIS_URL,
+    prefixo: resultado.data.BULLMQ_PREFIX,
+    workerPorta: resultado.data.WORKER_PORTA,
+    workerConcorrencia: resultado.data.WORKER_CONCORRENCIA,
+    workerPlanilhaConcorrencia: resultado.data.WORKER_PLANILHA_CONCORRENCIA,
+    workerTimeout: resultado.data.WORKER_TIMEOUT,
+    workerShutdownTimeout: resultado.data.WORKER_SHUTDOWN_TIMEOUT,
   },
   fuso: resultado.data.TZ_APP,
   ehProducao,

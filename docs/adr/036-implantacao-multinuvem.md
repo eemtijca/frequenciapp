@@ -26,3 +26,7 @@ Manter apenas a Vercel deixaria a escola sem opção de hospedagem própria. Usa
 - O caminho de produção depende de recursos que o emulador não cobre, como App Service, Key Vault e Artifact Registry, validados por `terraform validate` e não pelo Floci.
 - O modo local tem limites registrados em [implantacao-nuvem.md](../implantacao-nuvem.md), como a ausência de registros de imagem e a limitação de ingress h2c dos emuladores de Container Apps e Cloud Run com o servidor standalone do Next.
 - Rotação automática das senhas do banco fica como evolução; a troca acontece ao incrementar `versao_segredos`.
+
+## Adendo de 2026-11-28
+
+A decisão de manter o cache externo fora das três nuvens continua valendo para cache e anexos. A [ADR-085](085-fila-de-processamento-com-redis-e-bullmq.md) acrescenta o Redis como transporte opcional da fila de processamento, apenas na auto-hospedagem e no Compose. O Redis não é cache da aplicação, não é fonte de dados e não é instalado pelo chart Helm. As nuvens tradicionais continuam sem Redis obrigatório; quem habilitar a fila nelas precisa fornecer um Redis compatível e um worker.

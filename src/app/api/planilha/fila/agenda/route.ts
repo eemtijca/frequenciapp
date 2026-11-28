@@ -1,5 +1,5 @@
 // Recolhe os envios que sobraram na fila; autenticada por segredo, sem cookie.
-import { processarFilaDaAgenda } from "@/application/fila-planilha";
+import { despacharFilaPlanilha } from "@/infra/fila/despacho-planilha";
 import { erroApi, executarRota, json } from "@/infra/http";
 import { segredoDaAgendaConfere } from "@/infra/web-push";
 
@@ -11,7 +11,7 @@ export async function GET(requisicao: Request): Promise<Response> {
     if (!segredoDaAgendaConfere(requisicao.headers.get("authorization"))) {
       return erroApi("Acesso não permitido.", 403);
     }
-    const { resumo } = await processarFilaDaAgenda();
+    const resumo = await despacharFilaPlanilha();
     return json(resumo);
   });
 }

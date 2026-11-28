@@ -118,7 +118,7 @@ O guia operacional está em [observabilidade.md](observabilidade.md).
 
 ## Superfície de dependências
 
-Distribuição enxuta: framework, UI, Prisma 7 com adaptador pg, zod, Motion e dotenv para o CLI. Nenhuma dependência de serviços externos em runtime, o que elimina toda uma classe de risco de integração. O service worker é código próprio, auditável em um arquivo.
+Distribuição enxuta: framework, UI, Prisma 7 com adaptador pg, zod, Motion, dotenv para o CLI e BullMQ com ioredis apenas na fila opcional. O Redis fica na rede interna, sem porta pública, com senha e AOF. Ele não é fonte da verdade e não recebe dado de aluno. O service worker é código próprio, auditável em um arquivo.
 
 ## Chaves do FrequenciBI
 

@@ -56,6 +56,26 @@ O rascunho de Configurações usa o mesmo isolamento. `configuracoes-completo.ts
 
 O cliente mantém rascunho em sessionStorage enquanto houver marcações não salvas, e o 409 preserva as marcações locais oferecendo a recarga da versão salva. Assim, duas pessoas da coordenação nunca sobrescrevem a mesma chamada sem aviso.
 
+## Fila de processamento
+
+O PostgreSQL é a fonte da verdade da fila. A intenção entra no mesmo commit do registro escolar, o dispatcher publica no Redis com BullMQ e um worker dedicado consome. O Redis não guarda dado de aluno, não decide retentativa e não substitui `fila_planilha` nem `trabalhos`.
+
+```mermaid
+flowchart LR
+  A[API Next.js] -->|transação| P[(PostgreSQL)]
+  A -->|publica cabeça| R[Redis e BullMQ]
+  P -->|dispatcher| R
+  R -->|job| W[Worker]
+  W -->|estado e resultado| P
+  W -->|Sheets API| G[Google Planilhas]
+```
+
+- `fila_planilha` continua com a ordem FIFO, a reserva, as esperas e a conferência da ADR-039 e da ADR-074. O BullMQ publica somente a cabeça e usa `attempts: 1`.
+- `trabalhos` guarda os trabalhos genéricos, com chave de idempotência, reserva por `reserva_id`, heartbeat e desfecho seguro.
+- O worker fica em `src/worker.ts`, expõe `/saude` e `/metricas` na porta interna e encerra com `SIGTERM`.
+- O caminho simples continua com `FILA_DRIVER=postgres` e `FILA_PLANILHA_TRANSPORTE=direto`. A Vercel e os previews usam esse caminho.
+- A decisão está na [ADR-085](adr/085-fila-de-processamento-com-redis-e-bullmq.md); a operação está em [fila-processamento.md](fila-processamento.md).
+
 ## Chamada Parcial e confirmação manual
 
 `frequencia-parcial.ts` define a presença personalizada por dia inteiro, turno ou aulas. O caso de uso correspondente guarda uma linha por aluno e dia, com nomes históricos e revisão otimista. Salvamento, confirmação manual da Seduc e exclusão rodam em transação serializável; revisão obsoleta responde 409. A revisão aumenta quando o conteúdo ou a confirmação muda. Corrigir conteúdo limpa data, responsável e chave da confirmação.
@@ -123,6 +143,7 @@ src/
     gestao/cadastros/       diálogos de aulas, importação e ordenação
     gestao/configuracoes/   rascunho, seções e controles de configuração
     gestao/planilhas/       integrações, seletores e diálogos de planilha
+    gestao/fila-trabalhos/  fila genérica, contagens e ações administrativas
     conta/                  diálogo de troca de senha
     pwa/                    registro do service worker e avisos
     ui/                     componentes MUI compartilhados
@@ -141,6 +162,8 @@ src/
     frequencia-personalizada.ts   compor a base diária com os ajustes existentes
     planilha-parcial.ts     preparar a aba, simular e enviar registros parciais
     fila-planilha.ts        fila FIFO durável dos envios automáticos às planilhas (ADR-039)
+    fila-trabalhos.ts      fila genérica, reserva, idempotência e desfecho seguro
+    trabalhos/              handlers de indicadores, preparação mensal e expurgo
     frequencias.ts          carregar, listar, salvar e resumir o acumulado
     saidas.ts               registrar, listar e remover saídas antecipadas
     configuracoes.ts        ler e atualizar os recursos da escola
@@ -160,11 +183,14 @@ src/
     erros.ts                tradução de exceções para português
     transacoes.ts           transações ACID com repetição
     auditoria.ts            trilha de ações administrativas
+    fila/                   BullMQ, pump da fila de planilhas e despacho
     google/                 OAuth, Sheets API, planilhas e diagnóstico da integração
     auth/
       hash.ts               scrypt de senhas
       sessao.ts             sessões opacas em cookie HttpOnly
       limite.ts             limitador de tentativas em memória
+  worker.ts                 processo dedicado da fila, saúde e encerramento
+  worker/                   filas, saúde e métricas do processo dedicado
   proxy.ts                  CSRF, CSP com nonce e cabeçalhos
 prisma/                     schema e migrações
 prisma.config.ts            configuração do CLI do Prisma 7
@@ -212,6 +238,7 @@ tests/
 - [ADR-020: justificativa escrita e catálogo de quem libera a saída](adr/020-justificativa-escrita-e-catalogo-de-liberadores.md)
 - [ADR-049: regras de frequência dos benefícios configuráveis](adr/049-regras-de-frequencia-dos-beneficios.md)
 
+- [ADR-085: fila de processamento com Redis e BullMQ](adr/085-fila-de-processamento-com-redis-e-bullmq.md)
 - [ADR-034: Chamada Parcial e confirmação manual da Seduc](adr/034-chamada-parcial-e-confirmacao-seduc.md)
 - [ADR-054: interface plana sem desfoque](adr/054-interface-plana.md)
 - [ADR-055: saídas antecipadas na Chamada Parcial](adr/055-saidas-na-chamada-parcial.md)

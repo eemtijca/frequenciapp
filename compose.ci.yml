@@ -8,6 +8,7 @@ services:
     # O Google falso das suítes sobe no loopback do runner; a rede do host
     # deixa o aplicativo alcançar esse endereço e o PostgreSQL publicado.
     network_mode: host
+    networks: !reset []
     ports: !reset []
     volumes:
       - ./tests/helpers/redirecionar-google.mjs:/teste-google.mjs:ro
@@ -20,6 +21,11 @@ services:
       PUSH_VAPID_PRIVATE_KEY: ${PUSH_VAPID_PRIVATE_KEY:-}
       PUSH_VAPID_SUBJECT: ${PUSH_VAPID_SUBJECT:-}
       CRON_SECRET: segredo-ficticio-da-agenda-para-testes-0000
+      # O CI padrão usa o caminho PostgreSQL mais cron. A suíte da fila
+      # sobrescreve estas variáveis quando sobe Redis e worker.
+      FILA_DRIVER: postgres
+      FILA_PLANILHA_TRANSPORTE: direto
+      FILA_TRABALHOS_HABILITADA: "false"
       AGENDA_URL: ${AGENDA_URL:-http://127.0.0.1:3000}
       AGENDA_TIMEOUT: ${AGENDA_TIMEOUT:-300}
       AGENDA_NOTIFICACOES: ${AGENDA_NOTIFICACOES-true}
