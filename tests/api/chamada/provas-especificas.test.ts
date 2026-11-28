@@ -30,6 +30,9 @@ interface Participante {
   alunoId: string;
   nome: string;
   presente: boolean | null;
+  local: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 async function entrar(email: string, senha: string): Promise<string> {
@@ -164,6 +167,14 @@ it("recusa origem inválida nas demais escritas e registra a auditoria de cada u
     origemInvalida,
   );
   expect(frequencia.status).toBe(403);
+  const locais = await chamar(
+    `${caminho}/locais`,
+    "PUT",
+    cookieCoordenacao,
+    { locais: [{ alunoId: alunos[0], local: "Campus" }] },
+    origemInvalida,
+  );
+  expect(locais.status).toBe(403);
 
   expect(
     (
@@ -176,6 +187,13 @@ it("recusa origem inválida nas demais escritas e registra a auditoria de cada u
     (
       await chamar(`${caminho}/frequencia`, "PUT", cookieCoordenacao, {
         marcas: [{ alunoId: alunos[0], presente: true }],
+      })
+    ).status,
+  ).toBe(200);
+  expect(
+    (
+      await chamar(`${caminho}/locais`, "PUT", cookieCoordenacao, {
+        locais: [{ alunoId: alunos[0], local: "Campus" }],
       })
     ).status,
   ).toBe(200);
@@ -197,6 +215,7 @@ it("recusa origem inválida nas demais escritas e registra a auditoria de cada u
     "prova-especifica.criar",
     "prova-especifica.participantes",
     "prova-especifica.frequencia",
+    "prova-especifica.locais",
     "prova-especifica.editar",
     "prova-especifica.remover",
   ]);
@@ -517,4 +536,164 @@ it("excluir o aluno remove a inscrição dele nas provas", async () => {
   expect((await ler(prova.id)).prova.total).toBe(1);
   await banco.query("delete from alunos where id = $1", [temporario]);
   expect((await ler(prova.id)).prova.total).toBe(0);
+});
+
+it("grava o local de cada aluno, herda o da prova e aplica o mesmo local em lote", async () => {
+  const ponto = { latitude: -7.23, longitude: -39.31 };
+  const outro = { latitude: -7.24, longitude: -39.31 };
+  const prova = await criar({
+    nome: "QA Locais",
+    local: "Campus central",
+    ...ponto,
+    dia: "2026-11-18",
+  });
+  const caminho = `/api/provas/${prova.id}/locais`;
+  await chamar(`/api/provas/${prova.id}/participantes`, "PUT", cookieCoordenacao, {
+    alunoIds: alunos,
+  });
+  expect((await ler(prova.id)).participantes.every((item) => item.local === null)).toBe(true);
+
+  await chamar(`/api/provas/${prova.id}/frequencia`, "PUT", cookieCoordenacao, {
+    marcas: [{ alunoId: alunos[0], presente: true }],
+  });
+  const um = await chamar(caminho, "PUT", cookieAdmin, {
+    locais: [{ alunoId: alunos[0], local: " Campus Betânia ", ...outro }],
+  });
+  expect(um.status).toBe(200);
+  const aposUm = (await um.json()) as { participantes: Participante[] };
+  expect(aposUm.participantes.find((item) => item.alunoId === alunos[0])).toMatchObject({
+    local: "Campus Betânia",
+    latitude: outro.latitude,
+    longitude: outro.longitude,
+    presente: true,
+  });
+  expect(aposUm.participantes.find((item) => item.alunoId === alunos[1])).toMatchObject({
+    local: null,
+    latitude: null,
+    longitude: null,
+  });
+
+  const lote = await chamar(caminho, "PUT", cookieCoordenacao, {
+    locais: [
+      { alunoId: alunos[1], local: "Campus Junco" },
+      { alunoId: alunos[2], local: "Campus Junco" },
+    ],
+  });
+  expect(lote.status).toBe(200);
+  const aposLote = (await lote.json()) as { participantes: Participante[] };
+  expect(aposLote.participantes.filter((item) => item.local === "Campus Junco")).toHaveLength(2);
+  expect(aposLote.participantes.find((item) => item.alunoId === alunos[0])?.presente).toBe(true);
+
+  const limpo = await chamar(caminho, "PUT", cookieCoordenacao, {
+    locais: [{ alunoId: alunos[1], local: "   " }],
+  });
+  expect(limpo.status).toBe(200);
+  expect(
+    ((await limpo.json()) as { participantes: Participante[] }).participantes.find(
+      (item) => item.alunoId === alunos[1],
+    ),
+  ).toMatchObject({ local: null, latitude: null, longitude: null });
+
+  await chamar(`/api/provas/${prova.id}/participantes`, "PUT", cookieCoordenacao, {
+    alunoIds: [alunos[0], alunos[1], alunos[2]],
+  });
+  expect(
+    (await ler(prova.id)).participantes.find((item) => item.alunoId === alunos[0]),
+  ).toMatchObject({
+    local: "Campus Betânia",
+    presente: true,
+  });
+
+  const recusas: Array<[unknown, string]> = [
+    [
+      { locais: [{ alunoId: alunos[0], local: null, latitude: -3.7, longitude: -38.5 }] },
+      "Informe o nome do local junto com o ponto no mapa.",
+    ],
+    [
+      { locais: [{ alunoId: alunos[0], local: "Sala", latitude: -3.7 }] },
+      "Informe a latitude e a longitude juntas.",
+    ],
+    [
+      { locais: [{ alunoId: alunoInativo, local: "Sala" }] },
+      "Há aluno que não está inscrito nesta prova.",
+    ],
+    [
+      {
+        locais: [
+          { alunoId: alunos[0], local: "A" },
+          { alunoId: alunos[0], local: "B" },
+        ],
+      },
+      "Há alunos repetidos na lista.",
+    ],
+    [{ locais: [] }, "Informe ao menos um local."],
+    [{ locais: [{ alunoId: alunos[0], local: "A", extra: true }] }, ""],
+  ];
+  for (const [corpo, mensagem] of recusas) {
+    const resposta = await chamar(caminho, "PUT", cookieCoordenacao, corpo);
+    expect(resposta.status).toBe(400);
+    expect(((await resposta.json()) as { error: string }).error).toContain(mensagem);
+  }
+  expect(
+    (await chamar(caminho, "PUT", "", { locais: [{ alunoId: alunos[0], local: "X" }] })).status,
+  ).toBe(401);
+  expect(
+    (await chamar("/api/provas/nao-e-uuid/locais", "PUT", cookieAdmin, { locais: [] })).status,
+  ).toBe(404);
+
+  const auditoria = await banco.query<{ alvo: string }>(
+    "select alvo from auditoria where acao = 'prova-especifica.locais' and alvo like $1 order by criado_em",
+    [`prova:${prova.id}:%`],
+  );
+  expect(auditoria.rows.some((linha) => linha.alvo.includes("Betânia"))).toBe(false);
+  expect(auditoria.rows.map((linha) => linha.alvo)).toEqual([
+    `prova:${prova.id}:locais:1`,
+    `prova:${prova.id}:locais:2`,
+    `prova:${prova.id}:locais:1`,
+  ]);
+
+  const noCentral = await chamar(
+    `/api/provas/ocupacao?latitude=${ponto.latitude}&longitude=${ponto.longitude}`,
+    "GET",
+    cookieCoordenacao,
+  );
+  const central = (await noCentral.json()) as {
+    alunos: number;
+    provas: Array<{ id: string; alunos: number }>;
+  };
+  expect(central.provas.find((item) => item.id === prova.id)?.alunos).toBe(1);
+  const noOutro = await chamar(
+    `/api/provas/ocupacao?latitude=${outro.latitude}&longitude=${outro.longitude}&provaId=${prova.id}`,
+    "GET",
+    cookieCoordenacao,
+  );
+  const afastado = (await noOutro.json()) as {
+    alunos: number;
+    provas: Array<{ id: string; alunos: number; atual: boolean }>;
+  };
+  const desta = afastado.provas.find((item) => item.id === prova.id);
+  expect(desta).toMatchObject({ atual: true, alunos: 2 });
+  expect(afastado.alunos).toBeGreaterThanOrEqual(2);
+});
+
+it("o banco recusa coordenadas incompletas ou fora da faixa no local do aluno", async () => {
+  const prova = await criar({ nome: "QA Local banco", dia: "2026-11-19" });
+  await chamar(`/api/provas/${prova.id}/participantes`, "PUT", cookieCoordenacao, {
+    alunoIds: [alunos[0]],
+  });
+  const atualizar = (latitude: number | null, longitude: number | null) =>
+    banco.query(
+      "update participantes_prova set latitude = $1, longitude = $2 where prova_id = $3",
+      [latitude, longitude, prova.id],
+    );
+  await expect(atualizar(10, null)).rejects.toThrow(/participantes_prova_coordenadas_ck/);
+  await expect(atualizar(null, 10)).rejects.toThrow(/participantes_prova_coordenadas_ck/);
+  await expect(atualizar(91, 0)).rejects.toThrow(/participantes_prova_coordenadas_ck/);
+  await expect(atualizar(0, 181)).rejects.toThrow(/participantes_prova_coordenadas_ck/);
+  await atualizar(null, null);
+  const gravado = await banco.query<{ local: string | null }>(
+    "update participantes_prova set local = 'Sala 1' where prova_id = $1 returning local",
+    [prova.id],
+  );
+  expect(gravado.rows[0]?.local).toBe("Sala 1");
 });

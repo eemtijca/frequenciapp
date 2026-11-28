@@ -295,14 +295,16 @@ export default function VistaPrivacidade() {
                   <li>
                     Prova específica, como Enem ou vestibular, quando a equipe a cadastra: nome da
                     prova, data, local em texto, coordenadas do local escolhidas no mapa, alunos
-                    inscritos e a marca de presente, ausente ou sem registro. As coordenadas
-                    descrevem o local da prova, não a posição de quem usa o aplicativo.
+                    inscritos, a marca de presente, ausente ou sem registro e, quando a equipe
+                    informar, o local e as coordenadas daquele aluno. Em branco, vale o local da
+                    prova. As coordenadas descrevem o lugar da prova, não a posição de quem usa o
+                    aplicativo.
                   </li>
                   <li>
                     Posição do aparelho: só é lida quando a pessoa toca em Usar minha localização e
                     o navegador autoriza. Ela aparece no mapa e só é gravada, como coordenadas do
-                    local da prova, se a equipe salvar a prova. Não há rastreamento nem gravação de
-                    trajeto.
+                    local da prova ou do local de um aluno, se a equipe salvar. Não há rastreamento
+                    nem gravação de trajeto.
                   </li>
                 </Lista>
                 <Paragrafo>

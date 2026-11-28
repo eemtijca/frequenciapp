@@ -39,6 +39,10 @@ interface Props {
   ponto: PontoGeografico | null;
   /** Prova em edição: os alunos dela entram na contagem do lugar mesmo antes de salvar o ponto. */
   provaId: string | null;
+  titulo?: string;
+  descricao?: string;
+  /** Nome acessível da área do mapa. */
+  rotuloMapa?: string;
   onFechar: () => void;
   /** Ponto confirmado, ou nulo quando a pessoa remove o local do mapa. */
   onConfirmar: (ponto: PontoGeografico | null) => void;
@@ -64,7 +68,16 @@ function erroDoCampo(
 /** Espera depois do último movimento do marcador antes de perguntar quantos alunos há no lugar. */
 const ATRASO_DA_CONTAGEM_MS = 350;
 
-export function DialogoMapaLocal({ aberto, ponto, provaId, onFechar, onConfirmar }: Props) {
+export function DialogoMapaLocal({
+  aberto,
+  ponto,
+  provaId,
+  titulo = "Local da prova no mapa",
+  descricao = "Toque no mapa para marcar o local ou arraste o marcador. Em campo, a localização do aparelho coloca o marcador na posição atual.",
+  rotuloMapa = "Mapa do local da prova",
+  onFechar,
+  onConfirmar,
+}: Props) {
   const [latitude, setLatitude] = useState(coordenadaComoTexto(ponto?.latitude));
   const [longitude, setLongitude] = useState(coordenadaComoTexto(ponto?.longitude));
   const [avisoDoGps, setAvisoDoGps] = useState("");
@@ -143,8 +156,8 @@ export function DialogoMapaLocal({ aberto, ponto, provaId, onFechar, onConfirmar
     <DialogoPadrao
       aberto={aberto}
       onFechar={onFechar}
-      titulo="Local da prova no mapa"
-      descricao="Toque no mapa para marcar o local ou arraste o marcador. Em campo, a localização do aparelho coloca o marcador na posição atual."
+      titulo={titulo}
+      descricao={descricao}
       tamanho="grande"
       acoes={
         <>
@@ -212,7 +225,7 @@ export function DialogoMapaLocal({ aberto, ponto, provaId, onFechar, onConfirmar
           <MapaDoLocal
             ponto={escolhido}
             onEscolher={escolherNoMapa}
-            rotulo="Mapa do local da prova"
+            rotulo={rotuloMapa}
             contagem={doLugar?.alunos ?? 0}
           />
         </Suspense>

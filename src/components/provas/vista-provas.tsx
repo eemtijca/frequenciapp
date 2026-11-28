@@ -4,12 +4,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import ContentPasteRoundedIcon from "@mui/icons-material/ContentPasteRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import FactCheckRoundedIcon from "@mui/icons-material/FactCheckRounded";
 import GroupAddRoundedIcon from "@mui/icons-material/GroupAddRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
 import Box from "@mui/material/Box";
+import Checkbox from "@mui/material/Checkbox";
+import FormControlLabel from "@mui/material/FormControlLabel";
 import Link from "@mui/material/Link";
 import List from "@mui/material/List";
 import ListItem from "@mui/material/ListItem";
@@ -25,9 +28,13 @@ import {
   type Turma,
 } from "@/domain/frequencia";
 import {
+  agruparPorLocal,
+  chaveDoGrupoDeLocal,
   comMarca,
   enderecoNoOpenStreetMap,
+  resolverLocalDoAluno,
   rotuloDasCoordenadas,
+  type LocalGravado,
   type MarcaDaProva,
   type ParticipanteDaProva,
   type ProvaEspecifica,
@@ -48,6 +55,8 @@ import { CabecalhoPagina } from "@/components/layout/cabecalho-pagina";
 import { EstadoVazio } from "@/components/layout/estado-vazio";
 import { useLeituraDaVisao } from "@/components/layout/quadro-das-visoes";
 import { DialogoAlunosProva } from "@/components/provas/dialogo-alunos-prova";
+import { DialogoColarLocais } from "@/components/provas/dialogo-colar-locais";
+import { DialogoLocalDoAluno } from "@/components/provas/dialogo-local-aluno";
 import { DialogoProva } from "@/components/provas/dialogo-prova";
 import { TOKENS_LAYOUT } from "@/theme/layout";
 
@@ -102,13 +111,38 @@ function ResumoDaProva({
 
 interface LinhaProps {
   participante: ParticipanteDaProva;
+  prova: Pick<ProvaEspecifica, "local" | "latitude" | "longitude">;
   turma: string;
   ocupado: boolean;
+  selecionado: boolean;
+  onSelecionar: (alunoId: string, marcado: boolean) => void;
   onMarcar: (alunoId: string, marca: MarcaDaProva) => void;
+  onEditarLocal: (alunoId: string) => void;
 }
 
-function LinhaDoParticipante({ participante, turma, ocupado, onMarcar }: LinhaProps) {
+function textoDoLocal(resolvido: ReturnType<typeof resolverLocalDoAluno>): string {
+  if (resolvido.local) {
+    return resolvido.proprio ? resolvido.local : `${resolvido.local} (local da prova)`;
+  }
+  if (resolvido.latitude !== null && resolvido.longitude !== null) {
+    return resolvido.proprio ? "Ponto no mapa" : "Ponto no mapa (local da prova)";
+  }
+  return "Sem local";
+}
+
+function LinhaDoParticipante({
+  participante,
+  prova,
+  turma,
+  ocupado,
+  selecionado,
+  onSelecionar,
+  onMarcar,
+  onEditarLocal,
+}: LinhaProps) {
   const { alunoId, nome, presente } = participante;
+  const resolvido = resolverLocalDoAluno(participante, prova);
+  const temPonto = resolvido.latitude !== null && resolvido.longitude !== null;
   function estilo(ativa: boolean, cor: "success" | "error") {
     return {
       minHeight: TOKENS_LAYOUT.alvoToque,
@@ -124,13 +158,49 @@ function LinhaDoParticipante({ participante, turma, ocupado, onMarcar }: LinhaPr
   return (
     <ListItem
       divider
-      sx={{ gap: 1.5, py: 1, flexWrap: "wrap", "&:last-of-type": { borderBottom: 0 } }}
+      sx={{ gap: 1, py: 1, flexWrap: "wrap", "&:last-of-type": { borderBottom: 0 } }}
     >
+      <Checkbox
+        checked={selecionado}
+        disabled={ocupado}
+        onChange={(evento) => onSelecionar(alunoId, evento.target.checked)}
+        slotProps={{ input: { "aria-label": `Selecionar ${nome}` } }}
+        sx={{
+          flexShrink: 0,
+          minWidth: TOKENS_LAYOUT.alvoToque,
+          minHeight: TOKENS_LAYOUT.alvoToque,
+        }}
+      />
       <Box sx={{ minWidth: 0, flex: "1 1 200px", overflowWrap: "anywhere" }}>
         <Typography sx={{ fontWeight: 500 }}>{nome}</Typography>
-        <Typography variant="caption" sx={{ color: "text.secondary" }}>
+        <Typography variant="caption" sx={{ color: "text.secondary", display: "block" }}>
           {turma}
+          {" · "}
+          {textoDoLocal(resolvido)}
         </Typography>
+        {temPonto && resolvido.latitude !== null && resolvido.longitude !== null ? (
+          <Link
+            href={enderecoNoOpenStreetMap(resolvido.latitude, resolvido.longitude)}
+            target="_blank"
+            rel="noopener noreferrer"
+            variant="caption"
+            sx={ESTILO_ALVO_TOQUE}
+          >
+            Abrir local no OpenStreetMap
+            <Box component="span" sx={ESTILO_TEXTO_OCULTO}>
+              {" "}
+              (abre em nova aba)
+            </Box>
+          </Link>
+        ) : null}
+        <Botao
+          variante="texto"
+          disabled={ocupado}
+          onClick={() => onEditarLocal(alunoId)}
+          sx={{ minHeight: TOKENS_LAYOUT.alvoToque, px: 0 }}
+        >
+          Alterar local
+        </Botao>
       </Box>
       <Stack
         role="group"
@@ -171,8 +241,13 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
   const [abertaId, setAbertaId] = useState<string | null>(null);
   const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
   const [busca, setBusca] = useState("");
+  const [filtroLocal, setFiltroLocal] = useState("");
+  const [selecionados, setSelecionados] = useState<string[]>([]);
+  const [alunoDoLocal, setAlunoDoLocal] = useState<string | null>(null);
   const [aberturas, setAberturas] = useState(0);
-  const [dialogo, setDialogo] = useState<"nova" | "editar" | "alunos" | "remover" | null>(null);
+  const [dialogo, setDialogo] = useState<
+    "nova" | "editar" | "alunos" | "remover" | "local" | "locais" | "colar" | null
+  >(null);
   const [removendo, setRemovendo] = useState(false);
   const { chaveAtiva, executar: executarFrequencia } = useAcaoUnicaComChave();
   const pedidoDetalhe = useRef(0);
@@ -224,6 +299,9 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
     setAbertaId(id);
     setDetalhe(null);
     setBusca("");
+    setFiltroLocal("");
+    setSelecionados([]);
+    setAlunoDoLocal(null);
     lerDetalhe(id).catch((excecao) => {
       abertaIdRef.current = null;
       setAbertaId(null);
@@ -236,10 +314,15 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
     pedidoDetalhe.current += 1;
     setAbertaId(null);
     setDetalhe(null);
+    setFiltroLocal("");
+    setSelecionados([]);
+    setAlunoDoLocal(null);
     lerLista().catch(() => undefined);
   }
 
-  function abrirDialogo(tipo: "nova" | "editar" | "alunos" | "remover") {
+  function abrirDialogo(
+    tipo: "nova" | "editar" | "alunos" | "remover" | "local" | "locais" | "colar",
+  ) {
     setAberturas((atual) => atual + 1);
     setDialogo(tipo);
   }
@@ -292,6 +375,47 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
     });
   }
 
+  function alternarSelecao(alunoId: string, marcado: boolean) {
+    setSelecionados((atuais) => {
+      if (marcado) return atuais.includes(alunoId) ? atuais : [...atuais, alunoId];
+      return atuais.filter((id) => id !== alunoId);
+    });
+  }
+
+  function selecionarVisiveis(ids: string[], marcado: boolean) {
+    setSelecionados((atuais) => {
+      if (marcado) return [...new Set([...atuais, ...ids])];
+      const ocultar = new Set(ids);
+      return atuais.filter((id) => !ocultar.has(id));
+    });
+  }
+
+  async function salvarLocais(locais: Array<{ alunoId: string } & LocalGravado>) {
+    if (!detalhe || locais.length === 0) return;
+    const provaId = detalhe.prova.id;
+    try {
+      const dados = await pedir<Detalhe>(
+        `/api/provas/${provaId}/locais`,
+        corpoAlteracao("PUT", { locais }),
+      );
+      if (abertaIdRef.current !== provaId) return;
+      setDetalhe(dados);
+      setDialogo(null);
+      setSelecionados([]);
+      setAlunoDoLocal(null);
+      avisarSucesso(
+        "Local atualizado.",
+        locais.length === 1
+          ? "O local do aluno foi gravado."
+          : `Local gravado para ${contarAlunos(locais.length)}.`,
+      );
+    } catch (excecao) {
+      if (abertaIdRef.current === provaId) {
+        avisarErro(excecao, { contexto: "Não foi possível salvar o local." });
+      }
+    }
+  }
+
   async function salvarAlunos(alunoIds: string[]) {
     if (!detalhe) return;
     try {
@@ -322,13 +446,26 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
     }
   }
 
+  const gruposDeLocal = useMemo(
+    () => (detalhe ? agruparPorLocal(detalhe.participantes, detalhe.prova) : []),
+    [detalhe],
+  );
+  const filtroAtivo = gruposDeLocal.some((grupo) => grupo.chave === filtroLocal) ? filtroLocal : "";
+
   const participantesFiltrados = useMemo(() => {
     if (!detalhe) return [];
     const termo = normalizar(busca);
-    return termo === ""
-      ? detalhe.participantes
-      : detalhe.participantes.filter((item) => normalizar(item.nome).includes(termo));
-  }, [detalhe, busca]);
+    return detalhe.participantes.filter((item) => {
+      if (termo !== "" && !normalizar(item.nome).includes(termo)) return false;
+      if (filtroAtivo === "") return true;
+      return chaveDoGrupoDeLocal(resolverLocalDoAluno(item, detalhe.prova).local) === filtroAtivo;
+    });
+  }, [detalhe, busca, filtroAtivo]);
+
+  const idsVisiveis = participantesFiltrados.map((item) => item.alunoId);
+  const visiveisMarcados = idsVisiveis.filter((id) => selecionados.includes(id)).length;
+  const alunoEmEdicao =
+    detalhe?.participantes.find((item) => item.alunoId === alunoDoLocal) ?? null;
 
   const dialogos = (
     <>
@@ -353,6 +490,45 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
         inscritos={detalhe?.participantes.map((item) => item.alunoId) ?? []}
         onFechar={() => setDialogo(null)}
         onSalvar={salvarAlunos}
+      />
+      <DialogoLocalDoAluno
+        key={`local-${aberturas}`}
+        aberto={dialogo === "local" || dialogo === "locais"}
+        alunos={dialogo === "local" ? 1 : selecionados.length}
+        nome={alunoEmEdicao?.nome}
+        localInicial={dialogo === "local" ? (alunoEmEdicao?.local ?? null) : null}
+        pontoInicial={
+          dialogo === "local" &&
+          alunoEmEdicao &&
+          alunoEmEdicao.latitude !== null &&
+          alunoEmEdicao.longitude !== null
+            ? { latitude: alunoEmEdicao.latitude, longitude: alunoEmEdicao.longitude }
+            : null
+        }
+        onFechar={() => {
+          setDialogo(null);
+          setAlunoDoLocal(null);
+        }}
+        onSalvar={(local) => {
+          const ids = dialogo === "local" && alunoDoLocal ? [alunoDoLocal] : selecionados;
+          return salvarLocais(ids.map((alunoId) => ({ alunoId, ...local })));
+        }}
+      />
+      <DialogoColarLocais
+        key={`colar-${aberturas}`}
+        aberto={dialogo === "colar"}
+        alunos={detalhe?.participantes ?? []}
+        onFechar={() => setDialogo(null)}
+        onAplicar={(casados) =>
+          salvarLocais(
+            casados.map((item) => ({
+              alunoId: item.alunoId,
+              local: item.local,
+              latitude: null,
+              longitude: null,
+            })),
+          )
+        }
       />
       <DialogoConfirmacao
         aberto={dialogo === "remover"}
@@ -464,7 +640,72 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
                   Marcar sem registro como presentes
                 </Botao>
               ) : null}
+              {prova.total > 0 ? (
+                <Botao
+                  variante="contorno"
+                  icone={<ContentPasteRoundedIcon />}
+                  disabled={chaveAtiva !== null}
+                  onClick={() => abrirDialogo("colar")}
+                  sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+                >
+                  Colar locais
+                </Botao>
+              ) : null}
+              {selecionados.length > 0 ? (
+                <Botao
+                  variante="principal"
+                  icone={<PlaceRoundedIcon />}
+                  disabled={chaveAtiva !== null}
+                  onClick={() => abrirDialogo("locais")}
+                  sx={{ minHeight: TOKENS_LAYOUT.alvoToque }}
+                >
+                  {selecionados.length === 1
+                    ? "Definir local do selecionado"
+                    : `Definir local dos ${selecionados.length} selecionados`}
+                </Botao>
+              ) : null}
             </Stack>
+            {gruposDeLocal.length > 1 ? (
+              <Stack spacing={1}>
+                <Stack
+                  role="group"
+                  aria-label="Filtrar por local"
+                  direction="row"
+                  spacing={1}
+                  useFlexGap
+                  sx={{ flexWrap: "wrap" }}
+                >
+                  <Selo
+                    rotulo={`Todos · ${prova.total}`}
+                    variant={filtroAtivo === "" ? "filled" : "outlined"}
+                    aria-pressed={filtroAtivo === ""}
+                    onClick={() => setFiltroLocal("")}
+                  />
+                  {gruposDeLocal.map((grupo) => (
+                    <Selo
+                      key={grupo.chave || "sem-local"}
+                      rotulo={`${grupo.local ?? "Sem local"} · ${grupo.total}`}
+                      variant={filtroAtivo === grupo.chave ? "filled" : "outlined"}
+                      aria-pressed={filtroAtivo === grupo.chave}
+                      onClick={() => setFiltroLocal(grupo.chave)}
+                    />
+                  ))}
+                </Stack>
+                <Box component="ul" aria-label="Comparecimento por local" sx={{ m: 0, pl: 2.5 }}>
+                  {(filtroAtivo === ""
+                    ? gruposDeLocal
+                    : gruposDeLocal.filter((grupo) => grupo.chave === filtroAtivo)
+                  ).map((grupo) => (
+                    <Typography key={grupo.chave || "sem-local"} component="li" variant="body2">
+                      {grupo.local ?? "Sem local"}:{" "}
+                      {contarMarcados(grupo.presentes, "presente", "presentes")},{" "}
+                      {contarMarcados(grupo.ausentes, "ausente", "ausentes")}, {grupo.pendentes} sem
+                      registro
+                    </Typography>
+                  ))}
+                </Box>
+              </Stack>
+            ) : null}
             {detalhe && detalhe.participantes.length > 8 ? (
               <BarraBusca
                 id="busca-participantes-prova"
@@ -486,14 +727,40 @@ export default function VistaProvas({ alunos, turmas, diaCorrente, fuso }: Props
               </Typography>
             ) : (
               <Paper variant="outlined" sx={{ overflow: "hidden", boxShadow: "none" }}>
+                {idsVisiveis.length > 0 ? (
+                  <FormControlLabel
+                    sx={{ minHeight: TOKENS_LAYOUT.alvoToque, mx: 0.5, my: 0.5 }}
+                    control={
+                      <Checkbox
+                        checked={visiveisMarcados === idsVisiveis.length}
+                        indeterminate={
+                          visiveisMarcados > 0 && visiveisMarcados < idsVisiveis.length
+                        }
+                        disabled={chaveAtiva !== null}
+                        onChange={(evento) =>
+                          selecionarVisiveis(idsVisiveis, evento.target.checked)
+                        }
+                        slotProps={{ input: { "aria-label": "Selecionar os alunos visíveis" } }}
+                      />
+                    }
+                    label="Selecionar os alunos visíveis"
+                  />
+                ) : null}
                 <List disablePadding aria-label="Alunos da prova">
                   {participantesFiltrados.map((participante) => (
                     <LinhaDoParticipante
                       key={participante.alunoId}
                       participante={participante}
+                      prova={prova}
                       turma={rotuloDe.get(participante.turmaId) ?? "Turma"}
                       ocupado={chaveAtiva !== null}
+                      selecionado={selecionados.includes(participante.alunoId)}
+                      onSelecionar={alternarSelecao}
                       onMarcar={(alunoId, marca) => void marcar(alunoId, marca)}
+                      onEditarLocal={(alunoId) => {
+                        setAlunoDoLocal(alunoId);
+                        abrirDialogo("local");
+                      }}
                     />
                   ))}
                 </List>

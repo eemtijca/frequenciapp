@@ -12902,7 +12902,7 @@
       "get": {
         "operationId": "lerProvaEspecifica",
         "summary": "Ler uma prova com os alunos",
-        "description": "Administração e coordenação (capacidade de operação). Devolve a prova e os alunos inscritos, em ordem alfabética, com a marca de cada um.",
+        "description": "Administração e coordenação (capacidade de operação). Devolve a prova e os alunos inscritos, em ordem alfabética, com a marca e o local próprio de cada um. Local e coordenadas nulos herdam os da prova.",
         "tags": ["provas"],
         "parameters": [
           {
@@ -12945,13 +12945,19 @@
                           "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
                           "nome": "Ana Rodrigues Barros",
                           "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
-                          "presente": true
+                          "presente": true,
+                          "local": "Campus Betânia",
+                          "latitude": -3.74,
+                          "longitude": -38.54
                         },
                         {
                           "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
                           "nome": "Arthur Lima",
                           "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
-                          "presente": null
+                          "presente": null,
+                          "local": null,
+                          "latitude": null,
+                          "longitude": null
                         }
                       ]
                     }
@@ -13043,13 +13049,19 @@
                           "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
                           "nome": "Ana Rodrigues Barros",
                           "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
-                          "presente": true
+                          "presente": true,
+                          "local": "Campus Betânia",
+                          "latitude": -3.74,
+                          "longitude": -38.54
                         },
                         {
                           "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
                           "nome": "Arthur Lima",
                           "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
-                          "presente": null
+                          "presente": null,
+                          "local": null,
+                          "latitude": null,
+                          "longitude": null
                         }
                       ]
                     }
@@ -13196,13 +13208,19 @@
                           "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
                           "nome": "Ana Rodrigues Barros",
                           "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
-                          "presente": true
+                          "presente": true,
+                          "local": "Campus Betânia",
+                          "latitude": -3.74,
+                          "longitude": -38.54
                         },
                         {
                           "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
                           "nome": "Arthur Lima",
                           "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
-                          "presente": null
+                          "presente": null,
+                          "local": null,
+                          "latitude": null,
+                          "longitude": null
                         }
                       ]
                     }
@@ -13304,13 +13322,19 @@
                           "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
                           "nome": "Ana Rodrigues Barros",
                           "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
-                          "presente": true
+                          "presente": true,
+                          "local": "Campus Betânia",
+                          "latitude": -3.74,
+                          "longitude": -38.54
                         },
                         {
                           "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
                           "nome": "Arthur Lima",
                           "turmaId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
-                          "presente": null
+                          "presente": null,
+                          "local": null,
+                          "latitude": null,
+                          "longitude": null
                         }
                       ]
                     }
@@ -13337,11 +13361,89 @@
         }
       }
     },
+    "/api/provas/{id}/locais": {
+      "put": {
+        "operationId": "definirLocaisDaProva",
+        "summary": "Definir o local dos alunos na prova",
+        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria, só com identificador e quantidade. Grava o local próprio dos alunos já inscritos; os demais não mudam e a frequência permanece. Local nulo, sem coordenadas, volta a herdar o local da prova. Texto próprio sem ponto não herda as coordenadas da prova. O ponto exige o nome do local.",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Identificador da prova.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "example": "b7c8d9e0-1f2a-4b3c-8d4e-5f6a7b8c9d01"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Locais por aluno inscrito. Vale para um aluno ou para vários.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocaisDaProva"
+              },
+              "examples": {
+                "Locais": {
+                  "summary": "Locais",
+                  "value": {
+                    "locais": [
+                      {
+                        "alunoId": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73",
+                        "local": "Campus Betânia",
+                        "latitude": -3.74,
+                        "longitude": -38.54
+                      },
+                      {
+                        "alunoId": "2a3b4c5d-6e7f-4a8b-9c0d-1e2f3a4b5c6d",
+                        "local": null
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Prova e alunos inscritos, com o local de cada um.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetalheProvaEspecifica"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Erro400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Erro401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Erro403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Erro404"
+          },
+          "503": {
+            "$ref": "#/components/responses/Erro503"
+          }
+        }
+      }
+    },
     "/api/provas/ocupacao": {
       "get": {
         "operationId": "lerOcupacaoDoLocal",
         "summary": "Contar os alunos que fazem prova em um lugar",
-        "description": "Administração e coordenação (capacidade de operação). Soma os alunos distintos de todas as provas marcadas a até 100 m do ponto, de qualquer data; um aluno em duas provas do lugar conta uma vez. Com `provaId`, a prova em edição entra na conta com os próprios alunos, mesmo que o ponto novo ainda não esteja salvo. Alimenta o selo numérico sobre o marcador do mapa.",
+        "description": "Administração e coordenação (capacidade de operação). Soma os alunos distintos cujo local efetivo fica a até 100 m do ponto, de qualquer data. Coordenadas próprias do aluno vencem; texto próprio sem ponto fica fora; sem local próprio, vale o ponto da prova. Um aluno em duas provas do lugar conta uma vez. Com `provaId`, quem herda o local dessa prova usa o ponto consultado, mesmo que ele ainda não esteja salvo. Alimenta o selo numérico sobre o marcador do mapa e não devolve dado de aluno.",
         "tags": ["provas"],
         "parameters": [
           {
@@ -21814,7 +21916,7 @@
       "ParticipanteDaProva": {
         "type": "object",
         "title": "Aluno da prova",
-        "required": ["alunoId", "nome", "turmaId", "presente"],
+        "required": ["alunoId", "nome", "turmaId", "presente", "local", "latitude", "longitude"],
         "properties": {
           "alunoId": {
             "type": "string",
@@ -21834,6 +21936,26 @@
             "type": ["boolean", "null"],
             "description": "`true` presente, `false` ausente, `null` sem registro.",
             "example": true
+          },
+          "local": {
+            "type": ["string", "null"],
+            "maxLength": 120,
+            "description": "Local próprio do aluno. Nulo herda o local da prova.",
+            "example": "Campus Betânia"
+          },
+          "latitude": {
+            "type": ["number", "null"],
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude do local próprio. Nula, e sem local próprio, herda a da prova. Com local próprio e sem ponto, não herda o ponto da prova.",
+            "example": -3.74
+          },
+          "longitude": {
+            "type": ["number", "null"],
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude do local próprio, sempre junto com a latitude.",
+            "example": -38.54
           }
         }
       },
@@ -21871,6 +21993,50 @@
           }
         }
       },
+      "LocaisDaProva": {
+        "type": "object",
+        "title": "Locais dos alunos na prova",
+        "description": "Local próprio de alunos já inscritos. Nulo nas três partes herda o local da prova. O ponto vem com o nome do local, as duas coordenadas ou nenhuma.",
+        "additionalProperties": false,
+        "required": ["locais"],
+        "properties": {
+          "locais": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 3000,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["alunoId", "local"],
+              "properties": {
+                "alunoId": {
+                  "type": "string",
+                  "format": "uuid",
+                  "example": "6f8c0a52-91d4-4b3e-a7c8-5d2e1f0a9b73"
+                },
+                "local": {
+                  "type": ["string", "null"],
+                  "maxLength": 120,
+                  "description": "Texto do local. Vazio ou nulo, sem coordenadas, herda o da prova.",
+                  "example": "Campus Betânia"
+                },
+                "latitude": {
+                  "type": ["number", "null"],
+                  "minimum": -90,
+                  "maximum": 90,
+                  "example": -3.74
+                },
+                "longitude": {
+                  "type": ["number", "null"],
+                  "minimum": -180,
+                  "maximum": 180,
+                  "example": -38.54
+                }
+              }
+            }
+          }
+        }
+      },
       "MarcasDaProva": {
         "type": "object",
         "title": "Marcas de frequência da prova",
@@ -21903,7 +22069,7 @@
       "ProvaNoLocal": {
         "type": "object",
         "title": "Prova no mesmo lugar",
-        "description": "Prova marcada a até 100 m do ponto, com os alunos inscritos nela.",
+        "description": "Prova com alunos cujo local efetivo fica a até 100 m do ponto.",
         "required": ["id", "nome", "dia", "alunos", "atual"],
         "properties": {
           "id": {
@@ -21923,7 +22089,7 @@
           "alunos": {
             "type": "integer",
             "minimum": 0,
-            "description": "Alunos inscritos nesta prova.",
+            "description": "Alunos desta prova cujo local efetivo fica neste ponto. Quem herda usa o ponto da prova; quem tem texto próprio sem ponto fica de fora.",
             "example": 14
           },
           "atual": {
