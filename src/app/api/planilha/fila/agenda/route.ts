@@ -12,6 +12,6 @@ export async function GET(requisicao: Request): Promise<Response> {
       return erroApi("Acesso não permitido.", 403);
     }
     const resumo = await despacharFilaPlanilha();
-    return json(resumo ?? { despachado: true });
+    return json(resumo);
   });
 }

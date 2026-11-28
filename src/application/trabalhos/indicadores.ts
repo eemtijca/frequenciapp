@@ -5,7 +5,7 @@ import type { ContextoDoManipulador } from "@/application/fila-trabalhos";
 import type { ResultadoDoTrabalho } from "@/domain/trabalho";
 import { resultadoDeErro } from "./erros";
 
-const entrada = z.object({}).strict();
+const entrada = z.object({ janela: z.string().optional() }).strict();
 
 export async function executarIndicadores(
   contexto: ContextoDoManipulador,

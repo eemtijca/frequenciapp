@@ -197,11 +197,13 @@ export function processarFila(
   return rodada.then((resumo) => ({ resumo, compartilhado: false }));
 }
 
-export async function processarFilaDaAgenda(): Promise<ResultadoDoProcessamento> {
+export async function processarFilaDaAgenda(
+  opcoes: { limite?: number } = {},
+): Promise<ResultadoDoProcessamento> {
   await despacharIntencoesEscolares().catch(() =>
     console.error("Intenções escolares aguardam nova tentativa."),
   );
-  return processarFila({ limite: LIMITE_AGENDA });
+  return processarFila({ limite: opcoes.limite ?? LIMITE_AGENDA });
 }
 
 async function processarRodada(limite: number, workerId: string): Promise<ResumoDoProcessamento> {

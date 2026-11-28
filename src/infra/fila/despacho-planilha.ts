@@ -1,16 +1,39 @@
 // Despacho da fila de planilhas conforme o transporte configurado.
 import { ambiente } from "@/infra/ambiente";
-import { processarFilaDaAgenda, type ResultadoDoProcessamento } from "@/application/fila-planilha";
+import { banco } from "@/infra/banco";
+import { processarFilaDaAgenda } from "@/application/fila-planilha";
+import type { ResumoDoProcessamento } from "@/domain/fila-planilha";
 import { despacharIntencoesEscolares } from "@/application/outbox-escolar";
 import { publicarCabecaDaFila } from "./planilha";
 
-export async function despacharFilaPlanilha(): Promise<ResultadoDoProcessamento["resumo"] | null> {
-  if (ambiente.fila.planilhaTransporte === "bullmq") {
+/** Publica a cabeça no BullMQ ou processa direto, conforme o transporte. */
+export async function despacharFilaPlanilha(
+  opcoes: { limite?: number } = {},
+): Promise<ResumoDoProcessamento> {
+  if (ambiente.fila?.planilhaTransporte === "bullmq") {
     await despacharIntencoesEscolares().catch(() =>
       console.error("Intenções escolares aguardam nova tentativa."),
     );
     await publicarCabecaDaFila();
-    return null;
+    const [abertos, proximo] = await Promise.all([
+      banco().filaPlanilha.count({
+        where: { estado: { in: ["AGUARDANDO", "EM_ANDAMENTO"] } },
+      }),
+      banco().filaPlanilha.findFirst({
+        where: { estado: "AGUARDANDO", proximaTentativaEm: { not: null } },
+        orderBy: { proximaTentativaEm: "asc" },
+        select: { proximaTentativaEm: true },
+      }),
+    ]);
+    return {
+      processados: 0,
+      concluidos: 0,
+      falhas: 0,
+      abertos,
+      aguardandoAte: proximo?.proximaTentativaEm?.toISOString() ?? null,
+      despachado: true,
+    };
   }
-  return (await processarFilaDaAgenda()).resumo;
+  const resultado = await processarFilaDaAgenda(opcoes);
+  return { ...resultado.resumo, despachado: false };
 }

@@ -12,6 +12,9 @@ export default defineConfig({
     fileParallelism: false,
     testTimeout: 60_000,
     hookTimeout: 60_000,
+    env: {
+      BULLMQ_PREFIX: "{frequenciapp-teste}",
+    },
   },
   resolve: {
     alias: {

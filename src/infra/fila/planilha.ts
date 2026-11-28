@@ -14,9 +14,8 @@ export async function publicarCabecaDaFila(): Promise<void> {
   if (frente.estado === "EM_ANDAMENTO" && frente.reservadoAte && frente.reservadoAte > agora) {
     await publicarPlanilha(
       frente.id,
-      frente.tentativas,
+      `r${frente.reservadoAte.getTime()}`,
       frente.reservadoAte.getTime() - agora.getTime() + 1_000,
-      ":reserva",
     );
     return;
   }
@@ -25,5 +24,5 @@ export async function publicarCabecaDaFila(): Promise<void> {
     frente.estado === "AGUARDANDO" && frente.proximaTentativaEm
       ? frente.proximaTentativaEm.getTime() - agora.getTime()
       : 0;
-  await publicarPlanilha(frente.id, frente.tentativas, delay);
+  await publicarPlanilha(frente.id, String(frente.tentativas), delay);
 }

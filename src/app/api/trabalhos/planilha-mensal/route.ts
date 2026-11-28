@@ -2,6 +2,7 @@
 import { z } from "zod";
 import { despacharTrabalhosPendentes, enfileirarTrabalho } from "@/application/fila-trabalhos";
 import { ambiente } from "@/infra/ambiente";
+import { mesValido } from "@/domain/planilha-mensal";
 import { publicarTrabalho } from "@/infra/fila/bullmq";
 import { comTransacao } from "@/infra/transacoes";
 import { corpoJson, erroApi, executarRota, exigirAdmin, json, origemPermitida } from "@/infra/http";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 const entrada = z
   .object({
     turmaOriginalId: z.string().uuid(),
-    mes: z.string().regex(/^\d{4}-\d{2}$/),
+    mes: z.string().refine(mesValido, "Informe um mês válido."),
   })
   .strict();
 
@@ -20,6 +21,8 @@ export async function POST(requisicao: Request): Promise<Response> {
     if (!origemPermitida(requisicao)) return erroApi("Origem não permitida.", 403);
     const sessao = await exigirAdmin();
     if (!sessao.ok) return sessao.resposta;
+    const dados = entrada.safeParse(await corpoJson(requisicao));
+    if (!dados.success) return erroApi("Informe a turma e o mês da preparação.", 400);
     if (!ambiente.fila.trabalhosHabilitada || ambiente.fila.driver !== "redis")
       return erroApi("A fila de trabalhos não está habilitada nesta instalação.", 409);
     if (
@@ -27,8 +30,6 @@ export async function POST(requisicao: Request): Promise<Response> {
       !ambiente.fila.tiposHabilitados.includes("PLANILHA_MENSAL_PREPARAR")
     )
       return erroApi("A preparação mensal não está liberada na fila.", 409);
-    const dados = entrada.safeParse(await corpoJson(requisicao));
-    if (!dados.success) return erroApi("Informe a turma e o mês da preparação.", 400);
     const trabalhoId = await comTransacao((tx) =>
       enfileirarTrabalho(tx, {
         tipo: "PLANILHA_MENSAL_PREPARAR",

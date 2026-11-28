@@ -4,7 +4,7 @@ import { Queue, type ConnectionOptions } from "bullmq";
 import type { Trabalho } from "../../../generated/prisma/client";
 import { ambiente } from "@/infra/ambiente";
 
-export const PREFIXO_FILA = "{frequenciapp}";
+export const PREFIXO_FILA = ambiente.fila?.prefixo ?? "{frequenciapp}";
 export const FILA_TRABALHOS = "trabalhos";
 export const FILA_PLANILHA = "planilha";
 
@@ -85,18 +85,21 @@ export async function publicarTrabalho(trabalho: Trabalho): Promise<void> {
   );
 }
 
-/** Publica a cabeça da fila de planilhas com o atraso da próxima tentativa. */
+/**
+ * Publica a cabeça da fila de planilhas com o atraso da próxima tentativa.
+ * O terceiro segmento do jobId nunca contém dois-pontos: o BullMQ aceita
+ * exatamente três partes em um identificador personalizado.
+ */
 export async function publicarPlanilha(
   id: string,
-  tentativas: number,
+  chaveDaTentativa: string,
   delayMs: number,
-  sufixo = "",
 ): Promise<void> {
   await filaDePlanilhas().add(
     "planilha",
     { filaId: id },
     {
-      jobId: `planilha:${id}:${tentativas}${sufixo}`,
+      jobId: `planilha:${id}:${chaveDaTentativa}`,
       delay: Math.max(0, delayMs),
       attempts: 1,
       removeOnComplete: true,

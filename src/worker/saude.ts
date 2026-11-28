@@ -14,20 +14,30 @@ function tokenConfere(cabecalho: string | undefined, esperado: string): boolean 
 }
 
 async function verificarDependencias(): Promise<boolean> {
-  const [bancoOk, redisOk] = await Promise.allSettled([
-    banco().$queryRaw`SELECT 1`,
-    filaDeTrabalhos().getJobCounts(),
-  ]);
-  return bancoOk.status === "fulfilled" && redisOk.status === "fulfilled";
+  const bancoOk = await banco().$queryRaw`SELECT 1`.then(
+    () => true,
+    () => false,
+  );
+  if (!bancoOk) return false;
+  if (ambiente.fila.driver !== "redis") return true;
+  const redisOk = await filaDeTrabalhos()
+    .getJobCounts()
+    .then(
+      () => true,
+      () => false,
+    );
+  return redisOk;
 }
 
 async function coletarMetricas(): Promise<string> {
-  const [trabalhos, planilhas] = await Promise.all([
-    filaDeTrabalhos().getJobCounts(),
-    filaDePlanilhas().getJobCounts(),
-  ]);
-  atualizarContagensBullmq("trabalhos", trabalhos as unknown as Record<string, number>);
-  atualizarContagensBullmq("planilha", planilhas as unknown as Record<string, number>);
+  if (ambiente.fila.driver === "redis") {
+    const [trabalhos, planilhas] = await Promise.all([
+      filaDeTrabalhos().getJobCounts(),
+      filaDePlanilhas().getJobCounts(),
+    ]);
+    atualizarContagensBullmq("trabalhos", trabalhos as unknown as Record<string, number>);
+    atualizarContagensBullmq("planilha", planilhas as unknown as Record<string, number>);
+  }
   return metricas().registro.metrics();
 }
 

@@ -148,6 +148,13 @@ const esquema = z.object({
       )
       .optional(),
   ),
+  BULLMQ_PREFIX: z.preprocess(
+    ausenteSeVazio,
+    z
+      .string()
+      .regex(/^\{[A-Za-z0-9._-]+\}$/, "BULLMQ_PREFIX deve usar chaves, por exemplo {frequenciapp}.")
+      .default("{frequenciapp}"),
+  ),
   WORKER_PORTA: z.preprocess(
     ausenteSeVazio,
     z.coerce.number().int().min(1).max(65535).default(3001),
@@ -216,6 +223,9 @@ if (
 ) {
   throw new Error("FILA_PLANILHA_TRANSPORTE=bullmq exige FILA_DRIVER=redis.");
 }
+if (resultado.data.FILA_TRABALHOS_HABILITADA && resultado.data.FILA_DRIVER !== "redis") {
+  throw new Error("FILA_TRABALHOS_HABILITADA=true exige FILA_DRIVER=redis.");
+}
 
 const ehProducao = resultado.data.NODE_ENV === "production";
 // O valor do .env.example é público: em produção, quem o conhece decifra o
@@ -274,6 +284,7 @@ export const ambiente = {
       .map((tipo) => tipo.trim())
       .filter(Boolean),
     redisUrl: resultado.data.REDIS_URL,
+    prefixo: resultado.data.BULLMQ_PREFIX,
     workerPorta: resultado.data.WORKER_PORTA,
     workerConcorrencia: resultado.data.WORKER_CONCORRENCIA,
     workerPlanilhaConcorrencia: resultado.data.WORKER_PLANILHA_CONCORRENCIA,

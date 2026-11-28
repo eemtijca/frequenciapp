@@ -4,7 +4,7 @@ import { banco } from "@/infra/banco";
 import type { ContextoDoManipulador } from "@/application/fila-trabalhos";
 import type { ResultadoDoTrabalho } from "@/domain/trabalho";
 
-const entrada = z.object({}).strict();
+const entrada = z.object({ dia: z.string().optional() }).strict();
 const DIA = 86_400_000;
 
 export async function executarExpurgo(

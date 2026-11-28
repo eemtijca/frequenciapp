@@ -67,6 +67,49 @@ describe("GET /api/trabalhos", () => {
       (await chamar("/api/trabalhos/00000000-0000-0000-0000-000000000000", "GET", admin)).status,
     ).toBe(404);
   });
+
+  it("protege a resolução de conferência e recusa identificador inválido", async () => {
+    expect(
+      (
+        await fetch(`${APP_URL}/api/trabalhos/00000000-0000-0000-0000-000000000000/resolver`, {
+          method: "POST",
+          headers: { Origin: APP_URL, "Content-Type": "application/json" },
+          body: JSON.stringify({ decisao: "concluido" }),
+        })
+      ).status,
+    ).toBe(401);
+    const coordenacao = await entrar(EMAIL_COORDENACAO, SENHA_COORDENACAO);
+    expect(
+      (
+        await chamar(
+          "/api/trabalhos/00000000-0000-0000-0000-000000000000/resolver",
+          "POST",
+          coordenacao,
+          { decisao: "concluido" },
+        )
+      ).status,
+    ).toBe(403);
+    const admin = await entrar(EMAIL_ADMIN, SENHA_ADMIN);
+    expect(
+      (
+        await chamar("/api/trabalhos/nao-e-uuid/resolver", "POST", admin, {
+          decisao: "concluido",
+        })
+      ).status,
+    ).toBe(400);
+    expect(
+      (
+        await chamar(
+          "/api/trabalhos/00000000-0000-0000-0000-000000000000/resolver",
+          "POST",
+          admin,
+          {
+            decisao: "concluido",
+          },
+        )
+      ).status,
+    ).toBe(404);
+  });
 });
 
 describe.skipIf(FILA_REDIS)("POST /api/trabalhos/indicadores", () => {
@@ -74,5 +117,16 @@ describe.skipIf(FILA_REDIS)("POST /api/trabalhos/indicadores", () => {
     const admin = await entrar(EMAIL_ADMIN, SENHA_ADMIN);
     const resposta = await chamar("/api/trabalhos/indicadores", "POST", admin, {});
     expect(resposta.status).toBe(409);
+  });
+});
+
+describe.skipIf(FILA_REDIS)("POST /api/trabalhos/planilha-mensal", () => {
+  it("recusa um mês inválido antes da guarda da fila", async () => {
+    const admin = await entrar(EMAIL_ADMIN, SENHA_ADMIN);
+    const resposta = await chamar("/api/trabalhos/planilha-mensal", "POST", admin, {
+      turmaOriginalId: "00000000-0000-0000-0000-000000000000",
+      mes: "2026-13",
+    });
+    expect(resposta.status).toBe(400);
   });
 });

@@ -176,6 +176,8 @@ export interface ResumoDoProcessamento {
   /** Itens ainda abertos (aguardando ou em andamento) ao terminar. */
   abertos: number;
   aguardandoAte: string | null;
+  /** Verdadeiro quando a chamada apenas publicou a cabeça para o worker. */
+  despachado?: boolean;
 }
 
 export interface ItemDaFila {

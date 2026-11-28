@@ -2,13 +2,14 @@
 import { z } from "zod";
 import { prepararMesDaFrequencia } from "@/application/planilha-mensal";
 import type { ContextoDoManipulador } from "@/application/fila-trabalhos";
+import { mesValido } from "@/domain/planilha-mensal";
 import type { ResultadoDoTrabalho } from "@/domain/trabalho";
 import { resultadoDeErro } from "./erros";
 
 const entrada = z
   .object({
     turmaOriginalId: z.string().uuid(),
-    mes: z.string().regex(/^\d{4}-\d{2}$/),
+    mes: z.string().refine(mesValido, "Informe um mês válido."),
     autorId: z.string().uuid(),
   })
   .strict();

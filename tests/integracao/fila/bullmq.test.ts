@@ -14,6 +14,12 @@ import {
 
 const recebidos: string[] = [];
 
+function exigirPrefixoDeTeste(): void {
+  if (!PREFIXO_FILA.includes("teste")) {
+    throw new Error("A limpeza exige um prefixo Redis de teste, por exemplo {frequenciapp-teste}.");
+  }
+}
+
 async function esperar(condicao: () => boolean, tempoMs = 10_000): Promise<void> {
   const limite = Date.now() + tempoMs;
   while (Date.now() < limite) {
@@ -24,13 +30,16 @@ async function esperar(condicao: () => boolean, tempoMs = 10_000): Promise<void>
 }
 
 beforeAll(async () => {
+  exigirPrefixoDeTeste();
   await filaDeTrabalhos().obliterate({ force: true });
 });
 
 afterAll(async () => {
-  await filaDeTrabalhos()
-    .obliterate({ force: true })
-    .catch(() => undefined);
+  if (PREFIXO_FILA.includes("teste")) {
+    await filaDeTrabalhos()
+      .obliterate({ force: true })
+      .catch(() => undefined);
+  }
   await fecharFilas();
 });
 

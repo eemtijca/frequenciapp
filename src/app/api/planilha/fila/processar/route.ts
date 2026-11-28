@@ -10,7 +10,7 @@ export async function POST(requisicao: Request): Promise<Response> {
     if (!origemPermitida(requisicao)) return erroApi("Origem não permitida.", 403);
     const sessao = await exigirAdmin();
     if (!sessao.ok) return sessao.resposta;
-    const resumo = await despacharFilaPlanilha();
-    return json(resumo ?? { despachado: true });
+    const resumo = await despacharFilaPlanilha({ limite: 20 });
+    return json(resumo);
   });
 }
