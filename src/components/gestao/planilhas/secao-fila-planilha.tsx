@@ -127,10 +127,12 @@ export default function SecaoFilaPlanilha() {
           corpoJson({}),
         );
         if (resumo.despachado) {
-          avisarInfo(
-            "Fila publicada para o worker.",
-            "O processamento continua em segundo plano; acompanhe as contagens.",
-          );
+          if (resumo.abertos === 0) avisarInfo("Nada a processar agora.");
+          else
+            avisarInfo(
+              "Fila publicada para o worker.",
+              "O processamento continua em segundo plano; acompanhe as contagens.",
+            );
         } else if (resumo.processados === 0) avisarInfo("Nada a processar agora.");
         else
           avisarSucesso(
