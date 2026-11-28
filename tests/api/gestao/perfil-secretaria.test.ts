@@ -148,6 +148,12 @@ const recusas: Array<[string, string, string, unknown?]> = [
     "GET",
     "/api/provas/ocupacao?latitude=-3.7&longitude=-38.5",
   ],
+  [
+    "definir o local de um aluno na prova",
+    "PUT",
+    "/api/provas/00000000-0000-4000-8000-000000000001/locais",
+    { locais: [] },
+  ],
   ["alterar as configurações", "PATCH", "/api/configuracoes", { saidaAntecipada: false }],
   ["listar a equipe", "GET", "/api/usuarios"],
   [

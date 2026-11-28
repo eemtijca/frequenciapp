@@ -292,13 +292,13 @@ Auditoria `prova-especifica.criar`. Corpo `{"nome": string, "local"?: string | n
 
 Permissão: capacidade de operação, sem origem obrigatória.
 
-Soma os alunos que fazem prova em um lugar do mapa. Query: `latitude` e `longitude` obrigatórias, em graus decimais com ponto ou vírgula, e `provaId` opcional. Conta os alunos distintos de todas as provas marcadas a até 100 m do ponto (distância de haversine, de qualquer data); um aluno em duas provas do lugar conta uma vez. Com `provaId`, a prova em edição entra com os próprios alunos, mesmo que o ponto novo ainda não esteja salvo, e vem marcada com `atual: true`. 200 `{"alunos": number, "provas": [{"id", "nome", "dia", "alunos", "atual"}]}`, com as provas da mais recente para a mais antiga; 400 coordenada ausente, ilegível ou fora da faixa, ou `provaId` que não é UUID; 401 sem sessão; 403 papel sem a capacidade. Alimenta o selo numérico sobre o marcador do mapa e não devolve dado de aluno, só contagens e os nomes das provas.
+Soma os alunos que fazem prova em um lugar do mapa. Query: `latitude` e `longitude` obrigatórias, em graus decimais com ponto ou vírgula, e `provaId` opcional. Conta os alunos distintos cujo local efetivo fica a até 100 m do ponto (distância de haversine, de qualquer data); um aluno em duas provas do lugar conta uma vez. Coordenadas próprias do aluno vencem as da prova, e texto próprio sem ponto fica de fora. Com `provaId`, quem herda o local dessa prova usa o ponto consultado, mesmo que ele ainda não esteja salvo, e a prova vem marcada com `atual: true`. 200 `{"alunos": number, "provas": [{"id", "nome", "dia", "alunos", "atual"}]}`, com as provas da mais recente para a mais antiga; 400 coordenada ausente, ilegível ou fora da faixa, ou `provaId` que não é UUID; 401 sem sessão; 403 papel sem a capacidade. Alimenta o selo numérico sobre o marcador do mapa e não devolve dado de aluno, só contagens e os nomes das provas.
 
 ### GET /api/provas/{id}
 
 Permissão: capacidade de operação, sem origem obrigatória.
 
-200 `{"prova", "participantes": [{"alunoId", "nome", "turmaId", "presente"}]}`, com os alunos em ordem alfabética e `presente` verdadeiro, falso ou nulo (sem registro). 404 quando a prova não existe ou o id não é um UUID.
+200 `{"prova", "participantes": [{"alunoId", "nome", "turmaId", "presente", "local", "latitude", "longitude"}]}`, com os alunos em ordem alfabética e `presente` verdadeiro, falso ou nulo (sem registro). `local`, `latitude` e `longitude` nulos herdam o local da prova; a resposta traz o que está gravado, e a tela resolve a herança. 404 quando a prova não existe ou o id não é um UUID.
 
 ### PATCH /api/provas/{id}
 
@@ -323,6 +323,16 @@ Auditoria `prova-especifica.participantes`. Corpo `{"alunoIds": uuid[]}`, a list
 Permissão: capacidade de operação, com origem confiável e auditoria.
 
 Auditoria `prova-especifica.frequencia`. Corpo `{"marcas": [{"alunoId": uuid, "presente": true | false | null}]}`, de 1 a 3000 marcas. `true` é presente, `false` é ausente e `null` limpa o registro. Só vale para aluno já inscrito, e a gravação é atômica. 200 no formato da leitura; 400 marca inválida ou aluno fora da prova; 404 prova inexistente.
+
+### PUT /api/provas/{id}/locais
+
+Permissão: capacidade de operação, com origem confiável e auditoria.
+
+Auditoria `prova-especifica.locais`, com o identificador da prova e a quantidade, sem nome de aluno e sem o texto do local. Corpo `{"locais": [{"alunoId": uuid, "local": string | null, "latitude"?: number | null, "longitude"?: number | null}]}`, de 1 a 3000 itens, sem aluno repetido. Grava o local próprio de quem já está inscrito; quem fica de fora da lista não muda, e a frequência permanece. Local nulo, ou só espaços, sem coordenadas, apaga o próprio e volta a herdar o da prova. Texto próprio sem ponto não herda as coordenadas. O ponto exige as duas coordenadas e o nome do local; a aplicação arredonda em seis casas e o banco recusa par incompleto ou fora da faixa. 200 no formato da leitura; 400 local longo, ponto sem nome, coordenada sozinha ou fora da faixa, aluno de fora, lista vazia ou repetida; 404 prova inexistente ou id inválido.
+
+Na tela, uma lista colada casa o nome com um único aluno inscrito e grava por esta rota. Linha sem par, nome ambíguo ou local divergente não é enviada. A cola não traz ponto no mapa ([ADR-089](adr/089-local-por-aluno-na-prova.md)).
+
+`GET /api/provas/ocupacao` conta o ponto efetivo: coordenadas próprias vencem, texto próprio sem ponto fica de fora e quem herda usa o ponto da prova. Com `provaId`, quem herda essa prova usa o ponto consultado.
 
 As provas específicas não entram na cópia JSON.
 

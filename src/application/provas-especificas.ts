@@ -7,17 +7,21 @@ import { ErroHttp } from "@/infra/erros";
 import {
   caixaDeBusca,
   coordenadaDoTexto,
-  distanciaEmMetros,
   LIMITE_PARTICIPANTES_PROVA,
+  normalizarLocalDoAluno,
   normalizarProvaEspecifica,
+  ocupacaoDasProvas,
   problemaNaProvaEspecifica,
   problemaNasCoordenadas,
+  problemaNoLocalDoAluno,
   RAIO_DO_MESMO_LOCAL_METROS,
   resumirMarcas,
+  type LocalGravado,
   type MarcaDaProva,
   type OcupacaoDoLocal,
   type ParticipanteDaProva,
   type ProvaEspecifica,
+  type ProvaParaOcupacao,
 } from "@/domain/provas-especificas";
 
 const esquemaProva = z
@@ -36,6 +40,28 @@ const listaDeAlunos = z
   .refine((ids) => new Set(ids).size === ids.length, "Há alunos repetidos na lista.");
 
 const esquemaParticipantes = z.object({ alunoIds: listaDeAlunos }).strict();
+
+const esquemaLocalDoAluno = z
+  .object({
+    alunoId: z.uuid("Aluno inválido."),
+    local: z.string("Local inválido.").nullable(),
+    latitude: z.number("Latitude inválida.").nullish(),
+    longitude: z.number("Longitude inválida.").nullish(),
+  })
+  .strict();
+
+const esquemaLocais = z
+  .object({
+    locais: z
+      .array(esquemaLocalDoAluno, "Informe os locais.")
+      .min(1, "Informe ao menos um local.")
+      .max(LIMITE_PARTICIPANTES_PROVA, `Envie no máximo ${LIMITE_PARTICIPANTES_PROVA} locais.`)
+      .refine(
+        (itens) => new Set(itens.map((item) => item.alunoId)).size === itens.length,
+        "Há alunos repetidos na lista.",
+      ),
+  })
+  .strict();
 
 const esquemaFrequencia = z
   .object({
@@ -131,7 +157,14 @@ export async function lerProvaEspecifica(
     where: { id },
     include: {
       participantes: {
-        select: { alunoId: true, presente: true, aluno: { select: { nome: true, turmaId: true } } },
+        select: {
+          alunoId: true,
+          presente: true,
+          local: true,
+          latitude: true,
+          longitude: true,
+          aluno: { select: { nome: true, turmaId: true } },
+        },
       },
     },
   });
@@ -142,6 +175,9 @@ export async function lerProvaEspecifica(
       nome: linha.aluno.nome,
       turmaId: linha.aluno.turmaId,
       presente: linha.presente,
+      local: linha.local,
+      latitude: linha.latitude,
+      longitude: linha.longitude,
     }))
     .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   const contagem = resumirMarcas(participantes.map((p) => p.presente));
@@ -276,6 +312,63 @@ export async function definirParticipantes(
   });
 }
 
+/**
+ * Grava o local próprio de alunos já inscritos. Local nulo e sem coordenadas volta a herdar
+ * o da prova. Não altera a frequência. A auditoria guarda só a prova e a quantidade.
+ */
+export async function definirLocaisDaProva(
+  usuario: { id: string },
+  id: string,
+  entrada: unknown,
+): Promise<void> {
+  exigirId(id);
+  const dados = esquemaLocais.safeParse(entrada);
+  if (!dados.success) throw primeiroErro(dados.error);
+  const preparados: Array<LocalGravado & { alunoId: string }> = [];
+  for (const item of dados.data.locais) {
+    const local = normalizarLocalDoAluno(item);
+    const problema = problemaNoLocalDoAluno(local);
+    if (problema) throw new ErroHttp(problema, 400);
+    preparados.push({ alunoId: item.alunoId, ...local });
+  }
+
+  await comTransacao(async (tx) => {
+    const prova = await tx.provaEspecifica.findUnique({ where: { id }, select: { id: true } });
+    if (!prova) throw new ErroHttp("Prova não encontrada.", 404);
+    const alunoIds = preparados.map((item) => item.alunoId);
+    const inscritos = await tx.participanteProva.count({
+      where: { provaId: id, alunoId: { in: alunoIds } },
+    });
+    if (inscritos !== alunoIds.length) {
+      throw new ErroHttp("Há aluno que não está inscrito nesta prova.", 400);
+    }
+    const grupos = new Map<string, { dados: LocalGravado; alunoIds: string[] }>();
+    for (const item of preparados) {
+      const chave = JSON.stringify([item.local, item.latitude, item.longitude]);
+      const grupo = grupos.get(chave);
+      if (grupo) grupo.alunoIds.push(item.alunoId);
+      else {
+        grupos.set(chave, {
+          dados: { local: item.local, latitude: item.latitude, longitude: item.longitude },
+          alunoIds: [item.alunoId],
+        });
+      }
+    }
+    for (const grupo of grupos.values()) {
+      await tx.participanteProva.updateMany({
+        where: { provaId: id, alunoId: { in: grupo.alunoIds } },
+        data: grupo.dados,
+      });
+    }
+    await auditar(
+      tx,
+      usuario.id,
+      "prova-especifica.locais",
+      `prova:${id}:locais:${alunoIds.length}`,
+    );
+  });
+}
+
 /** Grava presente, ausente ou sem registro para alunos já inscritos na prova. */
 export async function registrarFrequenciaDaProva(
   usuario: { id: string },
@@ -316,8 +409,9 @@ export async function registrarFrequenciaDaProva(
 }
 
 /**
- * Soma os alunos distintos das provas marcadas no mesmo lugar, a até 100 m do ponto. A prova em
- * edição entra na conta com os próprios alunos, mesmo que o ponto novo ainda não esteja salvo.
+ * Soma os alunos distintos cujo local efetivo fica a até 100 m do ponto. Coordenadas próprias
+ * do aluno vencem as da prova; texto próprio sem ponto fica fora do mapa. A prova em edição
+ * empresta o ponto consultado a quem ainda herda o local dela, mesmo antes de salvar.
  * Um aluno em duas provas do mesmo lugar conta uma vez.
  */
 export async function lerOcupacaoDoLocal(entrada: unknown): Promise<OcupacaoDoLocal> {
@@ -328,10 +422,15 @@ export async function lerOcupacaoDoLocal(entrada: unknown): Promise<OcupacaoDoLo
   if (problema) throw new ErroHttp(problema, 400);
 
   // A caixa é folgada de propósito; a distância exata é conferida em seguida, em metros.
-  const caixa = caixaDeBusca({ latitude, longitude }, RAIO_DO_MESMO_LOCAL_METROS);
+  const ponto = { latitude, longitude };
+  const caixa = caixaDeBusca(ponto, RAIO_DO_MESMO_LOCAL_METROS);
   const linhas = await banco().provaEspecifica.findMany({
     where: {
-      OR: [...(provaId === null ? [] : [{ id: provaId }]), caixa],
+      OR: [
+        ...(provaId === null ? [] : [{ id: provaId }]),
+        caixa,
+        { participantes: { some: caixa } },
+      ],
     },
     select: {
       id: true,
@@ -339,32 +438,22 @@ export async function lerOcupacaoDoLocal(entrada: unknown): Promise<OcupacaoDoLo
       dia: true,
       latitude: true,
       longitude: true,
-      participantes: { select: { alunoId: true } },
+      participantes: { select: { alunoId: true, local: true, latitude: true, longitude: true } },
     },
   });
 
-  const distintos = new Set<string>();
-  const provas = linhas
-    .filter((linha) => {
-      if (linha.id === provaId) return true;
-      if (linha.latitude === null || linha.longitude === null) return false;
-      return (
-        distanciaEmMetros(
-          { latitude, longitude },
-          { latitude: linha.latitude, longitude: linha.longitude },
-        ) <= RAIO_DO_MESMO_LOCAL_METROS
-      );
-    })
-    .sort((a, b) => b.dia.getTime() - a.dia.getTime() || a.nome.localeCompare(b.nome, "pt-BR"))
-    .map((linha) => {
-      for (const { alunoId } of linha.participantes) distintos.add(alunoId);
-      return {
-        id: linha.id,
-        nome: linha.nome,
-        dia: paraDia(linha.dia),
-        alunos: linha.participantes.length,
-        atual: linha.id === provaId,
-      };
-    });
-  return { alunos: distintos.size, provas };
+  const provas: ProvaParaOcupacao[] = linhas.map((linha) => {
+    const emEdicao = linha.id === provaId;
+    return {
+      id: linha.id,
+      nome: linha.nome,
+      dia: paraDia(linha.dia),
+      latitude: linha.latitude,
+      longitude: linha.longitude,
+      participantes: linha.participantes,
+      emEdicao,
+      pontoHerdado: emEdicao ? ponto : null,
+    };
+  });
+  return ocupacaoDasProvas(ponto, provas);
 }

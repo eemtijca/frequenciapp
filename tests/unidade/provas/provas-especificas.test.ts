@@ -1,25 +1,32 @@
 // Provas específicas: normalização, validação do cadastro e contagem das marcas de frequência.
 import { describe, expect, it } from "vitest";
 import {
+  agruparPorLocal,
   caixaDeBusca,
+  casarLocaisColados,
   comMarca,
   coordenadaDoTexto,
   distanciaEmMetros,
   enderecoNoOpenStreetMap,
   LIMITE_LATITUDE,
-  LIMITE_LONGITUDE,
   LIMITE_LOCAL_PROVA_ESPECIFICA,
+  LIMITE_LONGITUDE,
   LIMITE_NOME_PROVA_ESPECIFICA,
+  normalizarLocalDoAluno,
   normalizarProvaEspecifica,
+  ocupacaoDasProvas,
   problemaNaCoordenada,
   problemaNaProvaEspecifica,
   problemaNasCoordenadas,
+  problemaNoLocalDoAluno,
   RAIO_DO_MESMO_LOCAL_METROS,
+  resolverLocalDoAluno,
   resumirMarcas,
   resumoDaOcupacao,
   rotuloDaContagem,
   rotuloDasCoordenadas,
   type DetalheDaProva,
+  type ParticipanteDaProva,
 } from "@/domain/provas-especificas";
 
 const valida = {
@@ -260,16 +267,48 @@ describe("marca de um participante", () => {
       ausentes: 0,
     },
     participantes: [
-      { alunoId: "aluno-1", nome: "Ana", turmaId: "turma-1", presente: null },
-      { alunoId: "aluno-2", nome: "Bruno", turmaId: "turma-1", presente: null },
+      {
+        alunoId: "aluno-1",
+        nome: "Ana",
+        turmaId: "turma-1",
+        presente: null,
+        local: null,
+        latitude: null,
+        longitude: null,
+      },
+      {
+        alunoId: "aluno-2",
+        nome: "Bruno",
+        turmaId: "turma-1",
+        presente: null,
+        local: null,
+        latitude: null,
+        longitude: null,
+      },
     ],
   };
 
   it("marca só o aluno escolhido e recalcula os contadores", () => {
     const marcado = comMarca(detalhe, "aluno-1", true);
     expect(marcado.participantes).toEqual([
-      { alunoId: "aluno-1", nome: "Ana", turmaId: "turma-1", presente: true },
-      { alunoId: "aluno-2", nome: "Bruno", turmaId: "turma-1", presente: null },
+      {
+        alunoId: "aluno-1",
+        nome: "Ana",
+        turmaId: "turma-1",
+        presente: true,
+        local: null,
+        latitude: null,
+        longitude: null,
+      },
+      {
+        alunoId: "aluno-2",
+        nome: "Bruno",
+        turmaId: "turma-1",
+        presente: null,
+        local: null,
+        latitude: null,
+        longitude: null,
+      },
     ]);
     expect(marcado.prova).toMatchObject({ total: 2, presentes: 1, ausentes: 0 });
   });
@@ -280,5 +319,228 @@ describe("marca de um participante", () => {
     expect(limpo.participantes[0]?.presente).toBeNull();
     expect(limpo.participantes[1]?.presente).toBeNull();
     expect(limpo.prova).toMatchObject({ presentes: 0, ausentes: 0 });
+  });
+
+  it("mantém o local próprio ao marcar a frequência", () => {
+    const comLocal: DetalheDaProva = {
+      ...detalhe,
+      participantes: detalhe.participantes.map((item) =>
+        item.alunoId === "aluno-1" ? { ...item, local: "Campus Betânia" } : item,
+      ),
+    };
+    expect(comMarca(comLocal, "aluno-1", true).participantes[0]?.local).toBe("Campus Betânia");
+  });
+});
+
+describe("local próprio do aluno", () => {
+  const prova = {
+    local: "Campus central",
+    latitude: -3.7319,
+    longitude: -38.5267,
+  };
+  const vazio = { local: null, latitude: null, longitude: null };
+
+  function participante(
+    parcial: Partial<ParticipanteDaProva> & Pick<ParticipanteDaProva, "alunoId" | "nome">,
+  ): ParticipanteDaProva {
+    return {
+      turmaId: "turma-1",
+      presente: null,
+      ...vazio,
+      ...parcial,
+    };
+  }
+
+  it("herda texto e ponto da prova quando o aluno não tem local", () => {
+    expect(normalizarLocalDoAluno({ local: "  " })).toEqual(vazio);
+    expect(problemaNoLocalDoAluno(vazio)).toBeNull();
+    expect(resolverLocalDoAluno(vazio, prova)).toEqual({ ...prova, proprio: false });
+  });
+
+  it("usa o texto próprio e não herda o ponto da prova quando não há coordenadas", () => {
+    const proprio = normalizarLocalDoAluno({ local: " Campus Betânia " });
+    expect(proprio).toEqual({ local: "Campus Betânia", latitude: null, longitude: null });
+    expect(problemaNoLocalDoAluno(proprio)).toBeNull();
+    expect(resolverLocalDoAluno(proprio, prova)).toEqual({ ...proprio, proprio: true });
+  });
+
+  it("guarda o ponto próprio junto com o nome e recusa ponto sem nome", () => {
+    const comPonto = normalizarLocalDoAluno({
+      local: "Campus Junco",
+      latitude: -3.731912345,
+      longitude: -38.526712345,
+    });
+    expect(comPonto.latitude).toBe(-3.731912);
+    expect(comPonto.longitude).toBe(-38.526712);
+    expect(problemaNoLocalDoAluno(comPonto)).toBeNull();
+    expect(resolverLocalDoAluno(comPonto, prova).proprio).toBe(true);
+    expect(problemaNoLocalDoAluno({ local: null, latitude: -3.7, longitude: -38.5 })).toBe(
+      "Informe o nome do local junto com o ponto no mapa.",
+    );
+    expect(problemaNoLocalDoAluno({ local: "Sala", latitude: -3.7, longitude: null })).toBe(
+      "Informe a latitude e a longitude juntas.",
+    );
+  });
+
+  it("agrupa pelo local efetivo e conta o comparecimento de cada lugar", () => {
+    const grupos = agruparPorLocal(
+      [
+        participante({ alunoId: "1", nome: "Ana", presente: true }),
+        participante({ alunoId: "2", nome: "Bruno", presente: false, local: "Campus Betânia" }),
+        participante({ alunoId: "3", nome: "Caio", presente: null, local: "campus betania" }),
+        participante({ alunoId: "4", nome: "Dani", presente: true, local: "Campus Junco" }),
+      ],
+      prova,
+    );
+    expect(grupos).toEqual([
+      {
+        chave: "campus betania",
+        local: "Campus Betânia",
+        total: 2,
+        presentes: 0,
+        ausentes: 1,
+        pendentes: 1,
+      },
+      {
+        chave: "campus central",
+        local: "Campus central",
+        total: 1,
+        presentes: 1,
+        ausentes: 0,
+        pendentes: 0,
+      },
+      {
+        chave: "campus junco",
+        local: "Campus Junco",
+        total: 1,
+        presentes: 1,
+        ausentes: 0,
+        pendentes: 0,
+      },
+    ]);
+  });
+
+  it("conta no mapa só quem tem ponto efetivo naquele lugar", () => {
+    const ponto = { latitude: -3.7319, longitude: -38.5267 };
+    const outro = { latitude: -3.8, longitude: -38.6 };
+    const base = {
+      id: "prova-1",
+      nome: "UVA",
+      dia: "2027-01-10",
+      latitude: ponto.latitude,
+      longitude: ponto.longitude,
+      emEdicao: false,
+      pontoHerdado: null,
+    };
+    const ocupacao = ocupacaoDasProvas(ponto, [
+      {
+        ...base,
+        participantes: [
+          { alunoId: "herda", ...vazio },
+          { alunoId: "texto", local: "Campus Junco", latitude: null, longitude: null },
+          {
+            alunoId: "longe",
+            local: "Outro",
+            latitude: outro.latitude,
+            longitude: outro.longitude,
+          },
+        ],
+      },
+    ]);
+    expect(ocupacao.alunos).toBe(1);
+    expect(ocupacao.provas).toEqual([
+      { id: "prova-1", nome: "UVA", dia: "2027-01-10", alunos: 1, atual: false },
+    ]);
+
+    const noOutro = ocupacaoDasProvas(outro, [
+      {
+        ...base,
+        participantes: [
+          { alunoId: "herda", ...vazio },
+          {
+            alunoId: "longe",
+            local: "Outro",
+            latitude: outro.latitude,
+            longitude: outro.longitude,
+          },
+        ],
+      },
+    ]);
+    expect(noOutro.alunos).toBe(1);
+    expect(noOutro.provas[0]?.alunos).toBe(1);
+
+    const emEdicao = ocupacaoDasProvas(outro, [
+      {
+        ...base,
+        emEdicao: true,
+        pontoHerdado: outro,
+        participantes: [
+          { alunoId: "herda", ...vazio },
+          {
+            alunoId: "longe",
+            local: "Outro",
+            latitude: ponto.latitude,
+            longitude: ponto.longitude,
+          },
+        ],
+      },
+    ]);
+    expect(emEdicao).toEqual({
+      alunos: 1,
+      provas: [{ id: "prova-1", nome: "UVA", dia: "2027-01-10", alunos: 1, atual: true }],
+    });
+  });
+});
+
+describe("lista colada de locais", () => {
+  const alunos = [
+    { alunoId: "ana", nome: "Ana Souza" },
+    { alunoId: "bruno", nome: "Bruno Lima" },
+    { alunoId: "caio", nome: "Caio Lima" },
+  ];
+
+  it("casa por nome sem acento, com tabulação, ponto e vírgula ou barra vertical", () => {
+    const texto = [
+      "Nome;Local",
+      "ana   souza;Campus Betânia",
+      "Bruno Lima\tCampus Junco",
+      "Caio Lima | IFCE",
+    ].join("\n");
+    expect(casarLocaisColados(texto, alunos)).toEqual({
+      casados: [
+        { alunoId: "ana", nome: "Ana Souza", local: "Campus Betânia" },
+        { alunoId: "bruno", nome: "Bruno Lima", local: "Campus Junco" },
+        { alunoId: "caio", nome: "Caio Lima", local: "IFCE" },
+      ],
+      recusados: [],
+    });
+  });
+
+  it("repete o mesmo local uma vez e recusa sem par, ambíguo, divergente e linha inválida", () => {
+    const texto = [
+      "Ana Souza;Campus Betânia",
+      "Ana Souza;Campus Betânia",
+      "Pessoa de fora;Campus X",
+      "Bruno Lima;Campus A",
+      "Bruno Lima;Campus B",
+      "Caio Lima;Escola Maria",
+      "linha sem separador",
+      ";Campus",
+      `Dani;${"a".repeat(LIMITE_LOCAL_PROVA_ESPECIFICA + 1)}`,
+    ].join("\n");
+    const homonimos = [...alunos, { alunoId: "caio-2", nome: "Caio Lima" }];
+    const resultado = casarLocaisColados(texto, homonimos);
+    expect(resultado.casados).toEqual([
+      { alunoId: "ana", nome: "Ana Souza", local: "Campus Betânia" },
+    ]);
+    expect(resultado.recusados.map((item) => item.motivo)).toEqual([
+      "Não há aluno com esse nome nesta prova.",
+      "O nome aparece mais de uma vez com locais diferentes.",
+      "O nome aparece mais de uma vez com locais diferentes.",
+      "Há mais de um aluno com esse nome nesta prova.",
+      "Informe o nome e o local separados por tabulação, ponto e vírgula ou barra vertical.",
+      "Informe o nome do aluno.",
+      `O local deve ter no máximo ${LIMITE_LOCAL_PROVA_ESPECIFICA} caracteres.`,
+    ]);
   });
 });

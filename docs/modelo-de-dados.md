@@ -156,10 +156,13 @@ O horário de provas é temporário. A administração cadastra a mesma prova pa
 | provaId      | uuid     | Prova. Excluir a prova remove a inscrição.                   |
 | alunoId      | uuid     | Aluno. Excluir o aluno remove a inscrição. Único por prova.  |
 | presente     | booleano | Nulo é sem registro, verdadeiro é presente, falso é ausente. |
+| local        | texto    | Opcional, até 120 caracteres. Nulo herda o local da prova.   |
+| latitude     | real     | Opcional. Com local próprio e sem ponto, não herda o ponto.  |
+| longitude    | real     | Opcional, junto com a latitude.                              |
 | criadoEm     | data     |                                                              |
 | atualizadoEm | data     |                                                              |
 
-As coordenadas vêm do mapa do OpenStreetMap, do GPS do aparelho ou da digitação, e descrevem o local da prova; uma restrição do banco exige as duas ou nenhuma, dentro da faixa geográfica ([ADR-086](adr/086-mapa-openstreetmap-para-locais-de-prova.md)). Só aluno ativo e sem desistência entra na prova; quem já está inscrito continua se depois for desativado. A frequência da prova é independente da Chamada e das planilhas, e as provas específicas não entram na cópia JSON ([ADR-085](adr/085-provas-especificas.md)).
+As coordenadas vêm do mapa do OpenStreetMap, do GPS do aparelho ou da digitação, e descrevem o local da prova ou o local próprio do aluno; uma restrição do banco exige as duas ou nenhuma, dentro da faixa geográfica ([ADR-086](adr/086-mapa-openstreetmap-para-locais-de-prova.md), [ADR-089](adr/089-local-por-aluno-na-prova.md)). Só aluno ativo e sem desistência entra na prova; quem já está inscrito continua se depois for desativado. A frequência da prova é independente da Chamada e das planilhas, e as provas específicas não entram na cópia JSON ([ADR-085](adr/085-provas-especificas.md)).
 
 ## Frequência (frequencia)
 

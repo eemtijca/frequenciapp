@@ -29,3 +29,4 @@ A escola leva alunos a provas externas, como o Enem e vestibulares, que não sã
 - A frequência em provas não altera a Chamada, as faltas, os relatórios nem as planilhas.
 - As provas específicas não entram na cópia JSON; restaurar uma cópia não as traz.
 - A migração é aditiva e não reescreve dados existentes.
+- O local por aluno, com herança do local geral, está na [ADR-089](089-local-por-aluno-na-prova.md).
