@@ -4,9 +4,10 @@
 services:
   app:
     environment:
-      FILA_DRIVER: redis
-      FILA_PLANILHA_TRANSPORTE: bullmq
-      FILA_TRABALHOS_HABILITADA: "true"
+      FILA_DRIVER: ${FILA_DRIVER:-redis}
+      FILA_PLANILHA_TRANSPORTE: ${FILA_PLANILHA_TRANSPORTE:-bullmq}
+      FILA_TRABALHOS_HABILITADA: ${FILA_TRABALHOS_HABILITADA:-true}
+      BULLMQ_PREFIX: ${BULLMQ_PREFIX:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:?Defina REDIS_PASSWORD}@redis:6379/0
       WORKER_TIMEOUT: ${WORKER_TIMEOUT:-240}
       WORKER_SHUTDOWN_TIMEOUT: ${WORKER_SHUTDOWN_TIMEOUT:-30}
@@ -55,9 +56,10 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-frequencia}:${POSTGRES_PASSWORD:-frequencia}@db:5432/${POSTGRES_DB:-frequencia}
       AUTH_SECRET: ${AUTH_SECRET:?Defina AUTH_SECRET no .env}
-      FILA_DRIVER: redis
-      FILA_PLANILHA_TRANSPORTE: bullmq
-      FILA_TRABALHOS_HABILITADA: "true"
+      FILA_DRIVER: ${FILA_DRIVER:-redis}
+      FILA_PLANILHA_TRANSPORTE: ${FILA_PLANILHA_TRANSPORTE:-bullmq}
+      FILA_TRABALHOS_HABILITADA: ${FILA_TRABALHOS_HABILITADA:-true}
+      BULLMQ_PREFIX: ${BULLMQ_PREFIX:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:?Defina REDIS_PASSWORD}@redis:6379/0
       WORKER_PORTA: ${WORKER_PORTA:-3001}
       WORKER_CONCORRENCIA: ${WORKER_CONCORRENCIA:-2}
@@ -97,6 +99,9 @@ services:
       - no-new-privileges:true
     networks:
       - interna
+      # Saída necessária para OAuth e Sheets API. O Redis e o banco continuam
+      # inacessíveis pela rede interna do servidor.
+      - publica
     stop_grace_period: 60s
     logging:
       driver: json-file
@@ -106,3 +111,9 @@ services:
 
 volumes:
   redisdata:
+
+networks:
+  # No Compose local, a rede interna permite saída. No servidor, a sobreposição
+  # a torna isolada e a rede publica é o único caminho para a internet.
+  interna:
+  publica:

@@ -394,9 +394,11 @@ O Prometheus já envia alertas para `alertmanager:9093`. Sem o perfil, os alerta
 
 A fila é opt-in. No `ops.env`, definir `FILA_HABILITADA=true`; no `app.env`, definir `REDIS_PASSWORD` com um valor longo. O `compose.fila.yml` entra automaticamente na lista efetiva quando a flag está ligada. Com `COMPOSE_ARQUIVOS` explícita, incluir o overlay na lista.
 
-O overlay sobe `redis` e `worker` na rede interna, sem portas publicadas. O worker usa a mesma imagem da aplicação, executa `node dist/worker.mjs` e encerra em até 60 segundos. O Redis usa AOF, `maxmemory-policy noeviction` e senha.
+O overlay sobe `redis` e `worker`, sem portas publicadas. O Redis fica apenas na rede interna; o worker entra também na rede pública porque precisa alcançar o OAuth e a Sheets API. O worker usa a mesma imagem da aplicação, executa `node dist/worker.mjs` e encerra em até 60 segundos. O Redis usa AOF, `maxmemory-policy noeviction` e senha.
 
 A fila não substitui o backup do banco. O PostgreSQL continua sendo a fonte da verdade. Se o volume do Redis for perdido, recriar o volume e reiniciar o worker; o pump e o reconciliador reconstroem a fila. O guia completo está em [fila-processamento.md](fila-processamento.md).
+
+Para desligar a fila, definir `FILA_HABILITADA=false` no `ops.env` e subir sem o overlay. Como rollback parcial, manter o overlay e usar `FILA_PLANILHA_TRANSPORTE=direto` com `FILA_TRABALHOS_HABILITADA=false`; o worker fica ocioso e a agenda volta a processar. As duas formas precisam passar por `scripts/servidor/compose.sh config` antes da subida.
 
 No perfil controlador, a inclusão de `redis` e `worker` altera a topologia e exige readoção revisada. A agenda de cinco minutos continua como fallback da fila de planilhas e dos indicadores.
 

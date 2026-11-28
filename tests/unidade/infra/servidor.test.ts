@@ -235,9 +235,11 @@ describe("servidor auto-hospedado", () => {
 
     expect(token).toMatch(/^[A-Za-z0-9_-]{32,200}$/);
     expect(validar).toContain("export PROMETHEUS_PORTA=9090");
-    expect(validar.match(/compose\.observabilidade\.yml/g)).toHaveLength(6);
-    expect(validar.match(/compose\.fila\.yml/g)).toHaveLength(2);
+    expect(validar.match(/compose\.observabilidade\.yml/g)).toHaveLength(8);
+    expect(validar.match(/compose\.fila\.yml/g)).toHaveLength(4);
     expect(validar.match(/--profile alertas/g)).toHaveLength(2);
+    expect(validar).toContain("config.networks?.interna?.internal");
+    expect(validar).toContain("FILA_PLANILHA_TRANSPORTE=direto");
     expect(validar).toContain("infra/observabilidade/prometheus/entrypoint.sh");
     expect(validar).toContain(
       "prom/prometheus:v3.16.0@sha256:e04987641b57704f408e31f6373ba4138ecf27cb4a165d24aabb6c38fddd0f06",

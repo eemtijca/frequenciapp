@@ -51,7 +51,7 @@ Se a migration inicial for recriada durante o desenvolvimento, bancos antigos pr
 
 ## Fila de processamento no Compose
 
-O overlay `compose.fila.yml` sobe Redis e o worker na rede interna. Ele é opcional e não altera o caminho simples:
+O overlay `compose.fila.yml` sobe Redis na rede interna e o worker nas redes interna e pública, porque ele precisa alcançar o OAuth e a Sheets API. Ele é opcional e não altera o caminho simples:
 
 ```bash
 docker compose -f compose.yml -f compose.fila.yml up --build
@@ -69,7 +69,7 @@ FILA_PLANILHA_TRANSPORTE=direto
 FILA_TRABALHOS_HABILITADA=false
 ```
 
-O worker não roda na Vercel. A operação completa está em [fila-processamento.md](fila-processamento.md).
+O worker não roda na Vercel. Para desligar a fila, remover o overlay e definir `FILA_HABILITADA=false`; como rollback parcial, manter o overlay e usar `FILA_PLANILHA_TRANSPORTE=direto` com `FILA_TRABALHOS_HABILITADA=false`, recriando o app. A operação completa está em [fila-processamento.md](fila-processamento.md).
 
 ## Servidor auto-hospedado
 

@@ -98,6 +98,62 @@ docker compose \
   -f "$REPO/compose.servidor.yml" \
   -f "$REPO/compose.servidor-caddy.yml" \
   -f "$REPO/compose.observabilidade.yml" \
+  -f "$REPO/compose.fila.yml" \
+  config --format json | node -e '
+let entrada = "";
+process.stdin.on("data", (parte) => {
+  entrada += parte;
+});
+process.stdin.on("end", () => {
+  const config = JSON.parse(entrada);
+  const worker = config.services.worker;
+  const redes = Object.keys(worker.networks ?? {});
+  if (!redes.includes("interna") || !redes.includes("publica")) {
+    console.error("O worker precisa das redes interna e publica.");
+    process.exit(1);
+  }
+  if (config.networks?.interna?.internal !== true) {
+    console.error("A rede interna do servidor precisa ser isolada.");
+    process.exit(1);
+  }
+  if ((worker.ports ?? []).length > 0) {
+    console.error("O worker não pode publicar portas.");
+    process.exit(1);
+  }
+});
+'
+
+FILA_PLANILHA_TRANSPORTE=direto FILA_TRABALHOS_HABILITADA=false \
+  docker compose \
+  -f "$REPO/compose.yml" \
+  -f "$REPO/compose.servidor.yml" \
+  -f "$REPO/compose.servidor-caddy.yml" \
+  -f "$REPO/compose.observabilidade.yml" \
+  -f "$REPO/compose.fila.yml" \
+  config --format json | node -e '
+let entrada = "";
+process.stdin.on("data", (parte) => {
+  entrada += parte;
+});
+process.stdin.on("end", () => {
+  const config = JSON.parse(entrada);
+  const ambiente = config.services.app.environment;
+  if (ambiente.FILA_PLANILHA_TRANSPORTE !== "direto") {
+    console.error("O rollback não alterou o transporte da fila de planilhas.");
+    process.exit(1);
+  }
+  if (String(ambiente.FILA_TRABALHOS_HABILITADA) !== "false") {
+    console.error("O rollback não desligou a fila de trabalhos.");
+    process.exit(1);
+  }
+});
+'
+
+docker compose \
+  -f "$REPO/compose.yml" \
+  -f "$REPO/compose.servidor.yml" \
+  -f "$REPO/compose.servidor-caddy.yml" \
+  -f "$REPO/compose.observabilidade.yml" \
   --profile alertas \
   config --quiet
 
