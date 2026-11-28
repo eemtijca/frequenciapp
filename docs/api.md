@@ -274,11 +274,11 @@ Excluir uma turma remove as provas dela. As provas são temporárias e não entr
 
 ## Provas
 
-Provas específicas, como o Enem e vestibulares. Todas as rotas exigem sessão com a capacidade de operação (administração e coordenação); as escritas pedem origem confiável e geram auditoria. Ver [ADR-085](adr/085-provas-especificas.md).
+Provas específicas, como o Enem e vestibulares. Quem opera (administração e coordenação) grava. A Secretaria consulta a lista, o detalhe, a rota e a busca de endereço, e não grava. O diretor de turma lê e grava a rota, a frequência e o ponto quando a prova tem aluno de turma vigente do vínculo. As escritas pedem origem confiável e geram auditoria. Ver [ADR-085](adr/085-provas-especificas.md) e [ADR-090](adr/090-rota-da-prova.md).
 
 ### GET /api/provas
 
-Permissão: capacidade de operação, sem origem obrigatória.
+Permissão: administração, coordenação, Secretaria ou diretor de turma, sem origem obrigatória. O diretor recebe só as provas com aluno de turma vigente.
 
 Devolve `{"provas": [{"id", "nome", "local", "latitude", "longitude", "dia", "total", "presentes", "ausentes"}]}`, da data mais recente para a mais antiga. `local`, `latitude` e `longitude` são nulos quando não foram informados.
 
@@ -296,9 +296,9 @@ Soma os alunos que fazem prova em um lugar do mapa. Query: `latitude` e `longitu
 
 ### GET /api/provas/{id}
 
-Permissão: capacidade de operação, sem origem obrigatória.
+Permissão: administração, coordenação, Secretaria ou diretor com aluno da prova, sem origem obrigatória.
 
-200 `{"prova", "participantes": [{"alunoId", "nome", "turmaId", "presente", "local", "latitude", "longitude"}]}`, com os alunos em ordem alfabética e `presente` verdadeiro, falso ou nulo (sem registro). `local`, `latitude` e `longitude` nulos herdam o local da prova; a resposta traz o que está gravado, e a tela resolve a herança. 404 quando a prova não existe ou o id não é um UUID.
+200 `{"prova", "participantes": [{"alunoId", "nome", "turmaId", "presente", "local", "latitude", "longitude"}]}`, com os alunos em ordem alfabética e `presente` verdadeiro, falso ou nulo (sem registro). `local`, `latitude` e `longitude` nulos herdam o local da prova; a resposta traz o que está gravado, e a tela resolve a herança. 404 quando a prova não existe, o id não é um UUID ou o diretor não tem aluno dela.
 
 ### PATCH /api/provas/{id}
 
@@ -320,13 +320,13 @@ Auditoria `prova-especifica.participantes`. Corpo `{"alunoIds": uuid[]}`, a list
 
 ### PUT /api/provas/{id}/frequencia
 
-Permissão: capacidade de operação, com origem confiável e auditoria.
+Permissão: administração, coordenação ou diretor com aluno da prova, com origem confiável e auditoria. A Secretaria recebe 403.
 
 Auditoria `prova-especifica.frequencia`. Corpo `{"marcas": [{"alunoId": uuid, "presente": true | false | null}]}`, de 1 a 3000 marcas. `true` é presente, `false` é ausente e `null` limpa o registro. Só vale para aluno já inscrito, e a gravação é atômica. 200 no formato da leitura; 400 marca inválida ou aluno fora da prova; 404 prova inexistente.
 
 ### PUT /api/provas/{id}/locais
 
-Permissão: capacidade de operação, com origem confiável e auditoria.
+Permissão: administração, coordenação ou diretor com aluno da prova, com origem confiável e auditoria. A Secretaria recebe 403.
 
 Auditoria `prova-especifica.locais`, com o identificador da prova e a quantidade, sem nome de aluno e sem o texto do local. Corpo `{"locais": [{"alunoId": uuid, "local": string | null, "latitude"?: number | null, "longitude"?: number | null}]}`, de 1 a 3000 itens, sem aluno repetido. Grava o local próprio de quem já está inscrito; quem fica de fora da lista não muda, e a frequência permanece. Local nulo, ou só espaços, sem coordenadas, apaga o próprio e volta a herdar o da prova. Texto próprio sem ponto não herda as coordenadas. O ponto exige as duas coordenadas e o nome do local; a aplicação arredonda em seis casas e o banco recusa par incompleto ou fora da faixa. 200 no formato da leitura; 400 local longo, ponto sem nome, coordenada sozinha ou fora da faixa, aluno de fora, lista vazia ou repetida; 404 prova inexistente ou id inválido.
 
@@ -335,6 +335,30 @@ Na tela, uma lista colada casa o nome com um único aluno inscrito e grava por e
 `GET /api/provas/ocupacao` conta o ponto efetivo: coordenadas próprias vencem, texto próprio sem ponto fica de fora e quem herda usa o ponto da prova. Com `provaId`, quem herda essa prova usa o ponto consultado.
 
 As provas específicas não entram na cópia JSON.
+
+### GET /api/provas/{id}/rota
+
+Permissão: administração, coordenação, Secretaria ou diretor com aluno da prova, sem origem obrigatória.
+
+200 `{"origem", "criterio", "voltar", "ordem", "servicos"}`. `origem` é nula ou `{"texto", "latitude", "longitude"}`. `criterio` é `tempo`, `distancia` ou nulo. `ordem` é a lista de chaves das paradas ou nula. `servicos` diz se `OSRM_URL` e `NOMINATIM_URL` estão definidas. Não calcula trajeto. 404 prova inexistente ou diretor sem aluno nela.
+
+### PUT /api/provas/{id}/rota
+
+Permissão: administração, coordenação ou diretor com aluno da prova, com origem confiável e auditoria. A Secretaria recebe 403.
+
+Auditoria `prova-especifica.rota`, com o identificador da prova e a quantidade de paradas, sem coordenada, sem nome e sem o texto da origem. Corpo `{"origem": {"texto", "latitude", "longitude"} | null, "criterio": "tempo" | "distancia" | null, "voltar": boolean | null, "ordem": string[] | null}`. A origem, quando presente, exige texto e as duas coordenadas. 200 no formato da leitura; 400 origem incompleta ou parada repetida; 404 prova inexistente.
+
+### POST /api/provas/{id}/rota/calcular
+
+Permissão: os mesmos da leitura, com origem confiável. Não grava.
+
+Corpo `{"origem": {"texto", "latitude", "longitude"}, "criterio"?: "tempo" | "distancia", "voltar"?: boolean, "ordem"?: string[]}`. Sem `ordem`, calcula a melhor ordem desde a origem informada. Com `ordem`, usa a ordem recebida e só redesenha, desde que cada parada com ponto apareça uma vez. A primeira parada sai do custo desde essa origem. Até 12 paradas a ordem automática é exata; acima disso `metodo` é `aproximada`. Sem `OSRM_URL`, ou se a consulta falhar, `fonte` é `reta` e `aviso` explica a estimativa a 50 km/h. 200 com `metodo`, `fonte`, `aviso`, `criterio`, `voltar`, `origem`, `ordem`, `trechos`, `totais` e `geometria`. `totais` separa `viagem`, `urbano`, `volta` e `geral`. 400 origem incompleta, parada sem ponto ou ordem incompleta; 404 prova inexistente.
+
+### GET /api/provas/geocodificar
+
+Permissão: administração, coordenação, Secretaria ou diretor com palavra-chave já trocada. Query `q`, de 3 a 200 caracteres.
+
+200 `{"lugares": [{"rotulo", "latitude", "longitude"}]}`, no máximo cinco. 400 texto curto; 404 quando `NOMINATIM_URL` não está definida; 503 quando a consulta falha. Não grava o texto nem o ponto.
 
 ## Alunos
 

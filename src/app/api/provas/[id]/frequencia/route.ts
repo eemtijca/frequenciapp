@@ -1,10 +1,11 @@
 // Frequência de uma prova específica: grava presente, ausente ou sem registro por aluno inscrito.
+import { exigirAcessoAProva } from "@/application/acesso-prova";
 import { lerProvaEspecifica, registrarFrequenciaDaProva } from "@/application/provas-especificas";
 import {
   corpoJson,
   erroApi,
   executarRota,
-  exigirSessao,
+  exigirIdentidade,
   json,
   origemPermitida,
 } from "@/infra/http";
@@ -18,9 +19,10 @@ interface Contexto {
 export async function PUT(requisicao: Request, contexto: Contexto): Promise<Response> {
   return executarRota(async () => {
     if (!origemPermitida(requisicao)) return erroApi("Origem não permitida.", 403);
-    const sessao = await exigirSessao();
+    const sessao = await exigirIdentidade();
     if (!sessao.ok) return sessao.resposta;
     const { id } = await contexto.params;
+    await exigirAcessoAProva(sessao.usuario, id, "gravar");
     await registrarFrequenciaDaProva(sessao.usuario, id, await corpoJson(requisicao));
     return json(await lerProvaEspecifica(id));
   });

@@ -620,17 +620,24 @@ model ProvaBimestral {
 }
 
 // Prova específica (Enem, vestibulares e similares) com nome, local, coordenadas opcionais
-// do mapa e data definidos pela equipe. Os participantes e a frequência ficam em ParticipanteProva.
+// do mapa e data definidos pela equipe. A origem e a ordem da rota são opcionais e nulas
+// até alguém planejar o ônibus. Os participantes e a frequência ficam em ParticipanteProva.
 model ProvaEspecifica {
-  id            String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  nome          String              @db.VarChar(120)
-  local         String?             @db.VarChar(120)
-  latitude      Float?              @db.DoublePrecision
-  longitude     Float?              @db.DoublePrecision
-  dia           DateTime            @db.Date
-  criadoEm      DateTime            @default(now()) @map("criado_em") @db.Timestamptz
-  atualizadoEm  DateTime            @updatedAt @map("atualizado_em") @db.Timestamptz
-  participantes ParticipanteProva[]
+  id              String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nome            String              @db.VarChar(120)
+  local           String?             @db.VarChar(120)
+  latitude        Float?              @db.DoublePrecision
+  longitude       Float?              @db.DoublePrecision
+  dia             DateTime            @db.Date
+  origemRota      String?             @map("origem_rota") @db.VarChar(200)
+  origemLatitude  Float?              @map("origem_latitude") @db.DoublePrecision
+  origemLongitude Float?              @map("origem_longitude") @db.DoublePrecision
+  rotaCriterio    String?             @map("rota_criterio") @db.VarChar(12)
+  rotaVoltar      Boolean?            @map("rota_voltar")
+  rotaOrdem       Json?               @map("rota_ordem")
+  criadoEm        DateTime            @default(now()) @map("criado_em") @db.Timestamptz
+  atualizadoEm    DateTime            @updatedAt @map("atualizado_em") @db.Timestamptz
+  participantes   ParticipanteProva[]
 
   @@index([dia])
   @@map("provas_especificas")

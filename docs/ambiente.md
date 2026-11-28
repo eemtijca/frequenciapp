@@ -43,6 +43,17 @@ A sincronização do calendário letivo consulta uma base externa somente quando
 
 A consulta envia o ano, a página e o recorte geográfico. Não envia alunos, frequências nem senhas. Pontos facultativos ficam de fora. Na base padrão, as capitais são gratuitas e os demais municípios exigem plano pago. A decisão está na [ADR-041](adr/041-sincronizacao-de-feriados.md).
 
+## Rota da prova
+
+A ordem por ruas e a busca de endereço só acontecem quando a variável correspondente está definida. Vazio desliga o recurso: a rota segue em linha reta e o campo de partida continua no mapa e no GPS. Não há endereço público embutido.
+
+| Variável      | Obrigatória | Padrão | Descrição                                                                                               |
+| ------------- | ----------- | ------ | ------------------------------------------------------------------------------------------------------- |
+| OSRM_URL      | não         |        | Base do OSRM, com ou sem caminho. HTTPS, ou HTTP só em localhost e 127.0.0.1. Sem usuário nem consulta. |
+| NOMINATIM_URL | não         |        | Base do Nominatim, com ou sem caminho. Mesma regra de URL. A busca é um botão, no mínimo 3 caracteres.  |
+
+O servidor envia as coordenadas dos pontos da rota ao OSRM e o texto digitado ao Nominatim. Não envia nome de aluno nem a posição contínua de quem acompanha o ônibus. A decisão está na [ADR-090](adr/090-rota-da-prova.md).
+
 ## Notificações opcionais
 
 O cadastro Web Push funciona sem configuração manual: o servidor deriva um par VAPID estável de `AUTH_SECRET`, com contexto criptográfico exclusivo para notificações. A chave privada fica somente no servidor. Um par já configurado em `PUSH_VAPID_PUBLIC_KEY` e `PUSH_VAPID_PRIVATE_KEY` tem prioridade; as duas chaves precisam estar presentes juntas. `PUSH_VAPID_SUBJECT` permite informar um contato em `mailto:` ou HTTPS, inclusive sem definir chaves próprias.

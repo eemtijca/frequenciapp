@@ -118,10 +118,17 @@ function validarProvaDaEntrada(entrada: unknown) {
 }
 
 /** Provas da mais recente para a mais antiga, com as contagens de frequência. */
-export async function listarProvasEspecificas(): Promise<ProvaEspecifica[]> {
+export async function listarProvasEspecificas(
+  turmaIds?: readonly string[],
+): Promise<ProvaEspecifica[]> {
   const cliente = banco();
   const [provas, contagens] = await Promise.all([
-    cliente.provaEspecifica.findMany({ orderBy: [{ dia: "desc" }, { nome: "asc" }] }),
+    cliente.provaEspecifica.findMany({
+      where: turmaIds
+        ? { participantes: { some: { aluno: { turmaId: { in: [...turmaIds] } } } } }
+        : undefined,
+      orderBy: [{ dia: "desc" }, { nome: "asc" }],
+    }),
     cliente.participanteProva.groupBy({ by: ["provaId", "presente"], _count: { _all: true } }),
   ]);
   return provas.map((prova) => {

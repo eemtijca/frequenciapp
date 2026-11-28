@@ -120,6 +120,15 @@ export async function exigirSessao(): Promise<Guarda> {
   return exigirCapacidade("operar");
 }
 
+/** Exige sessão ativa, sem decidir a capacidade. A rota escolhe o acesso em seguida. */
+export async function exigirIdentidade(): Promise<Guarda> {
+  const usuario = await identidadeAtual(ambiente.authSecret);
+  if (!usuario) {
+    return { ok: false, resposta: erroApi("Sua sessão expirou. Entre novamente.", 401) };
+  }
+  return { ok: true, usuario };
+}
+
 /** Exige sessão ativa de administrador (acesso root de configuração). */
 export async function exigirAdmin(): Promise<Guarda> {
   return exigirCapacidade("administrar");

@@ -1,6 +1,6 @@
 # Modelo de dados
 
-Entidades, invariantes e derivações. A coordenação faz uma chamada por turma e dia, compartilhada pela equipe, com todos os presentes por padrão e apenas as faltas registradas. Cada falta pode ter um código de justificativa (FJ). A saída antecipada é um registro separado da chamada, com momento, horário, justificativa e responsável pela liberação. A administração cuida das contas, dos cadastros e dos recursos ligados; a secretaria consulta o Painel e as grades de relatório.
+Entidades, invariantes e derivações. A coordenação faz uma chamada por turma e dia, compartilhada pela equipe, com todos os presentes por padrão e apenas as faltas registradas. Cada falta pode ter um código de justificativa (FJ). A saída antecipada é um registro separado da chamada, com momento, horário, justificativa e responsável pela liberação. A administração cuida das contas, dos cadastros e dos recursos ligados; a secretaria consulta o Painel, as grades de relatório e as provas específicas.
 
 ## Usuário (usuario)
 
@@ -137,16 +137,24 @@ O horário de provas é temporário. A administração cadastra a mesma prova pa
 
 ## Prova específica (prova_especifica)
 
-| Campo        | Tipo  | Observação                                       |
-| ------------ | ----- | ------------------------------------------------ |
-| id           | uuid  |                                                  |
-| nome         | texto | De 1 a 120 caracteres.                           |
-| local        | texto | Opcional, até 120 caracteres.                    |
-| latitude     | real  | Opcional, de -90 a 90, em graus decimais.        |
-| longitude    | real  | Opcional, de -180 a 180; vem com a latitude.     |
-| dia          | data  | Data civil; pode ser passada ou cair no domingo. |
-| criadoEm     | data  |                                                  |
-| atualizadoEm | data  |                                                  |
+| Campo           | Tipo     | Observação                                            |
+| --------------- | -------- | ----------------------------------------------------- |
+| id              | uuid     |                                                       |
+| nome            | texto    | De 1 a 120 caracteres.                                |
+| local           | texto    | Opcional, até 120 caracteres.                         |
+| latitude        | real     | Opcional, de -90 a 90, em graus decimais.             |
+| longitude       | real     | Opcional, de -180 a 180; vem com a latitude.          |
+| dia             | data     | Data civil; pode ser passada ou cair no domingo.      |
+| origemRota      | texto    | Opcional, até 200 caracteres. Campo livre da partida. |
+| origemLatitude  | real     | Opcional, de -90 a 90. Vem com a longitude da origem. |
+| origemLongitude | real     | Opcional, de -180 a 180.                              |
+| rotaCriterio    | texto    | Opcional: `tempo` ou `distancia`.                     |
+| rotaVoltar      | booleano | Opcional. Verdadeiro inclui a volta à origem.         |
+| rotaOrdem       | json     | Opcional. Chaves das paradas na ordem escolhida.      |
+| criadoEm        | data     |                                                       |
+| atualizadoEm    | data     |                                                       |
+
+A origem da rota não tem município padrão. O texto e o ponto são os que a equipe gravou. A primeira parada sai do trajeto desde esse ponto ([ADR-090](adr/090-rota-da-prova.md)).
 
 ## Participante da prova (participante_prova)
 

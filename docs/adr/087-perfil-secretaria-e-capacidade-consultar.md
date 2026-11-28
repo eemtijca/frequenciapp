@@ -33,3 +33,4 @@ A secretaria da escola precisa consultar a frequência, no Painel, na Grade e no
 - O registro de auditoria do download da Grade é a exceção de escrita sob `consultar`. Ele não grava dado escolar nem conteúdo de aluno; registra conta, tipo, formato, retrato e data.
 - Toda rota de leitura nova das telas de consulta precisa escolher entre `consultar` e `operar`. O teste de acesso da Secretaria lista, por rota, o que passa e o que recebe 403, inclusive o registro do download e a recusa da relação, e o de ponta a ponta confere que a navegação da Secretaria, inclusive no resumo de domingo, não dispara requisição recusada.
 - A migração é aditiva e não reescreve dados existentes. O banco aceita o valor novo sem mudar as contas atuais.
+- A rota da prova abre uma exceção de leitura: a Secretaria consulta Provas, inclusive o cálculo da rota, e continua sem gravar ([ADR-090](090-rota-da-prova.md)).

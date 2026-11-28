@@ -12782,7 +12782,7 @@
       "get": {
         "operationId": "listarProvasEspecificas",
         "summary": "Listar as provas específicas",
-        "description": "Administração e coordenação (capacidade de operação). Da data mais recente para a mais antiga, com as contagens de presentes e ausentes.",
+        "description": "Administração, coordenação, Secretaria e diretor de turma. O diretor recebe só as provas com aluno de turma vigente. Da data mais recente para a mais antiga, com as contagens de presentes e ausentes.",
         "tags": ["provas"],
         "responses": {
           "200": {
@@ -12902,7 +12902,7 @@
       "get": {
         "operationId": "lerProvaEspecifica",
         "summary": "Ler uma prova com os alunos",
-        "description": "Administração e coordenação (capacidade de operação). Devolve a prova e os alunos inscritos, em ordem alfabética, com a marca e o local próprio de cada um. Local e coordenadas nulos herdam os da prova.",
+        "description": "Administração, coordenação, Secretaria e diretor com aluno da prova. Devolve a prova e os alunos inscritos, em ordem alfabética, com a marca e o local próprio de cada um. Local e coordenadas nulos herdam os da prova. Diretor sem aluno na prova recebe 404.",
         "tags": ["provas"],
         "parameters": [
           {
@@ -13251,7 +13251,7 @@
       "put": {
         "operationId": "registrarFrequenciaDaProva",
         "summary": "Registrar a frequência na prova",
-        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria. Cada marca é presente (`true`), ausente (`false`) ou sem registro (`null`); só vale para aluno já inscrito (400 caso contrário).",
+        "description": "Administração, coordenação e diretor com aluno da prova. A Secretaria recebe 403. Origem confiável e auditoria. Cada marca é presente (`true`), ausente (`false`) ou sem registro (`null`); só vale para aluno já inscrito (400 caso contrário).",
         "tags": ["provas"],
         "parameters": [
           {
@@ -13365,7 +13365,7 @@
       "put": {
         "operationId": "definirLocaisDaProva",
         "summary": "Definir o local dos alunos na prova",
-        "description": "Administração e coordenação (capacidade de operação). Origem confiável e auditoria, só com identificador e quantidade. Grava o local próprio dos alunos já inscritos; os demais não mudam e a frequência permanece. Local nulo, sem coordenadas, volta a herdar o local da prova. Texto próprio sem ponto não herda as coordenadas da prova. O ponto exige o nome do local.",
+        "description": "Administração, coordenação e diretor com aluno da prova. A Secretaria recebe 403. Origem confiável e auditoria, só com identificador e quantidade. Grava o local próprio dos alunos já inscritos; os demais não mudam e a frequência permanece. Local nulo, sem coordenadas, volta a herdar o local da prova. Texto próprio sem ponto não herda as coordenadas da prova. O ponto exige o nome do local.",
         "tags": ["provas"],
         "parameters": [
           {
@@ -13529,6 +13529,150 @@
           "503": {
             "$ref": "#/components/responses/Erro503"
           }
+        }
+      }
+    },
+    "/api/provas/{id}/rota": {
+      "get": {
+        "operationId": "lerRotaDaProva",
+        "summary": "Ler a origem e a ordem salvas da rota",
+        "description": "Administração, coordenação, Secretaria e diretor com aluno da prova. Devolve o que foi salvo, sem calcular trajeto. A origem é nula até alguém gravar texto e ponto. servicos indica se a consulta de ruas e a busca de endereço estão configuradas.",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plano salvo.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PlanoDaRota" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Erro401" },
+          "403": { "$ref": "#/components/responses/Erro403" },
+          "404": { "$ref": "#/components/responses/Erro404" }
+        }
+      },
+      "put": {
+        "operationId": "salvarRotaDaProva",
+        "summary": "Salvar a origem e a ordem da rota",
+        "description": "Administração, coordenação e diretor com aluno da prova. A Secretaria recebe 403. Origem confiável. A auditoria leva o identificador da prova e a quantidade de paradas, sem coordenada, sem nome e sem o texto da origem.",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RotaParaSalvar" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Plano salvo.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PlanoDaRota" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Erro400" },
+          "401": { "$ref": "#/components/responses/Erro401" },
+          "403": { "$ref": "#/components/responses/Erro403" },
+          "404": { "$ref": "#/components/responses/Erro404" }
+        }
+      }
+    },
+    "/api/provas/{id}/rota/calcular": {
+      "post": {
+        "operationId": "calcularRotaDaProva",
+        "summary": "Calcular a rota desde a origem informada",
+        "description": "Administração, coordenação, Secretaria e diretor com aluno da prova. Origem confiável. Não grava. A primeira parada sai do custo desde a origem recebida, que é um ponto escolhido no aplicativo, nunca um centro de cidade. Sem ordem, resolve a melhor rota. Com ordem, redesenha a ordem recebida. Até 12 paradas a ordem automática é exata. Sem serviço de ruas, estima em linha reta a 50 km/h e avisa.",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "format": "uuid" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RotaParaCalcular" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Rota calculada.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CalculoDaRota" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Erro400" },
+          "401": { "$ref": "#/components/responses/Erro401" },
+          "403": { "$ref": "#/components/responses/Erro403" },
+          "404": { "$ref": "#/components/responses/Erro404" }
+        }
+      }
+    },
+    "/api/provas/geocodificar": {
+      "get": {
+        "operationId": "buscarOrigemDaRota",
+        "summary": "Buscar endereço ou cidade para a partida",
+        "description": "Administração, coordenação, Secretaria e diretor com palavra-chave já trocada. Query q, de 3 a 200 caracteres. Não grava. 404 quando a busca não está configurada e 503 quando a consulta falha.",
+        "tags": ["provas"],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "minLength": 3, "maxLength": 200 },
+            "example": "Mucambo, CE"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lugares encontrados, no máximo cinco.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["lugares"],
+                  "properties": {
+                    "lugares": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/LugarEncontrado" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Erro400" },
+          "401": { "$ref": "#/components/responses/Erro401" },
+          "403": { "$ref": "#/components/responses/Erro403" },
+          "404": { "$ref": "#/components/responses/Erro404" },
+          "503": { "$ref": "#/components/responses/Erro503" }
         }
       }
     }
@@ -21778,6 +21922,150 @@
             "description": "Provas apagadas, de todas as turmas.",
             "example": 12
           }
+        }
+      },
+      "OrigemDaRota": {
+        "type": "object",
+        "title": "Origem da rota",
+        "description": "Texto e ponto escolhidos no aplicativo. Não há município padrão.",
+        "additionalProperties": false,
+        "required": ["texto", "latitude", "longitude"],
+        "properties": {
+          "texto": { "type": "string", "maxLength": 200, "example": "Mucambo, CE" },
+          "latitude": { "type": "number", "minimum": -90, "maximum": 90, "example": -3.9 },
+          "longitude": { "type": "number", "minimum": -180, "maximum": 180, "example": -40.75 }
+        }
+      },
+      "PlanoDaRota": {
+        "type": "object",
+        "title": "Plano da rota",
+        "additionalProperties": false,
+        "required": ["origem", "criterio", "voltar", "ordem", "servicos"],
+        "properties": {
+          "origem": {
+            "oneOf": [{ "$ref": "#/components/schemas/OrigemDaRota" }, { "type": "null" }]
+          },
+          "criterio": { "type": ["string", "null"], "enum": ["tempo", "distancia", null] },
+          "voltar": { "type": ["boolean", "null"] },
+          "ordem": { "type": ["array", "null"], "items": { "type": "string" } },
+          "servicos": {
+            "type": "object",
+            "required": ["ruas", "enderecos"],
+            "properties": {
+              "ruas": { "type": "boolean" },
+              "enderecos": { "type": "boolean" }
+            }
+          }
+        }
+      },
+      "RotaParaSalvar": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["origem", "criterio", "voltar", "ordem"],
+        "properties": {
+          "origem": {
+            "oneOf": [{ "$ref": "#/components/schemas/OrigemDaRota" }, { "type": "null" }]
+          },
+          "criterio": { "type": ["string", "null"], "enum": ["tempo", "distancia", null] },
+          "voltar": { "type": ["boolean", "null"] },
+          "ordem": { "type": ["array", "null"], "items": { "type": "string" } }
+        }
+      },
+      "RotaParaCalcular": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["origem"],
+        "properties": {
+          "origem": { "$ref": "#/components/schemas/OrigemDaRota" },
+          "criterio": { "type": "string", "enum": ["tempo", "distancia"], "default": "tempo" },
+          "voltar": { "type": "boolean", "default": false },
+          "ordem": { "type": "array", "items": { "type": "string" } }
+        }
+      },
+      "MedidaDaRota": {
+        "type": "object",
+        "required": ["distanciaMetros", "duracaoSegundos"],
+        "properties": {
+          "distanciaMetros": { "type": "number" },
+          "duracaoSegundos": { "type": "number" }
+        }
+      },
+      "CalculoDaRota": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metodo",
+          "fonte",
+          "aviso",
+          "criterio",
+          "voltar",
+          "origem",
+          "ordem",
+          "trechos",
+          "totais",
+          "geometria"
+        ],
+        "properties": {
+          "metodo": { "type": "string", "enum": ["exata", "aproximada", "manual"] },
+          "fonte": { "type": "string", "enum": ["ruas", "reta"] },
+          "aviso": { "type": ["string", "null"] },
+          "criterio": { "type": "string", "enum": ["tempo", "distancia"] },
+          "voltar": { "type": "boolean" },
+          "origem": { "$ref": "#/components/schemas/OrigemDaRota" },
+          "ordem": { "type": "array", "items": { "type": "string" } },
+          "trechos": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["tipo", "distanciaMetros", "duracaoSegundos"],
+              "properties": {
+                "tipo": { "type": "string", "enum": ["viagem", "urbano", "volta"] },
+                "distanciaMetros": { "type": "number" },
+                "duracaoSegundos": { "type": "number" }
+              }
+            }
+          },
+          "totais": {
+            "type": "object",
+            "required": ["viagem", "urbano", "volta", "geral"],
+            "properties": {
+              "viagem": { "$ref": "#/components/schemas/MedidaDaRota" },
+              "urbano": { "$ref": "#/components/schemas/MedidaDaRota" },
+              "volta": { "$ref": "#/components/schemas/MedidaDaRota" },
+              "geral": { "$ref": "#/components/schemas/MedidaDaRota" }
+            }
+          },
+          "geometria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["tipo", "pontos"],
+              "properties": {
+                "tipo": { "type": "string", "enum": ["viagem", "urbano", "volta"] },
+                "pontos": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["latitude", "longitude"],
+                    "properties": {
+                      "latitude": { "type": "number" },
+                      "longitude": { "type": "number" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "LugarEncontrado": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rotulo", "latitude", "longitude"],
+        "properties": {
+          "rotulo": { "type": "string" },
+          "latitude": { "type": "number" },
+          "longitude": { "type": "number" }
         }
       },
       "ProvaEspecifica": {

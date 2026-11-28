@@ -104,3 +104,4 @@ A organização do histórico mensal e a retirada conferida de abas antigas est�
 - [ADR-087](adr/087-perfil-secretaria-e-capacidade-consultar.md): papel Secretaria, só de consulta, e a capacidade consultar na matriz de acesso, com o aplicativo reduzido ao Painel e a duas grades de relatório.
 - [ADR-088](adr/088-aprovacao-agendada-de-migracoes.md): aprovação opt-in, prova do lote, backup fixado e autorização de partida efêmera.
 - [ADR-089](adr/089-local-por-aluno-na-prova.md): local e ponto opcionais por aluno na prova específica, com herança do local geral.
+- [ADR-090](adr/090-rota-da-prova.md): rota da prova a partir de uma origem livre, com ordem exata até 12 paradas e serviços opcionais de ruas e endereço.

@@ -66,6 +66,8 @@ services:
       FERIADOS_API_TOKEN: ${FERIADOS_API_TOKEN:-}
       FERIADOS_UF: ${FERIADOS_UF:-}
       FERIADOS_IBGE: ${FERIADOS_IBGE:-}
+      OSRM_URL: ${OSRM_URL:-}
+      NOMINATIM_URL: ${NOMINATIM_URL:-}
       TZ_APP: ${TZ_APP:-America/Fortaleza}
       # Implantação sem TLS em rede confiável (ver .env.example).
       PERMITIR_HTTP: ${PERMITIR_HTTP:-false}

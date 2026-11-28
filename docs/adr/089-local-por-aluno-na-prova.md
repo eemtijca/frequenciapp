@@ -15,7 +15,7 @@ Uma prova específica tinha um único local, texto e ponto no mapa, valendo para
 - A leitura devolve o que está gravado, não o valor herdado. A tela resolve a herança. No detalhe, cada aluno mostra o local efetivo, é possível editar um e aplicar o mesmo local aos selecionados. Com mais de um local, a tela filtra a lista e conta presentes, ausentes e sem registro por local.
 - Colar uma lista é conferência no navegador, sem rota nova: uma linha por aluno, nome e local separados por tabulação, ponto e vírgula ou barra vertical. O nome casa com um único inscrito, sem acento e sem caixa. Linha sem par, nome repetido na prova, local divergente ou acima de 120 caracteres não é gravada. O ponto no mapa não entra na cola.
 - A ocupação do mapa usa o ponto efetivo. Coordenadas próprias vencem. Texto próprio sem ponto fica de fora. Quem herda usa o ponto da prova, ou o ponto consultado quando a prova está em edição e o ponto novo ainda não foi salvo. A rota continua sem dado de aluno.
-- A auditoria registra `prova-especifica.locais` com o identificador da prova e a quantidade, sem nome de aluno e sem texto do local. A escrita exige a capacidade de operação e origem confiável. A Secretaria, só de consulta, recebe 403.
+- A auditoria registra `prova-especifica.locais` com o identificador da prova e a quantidade, sem nome de aluno e sem texto do local. A escrita exige a capacidade de operação e origem confiável, ou o diretor de turma com aluno da prova. A Secretaria, só de consulta, recebe 403. A rota que usa esses pontos está na [ADR-090](090-rota-da-prova.md).
 
 ## Alternativas
 

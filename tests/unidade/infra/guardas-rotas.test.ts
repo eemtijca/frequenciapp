@@ -17,7 +17,8 @@ const PUBLICAS: Record<string, string> = {
   "docs/openapi.json GET": "especificação pública das rotas, sem dado escolar",
 };
 
-const GUARDA = /\bexigir(?:Capacidade|Sessao|Admin)\(/;
+/** Sessão com capacidade, sessão só de identidade ou administração. A regra fina fica no caso de uso. */
+const GUARDA = /\bexigir(?:Capacidade|Sessao|Admin|Identidade)\(/;
 /** A guarda só protege quando a recusa é devolvida antes do restante do corpo. */
 const RECUSA = /if \(!\w+\.ok\)/;
 const METODOS = "GET|HEAD|OPTIONS|POST|PUT|PATCH|DELETE";

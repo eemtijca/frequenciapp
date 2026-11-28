@@ -40,9 +40,9 @@ export default async function Pagina({
   );
   if (!sessao) return entrada;
   const { usuario, referenciaSessao } = sessao;
-  // Recusa por padrão: o aplicativo abre para quem opera a escola ou, reduzido ao Painel e aos
-  // relatórios de leitura, para quem só consulta (Secretaria). O diretor de turma tem a própria
-  // tela, só de leitura, e qualquer outro papel volta à entrada.
+  // Recusa por padrão: o aplicativo abre para quem opera a escola ou, reduzido ao Painel, aos
+  // relatórios de leitura e à consulta de Provas, para quem só consulta (Secretaria). O diretor
+  // de turma tem a própria tela e qualquer outro papel volta à entrada.
   const operaAEscola = temCapacidade(usuario.papel, "operar");
   const soConsulta = !operaAEscola && temCapacidade(usuario.papel, "consultar");
   if (!operaAEscola && !soConsulta) {
@@ -53,6 +53,7 @@ export default async function Pagina({
             usuario={usuario}
             contexto={await contextoDoDiretor(usuario.id)}
             fuso={ambiente.fuso}
+            diaCorrente={diaLocal(new Date(), ambiente.fuso)}
           />
         </DestinoSessao>
       );
